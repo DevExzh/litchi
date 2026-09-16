@@ -1,0 +1,43 @@
+Plausibility check: litchi's lenient read against an independent reader.
+
+litchi:      doc0640 text-dump-lenient (Document::text() through
+             OpenOptions::with_leniency(Leniency::TolerateStylesheetDefects))
+independent: LibreOffice 26.2.5.2 620(Build:2), headless
+             --convert-to 'txt:Text (encoded):UTF8'
+
+Comparison normalizes whitespace and drops control characters, then compares
+the word sequences. litchi returns stored text (field instructions and note
+stories included); LibreOffice's text export returns rendered body text
+(generated list labels included, field instructions excluded), so the two
+differ by exactly those known categories and by nothing else.
+
+duplicate-style-names    litchi words=60    LO words=60    identical=YES litchi-words-also-in-LO=60/60
+footnote                 litchi words=5     LO words=2     identical=no litchi-words-also-in-LO=1/5
+    only in litchi: ['TestComment', 'TestEndnote', 'TestFootnote', 'text']
+    only in LO    : ['text1i']
+lists-margins            litchi words=32    LO words=36    identical=no litchi-words-also-in-LO=32/32
+    only in litchi: []
+    only in LO    : ['1.', '2.', '3.', '4.']
+picture                  litchi words=1     LO words=1     identical=YES litchi-words-also-in-LO=1/1
+pictures_escher          litchi words=109   LO words=107   identical=no litchi-words-also-in-LO=105/109
+    only in litchi: ['"http://www.flickr.com/photos/vlsergey/2187618962/in/photostream/"http://www.flickr.com/photos/vlsergey/2187618962/in/photostream/', '"http://www.flickr.com/photos/vlsergey/3856568537/in/photostream/"http://www.flickr.com/photos/vlsergey/3856568537/in/photostream/', 'HYPERLINK']
+    only in LO    : ['http://www.flickr.com/photos/vlsergey/2187618962/in/photostream/', 'http://www.flickr.com/photos/vlsergey/3856568537/in/photostream/']
+
+Reading of each difference:
+  duplicate-style-names.doc  identical.
+  picture.doc                identical.
+  lists-margins.doc          LibreOffice adds the generated list labels
+                             '1.' '2.' '3.' '4.'; those are numbering output,
+                             not stored text. Every litchi word appears in the
+                             LibreOffice text (32/32).
+  pictures_escher.doc        litchi returns the stored HYPERLINK field
+                             instruction and its result; LibreOffice returns
+                             only the result. 105 of 109 litchi words match;
+                             the four that do not are the field keyword and the
+                             instruction/result concatenations of two URLs that
+                             LibreOffice reports once each.
+  footnote.doc               litchi returns the footnote, endnote and comment
+                             stories ('TestFootnote', 'TestEndnote',
+                             'TestComment') alongside the body word 'text';
+                             LibreOffice's body export carries only 'text1i',
+                             the body word with its two note reference marks.

@@ -149,15 +149,35 @@ fn build_fields(story: FieldStory, markers: &[FieldMarker]) -> Result<Vec<Field>
                 let open = stack
                     .pop()
                     .ok_or_else(|| corrupted("FieldList has an unmatched end marker"))?;
+                // `grffldEnd.fHasSep` and `.fNested` (MS-DOC 2.9.88-2.9.90)
+                // restate what the `FieldList` grammar of the `Plcfld` (MS-DOC
+                // 2.8.25) already fixes: the separator is present exactly when
+                // a separator character was seen inside this field, and the
+                // field is nested exactly when another field is still open.
+                // The marker sequence is the normative carrier of both facts,
+                // and nothing in this reader consults either bit, so neither
+                // can resolve an ambiguity — it can only contradict a
+                // structure the checks above and below have already validated
+                // (CP ordering, story bounds, tag validity, at most one
+                // separator per field, no unmatched begin or end).
+                //
+                // Real producers do leave both stale. An OpenOffice.org `.doc`
+                // export writes `fNested = 0` on every `HYPERLINK` end nested
+                // inside a `TOC` (`test-data/ole/doc/watermark.doc`), and a
+                // `SEQ ... \h` field that legitimately has no result carries
+                // `fHasSep = 1` (`test-data/poi/test-data/document/test.doc`).
+                // Refusing costs the caller those whole documents.
+                //
+                // What a disagreement can still indicate is a narrow class of
+                // damage the grammar does not see: a separator marker dropped
+                // from an otherwise balanced field, or an enclosing begin/end
+                // pair lost together. This reader cannot tell that apart from a
+                // stale annotation, so it refuses neither and reports both: the
+                // bits are kept exactly as written, `to_plcf_bytes` replays
+                // them byte for byte, and `end_flags` sits beside the derived
+                // `has_separator` and `nesting_depth` so a caller that wants
+                // that signal can compare them itself.
                 let has_separator = open.separator_cp.is_some();
-                if flags.has_separator != has_separator {
-                    return Err(corrupted("grffldEnd.fHasSep disagrees with the FieldList"));
-                }
-                if flags.nested == stack.is_empty() {
-                    return Err(corrupted(
-                        "grffldEnd.fNested disagrees with field containment",
-                    ));
-                }
                 fields.push(Field {
                     story,
                     start_cp: open.start_cp,

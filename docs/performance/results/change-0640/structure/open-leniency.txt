@@ -1,0 +1,7 @@
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/duplicate-style-names.doc	strict=ERR Corrupted("invalid stylesheet: style names and aliases must be unique")	lenient=OK text_len=290 paragraphs=16
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/footnote.doc	strict=ERR Corrupted("invalid stylesheet: style names and aliases must be unique")	lenient=OK text_len=59 paragraphs=7
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/lists-margins.doc	strict=ERR Corrupted("invalid stylesheet: style names and aliases must be unique")	lenient=OK text_len=175 paragraphs=4
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/picture.doc	strict=ERR Corrupted("invalid stylesheet: style names and aliases must be unique")	lenient=OK text_len=1772 paragraphs=1
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/pictures_escher.doc	strict=ERR Corrupted("invalid stylesheet: style names and aliases must be unique")	lenient=OK text_len=1014 paragraphs=12
+/home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/watermark.doc	strict=ERR Corrupted("grffldEnd.fNested disagrees with field containment")	lenient=ERR Corrupted("grffldEnd.fNested disagrees with field containment")
+/home/zhuhe/code/litchi-worktrees/0640/test-data/poi/test-data/document/test.doc	strict=ERR Corrupted("grffldEnd.fHasSep disagrees with the FieldList")	lenient=ERR Corrupted("grffldEnd.fHasSep disagrees with the FieldList")

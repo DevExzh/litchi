@@ -1,0 +1,90 @@
+Producer evidence for the seven refused fixtures.
+
+Part 1 — FIB identification (probe mode 'provenance', before leg).
+
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/watermark.doc
+bytes=20480
+nFib=0x0101 (Word 2002/2003)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, 01, 01, 4d, 20, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 08, 00, 00, 8e, 13, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/poi/test-data/document/test.doc
+bytes=32768
+nFib=0x00c1 (Word 97)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, c1, 00, 47, 00, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 10, 00, 00, 00, 00, 00, 04, 00, 00, de, 07, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/duplicate-style-names.doc
+bytes=64512
+nFib=0x00c2 (Word 97+)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, c2, 00, 4d, 20, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 04, 00, 00, 44, 06, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/footnote.doc
+bytes=9728
+nFib=0x0101 (Word 2002/2003)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, 01, 01, 4d, 20, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 08, 00, 00, 76, 08, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/lists-margins.doc
+bytes=10752
+nFib=0x0101 (Word 2002/2003)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, 01, 01, 4d, 20, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 08, 00, 00, 5e, 09, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/picture.doc
+bytes=1448448
+nFib=0x0101 (Word 2002/2003)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, 01, 01, 4d, 20, 09, 04, 00, 00, 08, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 08, 00, 00, d8, 15, 00, 00]
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/pictures_escher.doc
+bytes=120320
+nFib=0x0101 (Word 2002/2003)  lid=0x0409  which_table_stream=true  encrypted=false
+FibBase[0..32] = [ec, a5, 01, 01, 4d, 20, 09, 04, 00, 00, 00, 12, bf, 00, 00, 00, 00, 00, 00, 30, 00, 00, 00, 00, 00, 08, 00, 00, ec, 0f, 00, 00]
+
+Part 2 — OLE property sets and the \x01CompObj user type, read with the
+python 'olefile' 0.47 module (an independent reader of the container).
+
+--- watermark
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'Data', 'WordDocument']
+    SummaryInformation: {1: -535, 7: b'Normal', 9: b'1', 10: 2067068, 11: 0, 12: 12958558200, 13: 12958558440}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+--- poi/test.doc
+    streams: ['1Table', 'Data', 'WordDocument']
+--- duplicate-style-names
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'WordDocument']
+    SummaryInformation: {1: -535, 9: b'0', 10: 0, 11: 0, 12: 12858113646, 13: 0, 17: b'\xff\xff\xff\xff\x08\x00\x00\x00(\x00\x00\x00q\x00\x00\x00\xa0\x00\x00\x00\x01\x00\x18\x00\x00\x00\x00\x00\x80\xd4\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+--- footnote
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'WordDocument']
+    SummaryInformation: {1: -535, 4: b'Maxim Valyanskiy', 9: b'0', 10: 2067068, 11: 0, 12: 12890138240, 13: 0}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+--- lists-margins
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'WordDocument']
+    SummaryInformation: {1: -535, 4: b'Sergey Vladimirov', 9: b'0', 10: 2067068, 11: 0, 12: 12960987226, 13: 0}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+--- picture
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'Data', 'WordDocument']
+    SummaryInformation: {1: -535, 4: b'Sergey Vladimirov', 9: b'0', 10: 2067068, 11: 0, 12: 12955291292, 13: 0}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+--- pictures_escher
+    streams: ['\x01CompObj', '\x01Ole', '\x05DocumentSummaryInformation', '\x05SummaryInformation', '1Table', 'Data', 'WordDocument']
+    SummaryInformation: {1: -535, 4: b'Sergey Vladimirov', 9: b'0', 10: 2067068, 11: 0, 12: 12956320396, 13: 0}
+    DocumentSummaryInformation: {1: -535}
+    \x01CompObj strings: ['Microsoft Word-Dokument', 'MSWordDoc', 'Word.Document.8']
+
+Part 3 — stylesheet producer signatures (counts over structure/stsh-*.txt).
+
+    duplicate-style-names    WW-prefixed=9  WW8Num=0
+    footnote                 WW-prefixed=2  WW8Num=0
+    lists-margins            WW-prefixed=3  WW8Num=0
+    picture                  WW-prefixed=2  WW8Num=0
+    pictures_escher          WW-prefixed=1  WW8Num=0
+    watermark                WW-prefixed=0  WW8Num=10
+    poi-test                 WW-prefixed=0  WW8Num=0
+
+Reading. No fixture names its producer: PIDSI_APPNAME (property 18) is
+absent everywhere and poi/test.doc has no SummaryInformation stream at all.
+The \x01CompObj user type 'Microsoft Word-Dokument' / 'Word.Document.8' is
+what an exporter writes as readily as Word does, so it identifies nothing.
+What does identify a producer is the stylesheet: 'WW-'-prefixed names are
+the OpenOffice.org / LibreOffice ww8 filter's de-duplication of a style
+name it could not keep (note duplicate-style-names.doc's
+WW-Absatz-Standardschriftart, ...1, ...11, ...111 trail), and 'WW8Numn zn'
+is that filter's list-level character styles. All five duplicate-style
+fixtures and watermark.doc carry one or both; poi/test.doc carries neither
+and is unattributed.

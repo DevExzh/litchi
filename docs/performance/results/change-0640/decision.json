@@ -1,0 +1,56 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0640",
+  "title": "Two DOC field-table refusals read a redundant grffldEnd annotation as a structural fact; the five duplicate-style refusals are correct and already have a documented lenient path",
+  "decision": "retained, correctness fix in litchi-doc; five of the seven refusals confirmed correct and unchanged",
+  "code_state": "crates/litchi-doc/src/parts/fields only; two refusals removed from build_fields, doc comments added to FieldEndFlags and Field, two tests changed in the fields test module; no public API, no error type, no limit, no output byte and no dependency changed; no new unsafe",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "grffldEnd.fHasSep and .fNested restate what the FieldList grammar of the Plcfld (MS-DOC 2.8.25) already fixes; the reader derives separator presence and nesting depth from the marker sequence and never consults the bits, so a disagreement is evidence about the producer rather than about the fields, while costing the caller the whole document",
+    "the bytes show both files are structurally intact: watermark.doc is a TOC containing five HYPERLINK fields, each end marker grffldEnd=0x80 with fNested clear although nested, markers balanced and CPs strictly increasing; poi test.doc is one ' SEQ CHAPTER \\h \\r 1' field with no separator marker and no separator character, end marker grffldEnd=0x80",
+    "fNested is set on none of the 98 field end markers in the 57-fixture corpus, including the only five that are genuinely nested; fHasSep tracks the structure on 97 of 98",
+    "both bits are still parsed, still stored on FieldEndFlags and still written back, so FieldStoryTable::to_plcf_bytes stays byte-identical and the quirk is preserved rather than repaired; the write side (writer/fields.rs:205) still derives both bits from the structure it emits, which is ADR 0006's reader/writer division",
+    "the duplicate-style refusals are correct: MS-DOC 2.9 requires style names and aliases to be unique, all five fixtures duplicate 'Absatz-Standardschriftart' across istd 10 and istd 15, and OpenOptions::with_leniency(Leniency::TolerateStylesheetDefects) already admits all five on the unmodified base"
+  ],
+  "accepted_evidence": {
+    "structure": "probe mode fld-dump decodes each Plcfld straight from the Table stream, independently of litchi-doc's field parser, and annotates every end marker's fNested and fHasSep against the structure; run on both witness fixtures and on all 57 .doc fixtures for the population table",
+    "stylesheets": "probe mode stsh-dump lists every style's index, invariant id, kind, name and aliases through a tolerant parse, marking duplicates; run on all five duplicate-style fixtures plus both witness fixtures",
+    "leniency": "probe mode open-leniency reports the strict and lenient open outcome for all seven fixtures on the unmodified base commit",
+    "differential": "change 0596's digest-doc oracle verbatim over all 57 .doc fixtures under test-data/: open outcome or exact refusal Debug text, text length and hash, paragraph count, paragraph_count(), a hash over every paragraph's Debug form, section count and hash, get_all_subdoc_ranges() hash, FIB raw_data length and hash",
+    "differential_cross_check": "the before digest is byte-identical to change 0596's retained after digest after path normalization",
+    "counts": "strace -c syscall census for one eager open on two field-bearing fixtures, before and after; callgrind isolation pairs (10 and 110 opens differenced, divided by 100) on the same two fixtures",
+    "plausibility": "Document::text() under TolerateStylesheetDefects compared against LibreOffice 26.2.5.2's txt:Text (encoded):UTF8 export, on normalized word sequences, for the five fixtures leniency admits"
+  },
+  "accepted_costs": {
+    "no_fixture_newly_admitted": "the corpus contains no file whose only defect is a stale grffldEnd bit, so the reach gain is unwitnessed here; the two witness fixtures reach a further refusal instead",
+    "detection_now_silent": "a disagreeing bit is no longer surfaced as an error; a caller who cares must compare Field::end_flags against Field::has_separator and Field::nesting_depth, which the doc comments now say",
+    "matrix_case_removed": "one case left the malformed-PLCF matrix because it was only invalid through these bits; two structurally invalid cases replace it",
+    "instruction_counts": "the callgrind deltas are code-layout drift, not the removed work; a first pass through a driver that differed only by one unused subcommand put the larger fixture's delta at the opposite sign",
+    "narrow_detection_given_up": "a disagreement could still indicate a separator marker dropped from an otherwise balanced field, or an enclosing begin/end pair lost together; the reader cannot tell that apart from a stale annotation, and after this change such a field reads as separator-less with its result text inside code_range(), with end_flags still carrying the producer's contradicting claim"
+  },
+  "known_gaps": {
+    "producer_identity": "this record does not claim Microsoft Word writes either disagreement; watermark.doc is an OpenOffice.org/LibreOffice export (WW8Num*z* styles, __RefHeading__ bookmarks) and poi test.doc has no SummaryInformation and no identifying stamp, correcting change 0587's 'ordinary Word files'",
+    "specification": "no copy of [MS-DOC] is retained in this repository; whether it states a MUST for fNested/fHasSep consistency is unverified, and the disposition rests on the bits being redundant with a validated structure rather than on the absence of a MUST",
+    "unmasked_refusals": "watermark.doc now fails on 'bookmark ibkl values must be unique and in range' and poi test.doc on 'malformed SPRM sequence: truncated SPRM opcode at byte 3'; both were decoded and provisionally read as also stricter than the format, and both are queued rather than decided (follow-ups.md)",
+    "duplicate_style_shape": "the duplicate-style disposition rests on five files sharing one producer and one duplicated name",
+    "facade_leniency": "OpenOptions carries the leniency, but the litchi facade's own .doc ingress opens with defaults, so a facade caller has no way to reach the lenient path; unchanged here because this brief is scoped to litchi-doc"
+  },
+  "withheld": [
+    "any registered speedup, throughput, instruction-count, allocation, RSS, cold-cache or timing result",
+    "any claim that a real-world file is newly admitted",
+    "any disposition of the two refusals this change unmasked"
+  ],
+  "provenance": {
+    "base_commit": "c7326f680",
+    "branch": "perf/0640-doc-facade-field-table-refusals",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0, LibreOffice 26.2.5.2 620(Build:2)",
+    "cpu_pin": "taskset -c 16",
+    "binaries": {
+      "before/doc0640": "see counts/binaries.sha256",
+      "after/doc0640": "see counts/binaries.sha256"
+    },
+    "note": "both probe legs built --release from probe/main.rs with path dependencies pointing at that leg's checkout; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR. Seven other agents were building on the same host throughout."
+  }
+}
