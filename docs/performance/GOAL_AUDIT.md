@@ -1,5 +1,54 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0633 — the XLS commit's second complete target parse deleted; the open's two framing passes priced at 1.6% each and frozen
+
+GOAL step 1 (eliminate unnecessary work) in its narrowest form again: the work
+removed is one complete parse of bytes the same call chain had just parsed, under
+the same limits and the same options, whose result was still alive one stack
+frame away. No later step was reached — no I/O restructuring, no layout change,
+no algorithm substitution, no parallelism, no SIMD — and no validation was moved,
+relaxed or deferred: the target is still materialized, reopened through
+`PackageEditor::open` under the retained limits, inventoried, parsed in full,
+checked by all five requirement checks, carried through
+`carry_fixed_numeric_inventory` and read back by
+`verify_public_numeric_readback`. ADR 0003's publication boundary and ADR 0006's
+validation contract are untouched, and ADR 0005's cache contract is not engaged
+because the snapshot retains no reader — the `Workbook` is a local binding inside
+one constructor call, dropped before the `Snapshot` exists, and a plain open
+still drops it at the statement it dropped at before. Change 0016's standing
+instruction, "target a different source of whole-workbook work, not remove either
+retained validation layer", is followed to the letter: both layers remain and the
+checks' own cost is unchanged to within 1,471 Ir. The decision rules ran in
+order: before measurements from the shared read-only checkout, hypothesis and
+mechanism stated, smallest coherent change, correctness and adversarial evidence,
+after measurements with identical setup. The **stop-at-a-design rule** did the
+real work here: the brief asked for the two framing passes to be fused, the
+before measurement showed the framing is 1.60% of an open rather than the 12.5%
+and 82.1% the passes around it cost, and the first-error matrix showed neither
+fusion direction preserves refusal identity — so part (a) is a frozen design with
+its price and its admission conditions, and only its value-identical residue is
+implemented. The **instructions-rank-work, cycles-price-latency** rule again
+decided how the result is stated: callgrind reports −15.71% and native `perf stat`
+−28.23% on the same operation, the gap being valgrind's software SHA-256
+inflating the fingerprint terms the change does not touch. Evidence tiers:
+**measured** for every per-call-site Ir figure (32 isolation pairs, 64 annotated
+profiles), the 32 native counter pairs, the 20 (fixture, operation) counter rows
+with four metrics each, the 11,520 timed operations across two complete
+A1 B1 B2 A2 rounds, the 3,546 corpus-differential rows and the 58 matrix rows; **modelled** for nothing — this record makes no
+arithmetic prediction; **unknown** for the cost of the two frozen redundancies
+beyond their measured Ir, and for the shares on any workbook with a record mix
+unlike the two measured. Host quiescence is **not** claimed: seven other agents
+shared the machine, the first timing round's A/A floor on `54016.xls` reached
++12.3% at p50, and rather than hide it the capture was repeated twice, all three
+rounds are retained, and only the round whose floors on the changed scenarios are
+−0.15% and +1.92% is quoted at p50. The record states plainly that the unchanged
+`54016.xls` controls cover ±15% across those rounds with flat instruction counts,
+so no control timing on that fixture is a result in either direction.
+OLE2/OOXML optimization remains active; ODF is deferred until completion and
+iWork excluded. [Change and
+limitations](0633-xls-commit-single-framing.md); [retained
+evidence](results/change-0633/README.md).
+
 ## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
 
 Record: [0637](0637-pptx-eager-slide-catalog-memo.md).

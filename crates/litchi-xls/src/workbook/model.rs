@@ -162,6 +162,13 @@ impl<R: Read + Seek> Workbook<R> {
             .map_or_else(|| Arc::new(Vec::new()), Arc::clone)
     }
 
+    /// The rich-text and phonetic property table exactly as this open built it.
+    pub(crate) fn shared_string_properties_shared(
+        &self,
+    ) -> Option<Arc<Vec<Option<Box<SharedStringProperties>>>>> {
+        self.shared_string_properties.as_ref().map(Arc::clone)
+    }
+
     /// Formatting defects repaired while opening this workbook.
     ///
     /// Always clean under [`Leniency::Strict`], because a strict open either

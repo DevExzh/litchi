@@ -1,0 +1,23 @@
+# Change 0633: chasing the xls_owned_source_open* selectors' +7% to +9% wall-clock move
+#
+# Those three registered cases drive litchi_xls::SourceBackedWorkbook::from_read_at --
+# the lazy source-backed reader -- and touch no code this change edits. Their p50
+# moved +7.06% to +9.07% forward and +4.35% to +8.30% reverse against same-binary
+# floors under 2.5%, which is above this program's 5% review trigger, so it is chased
+# here with a deterministic count instead of being explained away.
+#
+# Method: callgrind isolation pair over the three cases together, --warmup 2 with
+# --samples 5 and --samples 25, differenced and divided by the 60 extra measured
+# operations (three cases x 20 samples). taskset -c 9, setarch -R.
+
+before  samples=5  PROGRAM TOTALS 4,641,808,031
+before  samples=25 PROGRAM TOTALS 4,880,489,501
+after   samples=5  PROGRAM TOTALS 4,640,254,861
+after   samples=25 PROGRAM TOTALS 4,878,989,869
+
+per measured operation: before 3,978,024 Ir, after 3,978,917 Ir  (+0.02%)
+
+Conclusion: the three owned-source selectors do the same work on both legs to two
+decimal places. The wall-clock move is host noise and code layout on a 90 microsecond
+operation measured while seven other agents shared the machine; it is not work added
+by this change, and no code on that path was touched.

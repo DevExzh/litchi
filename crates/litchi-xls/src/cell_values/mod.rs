@@ -480,6 +480,48 @@ impl SourcePolicyFacts {
     }
 }
 
+/// A source-backed numeric commit's verification of its own materialized
+/// target, deferred into the target's snapshot construction.
+///
+/// Every check below ran, in this order, inside
+/// `verify_source_backed_numeric_target` after the target snapshot was built;
+/// the only thing that changed is which complete `Workbook` parse answers
+/// them. The two parses read the same sealed bytes (`expected_bytes`, proved
+/// identical by the first check) through the same `Workbook::new` under the
+/// same default `Limits`.
+#[derive(Clone, Copy)]
+struct NumericTargetVerification<'a> {
+    expected_bytes: &'a [u8],
+    source: &'a Snapshot,
+    changes: &'a [Change],
+}
+
+impl NumericTargetVerification<'_> {
+    fn run<R: Read + Seek>(
+        self,
+        workbook: &Workbook<R>,
+        target_bytes: &[u8],
+        target_workbook_path: &[String],
+        target_workbook_stream: &[u8],
+    ) -> Result<()> {
+        if target_bytes != self.expected_bytes {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric target changed during complete reopen".into(),
+            ));
+        }
+        if self.source.inner.workbook_path != target_workbook_path {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric publication changed the Workbook owner".into(),
+            ));
+        }
+        require_public_worksheet_coverage(workbook, &self.source.inner.sheets)?;
+        require_unprotected_workbook(workbook)?;
+        require_macro_free_workbook(workbook)?;
+        let _ = carry_fixed_numeric_inventory(self.source, target_workbook_stream, self.changes)?;
+        verify_public_numeric_readback(workbook, self.source, self.changes)
+    }
+}
+
 struct Inner {
     bytes: Arc<[u8]>,
     source_version: SourceVersion,
@@ -519,6 +561,23 @@ impl Snapshot {
     }
 
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
+        Self::open_package(package, None)
+    }
+
+    /// Opens a captured package, optionally verifying a source-backed numeric
+    /// commit's materialized target on the complete `Workbook` this open
+    /// already parses.
+    ///
+    /// The optional verification is the exact sequence the source-backed
+    /// numeric commit used to run on a *second* complete parse of the same
+    /// bytes, in the same order and at the same point in the construction. It
+    /// reads the parse that is already here instead of repeating it; the parse
+    /// is a pure function of the sealed bytes and the retained limits, so the
+    /// second one could only ever have reproduced this one.
+    fn open_package(
+        package: PackageEditor,
+        verification: Option<NumericTargetVerification<'_>>,
+    ) -> Result<Self> {
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -537,27 +596,23 @@ impl Snapshot {
         // The legacy reader intentionally skips some malformed optional sheet
         // projections, so this edit owner additionally requires every sheet
         // it can mutate to have survived that complete semantic open.
-        let (shared_strings, shared_string_properties, source_policy) = {
-            let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
-            let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
-            let strings = workbook.shared_strings_shared();
-            let mut properties = Vec::new();
-            properties
-                .try_reserve_exact(strings.len())
-                .map_err(|_error| Error::Allocation("retaining shared-string properties"))?;
-            for index in 0..strings.len() {
-                let index = u32::try_from(index)
-                    .map_err(|_error| Error::InvalidData("SST index exceeds u32".into()))?;
-                properties.push(
-                    workbook
-                        .shared_string_properties(index)
-                        .cloned()
-                        .map(Box::new),
-                );
-            }
-            (strings, Arc::new(properties), source_policy)
-        };
+        let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
+        let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
+        let shared_strings = workbook.shared_strings_shared();
+        let shared_string_properties =
+            retained_shared_string_properties(&workbook, shared_strings.len())?;
+        // A plain open drops the complete reader here, exactly where it
+        // dropped before. Only a verification owner keeps it alive, and only
+        // for the checks it would otherwise have re-parsed the same bytes to
+        // run. Pairing the two in one `Option` is deliberate: there is no way
+        // to keep the reader without also running the checks that asked for
+        // it, or to ask for the checks and find the reader already gone.
+        let pending = verification.map(|verification| (verification, workbook));
         resolve_shared_strings(&mut sheets, &shared_strings)?;
+        if let Some((verification, workbook)) = &pending {
+            verification.run(workbook, &source, &workbook_path, &workbook_stream)?;
+        }
+        drop(pending);
         Ok(Self {
             inner: Arc::new(Inner {
                 bytes: Arc::from(source),
@@ -5314,13 +5369,20 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
         source.clone()
     } else {
         let target_bytes = materialize_numeric_plan(&plan, source.bytes().len())?;
-        let target = Snapshot::from_bytes(target_bytes.clone())?;
-        if target.bytes() != target_bytes.as_slice() {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric target changed during complete reopen".into(),
-            ));
-        }
-        verify_source_backed_numeric_target(&source, &target, &changes)?;
+        let package =
+            PackageEditor::open(target_bytes.clone(), Targets::default(), Limits::default())?;
+        // The publication boundary's complete reopen already parses this
+        // target in full. The target checks below used to run on a second,
+        // independent `Workbook::new` over the identical bytes; they now read
+        // that first parse, in the same order and at the same point.
+        let target = Snapshot::open_package(
+            package,
+            Some(NumericTargetVerification {
+                expected_bytes: &target_bytes,
+                source: &source,
+                changes: &changes,
+            }),
+        )?;
         target.retag_source_version(target_version)
     };
 
@@ -5494,24 +5556,6 @@ fn materialize_numeric_plan(plan: &ValidatedOverlayPlan, capacity: usize) -> Res
         ));
     }
     Ok(bytes)
-}
-
-fn verify_source_backed_numeric_target(
-    source: &Snapshot,
-    target: &Snapshot,
-    changes: &[Change],
-) -> Result<()> {
-    if source.inner.workbook_path != target.inner.workbook_path {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric publication changed the Workbook owner".into(),
-        ));
-    }
-    let workbook = Workbook::new(Cursor::new(target.bytes()))?;
-    require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
-    require_unprotected_workbook(&workbook)?;
-    require_macro_free_workbook(&workbook)?;
-    let _ = carry_fixed_numeric_inventory(source, &target.inner.workbook_stream, changes)?;
-    verify_public_numeric_readback(&workbook, source, changes)
 }
 
 fn source_backed_overlay_error(error: OverlayError) -> Error {
@@ -6866,6 +6910,40 @@ fn update_sst_total(workbook: &mut [u8], offset: Option<usize>, delta: i64) -> R
         .and_then(|value| u32::try_from(value).ok())
         .ok_or_else(|| Error::InvalidData("SST total reference count overflow".into()))?;
     write_field(workbook, offset, &updated.to_le_bytes())
+}
+
+/// Retains the shared-string properties the complete open already built.
+///
+/// The reader keeps exactly this vector behind an `Arc`. When it covers the
+/// shared-string table one entry for one, the shared handle is the same value
+/// the element-wise clone produced, so the clone is skipped. Any other shape
+/// still takes the copying path, which truncates a longer vector and pads a
+/// shorter one exactly as before.
+fn retained_shared_string_properties<R: Read + Seek>(
+    workbook: &Workbook<R>,
+    len: usize,
+) -> Result<Arc<Vec<Option<Box<crate::records::SharedStringProperties>>>>> {
+    if u32::try_from(len).is_ok()
+        && let Some(properties) = workbook.shared_string_properties_shared()
+        && properties.len() == len
+    {
+        return Ok(properties);
+    }
+    let mut properties = Vec::new();
+    properties
+        .try_reserve_exact(len)
+        .map_err(|_error| Error::Allocation("retaining shared-string properties"))?;
+    for index in 0..len {
+        let index = u32::try_from(index)
+            .map_err(|_error| Error::InvalidData("SST index exceeds u32".into()))?;
+        properties.push(
+            workbook
+                .shared_string_properties(index)
+                .cloned()
+                .map(Box::new),
+        );
+    }
+    Ok(Arc::new(properties))
 }
 
 fn resolve_shared_strings(sheets: &mut [SheetData], shared_strings: &[String]) -> Result<()> {

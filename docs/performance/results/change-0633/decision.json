@@ -1,0 +1,71 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0633",
+  "title": "The XLS source-backed numeric commit verifies its materialized target on the parse its own reopen already ran; the open's two framing passes are priced and frozen",
+  "decision": "retained, implemented in litchi-xls; part (a) of the brief frozen as a design with its measurement",
+  "code_state": "crates/litchi-xls only; no public API, error type, limit or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0620 left the commit's second complete target parse on the table at 137,426,515 Ir and said it could not be removed 'without the snapshot retaining its reader'; it can be removed without that, because the verification can run inside the target's own construction where the first parse is still a live local, and the commit's second Workbook::new is 130,182,770 Ir before and 0 after",
+    "value identity is by construction, not by argument: the five checks keep their order and their position relative to parse_workbook_stream, Workbook::new, SourcePolicyFacts::from_workbook and resolve_shared_strings, so require_public_worksheet_coverage still runs against the source's sheet list before carry_fixed_numeric_inventory proves the two lists agree -- the exact blocker 0620 recorded",
+    "the removed parse read the same bytes under the same default Limits as the one that remains, and the first check of the verification proves those bytes are the materialized target byte for byte before any check consumes the parse",
+    "part (a) of the brief is frozen rather than implemented because the measurement contradicts its premise: the two framing passes are 2,579,172 and 2,579,104 Ir, 1.60% of one open each, and the 0541-style first-error matrix shows by row that deriving the inventory from the eager walk moves precise per-record refusals to a generic per-tab one",
+    "the value-identical residue of part (a) -- the deep copy of the shared-string property table the reader already owns behind an Arc -- is implemented, guarded by a length and u32 check that keeps the copying path and its refusal reachable"
+  ],
+  "accepted_evidence": {
+    "counts": "change 0620's probe with its counting allocator armed for one measured iteration; 20 (fixture, operation) rows over 54016.xls, WithCustomViews.xls, FormulaEvalTestData.xls and 59858.xls; allocation calls, allocated bytes, peak live bytes, published bytes and the complete source-backed diagnostics object",
+    "instructions": "callgrind isolation pairs with --separate-callers=2, N=1/N=4 on 54016.xls and N=3/N=12 elsewhere, per leg, 16 scenarios; whole-operation totals plus the per-call-site chains",
+    "framing_attribution": "the same before-leg pairs read down to the sub-1% rows, giving Records::next per framing pass, the second OleFile::open_stream, the discarded Workbook's drop glue, add_cell and BTreeMap::insert",
+    "cycles": "perf stat -x, cycles/instructions/branches/branch-misses/task-clock, same isolation method, 16 scenarios per leg",
+    "timing": "the probe's per-phase vectors, order A1 B1 B2 A2, 40 samples on 54016.xls and 120 elsewhere, three complete rounds with the same-binary A/A and B/B floors in each window; round 3 is quoted because its floors on the two changed scenarios are -0.15% and +1.92%",
+    "selectors": "the twelve registered XLS cases (numeric, semantic, owned) A1 B1 B2 A2 with output_sha256 per round",
+    "value_identity": "change 0620's 126-fixture x 5-path corpus differential, three runs per leg, 3,546 rows, under its three oracles; plus a 16-run repetition per leg over the two fixtures 0620 found nonreproducible",
+    "first_error_matrix": "29 synthetic malformed Workbook streams through the public Snapshot::from_bytes, both legs, exact typed first error per case; 15 of the rows frozen as a unit test",
+    "review_trigger_chase": "callgrind isolation pair over xls_owned_source_open, _list_worksheets and _one_cell together, --warmup 2 with --samples 5 against --samples 25, differenced and divided by the 60 extra operations"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software, which is why the callgrind delta (-15.71%) is smaller than the native cycle delta (-28.23%) on the same scenario",
+    "formula_open_control": "the FormulaEvalTestData controls move +0.38% to +0.98% in callgrind Ir, all of it inside the renamed constructor's own inlined body with no named callee moving by more than 20,000 Ir; the same scenario moves -0.28% in native instructions, and that fixture's allocation counters move only downward",
+    "busy_host": "seven other agents shared the host for the whole window (load average 9-22); the unchanged 54016.xls controls move up to +-15% at p50 across the three rounds with instruction counts flat to within 0.5%, so no 54016.xls control timing here is a result in either direction. All three rounds are retained and the six p50 readings of the changed scenario lie between -34.9% and -44.1%",
+    "registered_selectors_blind": "the two registered source-backed numeric cases move +0.32%/-1.86% and -1.94%/-1.84%, because their corpora's Workbook stream is 0.48% and 0.82% of the archive against 90.7-94.2% on the measured fixtures; the change is invisible to the registered harness",
+    "narrow_reach": "the commit change reaches only Transaction::commit_source_backed on fixed-width Number/RK/MulRk edits; 33 of 126 .xls fixtures never reach a snapshot and only 35 of the 93 that do publish through both source-backed numeric paths",
+    "owned_source_selectors": "the three xls_owned_source_open* selectors moved +7.06% to +9.07% forward and +4.35% to +8.30% reverse, above the 5% review trigger; chased with a callgrind isolation pair that prices one measured operation at 3,978,024 Ir before and 3,978,917 Ir after (+0.02%), on a path this change does not touch (SourceBackedWorkbook::from_read_at). Retained in owned-source-chase.txt"
+  },
+  "known_gaps": {
+    "framing_fusion": "not implemented and not attempted beyond the design; the two remaining redundancies between the inventory and the eager parse -- the second CFB extraction of the Workbook stream (1.21% of an open) and the per-LabelSst text copy (2.26%) -- are frozen with the contract question each raises",
+    "eager_owner": "the eager Workbook is still built and discarded on every open to answer one bit per sheet; replacing that owner is change 0620's frozen design with its five admission gates, untouched here",
+    "peak_rss": "peak live bytes are the probe's counting allocator over one measured iteration, not process RSS; no RSS, cold-cache or physical-I/O figure was taken",
+    "corpus_reach": "no XLS edit measurement in this program can use ConditionalFormattingSamples.xls, which the edit owner refuses at open; that census is 0620's and is unchanged"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0633-xls-commit-single-framing",
+    "before_checkout": "/home/zhuhe/code/litchi-worktrees/before-c7326f680 (shared, read-only, detached at the base)",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 9 under setarch x86_64 -R, RAYON_NUM_THREADS=1, OMP_NUM_THREADS=1",
+    "binaries": {
+      "before/litchi-perf-baseline": "c8a72cdec51672dcd14643304ea550120da7d13de7ce8009ebfbcb254efcc6de",
+      "after/litchi-perf-baseline": "34e7752fb927716e8d00130331678546b0cbcc76f48b754f3a0142825672d0b5",
+      "before/xls_edit_probe": "ac9e73fbefa724184df5ad0f10f6683da8af6c4dc7bc0b7c1e11e90a9d1216ea",
+      "after/xls_edit_probe": "a7b4f254da5d19175c857945c94b6f4bd41c584ace0666a421648a431afc709b",
+      "before/xls_edit_corpus": "2d39c87ba729c8d4ee15a9951494e84a82a086a89e581e955f61bbdf0b31c142",
+      "after/xls_edit_corpus": "abeb2afdf1586dde7c6f4dac7c6c58ea626394e44fb2c84b29e078f6000b7194",
+      "before/xls_error_matrix": "9c79c36762e459849d1572b72737ea81c6373d382395efafacf43f33801bf882",
+      "after/xls_error_matrix": "6b87ef07f0eda0da019272a1452b50ab634a1953c2b2623d9327407c6950712f"
+    },
+    "note": "the harness binaries are tools/perf-baseline built --release --locked from each leg's tree with its own CARGO_TARGET_DIR; the three scratch binaries are standalone Cargo projects whose only dependencies are path dependencies on the leg's crates, sources in probe/, and every binary was copied out of its target directory before being measured (change 0627)"
+  },
+  "gates": {
+    "cargo fmt --all --check": "clean",
+    "cargo clippy -p litchi-xls --all-targets": "clean",
+    "cargo test -p litchi-xls": "72 suites, 1402 tests, 0 failed",
+    "cargo doc -p litchi-xls --no-deps": "clean",
+    "cargo test -p litchi --features docx,xlsx,pptx,xls": "26 suites, 266 tests, 0 failed",
+    "cargo test (tools/perf-baseline)": "19 suites, 531 tests, 0 failed"
+  }
+}

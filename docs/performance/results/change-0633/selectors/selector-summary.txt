@@ -1,0 +1,14 @@
+# change 0633 registered selectors: A1 B1 B2 A2, p50 ns, both directions and both same-binary floors
+case                                           phase               a1 p50        b1 p50      fwd      rev      A/A      B/B  output_sha256 identical a1=b1=b2=a2
+xls_numeric_eager_number_edit_save             elapsed_ns      31,184,320    30,474,757   -2.28%   -0.62%   -0.85%   +0.83%  True (f8f37064dc84)
+xls_numeric_eager_rk_mulrk_edit_save           elapsed_ns          99,421        97,750   -1.68%   +2.98%   -0.68%   +4.02%  True (ddf5d5b81d67)
+xls_numeric_plan_only_number_edit_save         elapsed_ns      33,708,575    33,704,454   -0.01%   +0.04%   -0.29%   -0.24%  True (f8f37064dc84)
+xls_numeric_plan_only_rk_mulrk_edit_save       elapsed_ns         408,093       405,852   -0.55%   +0.19%   -0.55%   +0.19%  True (ddf5d5b81d67)
+xls_numeric_source_backed_number_edit_save     elapsed_ns      78,071,628    78,322,290   +0.32%   -1.86%   +0.52%   -1.67%  True (f8f37064dc84)
+xls_numeric_source_backed_rk_mulrk_edit_save   elapsed_ns         842,164       825,785   -1.94%   -1.84%   -0.29%   -0.18%  True (ddf5d5b81d67)
+xls_owned_source_open                          elapsed_ns          89,861        97,200   +8.17%   +7.07%   -0.07%   -1.08%  True (6a57231ba681)
+xls_owned_source_open_list_worksheets          elapsed_ns          89,090        95,381   +7.06%   +4.35%   +2.42%   -0.17%  True (e9f1a47d927d)
+xls_owned_source_open_one_cell                 elapsed_ns          90,160        98,341   +9.07%   +8.30%   +0.16%   -0.56%  True (e726a50d216e)
+xls_semantic_noop_edit_save                    elapsed_ns           1,890         1,520  -19.58%  +47.53%  -14.29%  +57.24%  True (None)
+xls_semantic_one_edit_save                     elapsed_ns       1,491,458     1,487,318   -0.28%   +8.63%   -4.74%   +3.76%  True (None)
+xls_semantic_open                              elapsed_ns       1,373,217     1,421,818   +3.54%   +6.74%   -1.86%   +1.18%  True (None)

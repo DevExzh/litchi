@@ -2235,3 +2235,375 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
             .is_err()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Change 0633: the two framing passes of `Snapshot::from_bytes`, and the one
+// complete target parse a source-backed numeric commit now verifies on.
+// ---------------------------------------------------------------------------
+
+type MatrixRecord = (u16, Vec<u8>);
+
+fn matrix_records(package: &[u8]) -> Vec<MatrixRecord> {
+    let mut ole = OleFile::open(Cursor::new(package.to_vec())).unwrap();
+    let stream = ole.open_stream(&["Workbook"]).unwrap();
+    Records::new(&stream)
+        .map(|record| {
+            let record = record.unwrap();
+            (record.kind().get(), record.payload().to_vec())
+        })
+        .collect()
+}
+
+fn matrix_encode(records: &[MatrixRecord]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for (kind, payload) in records {
+        bytes.extend_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(&u16::try_from(payload.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(payload);
+    }
+    bytes
+}
+
+/// Rebuilds a package around a rewritten Workbook stream, repointing every
+/// `BoundSheet8` at its worksheet substream so an inserted or removed record
+/// does not turn every case into the same offset refusal.
+fn matrix_repackage(records: &[MatrixRecord], retarget: bool) -> Vec<u8> {
+    let mut records = records.to_vec();
+    if retarget {
+        let mut offset = 0_usize;
+        let mut starts = Vec::new();
+        let mut in_globals = true;
+        for (kind, payload) in &records {
+            if *kind == BOF && !in_globals {
+                starts.push(offset);
+            }
+            if *kind == EOF && in_globals {
+                in_globals = false;
+            }
+            offset += 4 + payload.len();
+        }
+        let mut next = 0;
+        for (kind, payload) in &mut records {
+            if *kind == BOUND_SHEET
+                && payload.len() >= 4
+                && let Some(start) = starts.get(next)
+            {
+                payload[0..4].copy_from_slice(&u32::try_from(*start).unwrap().to_le_bytes());
+                next += 1;
+            }
+        }
+    }
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &matrix_encode(&records))
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn matrix_globals_index(records: &[MatrixRecord], kind: u16) -> usize {
+    let end = records.iter().position(|(k, _)| *k == EOF).unwrap();
+    records[..end].iter().position(|(k, _)| *k == kind).unwrap()
+}
+
+fn matrix_worksheet_index(records: &[MatrixRecord], kind: u16) -> usize {
+    let end = records.iter().position(|(k, _)| *k == EOF).unwrap();
+    records[end + 1..]
+        .iter()
+        .position(|(k, _)| *k == kind)
+        .unwrap()
+        + end
+        + 1
+}
+
+fn matrix_outcome(bytes: Vec<u8>) -> String {
+    match Snapshot::from_bytes(bytes) {
+        Ok(snapshot) => format!("ok:{}", snapshot.worksheet_count()),
+        Err(error) => error.to_string(),
+    }
+}
+
+/// A 0541-style first-error matrix over the two framing passes of
+/// `Snapshot::from_bytes`.
+///
+/// The private offset inventory (`parse_workbook_stream`) frames the Workbook
+/// stream before the complete eager `Workbook::new` does, and
+/// `resolve_shared_strings` runs after both. Every row below is a stream that
+/// one of those three owners refuses, and the refusal text says which owner
+/// won. Fusing the two framing passes — deriving the inventory from the eager
+/// parse's walk, or feeding the inventory's frames to it — moves these rows,
+/// which is why change 0633 froze that design instead of implementing it. This
+/// test is the oracle any future attempt has to reproduce.
+#[test]
+fn snapshot_open_first_error_matrix_is_frozen() {
+    let base = package();
+    let records = matrix_records(&base);
+    let mut rows: Vec<(String, String)> = Vec::new();
+    let mut case =
+        |name: &str, bytes: Vec<u8>| rows.push((name.to_string(), matrix_outcome(bytes)));
+
+    case("control-unmodified", base.clone());
+    case("control-repackaged", matrix_repackage(&records, false));
+
+    // Globals, refused by the offset inventory before the eager parse runs.
+    {
+        let mut damaged = records.clone();
+        damaged[0].1[2..4].copy_from_slice(&0x0006_u16.to_le_bytes());
+        case("globals-bof-substream", matrix_repackage(&damaged, false));
+    }
+    {
+        let mut damaged = records.clone();
+        let insert = matrix_globals_index(&damaged, BOUND_SHEET);
+        damaged.insert(insert, (FILE_PASS, vec![1, 0, 1, 0]));
+        case("globals-file-pass", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let sst = matrix_globals_index(&damaged, SST);
+        let payload = damaged[sst].1.clone();
+        damaged.insert(sst, (SST, payload));
+        case("globals-duplicate-sst", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        damaged.retain(|(kind, _)| *kind != XF);
+        case("globals-no-xf", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let bound = matrix_globals_index(&damaged, BOUND_SHEET);
+        let length = matrix_encode(&damaged).len();
+        damaged[bound].1[0..4].copy_from_slice(&u32::try_from(length + 64).unwrap().to_le_bytes());
+        case("boundsheet-past-end", matrix_repackage(&damaged, false));
+    }
+
+    // Cell records, refused by the offset inventory. `cell-xf-past-end`
+    // matters most: the eager reader validates the same index through
+    // `Formatting::validate_cell_xf` with a different message, and the
+    // inventory's refusal shadows it because the inventory frames first.
+    {
+        let mut damaged = records.clone();
+        let number = matrix_worksheet_index(&damaged, NUMBER);
+        damaged[number].1.truncate(10);
+        case("number-truncated", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let number = matrix_worksheet_index(&damaged, NUMBER);
+        damaged[number].1[6..14].copy_from_slice(&f64::NAN.to_le_bytes());
+        case("number-nan", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let number = matrix_worksheet_index(&damaged, NUMBER);
+        damaged[number].1[4..6].copy_from_slice(&0x0fff_u16.to_le_bytes());
+        case("cell-xf-past-end", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let boolerr = matrix_worksheet_index(&damaged, BOOL_ERR);
+        damaged[boolerr].1[7] = 9;
+        case("boolerr-bad-flag", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let formula = matrix_worksheet_index(&damaged, FORMULA);
+        damaged[formula].1[6..14].copy_from_slice(&[0, 0, 0, 0, 0, 0, 0xff, 0xff]);
+        case(
+            "formula-string-cache-orphan",
+            matrix_repackage(&damaged, true),
+        );
+    }
+
+    // Refused only after the eager parse: the reader drops a worksheet it
+    // cannot project and `require_public_worksheet_coverage` reports the tab.
+    {
+        let mut damaged = records.clone();
+        let end = damaged.iter().position(|(k, _)| *k == EOF).unwrap();
+        damaged[end + 1].0 = 0x003c;
+        case("worksheet-bof-missing", matrix_repackage(&damaged, true));
+    }
+    {
+        let mut damaged = records.clone();
+        let formula = matrix_worksheet_index(&damaged, FORMULA);
+        damaged.insert(formula + 1, (STRING, vec![1, 0, 0, b'a']));
+        case(
+            "stray-string-after-formula",
+            matrix_repackage(&damaged, true),
+        );
+    }
+
+    // Refused after both passes, by `resolve_shared_strings`.
+    {
+        let mut damaged = records.clone();
+        let label = matrix_worksheet_index(&damaged, LABEL_SST);
+        damaged[label].1[6..10].copy_from_slice(&0x0000_7fff_u32.to_le_bytes());
+        case("labelsst-past-sst", matrix_repackage(&damaged, true));
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            ("control-unmodified".to_string(), "ok:1".to_string()),
+            ("control-repackaged".to_string(), "ok:1".to_string()),
+            (
+                "globals-bof-substream".to_string(),
+                "Invalid record 0x0809: expected BIFF8 substream 0x0005, found version 0x0600 and substream 0x0006".to_string()
+            ),
+            (
+                "globals-file-pass".to_string(),
+                "Workbook password is required".to_string()
+            ),
+            (
+                "globals-duplicate-sst".to_string(),
+                "Invalid record 0x00FC: SST header is truncated or duplicated".to_string()
+            ),
+            (
+                "globals-no-xf".to_string(),
+                "Unsafe edit refused: opened-workbook transaction requires at least one XF resource"
+                    .to_string()
+            ),
+            (
+                "boundsheet-past-end".to_string(),
+                "Invalid record 0x0085: BoundSheet8 points outside the Workbook stream".to_string()
+            ),
+            (
+                "number-truncated".to_string(),
+                "Invalid length: expected 14, found 10".to_string()
+            ),
+            (
+                "number-nan".to_string(),
+                "Invalid record 0x0203: Number contains an Xnum forbidden by MS-XLS 2.5.342"
+                    .to_string()
+            ),
+            (
+                "cell-xf-past-end".to_string(),
+                "Invalid record 0x0203: cell XF index 4095 is outside 21 workbook resources"
+                    .to_string()
+            ),
+            (
+                "boolerr-bad-flag".to_string(),
+                "Invalid record 0x0205: BoolErr has an invalid Boolean value or error flag"
+                    .to_string()
+            ),
+            (
+                "formula-string-cache-orphan".to_string(),
+                "Invalid record 0x00D7: string-valued Formula is not followed by its String record"
+                    .to_string()
+            ),
+            (
+                "worksheet-bof-missing".to_string(),
+                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                    .to_string()
+            ),
+            (
+                "stray-string-after-formula".to_string(),
+                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                    .to_string()
+            ),
+            (
+                "labelsst-past-sst".to_string(),
+                "Invalid record 0x00FD: LabelSst index 32767 is outside the SST".to_string()
+            ),
+        ]
+    );
+}
+
+/// The snapshot keeps the shared-string property table the complete open
+/// already built instead of cloning it entry by entry. The retained table has
+/// to be the same value the clone produced, for every index.
+#[test]
+fn snapshot_retains_the_open_shared_string_property_table() {
+    for bytes in [
+        package(),
+        formula_free_package(),
+        two_sheet_matrix_package(),
+    ] {
+        let snapshot = Snapshot::from_bytes(bytes.clone()).unwrap();
+        let workbook = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+        let strings = workbook.shared_strings_shared();
+        assert_eq!(snapshot.inner.shared_strings.len(), strings.len());
+        assert_eq!(snapshot.inner.shared_string_properties.len(), strings.len());
+        for index in 0..strings.len() {
+            assert_eq!(
+                snapshot.inner.shared_string_properties[index].as_deref(),
+                workbook.shared_string_properties(u32::try_from(index).unwrap()),
+                "shared-string property {index} diverged from the complete open"
+            );
+        }
+    }
+}
+
+fn two_sheet_matrix_package() -> Vec<u8> {
+    let mut writer = crate::Writer::new();
+    let first = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(first, 3, 2, 4.5).unwrap();
+    writer.write_string(first, 6, 0, "alpha").unwrap();
+    let second = writer.add_worksheet("Sheet2").unwrap();
+    writer.write_number(second, 1, 1, 8.5).unwrap();
+    writer.write_string(second, 2, 0, "beta").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+/// The source-backed numeric commit verifies its materialized target on the
+/// complete parse its own reopen performs, instead of parsing the same bytes a
+/// second time. An independent parse of the published artifact must answer
+/// every one of those checks the same way, which is the property that made the
+/// second parse redundant.
+#[test]
+fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    let published = commit.snapshot().bytes().to_vec();
+
+    let independent = Workbook::new(Cursor::new(published.as_slice())).unwrap();
+    require_public_worksheet_coverage(&independent, &source.inner.sheets).unwrap();
+    require_unprotected_workbook(&independent).unwrap();
+    require_macro_free_workbook(&independent).unwrap();
+    let carried = carry_fixed_numeric_inventory(
+        &source,
+        &commit.snapshot().inner.workbook_stream,
+        &[Change {
+            sheet: 0,
+            entry: source.inner.sheets[0]
+                .entries
+                .iter()
+                .position(|entry| entry.cell.reference == reference)
+                .unwrap(),
+            reference,
+            storage: Storage::Number,
+            value: Value::Number(9.25),
+        }],
+    )
+    .unwrap();
+    assert_eq!(carried.len(), source.inner.sheets.len());
+
+    // The target snapshot's own recorded verdicts come from the same parse.
+    assert!(
+        commit
+            .snapshot()
+            .inner
+            .source_policy
+            .public_worksheet_coverage
+    );
+    assert_eq!(
+        commit.snapshot().inner.source_policy.protection,
+        SourceProtectionPolicy::Unprotected
+    );
+    assert!(commit.snapshot().inner.source_policy.macro_free_workbook);
+
+    let readback = independent
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(3, 2)
+        .unwrap()
+        .value()
+        .clone();
+    assert!(matches!(readback, CellValue::Float(value) if value.to_bits() == 9.25_f64.to_bits()));
+}

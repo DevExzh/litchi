@@ -1,5 +1,55 @@
 # Performance optimization ADR-compliance matrix
 
+## 0633 — the XLS commit's second complete target parse deleted; the open's two framing passes priced at 1.6% each and frozen
+
+**ADR 0003 (publication boundary).** "Publish only after their staged CRUD
+operation and typed readback succeed" and "the complete package is reopened under
+the retained limits" both continue to hold exactly. The materialized target is
+still opened through `PackageEditor::open` with `Targets::default()` and
+`Limits::default()`, still inventoried by `parse_workbook_stream`, still parsed
+in full by an independent `Workbook::new`, still proved byte-identical to the
+plan, still checked by `require_public_worksheet_coverage` against the source's
+sheet list, `require_unprotected_workbook` and `require_macro_free_workbook`,
+still carried through `carry_fixed_numeric_inventory` and still read back by
+`verify_public_numeric_readback`. What is deleted is a *duplicate* of the reopen,
+not the reopen: the second `Workbook::new` read the same `Arc<[u8]>` under the
+same default limits and the same `OpenOptions`, and the first check of the moved
+verification proves those bytes are the materialized target before any check
+consumes the parse. The reading that "reopened" means "parsed twice" is the one
+this change declines; the reading that it means "parsed independently of the
+editor's own inventory, in full, under the retained limits" is preserved. The
+neighbouring temptation — handing the eager reader the Workbook stream bytes
+`PackageEditor` already captured, worth 1.21% of an open — is **frozen precisely
+because it would make that second reading false**, and is recorded with the ADR
+amendment it would need.
+
+**ADR 0005 (cache contract).** Not engaged. Change 0620 judged that removing this
+parse required "the snapshot retaining its reader", which would have made it an
+ADR 0005 subsystem; it does not. The `Workbook` is a local binding inside one
+constructor call, `drop`ped before the `Snapshot` is constructed, never stored in
+`Inner`, never reachable from a public type, and a plain open still drops it at
+the exact statement it dropped at before this change. No cache, no
+lifetime-extended handle, no invalidation question.
+
+**ADR 0006 (validation and determinism).** No validation was moved, relaxed,
+reordered or deferred; the five checks keep their order and their position in the
+construction, so no refusal moves. The 29-case first-error matrix is the
+adversarial evidence for that and is identical on both legs; the 126-fixture
+differential adds 591 typed-refusal rows and 591 artifact digests per run, all
+identical. The determinism clause is better served than before: 0620 reported a
+deviation — the generic commit's CFB storage directory ordered by `HashSet`
+iteration — and this record confirms change 0625 closed it, with sixteen runs per
+leg over the two affected fixtures now yielding one digest each and zero corpus
+rows excluded as nonreproducible.
+
+**No ADR was cited as authority for a change it does not cover, and proposed ADRs
+0030 and 0031 are not cited at all.** No new `unsafe`, no weakened limit or
+malformed-input defence, no hidden global Rayon pool, no ambient I/O, no public
+leakage of archive types, raw locks or executors, and no public API, error type
+or output byte changed. [Change and
+limitations](0633-xls-commit-single-framing.md); [retained
+evidence](results/change-0633/README.md).
+
 ## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
 
 Record: [0637](0637-pptx-eager-slide-catalog-memo.md).

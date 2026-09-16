@@ -1,0 +1,19 @@
+[package]
+name = "xls-error-matrix"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xls_error_matrix"
+path = "src/main.rs"
+
+[dependencies]
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-xls" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-cfb" }
+litchi-biff = { path = "/home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-biff" }
+
+[profile.release]
+debug = 0

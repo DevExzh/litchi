@@ -1,0 +1,433 @@
+# Change 0633 analysis tables
+#
+# One 'operation' is one whole open + stage + commit + publish of the
+# named scenario through the retained probe, including its per-iteration
+# copy of the fixture bytes. Callgrind runs SHA-256 in software, so every
+# fingerprint term is an upper bound there and the perf table is the
+# native counterpart.
+
+==============================================================================
+1. FRAMING ATTRIBUTION (before leg) -- what the two framing passes cost
+==============================================================================
+# change 0633 framing attribution: before leg, 54016, --operation open
+# isolation pair N=1 and N=4, differenced and divided by 3
+# callgrind --inclusive=yes --separate-callers=2; Ir per operation
+
+phase                                                         Ir/op    share
+whole operation                                         160,833,535  100.00%
+Snapshot::from_bytes                                    155,960,385   96.97%
+  Editor::open (CFB capture)                              4,172,688    2.59%
+  constructor                                           151,787,620   94.38%
+    PASS 1 parse_worksheet (inventory)                    7,864,092    4.89%
+      framing: Records::next                              2,579,172    1.60%
+      push_entry                                          2,732,787    1.70%
+      parse_reference                                       444,120    0.28%
+    resolve_shared_strings                                3,629,090    2.26%
+    PASS 2 Workbook::new                                130,517,621   81.15%
+      OleFile::open_stream (2nd Workbook extraction)      1,948,501    1.21%
+      SharedStringTable::parse_from_records              11,451,901    7.12%
+      parse_worksheet_records_with_compatibility        113,616,319   70.64%
+        framing: Records::next                            2,579,104    1.60%
+        add_cell                                         54,395,849   33.82%
+          BTreeMap::insert                               32,438,095   20.17%
+    drop_glue::<Workbook>                                 7,524,989    4.68%
+
+# change 0633 framing attribution: before leg, cv, --operation open
+# isolation pair N=3 and N=12, differenced and divided by 9
+# callgrind --inclusive=yes --separate-callers=2; Ir per operation
+
+phase                                                         Ir/op    share
+whole operation                                          14,923,978  100.00%
+Snapshot::from_bytes                                     14,502,344   97.17%
+  Editor::open (CFB capture)                                729,791    4.89%
+  constructor                                            13,772,477   92.28%
+    PASS 1 parse_worksheet (inventory)                      495,473    3.32%
+      framing: Records::next                                136,680    0.92%
+      push_entry                                            218,116    1.46%
+      parse_reference                                        16,620    0.11%
+    resolve_shared_strings                                  276,080    1.85%
+    PASS 2 Workbook::new                                 12,084,000   80.97%
+      OleFile::open_stream (2nd Workbook extraction)        320,567    2.15%
+      SharedStringTable::parse_from_records               3,126,504   20.95%
+      parse_worksheet_records_with_compatibility          8,201,159   54.95%
+        framing: Records::next                              136,476    0.91%
+        add_cell                                          3,756,056   25.17%
+          BTreeMap::insert                                2,303,410   15.43%
+    drop_glue::<Workbook>                                   653,185    4.38%
+
+==============================================================================
+2. DETERMINISTIC COUNTERS
+==============================================================================
+scenario                                  metric               before       after      delta
+----------------------------------------  ---------------  ----------  ----------  ---------
+54016.xls/noop-generic                    allocations          59,714      59,710     -0.01%
+54016.xls/noop-generic                    allocated_bytes  26,531,880  26,468,584     -0.24%
+54016.xls/noop-generic                    peak_live_bytes  17,787,131  17,787,131  identical
+54016.xls/noop-generic                    published_bytes     984,576     984,576  identical
+54016.xls/number-generic                  allocations         118,063     118,059     -0.00%
+54016.xls/number-generic                  allocated_bytes  63,060,394  62,997,098     -0.10%
+54016.xls/number-generic                  peak_live_bytes  24,254,634  24,254,634  identical
+54016.xls/number-generic                  published_bytes     984,576     984,576  identical
+54016.xls/number-plan                     allocations          99,952      99,948     -0.00%
+54016.xls/number-plan                     allocated_bytes  44,623,130  44,559,834     -0.14%
+54016.xls/number-plan                     peak_live_bytes  18,540,525  18,540,525  identical
+54016.xls/number-plan                     published_bytes     984,576     984,576  identical
+54016.xls/number-source-backed            allocations         161,751     121,641    -24.80%
+54016.xls/number-source-backed            allocated_bytes  76,204,234  59,090,612    -22.46%
+54016.xls/number-source-backed            peak_live_bytes  26,082,823  25,628,658     -1.74%
+54016.xls/number-source-backed            published_bytes     984,576     984,576  identical
+54016.xls/open                            allocations          51,818      51,814     -0.01%
+54016.xls/open                            allocated_bytes  26,140,189  26,076,893     -0.24%
+54016.xls/open                            peak_live_bytes  17,787,131  17,787,131  identical
+54016.xls/open                            published_bytes           0           0  identical
+54016.xls/string-generic                  allocations         127,693     127,685     -0.01%
+54016.xls/string-generic                  allocated_bytes  66,233,349  66,106,757     -0.19%
+54016.xls/string-generic                  peak_live_bytes  24,233,934  24,233,934  identical
+54016.xls/string-generic                  published_bytes     984,576     984,576  identical
+59858.xls/noop-generic                    allocations           9,873       9,861     -0.12%
+59858.xls/noop-generic                    allocated_bytes   8,211,988   8,208,728     -0.04%
+59858.xls/noop-generic                    peak_live_bytes   3,529,873   3,529,873  identical
+59858.xls/noop-generic                    published_bytes   1,103,360   1,103,360  identical
+59858.xls/number-generic                  allocations          21,522      21,510     -0.06%
+59858.xls/number-generic                  allocated_bytes  31,560,284  31,557,024     -0.01%
+59858.xls/number-generic                  peak_live_bytes   8,169,797   8,169,797  identical
+59858.xls/number-generic                  published_bytes   1,103,360   1,103,360  identical
+59858.xls/open                            allocations           9,535       9,523     -0.13%
+59858.xls/open                            allocated_bytes   8,187,958   8,184,698     -0.04%
+59858.xls/open                            peak_live_bytes   3,529,873   3,529,873  identical
+59858.xls/open                            published_bytes           0           0  identical
+59858.xls/string-generic                  allocations          23,191      23,167     -0.10%
+59858.xls/string-generic                  allocated_bytes  31,913,053  31,906,533     -0.02%
+59858.xls/string-generic                  peak_live_bytes   8,170,079   8,170,079  identical
+59858.xls/string-generic                  published_bytes   1,103,360   1,103,360  identical
+FormulaEvalTestData.xls/noop-generic      allocations          29,970      29,968     -0.01%
+FormulaEvalTestData.xls/noop-generic      allocated_bytes   4,814,625   4,804,593     -0.21%
+FormulaEvalTestData.xls/noop-generic      peak_live_bytes   2,757,906   2,757,906  identical
+FormulaEvalTestData.xls/noop-generic      published_bytes     178,176     178,176  identical
+FormulaEvalTestData.xls/number-generic    allocations          60,594      60,592     -0.00%
+FormulaEvalTestData.xls/number-generic    allocated_bytes  11,289,572  11,279,540     -0.09%
+FormulaEvalTestData.xls/number-generic    peak_live_bytes   3,714,974   3,714,974  identical
+FormulaEvalTestData.xls/number-generic    published_bytes     178,176     178,176  identical
+FormulaEvalTestData.xls/open              allocations          28,718      28,716     -0.01%
+FormulaEvalTestData.xls/open              allocated_bytes   4,772,340   4,762,308     -0.21%
+FormulaEvalTestData.xls/open              peak_live_bytes   2,757,906   2,757,906  identical
+FormulaEvalTestData.xls/open              published_bytes           0           0  identical
+FormulaEvalTestData.xls/string-generic    allocations          62,258      62,254     -0.01%
+FormulaEvalTestData.xls/string-generic    allocated_bytes  12,292,981  12,272,917     -0.16%
+FormulaEvalTestData.xls/string-generic    peak_live_bytes   4,007,397   4,007,397  identical
+FormulaEvalTestData.xls/string-generic    published_bytes     178,176     178,176  identical
+WithCustomViews.xls/noop-generic          allocations           7,317       7,259     -0.79%
+WithCustomViews.xls/noop-generic          allocated_bytes   3,395,609   3,388,701     -0.20%
+WithCustomViews.xls/noop-generic          peak_live_bytes   1,862,105   1,862,105  identical
+WithCustomViews.xls/noop-generic          published_bytes     165,888     165,888  identical
+WithCustomViews.xls/number-generic        allocations          14,760      14,702     -0.39%
+WithCustomViews.xls/number-generic        allocated_bytes   8,662,354   8,655,446     -0.08%
+WithCustomViews.xls/number-generic        peak_live_bytes   2,955,437   2,955,437  identical
+WithCustomViews.xls/number-generic        published_bytes     165,888     165,888  identical
+WithCustomViews.xls/number-plan           allocations          13,100      13,042     -0.44%
+WithCustomViews.xls/number-plan           allocated_bytes   5,847,933   5,841,025     -0.12%
+WithCustomViews.xls/number-plan           peak_live_bytes   2,181,242   2,181,242  identical
+WithCustomViews.xls/number-plan           published_bytes     165,888     165,888  identical
+WithCustomViews.xls/number-source-backed  allocations          20,945      15,163    -27.61%
+WithCustomViews.xls/number-source-backed  allocated_bytes   9,911,311   7,700,045    -22.31%
+WithCustomViews.xls/number-source-backed  peak_live_bytes   3,176,770   2,969,885     -6.51%
+WithCustomViews.xls/number-source-backed  published_bytes     165,888     165,888  identical
+WithCustomViews.xls/open                  allocations           6,839       6,781     -0.85%
+WithCustomViews.xls/open                  allocated_bytes   3,285,160   3,278,252     -0.21%
+WithCustomViews.xls/open                  peak_live_bytes   1,862,105   1,862,105  identical
+WithCustomViews.xls/open                  published_bytes           0           0  identical
+WithCustomViews.xls/string-generic        allocations          15,423      15,307     -0.75%
+WithCustomViews.xls/string-generic        allocated_bytes   8,984,377   8,970,561     -0.15%
+WithCustomViews.xls/string-generic        peak_live_bytes   2,893,725   2,893,725  identical
+WithCustomViews.xls/string-generic        published_bytes     165,888     165,888  identical
+
+(20 scenarios x 4 counters; 38 identical)
+
+source-backed overlay diagnostics, before against after:
+  rows whose complete diagnostics object differs: 0
+
+==============================================================================
+3. CALLGRIND, per-operation inclusive Ir
+==============================================================================
+scenario                    before Ir/op  after Ir/op    delta
+--------------------------  ------------  -----------  -------
+54016/noop-generic           164,397,465  163,930,325   -0.28%
+54016/number-generic         331,900,948  331,476,067   -0.13%
+54016/number-plan            511,974,126  511,521,753   -0.09%
+54016/number-source-backed   887,985,767  748,477,137  -15.71%
+54016/open                   160,833,535  160,442,849   -0.24%
+54016/string-generic         345,371,584  343,967,890   -0.41%
+cv/noop-generic               15,090,580   15,073,731   -0.11%
+cv/number-generic             31,575,549   31,531,043   -0.14%
+cv/number-plan                63,215,305   63,121,870   -0.15%
+cv/number-source-backed      114,019,837  100,983,635  -11.43%
+cv/open                       14,923,978   14,861,175   -0.42%
+cv/string-generic             32,172,723   32,239,528   +0.21%
+formula/noop-generic          30,382,746   30,679,687   +0.98%
+formula/number-generic        62,142,191   62,380,663   +0.38%
+formula/open                  29,800,525   30,086,389   +0.96%
+formula/string-generic        64,501,727   64,876,669   +0.58%
+
+the rows that carry the change (54016/number-source-backed):
+     -260,328,284  :new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     +260,074,700  :parse_workbook'Workbook>::new'<Snapshot>::open_package
+     -260,006,192  :parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     +157,867,348  :open_package'<Transaction>::commit_source_backed'xls_edit_probe::main
+     -155,550,870  :from_bytes'<Transaction>::commit_source_backed'xls_edit_probe::main
+     -151,474,329  :from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     -151,377,890  :from_package_editor'<Snapshot>::from_bytes'<Transaction>::commit_source_backed
+     +151,238,747  :open_package'<Snapshot>::from_bytes'xls_edit_probe::main
+     -145,614,525  :commit_source_backed'xls_edit_probe::main
+     -139,508,630  (below main)'0x0000000000023cc0
+     -139,508,630  __libc_start_main@@GLIBC_2.34'(below main)'0x0000000000023cc0
+     -139,508,630  :rt::lang_start_internal'main'(below main)
+     -139,508,630  :rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}'std::rt::lang_start_
+     -139,508,630  0x0000000000023cc0
+
+==============================================================================
+4. NATIVE perf stat, per operation
+==============================================================================
+scenario                    cycles before  cycles after        d  instr before  instr after        d
+--------------------------  -------------  ------------  -------  ------------  -----------  -------
+54016/noop-generic             49,619,971    47,360,360   -4.55%   152,735,753  152,296,253   -0.29%
+54016/number-generic          111,268,253   107,497,063   -3.39%   298,647,202  298,085,160   -0.19%
+54016/number-plan             110,996,829   107,169,456   -3.45%   297,111,926  296,661,892   -0.15%
+54016/number-source-backed    179,110,791   128,547,808  -28.23%   467,095,195  328,369,298  -29.70%
+54016/open                     50,190,782    49,505,851   -1.36%   149,063,439  148,732,582   -0.22%
+54016/string-generic          107,300,976   102,976,502   -4.03%   309,723,882  308,942,591   -0.25%
+cv/noop-generic                 4,771,461     4,852,846   +1.71%    13,917,646   13,904,732   -0.09%
+cv/number-generic               9,774,271     9,959,955   +1.90%    27,516,871   27,834,075   +1.15%
+cv/number-plan                 10,363,448    10,532,215   +1.63%    27,917,132   28,041,362   +0.44%
+cv/number-source-backed        16,660,730    12,244,019  -26.51%    43,664,526   30,876,780  -29.29%
+cv/open                         4,761,343     4,826,027   +1.36%    13,701,413   13,689,189   -0.09%
+cv/string-generic               9,804,869     9,990,023   +1.89%    27,941,862   28,124,020   +0.65%
+formula/noop-generic           10,086,304     9,817,291   -2.67%    29,338,455   28,199,335   -3.88%
+formula/number-generic         20,346,620    21,028,303   +3.35%    57,925,675   58,511,761   +1.01%
+formula/open                    9,924,065    10,134,290   +2.12%    28,754,876   28,673,650   -0.28%
+formula/string-generic         20,792,727    21,182,890   +1.88%    59,842,208   59,628,485   -0.36%
+
+==============================================================================
+5. PAIRED WALL CLOCK, A1 B1 B2 A2, both rounds
+==============================================================================
+
+-- round 1: p50 ns per phase
+scenario                    phase       a1 p50      b1 p50      fwd      rev      A/A      B/B
+--------------------------  ------  ----------  ----------  -------  -------  -------  -------
+54016/noop-generic          open    12,554,440  14,937,642  +18.98%  +45.56%   +6.19%  +29.91%
+54016/number-generic        open    12,202,558  12,816,466   +5.03%  -17.93%  +36.24%   +6.46%
+54016/number-generic        commit  12,385,709  13,187,843   +6.48%  -19.91%  +39.85%   +5.20%
+54016/number-plan           open    11,550,670  12,664,290   +9.64%   +3.36%  +16.18%   +9.52%
+54016/number-plan           commit  11,349,683  12,485,928  +10.01%   +2.72%  +15.48%   +7.83%
+54016/number-source-backed  open    11,993,682  12,851,516   +7.15%   -1.06%  +12.66%   +4.02%
+54016/number-source-backed  commit  26,407,967  16,337,805  -38.13%  -43.18%  +12.30%   +3.14%
+54016/open                  open    11,302,693  12,009,488   +6.25%  -25.46%  +46.70%   +2.92%
+54016/string-generic        open    12,036,473  13,682,581  +13.68%  +12.07%  +10.06%   +8.51%
+54016/string-generic        commit  12,306,130  14,291,599  +16.13%  +24.89%  +11.85%  +20.28%
+cv/noop-generic             open     1,026,009   1,026,546   +0.05%   -5.73%   +6.77%   +0.61%
+cv/number-generic           open     1,009,639   1,050,991   +4.10%   +1.62%   +2.48%   +0.04%
+cv/number-generic           commit   1,106,124   1,239,387  +12.05%   +4.28%   +5.34%   -1.97%
+cv/number-plan              open     1,040,034   1,050,400   +1.00%   +0.52%   +0.57%   +0.09%
+cv/number-plan              commit   1,080,790   1,122,996   +3.91%   +2.26%   +1.58%   -0.02%
+cv/number-source-backed     open     1,032,024   1,035,326   +0.32%   -0.09%   +3.98%   +3.55%
+cv/number-source-backed     commit   2,508,700   1,568,028  -37.50%  -35.95%   +5.14%   +7.73%
+cv/open                     open       975,544     994,386   +1.93%   +0.07%   +2.64%   +0.76%
+cv/string-generic           open     1,010,369   1,121,371  +10.99%   +1.79%   +0.44%   -7.88%
+cv/string-generic           commit   1,143,570   1,312,358  +14.76%   +3.96%   +1.75%   -7.82%
+formula/noop-generic        open     2,210,909   2,173,062   -1.71%  +49.42%   +2.83%  +56.32%
+formula/number-generic      open     2,152,768   2,245,853   +4.32%   +3.66%   +4.17%   +3.50%
+formula/number-generic      commit   2,247,574   2,371,078   +5.49%   +5.03%   +6.20%   +5.73%
+formula/open                open     2,159,349   2,273,852   +5.30%   -4.47%  +10.11%   -0.11%
+formula/string-generic      open     2,140,374   2,230,108   +4.19%  +16.51%   +3.33%  +15.54%
+formula/string-generic      commit   2,354,059   2,461,574   +4.57%  +53.87%   +4.92%  +54.38%
+
+   the changed scenario at every quantile:
+   54016/number-source-backed   mean  a1=  26,576,115 b1=  16,333,315 b2=  16,874,715 a2=  29,989,580  fwd  -38.54%  rev  -43.73%  A/A +12.84%  B/B  +3.31%
+   54016/number-source-backed   p50   a1=  26,407,967 b1=  16,337,805 b2=  16,850,780 a2=  29,655,022  fwd  -38.13%  rev  -43.18%  A/A +12.30%  B/B  +3.14%
+   54016/number-source-backed   p95   a1=  28,461,419 b1=  16,598,661 b2=  17,209,878 a2=  31,037,235  fwd  -41.68%  rev  -44.55%  A/A  +9.05%  B/B  +3.68%
+   54016/number-source-backed   p99   a1=  29,033,942 b1=  16,960,314 b2=  17,606,530 a2=  40,165,690  fwd  -41.58%  rev  -56.17%  A/A +38.34%  B/B  +3.81%
+   cv/number-source-backed      mean  a1=   2,510,040 b1=   1,822,000 b2=   2,439,546 a2=   2,644,690  fwd  -27.41%  rev   -7.76%  A/A  +5.36%  B/B +33.89%
+   cv/number-source-backed      p50   a1=   2,508,700 b1=   1,568,028 b2=   1,689,254 a2=   2,637,560  fwd  -37.50%  rev  -35.95%  A/A  +5.14%  B/B  +7.73%
+   cv/number-source-backed      p95   a1=   2,541,820 b1=   4,636,515 b2=   4,854,038 a2=   2,729,075  fwd  +82.41%  rev  +77.86%  A/A  +7.37%  B/B  +4.69%
+   cv/number-source-backed      p99   a1=   2,551,750 b1=   4,712,616 b2=   5,408,351 a2=   2,984,636  fwd  +84.68%  rev  +81.21%  A/A +16.96%  B/B +14.76%
+
+-- round 2: p50 ns per phase
+scenario                    phase       a1 p50      b1 p50      fwd      rev      A/A     B/B
+--------------------------  ------  ----------  ----------  -------  -------  -------  ------
+54016/noop-generic          open    12,859,530  13,129,077   +2.10%   +6.74%  -12.22%  -8.23%
+54016/number-generic        open    13,599,594  13,602,895   +0.02%   -2.22%   -7.01%  -9.10%
+54016/number-generic        commit  13,585,789  13,896,482   +2.29%   -0.31%   -5.51%  -7.91%
+54016/number-plan           open    13,503,684  13,559,754   +0.42%   -1.09%   -3.79%  -5.24%
+54016/number-plan           commit  13,175,258  13,297,568   +0.93%   -0.32%   -3.25%  -4.44%
+54016/number-source-backed  open    13,412,004  13,592,890   +1.35%   -3.18%   -2.94%  -7.27%
+54016/number-source-backed  commit  29,371,626  17,087,239  -41.82%  -44.06%   -2.28%  -6.04%
+54016/open                  open    12,888,196  12,938,861   +0.39%   -3.51%   -2.78%  -6.56%
+54016/string-generic        open    13,213,342  13,342,423   +0.98%   +3.61%  -10.57%  -8.24%
+54016/string-generic        commit  13,713,030  14,021,356   +2.25%   +5.16%  -10.44%  -7.88%
+cv/noop-generic             open       998,175   1,032,560   +3.44%   -1.50%   +3.26%  -1.67%
+cv/number-generic           open     1,018,396   1,031,925   +1.33%   +1.40%   -0.04%  +0.03%
+cv/number-generic           commit   1,122,826   1,175,316   +4.67%   +3.68%   +0.70%  -0.26%
+cv/number-plan              open     1,040,231   1,039,036   -0.11%   -3.41%   +0.66%  -2.66%
+cv/number-plan              commit   1,099,451   1,127,942   +2.59%   +2.00%   -1.51%  -2.08%
+cv/number-source-backed     open     1,035,650   1,037,911   +0.22%   -0.42%   -2.05%  -2.67%
+cv/number-source-backed     commit   2,554,364   1,588,174  -37.83%  -37.33%   -2.85%  -2.09%
+cv/open                     open     1,001,120     995,510   -0.56%   -2.70%   +1.04%  -1.13%
+cv/string-generic           open     1,005,481   1,025,600   +2.00%   +1.40%   -0.14%  -0.74%
+cv/string-generic           commit   1,130,246   1,178,202   +4.24%   +4.72%   -1.16%  -0.71%
+formula/noop-generic        open     2,227,402   2,168,522   -2.64%   -3.77%   +1.03%  -0.13%
+formula/number-generic      open     2,194,137   2,210,653   +0.75%   +0.75%   -0.01%  -0.02%
+formula/number-generic      commit   2,302,688   2,305,732   +0.13%   +1.69%   -0.46%  +1.09%
+formula/open                open     2,197,527   2,229,712   +1.46%   +1.84%   -0.85%  -0.49%
+formula/string-generic      open     2,216,527   2,209,857   -0.30%   +1.09%   -1.26%  +0.11%
+formula/string-generic      commit   2,456,498   2,407,748   -1.98%   -2.44%   -0.09%  -0.56%
+
+   the changed scenario at every quantile:
+   54016/number-source-backed   mean  a1=  29,357,524 b1=  17,169,611 b2=  16,097,716 a2=  28,692,488  fwd  -41.52%  rev  -43.90%  A/A  -2.27%  B/B  -6.24%
+   54016/number-source-backed   p50   a1=  29,371,626 b1=  17,087,239 b2=  16,055,818 a2=  28,701,277  fwd  -41.82%  rev  -44.06%  A/A  -2.28%  B/B  -6.04%
+   54016/number-source-backed   p95   a1=  30,260,036 b1=  17,769,428 b2=  16,612,521 a2=  29,524,681  fwd  -41.28%  rev  -43.73%  A/A  -2.43%  B/B  -6.51%
+   54016/number-source-backed   p99   a1=  30,713,728 b1=  19,002,194 b2=  16,890,272 a2=  30,086,585  fwd  -38.13%  rev  -43.86%  A/A  -2.04%  B/B -11.11%
+   cv/number-source-backed      mean  a1=   2,559,480 b1=   1,593,204 b2=   1,555,407 a2=   2,504,306  fwd  -37.75%  rev  -37.89%  A/A  -2.16%  B/B  -2.37%
+   cv/number-source-backed      p50   a1=   2,554,364 b1=   1,588,174 b2=   1,555,034 a2=   2,481,448  fwd  -37.83%  rev  -37.33%  A/A  -2.85%  B/B  -2.09%
+   cv/number-source-backed      p95   a1=   2,626,064 b1=   1,638,289 b2=   1,588,509 a2=   2,523,954  fwd  -37.61%  rev  -37.06%  A/A  -3.89%  B/B  -3.04%
+   cv/number-source-backed      p99   a1=   2,847,976 b1=   1,719,439 b2=   1,602,319 a2=   2,711,995  fwd  -39.63%  rev  -40.92%  A/A  -4.77%  B/B  -6.81%
+
+-- round 3 (quoted: smallest floor on both changed scenarios): p50 ns per phase
+scenario                    phase       a1 p50      b1 p50      fwd      rev      A/A     B/B
+--------------------------  ------  ----------  ----------  -------  -------  -------  ------
+54016/noop-generic          open    11,245,392  11,977,926   +6.51%   -1.70%   +2.12%  -5.75%
+54016/number-generic        open    10,843,180  12,271,236  +13.17%   +0.27%  +10.15%  -2.41%
+54016/number-generic        commit  10,993,070  12,673,719  +15.29%   +1.79%  +10.54%  -2.40%
+54016/number-plan           open    10,598,958  11,993,230  +13.15%   +7.99%   +5.90%  +1.07%
+54016/number-plan           commit  10,417,792  11,805,100  +13.32%   +8.04%   +6.61%  +1.64%
+54016/number-source-backed  open    11,536,633  12,351,102   +7.06%   +5.67%   +0.26%  -1.03%
+54016/number-source-backed  commit  25,781,630  15,856,600  -38.50%  -38.25%   -0.15%  +0.25%
+54016/open                  open    10,722,604  10,932,210   +1.95%   +7.43%   +0.52%  +5.91%
+54016/string-generic        open    11,309,792  12,150,556   +7.43%   +6.77%   +1.29%  +0.67%
+54016/string-generic        commit  11,925,990  12,815,889   +7.46%   +8.16%   +0.05%  +0.70%
+cv/noop-generic             open     1,034,136     982,005   -5.04%   -2.95%   -0.31%  +1.89%
+cv/number-generic           open     1,007,620   1,018,390   +1.07%   +0.85%   +0.41%  +0.20%
+cv/number-generic           commit   1,121,906   1,161,021   +3.49%   +3.34%   -0.69%  -0.84%
+cv/number-plan              open     1,025,990   1,038,650   +1.23%   -0.05%   +0.77%  -0.50%
+cv/number-plan              commit   1,086,476   1,113,936   +2.53%   +2.39%   -0.83%  -0.96%
+cv/number-source-backed     open     1,000,500   1,018,035   +1.75%   +0.09%   +1.17%  -0.48%
+cv/number-source-backed     commit   2,432,018   1,583,743  -34.88%  -36.75%   +1.92%  -1.01%
+cv/open                     open       972,855     981,250   +0.86%   +0.32%   +0.17%  -0.37%
+cv/string-generic           open     1,006,600   1,016,205   +0.95%   +0.70%   -0.05%  -0.30%
+cv/string-generic           commit   1,106,190   1,154,811   +4.40%   +2.61%   +2.57%  +0.82%
+formula/noop-generic        open     2,196,932   2,157,366   -1.80%   -1.90%   -0.04%  -0.14%
+formula/number-generic      open     2,193,341   2,197,391   +0.18%   +3.06%   -2.05%  +0.76%
+formula/number-generic      commit   2,281,156   2,289,546   +0.37%   +4.67%   -2.47%  +1.72%
+formula/open                open     2,170,496   2,221,281   +2.34%   +2.53%   -0.34%  -0.15%
+formula/string-generic      open     2,159,496   2,207,026   +2.20%   +2.80%   -1.56%  -0.99%
+formula/string-generic      commit   2,327,292   2,409,328   +3.52%   +2.97%   +0.51%  -0.02%
+
+   the changed scenario at every quantile:
+   54016/number-source-backed   mean  a1=  25,809,723 b1=  15,914,291 b2=  15,896,521 a2=  25,955,721  fwd  -38.34%  rev  -38.76%  A/A  +0.57%  B/B  -0.11%
+   54016/number-source-backed   p50   a1=  25,781,630 b1=  15,856,600 b2=  15,896,240 a2=  25,743,793  fwd  -38.50%  rev  -38.25%  A/A  -0.15%  B/B  +0.25%
+   54016/number-source-backed   p95   a1=  26,811,265 b1=  16,225,512 b2=  16,406,033 a2=  27,962,295  fwd  -39.48%  rev  -41.33%  A/A  +4.29%  B/B  +1.11%
+   54016/number-source-backed   p99   a1=  27,360,807 b1=  16,830,734 b2=  16,701,414 a2=  28,166,126  fwd  -38.49%  rev  -40.70%  A/A  +2.94%  B/B  -0.77%
+   cv/number-source-backed      mean  a1=   2,437,108 b1=   1,584,498 b2=   1,566,206 a2=   2,479,380  fwd  -34.98%  rev  -36.83%  A/A  +1.73%  B/B  -1.15%
+   cv/number-source-backed      p50   a1=   2,432,018 b1=   1,583,743 b2=   1,567,764 a2=   2,478,728  fwd  -34.88%  rev  -36.75%  A/A  +1.92%  B/B  -1.01%
+   cv/number-source-backed      p95   a1=   2,469,562 b1=   1,620,358 b2=   1,589,678 a2=   2,517,603  fwd  -34.39%  rev  -36.86%  A/A  +1.95%  B/B  -1.89%
+   cv/number-source-backed      p99   a1=   2,576,553 b1=   1,629,688 b2=   1,633,408 a2=   2,576,924  fwd  -36.75%  rev  -36.61%  A/A  +0.01%  B/B  +0.23%
+
+==============================================================================
+6. REGISTERED SELECTORS
+==============================================================================
+# change 0633 registered selectors: A1 B1 B2 A2, p50 ns, both directions and both same-binary floors
+case                                           phase               a1 p50        b1 p50      fwd      rev      A/A      B/B  output_sha256 identical a1=b1=b2=a2
+xls_numeric_eager_number_edit_save             elapsed_ns      31,184,320    30,474,757   -2.28%   -0.62%   -0.85%   +0.83%  True (f8f37064dc84)
+xls_numeric_eager_rk_mulrk_edit_save           elapsed_ns          99,421        97,750   -1.68%   +2.98%   -0.68%   +4.02%  True (ddf5d5b81d67)
+xls_numeric_plan_only_number_edit_save         elapsed_ns      33,708,575    33,704,454   -0.01%   +0.04%   -0.29%   -0.24%  True (f8f37064dc84)
+xls_numeric_plan_only_rk_mulrk_edit_save       elapsed_ns         408,093       405,852   -0.55%   +0.19%   -0.55%   +0.19%  True (ddf5d5b81d67)
+xls_numeric_source_backed_number_edit_save     elapsed_ns      78,071,628    78,322,290   +0.32%   -1.86%   +0.52%   -1.67%  True (f8f37064dc84)
+xls_numeric_source_backed_rk_mulrk_edit_save   elapsed_ns         842,164       825,785   -1.94%   -1.84%   -0.29%   -0.18%  True (ddf5d5b81d67)
+xls_owned_source_open                          elapsed_ns          89,861        97,200   +8.17%   +7.07%   -0.07%   -1.08%  True (6a57231ba681)
+xls_owned_source_open_list_worksheets          elapsed_ns          89,090        95,381   +7.06%   +4.35%   +2.42%   -0.17%  True (e9f1a47d927d)
+xls_owned_source_open_one_cell                 elapsed_ns          90,160        98,341   +9.07%   +8.30%   +0.16%   -0.56%  True (e726a50d216e)
+xls_semantic_noop_edit_save                    elapsed_ns           1,890         1,520  -19.58%  +47.53%  -14.29%  +57.24%  True (None)
+xls_semantic_one_edit_save                     elapsed_ns       1,491,458     1,487,318   -0.28%   +8.63%   -4.74%   +3.76%  True (None)
+xls_semantic_open                              elapsed_ns       1,373,217     1,421,818   +3.54%   +6.74%   -1.86%   +1.18%  True (None)
+
+# Change 0633: chasing the xls_owned_source_open* selectors' +7% to +9% wall-clock move
+#
+# Those three registered cases drive litchi_xls::SourceBackedWorkbook::from_read_at --
+# the lazy source-backed reader -- and touch no code this change edits. Their p50
+# moved +7.06% to +9.07% forward and +4.35% to +8.30% reverse against same-binary
+# floors under 2.5%, which is above this program's 5% review trigger, so it is chased
+# here with a deterministic count instead of being explained away.
+#
+# Method: callgrind isolation pair over the three cases together, --warmup 2 with
+# --samples 5 and --samples 25, differenced and divided by the 60 extra measured
+# operations (three cases x 20 samples). taskset -c 9, setarch -R.
+
+before  samples=5  PROGRAM TOTALS 4,641,808,031
+before  samples=25 PROGRAM TOTALS 4,880,489,501
+after   samples=5  PROGRAM TOTALS 4,640,254,861
+after   samples=25 PROGRAM TOTALS 4,878,989,869
+
+per measured operation: before 3,978,024 Ir, after 3,978,917 Ir  (+0.02%)
+
+Conclusion: the three owned-source selectors do the same work on both legs to two
+decimal places. The wall-clock move is host noise and code layout on a 90 microsecond
+operation measured while seven other agents shared the machine; it is not work added
+by this change, and no code on that path was touched.
+
+
+==============================================================================
+7. CORRECTNESS ORACLES
+==============================================================================
+fixtures 126, opened 93, refused at open 33
+rows per run 591 (297 typed refusals, 294 publishing)
+rows compared in total 3546
+oracle 1, refusal-text mismatches: 0
+oracle 2, non-digest field mismatches: 0
+oracle 3, digest mismatches over 591 reproducible rows: 0
+          rows excluded as not reproducible within one binary: 0
+
+16-run repetition, before leg:
+  59858.xls                            noop-generic           1 distinct digest(s)
+  59858.xls                            number-generic         1 distinct digest(s)
+  59858.xls                            string-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        noop-generic           1 distinct digest(s)
+  pivottable_dates_grouping.xls        number-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        string-generic         1 distinct digest(s)
+
+16-run repetition, after leg:
+  59858.xls                            noop-generic           1 distinct digest(s)
+  59858.xls                            number-generic         1 distinct digest(s)
+  59858.xls                            string-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        noop-generic           1 distinct digest(s)
+  pivottable_dates_grouping.xls        number-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        string-generic         1 distinct digest(s)
+
+-- 0541-style first-error matrix over synthetic malformed workbooks
+   cases: 29; rows differing between the legs: 0
+   00-control-unmodified                  ok       worksheets=1
+   01-control-repackaged                  ok       worksheets=1
+   10-globals-bof-kind                    ok       worksheets=1
+   11-globals-bof-payload-truncated       refused  Invalid length: expected 4, found 2
+   12-globals-bof-substream-kind          refused  Invalid record 0x0809: expected BIFF8 substream 0x0005, found version 0x0600 and substream 0x0006
+   13-globals-no-eof                      refused  Invalid record 0x0809: expected BIFF8 substream 0x0010, found version 0x4F5A and substream 0x07CD
+   14-globals-file-pass                   refused  Workbook password is required
+   15-globals-duplicate-sst               refused  Invalid record 0x00FC: SST header is truncated or duplicated
+   16-globals-truncated-sst               refused  Invalid record 0x00FC: SST header is truncated or duplicated
+   17-globals-no-xf                       refused  Unsafe edit refused: opened-workbook transaction requires at least one XF resource
+   18-globals-unknown-codepage            refused  Encoding error: unsupported code page 57005
+   20-boundsheet-position-past-end        refused  Invalid record 0x0085: BoundSheet8 points outside the Workbook stream
+   21-boundsheet-duplicate-position       refused  Invalid record 0x0085: multiple BoundSheet8 records point to one substream
+   22-boundsheet-duplicate-name           refused  Invalid record 0x0085: duplicate case-insensitive BoundSheet8 name: "Sheet1"
+   30-worksheet-bof-substream-kind        refused  Invalid record 0x0809: expected BIFF8 substream 0x0010, found version 0x0600 and substream 0x0005
+   31-worksheet-bof-kind                  refused  Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
+   32-worksheet-no-eof                    refused  End of file: worksheet EOF
+   40-number-payload-truncated            refused  Invalid length: expected 14, found 10
+   41-number-nan                          refused  Invalid record 0x0203: Number contains an Xnum forbidden by MS-XLS 2.5.342
+   42-cell-xf-index-past-end              refused  Invalid record 0x0203: cell XF index 4095 is outside 21 workbook resources
+   43-labelsst-index-past-sst             refused  Invalid record 0x00FD: LabelSst index 32767 is outside the SST
+   44-boolerr-bad-flag                    refused  Invalid record 0x0205: BoolErr has an invalid Boolean value or error flag
+   45-formula-string-cache-without-string refused  Invalid record 0x00D7: string-valued Formula is not followed by its String record
+   46-formula-payload-truncated           refused  Invalid length: expected 22, found 20
+   47-stray-string-after-numeric-formula  refused  Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
+   50-trailing-partial-header             ok       worksheets=1
+   51-record-payload-overruns             refused  Invalid data: record bytes limit exceeded: observed 65520, maximum 8224
+   60-no-workbook-stream                  refused  Invalid data: XLS package has no Workbook or Book stream
+   61-book-stream-alias                   ok       worksheets=1
