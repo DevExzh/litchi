@@ -3,7 +3,7 @@
 use crate::mce::Name;
 use crate::{Error, Result};
 use litchi_opc::part::XmlPart;
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -442,17 +442,20 @@ pub(crate) fn apply_items(
         )?;
 
         if let (Some(props_part), Some(props_xml)) = (item.props_part(), item.props_xml()) {
-            let mut state = before
-                .source()
-                .part(props_part)
-                .cloned()
-                .or_else(|| package.get_part(props_part).ok().map(PartState::capture))
-                .unwrap_or_else(|| PartState {
-                    name: props_part.clone(),
-                    content_type: PROPS_CONTENT_TYPE.into(),
-                    data: Arc::new(Vec::new()),
-                    relationships: Vec::new(),
-                });
+            let mut state = before.source().part(props_part).cloned();
+            if state.is_none() {
+                state = match package.get_part(props_part) {
+                    Ok(part) => Some(PartState::capture(part)),
+                    Err(OpcError::PartNotFound(_)) => None,
+                    Err(error) => return Err(error.into()),
+                };
+            }
+            let mut state = state.unwrap_or_else(|| PartState {
+                name: props_part.clone(),
+                content_type: PROPS_CONTENT_TYPE.into(),
+                data: Arc::new(Vec::new()),
+                relationships: Vec::new(),
+            });
             state.content_type = PROPS_CONTENT_TYPE.into();
             state.data = Arc::new(props_xml.to_vec());
             staged_state(&mut staged, state)?;
@@ -534,28 +537,33 @@ fn validate_destinations(
             .iter()
             .any(|existing| existing.name == part.name);
         let is_host = desired.iter().any(|item| item.source() == &part.name);
-        if let Ok(existing) = package.get_part(&part.name) {
-            if !belongs_to_source && !is_host {
-                return invalid(format!(
-                    "custom XML destination part '{}' is occupied",
+        match package.get_part(&part.name) {
+            Ok(existing) => {
+                if !belongs_to_source && !is_host {
+                    return invalid(format!(
+                        "custom XML destination part '{}' is occupied",
+                        part.name.as_str()
+                    ));
+                }
+                if belongs_to_source
+                    && !before
+                        .source()
+                        .part(existing.partname())
+                        .is_some_and(|source| source.matches(existing))
+                {
+                    return Err(super::snapshot::source_mismatch());
+                }
+            },
+            Err(OpcError::PartNotFound(_)) if !belongs_to_source => {
+                package.validate_new_part_name(&part.name)?;
+            },
+            Err(OpcError::PartNotFound(_)) => {
+                return Err(Error::Missing(format!(
+                    "custom XML source part '{}' disappeared",
                     part.name.as_str()
-                ));
-            }
-            if belongs_to_source
-                && !before
-                    .source()
-                    .part(existing.partname())
-                    .is_some_and(|source| source.matches(existing))
-            {
-                return Err(super::snapshot::source_mismatch());
-            }
-        } else if !belongs_to_source {
-            package.validate_new_part_name(&part.name)?;
-        } else {
-            return Err(Error::Missing(format!(
-                "custom XML source part '{}' disappeared",
-                part.name.as_str()
-            )));
+                )));
+            },
+            Err(error) => return Err(error.into()),
         }
     }
     Ok(())

@@ -106,7 +106,8 @@ fn relationship_state(rels: &Relationships) -> Vec<(String, String, String, bool
 fn opc_state(package: &Package) -> OpcState {
     let opc = package.opc_package();
     let mut parts = opc
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| OpcPartState {
             name: part.partname().as_str().to_owned(),
             content_type: part.content_type().to_owned(),

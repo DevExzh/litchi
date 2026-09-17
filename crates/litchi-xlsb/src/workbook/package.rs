@@ -19,8 +19,8 @@ use crate::sparkline;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
-use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type, relationship_type};
+use litchi_opc::{OpcError, OpcPackage};
 use std::collections::HashMap;
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
@@ -1217,10 +1217,14 @@ impl Workbook {
     /// Load shared strings from xl/sharedStrings.bin
     fn load_shared_strings(&mut self) -> Result<()> {
         let shared_strings_uri = litchi_opc::PackURI::new("/xl/sharedStrings.bin")?;
-        if let Ok(shared_strings_part) = self.package.get_part(&shared_strings_uri) {
-            let blob = shared_strings_part.blob();
-            let mut iter = Records::new(blob);
-            Self::read_shared_strings(&mut iter, &mut self.shared_strings)?;
+        match self.package.get_part(&shared_strings_uri) {
+            Ok(shared_strings_part) => {
+                let blob = shared_strings_part.blob();
+                let mut iter = Records::new(blob);
+                Self::read_shared_strings(&mut iter, &mut self.shared_strings)?;
+            },
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
 
         Ok(())
@@ -1230,8 +1234,10 @@ impl Workbook {
     /// for minimal producer files that omit the optional styles part.
     fn load_styles(&mut self) -> Result<()> {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
-        if let Ok(styles_part) = self.package.get_part(&styles_uri) {
-            self.styles = StylesTable::from_bytes(styles_part.blob())?;
+        match self.package.get_part(&styles_uri) {
+            Ok(styles_part) => self.styles = StylesTable::from_bytes(styles_part.blob())?,
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
         Ok(())
     }

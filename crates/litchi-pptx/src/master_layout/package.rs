@@ -307,7 +307,10 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
         if part.content_type() != ct::PML_SLIDE_MASTER {
             continue;
         }
-        for reference in parse_layout_id_list(part.blob())? {
+        // Only a slide-master part's payload is parsed, so only a slide
+        // master's payload is decoded (ADR 0030).
+        let master_blob = package.get_part(part.partname())?.blob();
+        for reference in parse_layout_id_list(master_blob)? {
             let Some(relationship) = part.rels().get(reference.relationship_id()) else {
                 continue;
             };
@@ -751,8 +754,10 @@ fn next_part_index(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<u
     loop {
         let candidate = PackURI::new(format!("{prefix}{index}{suffix}"))
             .map_err(|error| Error::Uri(format!("partname allocation: {error}")))?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(index);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(index),
+            Err(error) => return Err(error.into()),
         }
         index = index
             .checked_add(1)
@@ -774,12 +779,16 @@ fn theme_target_for_new_master(
             continue;
         }
         for relationship in part.rels().iter() {
-            if relationship.reltype() == rt::THEME
-                && !relationship.is_external()
-                && let Ok(target) = relationship.target_partname()
-                && package.get_part(&target).is_ok()
-            {
-                return Ok((relative_target(master_dir, target.as_str())?, None));
+            if relationship.reltype() != rt::THEME || relationship.is_external() {
+                continue;
+            }
+            let Ok(target) = relationship.target_partname() else {
+                continue;
+            };
+            match package.get_part(&target) {
+                Ok(_) => return Ok((relative_target(master_dir, target.as_str())?, None)),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => {},
+                Err(error) => return Err(error.into()),
             }
         }
     }

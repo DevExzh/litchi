@@ -423,7 +423,10 @@ fn publication_reopens_and_preserves_every_unselected_part_and_relationship() {
             .collections(),
         expected
     );
-    for source_part in source_package.iter_parts() {
+    for source_part in source_package
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = output_package.get_part(source_part.partname()).unwrap();
         assert_eq!(output_part.content_type(), source_part.content_type());
         assert_eq!(

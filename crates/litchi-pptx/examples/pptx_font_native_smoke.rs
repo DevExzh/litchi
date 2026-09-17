@@ -165,7 +165,8 @@ fn verify(path: &Path, expected_text: &[u8], payload: Payload) -> Result<()> {
         return Err(invalid("presentation embedding flag or schema order is invalid").into());
     }
     let slide_is_visible = opc
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .filter(|part| part.content_type() == ct::PML_SLIDE)
         .any(|slide| {
             find(slide.blob(), expected_text).is_some()

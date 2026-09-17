@@ -181,8 +181,10 @@ fn next_part_uri_after(
         let uri =
             litchi_opc::PackURI::new(format!("/xl/externalLinks/externalLink{candidate}.xml"))
                 .map_err(invalid)?;
-        if package.get_part(&uri).is_err() {
-            return Ok(uri);
+        match package.get_part(&uri) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(uri),
+            Err(error) => return Err(error.into()),
         }
         candidate = candidate
             .checked_add(1)

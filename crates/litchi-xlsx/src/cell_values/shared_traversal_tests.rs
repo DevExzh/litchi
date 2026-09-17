@@ -829,7 +829,10 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
         let Ok(package) = OpcPackage::open(path) else {
             continue;
         };
-        for part in package.iter_parts() {
+        for part in package
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
+        {
             let name = part.partname().as_str().to_owned();
             if !name.starts_with("/xl/worksheets/sheet") || !name.ends_with(".xml") {
                 continue;

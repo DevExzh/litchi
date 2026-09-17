@@ -61,18 +61,23 @@ pub(super) fn compose_part_optional(
     Ok(())
 }
 
-pub(super) fn reference_part(part: &dyn Part) -> bool {
-    let uri = part.partname().as_str();
+/// Whether a part is one whose XML may carry a sheet-name reference.
+///
+/// This is decided from the part's name and content type, never from its
+/// bytes, so a metadata pass can answer it without decoding a deferred
+/// payload (ADR 0030).
+pub(super) fn reference_part_named(partname: &PackURI, content_type: &str) -> bool {
+    let uri = partname.as_str();
     if uri.starts_with("/xl/externalLinks/")
-        || part.content_type() == litchi_opc::constants::content_type::SML_EXTERNAL_LINK
+        || content_type == litchi_opc::constants::content_type::SML_EXTERNAL_LINK
     {
         return false;
     }
     (uri.starts_with("/xl/")
-        && (part.content_type().ends_with("+xml")
-            || part.content_type().ends_with("/xml")
-            || part.content_type() == litchi_opc::constants::content_type::OFC_VML_DRAWING))
-        || part.content_type() == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
+        && (content_type.ends_with("+xml")
+            || content_type.ends_with("/xml")
+            || content_type == litchi_opc::constants::content_type::OFC_VML_DRAWING))
+        || content_type == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
 }
 
 pub(super) fn removal_reference_part(part: &dyn Part) -> bool {

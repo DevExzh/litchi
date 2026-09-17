@@ -870,7 +870,8 @@ fn coordinate(reference: Reference) -> String {
 
 fn package_part_digests(package: &litchi_opc::OpcPackage) -> BTreeMap<String, String> {
     package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| {
             let mut hasher = Sha256::new();
             hasher.update(part.content_type().as_bytes());

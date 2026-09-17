@@ -261,7 +261,7 @@ fn locate(package: &OpcPackage) -> Result<Option<Owner>> {
     let mut parts = package
         .iter_parts()
         .filter(|part| part.content_type() == CONTENT_TYPE);
-    let part_name = parts.next().map(Part::partname);
+    let part_name = parts.next().map(|part| part.partname());
     if parts.next().is_some() {
         return Err(invalid("package has multiple web-settings parts"));
     }

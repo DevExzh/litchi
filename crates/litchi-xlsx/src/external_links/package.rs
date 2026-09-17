@@ -420,11 +420,15 @@ pub(crate) fn apply_entries(
             continue;
         }
 
-        if package.get_part(&entry.part_uri).is_ok() {
-            return Err(invalid(format!(
-                "new external-link part '{}' already exists",
-                entry.part_uri
-            )));
+        match package.get_part(&entry.part_uri) {
+            Ok(_) => {
+                return Err(invalid(format!(
+                    "new external-link part '{}' already exists",
+                    entry.part_uri
+                )));
+            },
+            Err(litchi_opc::OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
         let part = build_external_link_part_with_conformance(
             entry.part_uri.clone(),

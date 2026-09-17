@@ -285,11 +285,14 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     let archive = build_archive()?;
     let opc = OpcPackage::from_bytes(&archive)?;
     let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("DOCX story hyperlink logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("DOCX story hyperlink logical byte count overflows usize")
+        })?;
     let story_uri = PackURI::new("/word/header001.xml")?;
     let story_bytes = opc.get_part(&story_uri)?.blob().len();
     let mut target_payload = Vec::new();

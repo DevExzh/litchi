@@ -267,11 +267,13 @@ fn changed_edit_validates_and_preserves_unknown_xml() {
         "Alicia"
     );
     let person_part = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .find(|part| part.content_type() == PERSONS_CONTENT_TYPE)
         .unwrap();
     let comments_part = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .find(|part| part.content_type() == COMMENTS_CONTENT_TYPE)
         .unwrap();
     assert!(String::from_utf8_lossy(person_part.blob()).contains("personExt"));
@@ -378,7 +380,8 @@ fn graph_fixture(worksheet: &PackURI) -> Graph {
 
 fn owner_image(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
     let mut image: Vec<_> = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .filter(|part| {
             part.content_type() == PERSONS_CONTENT_TYPE
                 || part.content_type() == COMMENTS_CONTENT_TYPE

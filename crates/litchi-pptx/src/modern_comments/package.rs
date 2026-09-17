@@ -745,8 +745,10 @@ mod comments {
         for suffix in 1..=65_537u32 {
             let candidate = PackURI::new(format!("/ppt/comments/modernComment{suffix}.xml"))
                 .map_err(invalid)?;
-            if package.get_part(&candidate).is_err() {
-                return Ok(candidate);
+            match package.get_part(&candidate) {
+                Ok(_) => {},
+                Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+                Err(error) => return Err(error.into()),
             }
         }
         Err(invalid("no free modern comment part name"))
@@ -1286,8 +1288,10 @@ mod authors {
         for suffix in 1..=65_537u32 {
             let candidate =
                 PackURI::new(format!("/ppt/authors/author{suffix}.xml")).map_err(invalid)?;
-            if package.get_part(&candidate).is_err() {
-                return Ok(candidate);
+            match package.get_part(&candidate) {
+                Ok(_) => {},
+                Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+                Err(error) => return Err(error.into()),
             }
         }
         Err(invalid("no free modern comment author part name"))

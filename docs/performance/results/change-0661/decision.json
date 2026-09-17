@@ -1,0 +1,52 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0661",
+  "title": "Owned OPC packages defer part payload decoding until fallible access",
+  "decision": "retained, implemented; ADR 0030 is accepted and its C2' seam is complete",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "Change 0652 decision 3 accepts ADR 0030 (lazy OPC part decode), and change 0651 queue row 3 dispatches the accepted C2' implementation. Change 0610 supplies the frozen design, migration surface, and gates.",
+  "reason_codes": [
+    "Owned-source ingress retains one archive and defers typed-part payload inflation until a fallible accessor requests it.",
+    "The public Part::blob and Part::blob_arc signatures remain unchanged while get_part, get_part_mut, main_document_part, part_by_reltype, and try_iter_parts force and propagate typed failures.",
+    "Infallible iter_parts now exposes metadata without a payload route, preventing accidental hidden I/O or swallowed decode errors.",
+    "Deferred failures are recorded once and remain stable; failed members cannot become valid-looking empty payloads.",
+    "Exact source no-op publication intentionally copies the source archive without validating every untouched payload, while changed/materialized members are forced before publication.",
+    "Optional-part probes distinguish PartNotFound from decode, I/O, allocation, cancellation, and limit errors across the migrated format consumers."
+  ],
+  "accepted_evidence": {
+    "focused_contract_tests": "lazy_part_decode.rs has three passing tests: cold metadata and exact no-op, selected-part-only decode, and stable corrupt-member refusal.",
+    "opc_suite": "cargo test -p litchi-opc -j2 passed 437 unit tests, all integration tests, and 5 doctests.",
+    "workspace_check": "cargo check --workspace -j2 passed after the consumer error audit.",
+    "differential": "differ-eager-vs-lazy.txt has 1,342 MATCH rows and zero MISMATCH rows across 336 fixtures.",
+    "cross_checkout": "before/after cross-checkout artifacts compare equal for member observations, exact no-op, one-part reblob, and XLSX hide; cmp exits 0 for all four pairs.",
+    "read_sets": "The 336-row corpus has 5,077 admitted parts and 45,562,463 inflated bytes across 334 successful opens. Exact no-op decodes 0 parts/0 bytes; one-part reblob decodes 334 parts/389,581 bytes; the current XLSX hide route publishes 33 fixtures and decodes 216/550 parts and 6,044,263/8,274,037 bytes among those published fixtures."
+  },
+  "accepted_costs": {
+    "metadata": "Owned packages retain one deferred member handle and the source archive; a package that reads every member pays the bookkeeping and still performs the same payload work.",
+    "error_timing": "Actual inflated PartBytes and TotalPartBytes checks for deferred members occur at first access; declared-size central-directory preflight remains at open.",
+    "api_break": "iter_parts changes from payload-bearing parts to PartMetadata, and byte-bearing iteration uses the fallible try_iter_parts API, as authorized for early 0.0.x crates.",
+    "measurement_scope": "No timing, RSS, allocator, or release-mode performance claim is made; counters report work-set reads only."
+  },
+  "known_gaps": {
+    "xlsx_route_shape": "The current semantic XLSX hide path decodes 216 of 550 published-fixture parts, so 0610's earlier one-part estimate is retained as design context and not claimed as an implementation result.",
+    "refused_operations": "Signed, malformed, non-XLSX, noncompact, and skipped fixtures retain refusal outcomes; the read-set packet reports them rather than treating them as successful edits.",
+    "corrupt_exact_noop": "Exact no-op output may preserve a known-corrupt untouched source member byte-for-byte. This is intentional source preservation; first access to the member still returns the recorded ZIP failure.",
+    "broad_measurement": "Release-mode timing, peak RSS, and allocator measurement remain unrun and require a separate authorized measurement window."
+  },
+  "withheld": [
+    "any registered speedup or regression",
+    "any claim that the XLSX hide route reads exactly one part",
+    "any claim that an exact no-op validates or repairs a corrupt source member",
+    "any broad release-mode timing, RSS, or allocation result"
+  ],
+  "provenance": {
+    "base_commit": "ab07e2a47",
+    "branch": "perf/0661-opc-lazy-part-decode",
+    "commit": "implementation commit; coordinator reports the final cherry-pick hash",
+    "target_directory": "/tmp/litchi-0661-target",
+    "job_limit": 2,
+    "note": "The retained evidence and before-leg files are under results/change-0661. Shared before-* baseline artifacts remain until coordinator integration is complete."
+  }
+}

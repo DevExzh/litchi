@@ -244,8 +244,10 @@ fn next_part_index(package: &OpcPackage) -> Result<u32> {
     for index in 1..1_000_000u32 {
         let name =
             PackURI::new(format!("/ppt/embeddings/oleObject{index}.bin")).map_err(Error::Uri)?;
-        if package.get_part(&name).is_err() {
-            return Ok(index);
+        match package.get_part(&name) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(index),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(limit("OLE embedding part namespace", 1_000_000))

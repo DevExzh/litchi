@@ -1419,8 +1419,10 @@ fn build_xlsx_repeat_store_oversized_corpus() -> Result<super::Corpus, Box<dyn E
     corpus.manifest.payload_kind = "fixed-medium-grid-with-oversized-selected-worksheet";
     corpus.manifest.archive_bytes = corpus.archive.len();
     corpus.manifest.archive_sha256 = super::sha256_hex(&corpus.archive);
-    corpus.manifest.uncompressed_payload_bytes =
-        package.iter_parts().try_fold(0usize, |total, part| {
+    corpus.manifest.uncompressed_payload_bytes = package
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
             total.checked_add(part.blob().len()).ok_or_else(|| {
                 io::Error::other("XLSX repeated-store logical payload bytes overflow")
             })
@@ -6458,7 +6460,8 @@ struct DocxArchiveSignature {
 fn docx_archive_signature(bytes: &[u8]) -> Result<DocxArchiveSignature, Box<dyn Error>> {
     let package = OpcPackage::from_bytes(bytes)?;
     let mut parts = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| {
             let mut relationships = part
                 .rels()

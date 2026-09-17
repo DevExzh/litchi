@@ -61,8 +61,10 @@ impl Source {
                 resource: "XLSB transaction source parts",
                 source,
             })?;
-        for part in package.iter_parts() {
-            parts.push(SourcePart::capture(part)?);
+        // The fingerprint covers every part's payload, so every payload is
+        // decoded here, where a refusal can still be reported (ADR 0030).
+        for part in package.try_iter_parts() {
+            parts.push(SourcePart::capture(part?)?);
         }
         parts.sort_unstable_by(|left, right| left.name.cmp(&right.name));
         Ok(Self {

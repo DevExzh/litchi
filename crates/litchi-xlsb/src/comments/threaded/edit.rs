@@ -520,7 +520,13 @@ impl SourceState {
             parts.push(SourcePart {
                 part_name: part.partname().to_string(),
                 content_type: part.content_type().to_string(),
-                blob: owner.then(|| part.blob_arc()),
+                // Only an owner part's payload is captured, so only an
+                // owner part's payload is decoded (ADR 0030).
+                blob: if owner {
+                    Some(package.get_part(part.partname())?.blob_arc())
+                } else {
+                    None
+                },
                 relationships,
             });
         }

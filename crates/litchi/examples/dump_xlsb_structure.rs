@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             content_type == "application/vnd.ms-excel.styles" || part_name.ends_with("/styles.bin");
 
         if is_worksheet || is_styles {
-            dump_records(part_name, part.blob())?;
+            dump_records(part_name, package.get_part(part.partname())?.blob())?;
         }
     }
 

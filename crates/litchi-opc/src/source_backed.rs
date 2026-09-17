@@ -12933,8 +12933,11 @@ mod tests {
         let reopened = OpcPackage::from_bytes(&output).unwrap();
         assert_eq!(
             reopened
-                .iter_parts()
-                .find(|part| part.partname().as_str() == "/custom/new.bin")
+                .try_iter_parts()
+                .find_map(|part| {
+                    let part = part.unwrap();
+                    (part.partname().as_str() == "/custom/new.bin").then_some(part)
+                })
                 .unwrap()
                 .blob(),
             b"new payload"

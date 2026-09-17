@@ -14,7 +14,7 @@ use super::graph::{
     validate_package_conformance,
 };
 use super::model::{Binding, Catalog, Conformance};
-use super::{Arc, Error, OpcPackage, PackURI, Part, Result, ct};
+use super::{Arc, Error, OpcError, OpcPackage, PackURI, Part, Result, ct};
 pub(in crate::glossary) struct Owner {
     pub(in crate::glossary) main: PackURI,
     pub(in crate::glossary) root: PackURI,
@@ -147,21 +147,32 @@ pub(in crate::glossary) fn seed_semantic_graph(
             target: part_uri.relative_ref(root_uri.base_uri()),
             external: false,
         });
-        let source = package
-            .main_document_part()?
-            .rels()
-            .iter()
-            .find_map(|relationship| {
-                (!relationship.is_external()
-                    && relationship_kind(graph.conformance, relationship.reltype()) == Some(kind))
-                .then(|| relationship.target_partname().ok())
-                .flatten()
-                .and_then(|target| package.get_part(&target).ok())
-                .filter(|part| {
-                    part.content_type() == content_type && part.rels().iter().next().is_none()
-                })
-                .map(Part::blob_arc)
-            });
+        let source = {
+            let main = package.main_document_part()?;
+            let mut source = None;
+            for relationship in main.rels().iter() {
+                if relationship.is_external()
+                    || relationship_kind(graph.conformance, relationship.reltype()) != Some(kind)
+                {
+                    continue;
+                }
+                let Ok(target) = relationship.target_partname() else {
+                    continue;
+                };
+                match package.get_part(&target) {
+                    Ok(part)
+                        if part.content_type() == content_type
+                            && part.rels().iter().next().is_none() =>
+                    {
+                        source = Some(Part::blob_arc(part));
+                        break;
+                    },
+                    Ok(_) | Err(OpcError::PartNotFound(_)) => {},
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            source
+        };
         let data = source.unwrap_or_else(|| {
             Arc::new(format!(r#"<w:{root} xmlns:w="{namespace}"/>"#).into_bytes())
         });

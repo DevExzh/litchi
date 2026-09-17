@@ -35,7 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(out, "{:-<100}", "")?;
 
     // Collect into a Vec so we can sort for stable, human-friendly output.
-    let mut parts: Vec<_> = pkg.iter_parts().collect();
+    // The size column reads payloads, so this uses the fallible iterator.
+    let mut parts: Vec<_> = pkg.try_iter_parts().collect::<Result<Vec<_>, _>>()?;
     parts.sort_by(|a, b| a.partname().as_str().cmp(b.partname().as_str()));
 
     for part in parts {

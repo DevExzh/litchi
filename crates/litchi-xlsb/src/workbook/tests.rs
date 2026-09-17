@@ -1488,7 +1488,8 @@ fn loads_typed_pivot_cache_definitions_from_package_relationships() {
 /// relationships, in a stable order.
 fn package_digest(package: &OpcPackage) -> Vec<String> {
     let mut digests: Vec<String> = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| {
             let mut hasher = DefaultHasher::new();
             part.content_type().hash(&mut hasher);

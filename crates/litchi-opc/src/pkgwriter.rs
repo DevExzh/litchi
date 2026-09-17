@@ -7,6 +7,7 @@ use crate::content_type::ContentType;
 use crate::error::Result;
 use crate::package::{OpcPackage, SourceMember, SourceMemberKind};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
+use crate::part::Part;
 use crate::phys_pkg::PhysPkgWriter;
 use crate::rel::Relationships;
 use litchi_core::xml::escape_xml;
@@ -66,19 +67,20 @@ struct PublicationPlan<'package> {
 }
 
 struct PlannedPart<'package> {
+    part: &'package dyn Part,
     partname: &'package PackURI,
     content_type: &'package str,
-    blob: &'package [u8],
-    /// Whether publication audits this payload.
+    /// The payload when it is already decoded, and `None` while the part
+    /// still holds the payload its source member carries.
     ///
-    /// An XML payload the package still holds in the very allocation it was
-    /// decoded from is republished exactly as the source wrote it, and the
-    /// eager reader already admitted it, so the plan does not parse it again.
-    /// Every other XML payload — authored, replaced, or spliced from the
-    /// source by a caller — is audited by
-    /// [`PackageWriter::audit_published_xml`] before the plan completes. This
-    /// is a provenance decision, not a byte comparison: see
-    /// [`OpcPackage::holds_original_source_xml`](crate::OpcPackage).
+    /// `None` is a proof, not an absence: a deferred payload that nothing has
+    /// decoded cannot have been replaced, because no caller has ever held its
+    /// bytes. Publication uses that to copy the source member without
+    /// decoding it (ADR 0030).
+    blob: Option<&'package [u8]>,
+    /// Audit every authored/replaced XML allocation, including replacements
+    /// equal to source bytes. Unchanged source allocations and deferred source
+    /// members retain their publication provenance (0665 and ADR 0030).
     audit_payload: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
@@ -89,10 +91,23 @@ struct PlannedPart<'package> {
     relationships: Option<PlannedRelationships>,
 }
 
-impl PlannedPart<'_> {
+impl<'package> PlannedPart<'package> {
     /// Whether publication emits a relationships member for this part.
     fn has_relationships(&self) -> bool {
         self.relationships_pristine || self.relationships.is_some()
+    }
+
+    /// The payload, decoding it if the part still defers it.
+    ///
+    /// Every route that must emit or measure a part's bytes goes through
+    /// this, so a deferred payload's refusal reaches the caller instead of
+    /// being read as an empty member.
+    fn materialized_blob(&self) -> Result<&'package [u8]> {
+        if let Some(blob) = self.blob {
+            return Ok(blob);
+        }
+        self.part.ensure_payload()?;
+        Ok(self.part.blob())
     }
 }
 
@@ -147,7 +162,7 @@ impl<'package> PublicationPlan<'package> {
         // the source manifest describing the package exactly. Removed and
         // added parts are caught by the part-count comparison below.
         let mut content_types_match_source = provenance.is_some();
-        for part in package.iter_parts() {
+        for part in package.iter_parts_undecoded() {
             let source_part =
                 provenance.and_then(|provenance| provenance.parts.get(part.partname()));
             content_types_match_source &= source_part
@@ -159,9 +174,10 @@ impl<'package> PublicationPlan<'package> {
                     })
             });
             parts.push(PlannedPart {
+                part,
                 partname: part.partname(),
                 content_type: part.content_type(),
-                blob: part.blob(),
+                blob: part.decoded_blob(),
                 audit_payload: xml_minifier::audit::package::is_xml_part(
                     part.partname().as_str(),
                     part.content_type(),
@@ -207,7 +223,9 @@ impl<'package> PublicationPlan<'package> {
 
         for part in &mut parts {
             if part.audit_payload {
-                PackageWriter::audit_published_xml(part.partname.as_str(), part.blob)?;
+                let blob = part.materialized_blob()?;
+                part.blob = Some(blob);
+                PackageWriter::audit_published_xml(part.partname.as_str(), blob)?;
             }
             if part.relationships_pristine {
                 continue;
@@ -251,6 +269,10 @@ impl<'package> PublicationPlan<'package> {
             self.package_rels_xml = Some(package_rels_xml);
         }
         for part in &mut self.parts {
+            // The full writer republishes every member, so every payload has
+            // to be materialized — and every decode refusal raised — before a
+            // sequential sink sees a byte.
+            part.blob = Some(part.materialized_blob()?);
             if !part.relationships_pristine {
                 continue;
             }
@@ -279,7 +301,10 @@ impl<'package> PublicationPlan<'package> {
             if part.relationships_pristine {
                 return Err(unmaterialized_publication_error());
             }
-            physical.write(part.partname, part.blob)?;
+            let Some(blob) = part.blob else {
+                return Err(unmaterialized_publication_error());
+            };
+            physical.write(part.partname, blob)?;
             if let Some(relationships) = &part.relationships {
                 physical.write(&relationships.uri, relationships.xml.as_slice())?;
             }
@@ -643,7 +668,11 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                (!source_blob_retained(source_part, part)).then_some(part.blob.len())
+                if source_blob_retained(source_part, part) {
+                    None
+                } else {
+                    Some(part.materialized_blob()?.len())
+                }
             },
             SourceMemberKind::PartRelationships(partname) => {
                 let Some(part) = planned_parts.get(partname) else {
@@ -682,7 +711,7 @@ fn try_write_preserved<W: Write>(
             crate::OpcError::ZipError("OPC appended member count overflow".into())
         })?;
         let bytes = match append {
-            PlannedAppend::Part(part) => part.blob.len(),
+            PlannedAppend::Part(part) => part.materialized_blob()?.len(),
             PlannedAppend::Relationships(part) => {
                 let Some(relationships) = part.relationships.as_ref() else {
                     return Ok(PreservationWrite::Fallback(writer));
@@ -831,7 +860,22 @@ fn try_write_preserved<W: Write>(
 /// comparison is charged. The byte comparison remains the decision for every
 /// part whose payload was replaced.
 fn source_blob_retained(source_part: &crate::package::SourcePart, part: &PlannedPart<'_>) -> bool {
-    std::ptr::eq(source_part.blob.as_slice(), part.blob) || source_part.blob.as_slice() == part.blob
+    let Some(blob) = part.blob else {
+        // The part still holds the payload its source member carries, so no
+        // caller has ever held its bytes and it cannot have been replaced.
+        // The member is copied without decoding it (ADR 0030).
+        return true;
+    };
+    if let Some(source) = source_part.blob.decoded() {
+        return std::ptr::eq(source.as_slice(), blob) || source.as_slice() == blob;
+    }
+    // The part was decoded, so the source payload has to be decoded too to
+    // decide. A source payload that cannot be decoded proves nothing, and the
+    // planned payload is republished instead of copied.
+    source_part
+        .blob
+        .force()
+        .is_ok_and(|source| source.as_slice() == blob)
 }
 
 /// A plan reached the full writer with members only preservation can publish.
@@ -1477,7 +1521,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             pseudo_random_bytes(256 * 1024, 0x1234_5678),
         );
-        crate::Part::relate_to_ext(&mut first_part, "https://example.com/old", "urn:test");
+        Part::relate_to_ext(&mut first_part, "https://example.com/old", "urn:test");
         let mut package = OpcPackage::new();
         package.add_part(Box::new(first_part));
         package.add_part(Box::new(crate::BlobPart::new(
@@ -2138,13 +2182,13 @@ mod tests {
             "application/octet-stream".to_owned(),
             pseudo_random_bytes(4 * 1024, 0x1234_5678),
         );
-        crate::Part::relate_to_ext(&mut first_part, "https://example.com/first", "urn:test");
+        Part::relate_to_ext(&mut first_part, "https://example.com/first", "urn:test");
         let mut second_part = crate::BlobPart::new(
             second.clone(),
             "application/octet-stream".to_owned(),
             pseudo_random_bytes(4 * 1024, 0x8765_4321),
         );
-        crate::Part::relate_to_ext(&mut second_part, "https://example.com/second", "urn:test");
+        Part::relate_to_ext(&mut second_part, "https://example.com/second", "urn:test");
         let mut package = OpcPackage::new();
         package.add_part(Box::new(first_part));
         package.add_part(Box::new(second_part));
@@ -2457,7 +2501,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"third with relationships".to_vec(),
         );
-        crate::Part::relate_to_ext(&mut first_part, "https://example.com/new", "urn:new");
+        Part::relate_to_ext(&mut first_part, "https://example.com/new", "urn:new");
         added.add_part(Box::new(first_part));
         added.add_part(Box::new(crate::BlobPart::new(
             second_added.clone(),
@@ -2732,7 +2776,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"existing".to_vec(),
         );
-        crate::Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
         let mut source_package = OpcPackage::new();
         source_package.add_part(Box::new(existing));
         let source = PackageWriter::to_bytes(&source_package).expect("serialize conflict source");
@@ -2770,7 +2814,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"candidate".to_vec(),
         );
-        crate::Part::relate_to_ext(&mut candidate, "https://example.com", "urn:test");
+        Part::relate_to_ext(&mut candidate, "https://example.com", "urn:test");
         package.add_part(Box::new(candidate));
 
         assert!(matches!(
@@ -2789,7 +2833,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"existing".to_vec(),
         );
-        crate::Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
         source_package.add_part(Box::new(existing));
         let source =
             PackageWriter::to_bytes(&source_package).expect("serialize relationship source");
@@ -2841,7 +2885,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"temporary appended payload".to_vec(),
         );
-        crate::Part::relate_to_ext(
+        Part::relate_to_ext(
             &mut appended_part,
             "https://example.com/temporary",
             "urn:temporary",

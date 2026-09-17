@@ -548,7 +548,10 @@ fn changed_publication_raw_preserves_relationships_and_unselected_members() {
     let source_package = OpcPackage::from_bytes(&source_bytes).unwrap();
     let output_package = OpcPackage::from_bytes(&output).unwrap();
     assert_eq!(source_package.part_count(), output_package.part_count());
-    for source_part in source_package.iter_parts() {
+    for source_part in source_package
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = output_package.get_part(source_part.partname()).unwrap();
         assert_eq!(output_part.content_type(), source_part.content_type());
         assert_eq!(

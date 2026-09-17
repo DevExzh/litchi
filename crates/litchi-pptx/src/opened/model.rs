@@ -855,7 +855,11 @@ pub(crate) fn package_fingerprint_v1(package: &OpcPackage) -> Result<[u8; 32]> {
             resource: "opened-presentation fingerprint parts",
             source,
         })?;
-    parts.extend(package.iter_parts());
+    // The fingerprint feeds every payload, so every payload is decoded here
+    // (ADR 0030).
+    for part in package.try_iter_parts() {
+        parts.push(part?);
+    }
     parts.sort_unstable_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
     let mut digest = Sha256::new();
     feed(&mut digest, b"litchi-pptx-opened-v1");
@@ -922,11 +926,15 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     {
         return false;
     }
-    left.iter_parts().all(|part| {
-        right.get_part(part.partname()).is_ok_and(|other| {
-            part.content_type() == other.content_type()
-                && blobs_equal(part, other)
-                && relationships_equal(part.rels(), other.rels())
+    // A payload that cannot be decoded proves nothing, so it reads as unequal
+    // and the caller falls back to the ordinary capture (ADR 0030).
+    left.try_iter_parts().all(|part| {
+        part.is_ok_and(|part| {
+            right.get_part(part.partname()).is_ok_and(|other| {
+                part.content_type() == other.content_type()
+                    && blobs_equal(part, other)
+                    && relationships_equal(part.rels(), other.rels())
+            })
         })
     })
 }

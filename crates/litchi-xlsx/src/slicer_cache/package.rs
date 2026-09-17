@@ -151,10 +151,14 @@ fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Resul
             value.relationship_id
         )));
     }
-    if package.get_part(&uri).is_ok() {
-        return Err(invalid(format!(
-            "Slicer Cache target '{uri}' already exists"
-        )));
+    match package.get_part(&uri) {
+        Ok(_) => {
+            return Err(invalid(format!(
+                "Slicer Cache target '{uri}' already exists"
+            )));
+        },
+        Err(litchi_opc::OpcError::PartNotFound(_)) => {},
+        Err(error) => return Err(error.into()),
     }
     let xml = write(&value.definition)?;
     let ids = existing

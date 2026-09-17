@@ -176,7 +176,8 @@ fn fixture() -> (OpcPackage, PackURI) {
 
 fn owner_image(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
     let mut image = package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .filter(|part| {
             matches!(
                 part.content_type(),

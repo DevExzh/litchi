@@ -5,7 +5,7 @@ use super::super::{
     TASK_PANES_RELATIONSHIP, VecDeque,
 };
 use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
-use litchi_opc::{BlobPart, TargetMode};
+use litchi_opc::{BlobPart, OpcError, TargetMode};
 /// Opaque, exact, reversible task-pane graph transaction.
 ///
 /// A patch records the precise source and destination state of every affected
@@ -64,7 +64,11 @@ impl Patch {
         for part in planned {
             let name = part.name.clone();
             planned_names.insert(fold_part_name(&name));
-            let before = package.get_part(&name).ok().map(PartState::capture);
+            let before = match package.get_part(&name) {
+                Ok(part) => Some(PartState::capture(part)),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
             parts.push(PartChange {
                 name,
                 before,
@@ -75,13 +79,15 @@ impl Patch {
             if planned_names.contains(&fold_part_name(&name)) {
                 return invalid("planned Web Extensions part is also marked for deletion".into());
             }
-            let before = package
-                .get_part(&name)
-                .ok()
-                .map(PartState::capture)
-                .ok_or_else(|| {
-                    Error::Missing("Web Extensions patch source part disappeared".into())
-                })?;
+            let before = match package.get_part(&name) {
+                Ok(part) => PartState::capture(part),
+                Err(OpcError::PartNotFound(_)) => {
+                    return Err(Error::Missing(
+                        "Web Extensions patch source part disappeared".into(),
+                    ));
+                },
+                Err(error) => return Err(error.into()),
+            };
             parts.push(PartChange {
                 name,
                 before: Some(before),
@@ -233,7 +239,11 @@ impl Patch {
             }
         }
         for change in &self.parts {
-            let actual = package.get_part(&change.name).ok();
+            let actual = match package.get_part(&change.name) {
+                Ok(part) => Some(part),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
             let matches = match (&change.before, actual) {
                 (Some(before), Some(actual)) => before.matches(actual),
                 (None, None) => true,

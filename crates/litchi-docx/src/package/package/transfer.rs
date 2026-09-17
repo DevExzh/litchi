@@ -386,10 +386,12 @@ fn capture_graph_delta(
         .collect::<Vec<_>>();
     main_relationships.sort_by(|left, right| left.id.cmp(&right.id));
     let mut parts = Vec::new();
-    for part in after
-        .iter_parts()
-        .filter(|part| before.get_part(part.partname()).is_err())
-    {
+    for part in after.iter_parts() {
+        match before.get_part(part.partname()) {
+            Ok(_) => continue,
+            Err(litchi_opc::OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(crate::Error::from(error).into()),
+        }
         let mut relationships = part
             .rels()
             .iter()
@@ -399,7 +401,10 @@ fn capture_graph_delta(
         parts.push(TransferPart {
             name: part.partname().as_str().to_owned(),
             content_type: part.content_type().to_owned(),
-            blob: part.blob_arc(),
+            blob: after
+                .get_part(part.partname())
+                .map_err(crate::Error::from)?
+                .blob_arc(),
             relationships: relationships.into(),
         });
     }
@@ -530,7 +535,12 @@ pub(super) fn relationship_graph_digest_opc(
         .map_err(crate::Error::from)?
         .partname()
         .clone();
-    let mut parts = package.iter_parts().collect::<Vec<_>>();
+    // Every part except the main document contributes its payload digest, so
+    // this pass decodes them (ADR 0030).
+    let mut parts = package
+        .try_iter_parts()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(crate::Error::from)?;
     parts.sort_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
     let mut bytes = Vec::new();
     for part in parts {

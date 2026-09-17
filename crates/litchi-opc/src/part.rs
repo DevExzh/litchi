@@ -1,5 +1,7 @@
 use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
+use crate::payload::PartPayload;
+pub use crate::payload::PayloadHandle;
 use crate::rel::{Relationship, Relationships};
 use memchr::memmem;
 use quick_xml::events::Event;
@@ -89,6 +91,49 @@ pub trait Part: PartClone + Send + Sync {
         self.rels_mut().get_or_add_ext_rel(reltype, target_url)
     }
 
+    /// Decode this part's payload if it is still held by a source archive.
+    ///
+    /// A package opened from an owned source keeps each part's payload in the
+    /// retained archive until something asks for it (ADR 0030). Every public
+    /// route that hands a part to a caller outside `litchi-opc` calls this
+    /// first, so a caller never receives a part whose payload has not been
+    /// decoded and never sees a decode refusal swallowed.
+    ///
+    /// Parts that already hold their bytes — every part this crate's callers
+    /// can build — implement this as a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the decode produced: [`OpcError::ReadLimit`] for
+    /// `PartBytes` or `TotalPartBytes` when the central directory
+    /// under-declared the member, an allocation failure, a cancellation, an
+    /// I/O error, or a ZIP error for a corrupt Deflate stream or a CRC
+    /// mismatch. The refusal is recorded, so it is the same value on every
+    /// later access.
+    fn ensure_payload(&self) -> Result<()> {
+        Ok(())
+    }
+
+    /// The payload if it is already available, without decoding anything.
+    ///
+    /// `None` means the part still holds the payload its source member
+    /// carries, so it cannot have been replaced. This is an implementation
+    /// detail of publication planning and is not part of the supported
+    /// surface.
+    #[doc(hidden)]
+    fn decoded_blob(&self) -> Option<&[u8]> {
+        Some(self.blob())
+    }
+
+    /// Capture this part's payload storage without decoding it.
+    ///
+    /// This is an implementation detail of publication planning and is not
+    /// part of the supported surface.
+    #[doc(hidden)]
+    fn payload_handle(&self) -> PayloadHandle {
+        PayloadHandle(PartPayload::ready(self.blob_arc()))
+    }
+
     /// Get the relationships for this part.
     fn rels(&self) -> &Relationships;
 
@@ -163,8 +208,9 @@ pub struct BlobPart {
     /// The content type of this part
     content_type: String,
 
-    /// The binary content of this part (shared via Arc for efficiency)
-    blob: Arc<Vec<u8>>,
+    /// The binary content of this part. A part read from an owned source
+    /// archive holds a deferred payload until something asks for its bytes.
+    blob: PartPayload,
 
     /// Relationships from this part to other parts
     rels: Relationships,
@@ -192,6 +238,11 @@ impl BlobPart {
     /// * `blob` - The shared binary content of this part
     #[must_use]
     pub fn new_shared(partname: PackURI, content_type: String, blob: Arc<Vec<u8>>) -> Self {
+        Self::with_payload(partname, content_type, PartPayload::ready(blob))
+    }
+
+    /// Create a `BlobPart` over payload storage that may still be deferred.
+    pub(crate) fn with_payload(partname: PackURI, content_type: String, blob: PartPayload) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
             partname,
@@ -223,19 +274,31 @@ impl Part for BlobPart {
     }
 
     fn blob(&self) -> &[u8] {
-        &self.blob
+        self.blob.bytes()
     }
 
     fn blob_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.blob)
+        self.blob.arc()
+    }
+
+    fn ensure_payload(&self) -> Result<()> {
+        self.blob.force().map(|_| ())
+    }
+
+    fn decoded_blob(&self) -> Option<&[u8]> {
+        self.blob.decoded().map(|blob| blob.as_slice())
+    }
+
+    fn payload_handle(&self) -> PayloadHandle {
+        PayloadHandle(self.blob.clone())
     }
 
     fn set_blob(&mut self, blob: Vec<u8>) {
-        self.blob = Arc::new(blob);
+        self.blob = PartPayload::ready(Arc::new(blob));
     }
 
     fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
-        self.blob = blob;
+        self.blob = PartPayload::ready(blob);
     }
 
     fn rels(&self) -> &Relationships {
@@ -265,8 +328,10 @@ pub struct XmlPart {
     /// The content type of this part
     content_type: String,
 
-    /// The XML content as raw bytes (UTF-8 encoded, shared via Arc)
-    xml_bytes: Arc<Vec<u8>>,
+    /// The XML content as raw bytes (UTF-8 encoded). A part read from an
+    /// owned source archive holds a deferred payload until something asks for
+    /// its bytes.
+    xml_bytes: PartPayload,
 
     /// Relationships from this part to other parts
     rels: Relationships,
@@ -281,7 +346,7 @@ impl Clone for XmlPart {
         Self {
             partname: self.partname.clone(),
             content_type: self.content_type.clone(),
-            xml_bytes: Arc::clone(&self.xml_bytes),
+            xml_bytes: self.xml_bytes.clone(),
             rels: self.rels.clone(),
             // Parsed lookups are disposable derived state. Cloning them would
             // inflate edit snapshots without preserving additional semantics.
@@ -309,6 +374,15 @@ impl XmlPart {
     /// decompression buffer.
     #[must_use]
     pub fn new_shared(partname: PackURI, content_type: String, xml_bytes: Arc<Vec<u8>>) -> Self {
+        Self::with_payload(partname, content_type, PartPayload::ready(xml_bytes))
+    }
+
+    /// Create an `XmlPart` over payload storage that may still be deferred.
+    pub(crate) fn with_payload(
+        partname: PackURI,
+        content_type: String,
+        xml_bytes: PartPayload,
+    ) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
             partname,
@@ -335,7 +409,7 @@ impl XmlPart {
     /// The reader uses zero-copy parsing where possible.
     #[must_use]
     pub fn reader(&self) -> Reader<&[u8]> {
-        let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
+        let mut reader = Reader::from_reader(self.xml_bytes.bytes());
         reader.config_mut().trim_text(true);
         reader
     }
@@ -451,7 +525,7 @@ impl XmlPart {
     ///
     /// Returns an error if the XML content is not valid UTF-8.
     pub fn xml_str(&self) -> Result<&str> {
-        std::str::from_utf8(&self.xml_bytes).map_err(Into::into)
+        std::str::from_utf8(self.xml_bytes.bytes()).map_err(Into::into)
     }
 }
 
@@ -470,21 +544,33 @@ impl Part for XmlPart {
     }
 
     fn blob(&self) -> &[u8] {
-        &self.xml_bytes
+        self.xml_bytes.bytes()
     }
 
     fn blob_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.xml_bytes)
+        self.xml_bytes.arc()
+    }
+
+    fn ensure_payload(&self) -> Result<()> {
+        self.xml_bytes.force().map(|_| ())
+    }
+
+    fn decoded_blob(&self) -> Option<&[u8]> {
+        self.xml_bytes.decoded().map(|blob| blob.as_slice())
+    }
+
+    fn payload_handle(&self) -> PayloadHandle {
+        PayloadHandle(self.xml_bytes.clone())
     }
 
     fn set_blob(&mut self, blob: Vec<u8>) {
-        self.xml_bytes = Arc::new(blob);
+        self.xml_bytes = PartPayload::ready(Arc::new(blob));
         // Clear cache when blob is updated
         self.element_cache.clear();
     }
 
     fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
-        self.xml_bytes = blob;
+        self.xml_bytes = PartPayload::ready(blob);
         self.element_cache.clear();
     }
 
@@ -494,6 +580,80 @@ impl Part for XmlPart {
 
     fn rels_mut(&mut self) -> &mut Relationships {
         &mut self.rels
+    }
+}
+
+/// A part's name and metadata, without a route to its payload.
+///
+/// [`OpcPackage::iter_parts`](crate::package::OpcPackage::iter_parts) is the
+/// only infallible route to the parts of a package, so it must not be able to
+/// reach a payload: a package opened from an owned source decodes a part's
+/// payload on first access and that decode can fail, and an infallible
+/// iterator has nowhere to report the refusal (ADR 0030). Its item type is
+/// therefore this view, which carries everything a metadata pass needs and
+/// nothing a byte pass does.
+///
+/// Use [`OpcPackage::try_iter_parts`](crate::package::OpcPackage::try_iter_parts)
+/// when the iteration needs payloads: it yields `Result<&dyn Part>` and forces
+/// each part's decode as it yields it.
+#[derive(Clone, Copy)]
+pub struct PartMetadata<'part> {
+    part: &'part (dyn Part + 'part),
+}
+
+impl std::fmt::Debug for PartMetadata<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PartMetadata")
+            .field("partname", &self.part.partname())
+            .field("content_type", &self.part.content_type())
+            .finish()
+    }
+}
+
+impl<'part> PartMetadata<'part> {
+    pub(crate) fn new(part: &'part (dyn Part + 'part)) -> Self {
+        Self { part }
+    }
+
+    /// Get the partname of this part.
+    #[must_use]
+    pub fn partname(&self) -> &'part PackURI {
+        self.part.partname()
+    }
+
+    /// Get the content type of this part.
+    #[must_use]
+    pub fn content_type(&self) -> &'part str {
+        self.part.content_type()
+    }
+
+    /// Get the relationships for this part.
+    #[must_use]
+    pub fn rels(&self) -> &'part Relationships {
+        self.part.rels()
+    }
+
+    /// Get the target reference for a relationship ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::RelationshipNotFound`] if no relationship with the
+    /// given `r_id` exists on this part.
+    pub fn target_ref(&self, r_id: &str) -> Result<&'part str> {
+        self.part.target_ref(r_id)
+    }
+
+    /// Whether this part's payload is already available, without decoding it.
+    ///
+    /// `false` means the part still holds the payload its source member
+    /// carries. This reports what a lazy open has paid and exists for
+    /// measurement and regression tests; it is not part of the supported
+    /// surface.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn payload_is_decoded(&self) -> bool {
+        self.part.decoded_blob().is_some()
     }
 }
 
@@ -541,11 +701,32 @@ impl PartFactory {
         content_type: String,
         blob: Arc<Vec<u8>>,
     ) -> Result<Box<dyn Part + Send + Sync>> {
+        Self::load_payload(partname, content_type, PartPayload::ready(blob))
+    }
+
+    /// Load a part over payload storage that may still be deferred.
+    ///
+    /// The part type is selected from the content type exactly as
+    /// [`Self::load_shared`] selects it, so a deferred part and an eager part
+    /// of the same content type are the same concrete type.
+    pub(crate) fn load_payload(
+        partname: PackURI,
+        content_type: String,
+        blob: PartPayload,
+    ) -> Result<Box<dyn Part + Send + Sync>> {
         // Determine if this is an XML part based on content type
         if Self::is_xml_content_type(&content_type) {
-            Ok(Box::new(XmlPart::new_shared(partname, content_type, blob)))
+            Ok(Box::new(XmlPart::with_payload(
+                partname,
+                content_type,
+                blob,
+            )))
         } else {
-            Ok(Box::new(BlobPart::new_shared(partname, content_type, blob)))
+            Ok(Box::new(BlobPart::with_payload(
+                partname,
+                content_type,
+                blob,
+            )))
         }
     }
 

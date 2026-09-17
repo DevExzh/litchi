@@ -888,7 +888,8 @@ fn make_package_strict(package: &mut Package) -> Result<()> {
 fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
     package
         .opc
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| {
             let mut relationships: Vec<_> = part
                 .rels()

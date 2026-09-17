@@ -100,9 +100,8 @@ impl Package {
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
-        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            let _ = doc_part.relate_to("footnotes.xml", rt::FOOTNOTES);
-        }
+        let doc_part = self.opc.get_part_mut(&doc_uri)?;
+        let _ = doc_part.relate_to("footnotes.xml", rt::FOOTNOTES);
 
         Ok(())
     }
@@ -127,9 +126,8 @@ impl Package {
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
-        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            let _ = doc_part.relate_to("endnotes.xml", rt::ENDNOTES);
-        }
+        let doc_part = self.opc.get_part_mut(&doc_uri)?;
+        let _ = doc_part.relate_to("endnotes.xml", rt::ENDNOTES);
 
         Ok(())
     }
@@ -153,9 +151,8 @@ impl Package {
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
-        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            let _ = doc_part.relate_to("/word/comments.xml", rt::COMMENTS);
-        }
+        let doc_part = self.opc.get_part_mut(&doc_uri)?;
+        let _ = doc_part.relate_to("/word/comments.xml", rt::COMMENTS);
 
         Ok(())
     }
@@ -224,14 +221,15 @@ impl Package {
                         .collect(),
                 )
             },
-            Err(_) if relationship_exists => {
+            Err(litchi_opc::OpcError::PartNotFound(_)) if relationship_exists => {
                 return Err(Error::PartNotFound(format!("settings part {target}")));
             },
-            Err(_) => (
+            Err(litchi_opc::OpcError::PartNotFound(_)) => (
                 ct::WML_SETTINGS.to_owned(),
                 crate::template::default_settings_xml().as_bytes().to_vec(),
                 Vec::new(),
             ),
+            Err(error) => return Err(error.into()),
         };
         Ok(SettingsPartSnapshot {
             document_uri,
@@ -276,19 +274,18 @@ impl Package {
         let doc_uri = PackURI::new("/word/document.xml")
             .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
-        if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-            // Check if theme relationship already exists
-            let has_theme_rel = doc_part.rels().iter().any(|rel| {
-                rel.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
-            });
+        let doc_part = self.opc.get_part_mut(&doc_uri)?;
+        // Check if theme relationship already exists
+        let has_theme_rel = doc_part.rels().iter().any(|rel| {
+            rel.reltype()
+                == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+        });
 
-            if !has_theme_rel {
-                doc_part.relate_to(
-                    "theme/theme1.xml",
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
-                );
-            }
+        if !has_theme_rel {
+            doc_part.relate_to(
+                "theme/theme1.xml",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+            );
         }
 
         Ok(())
@@ -372,9 +369,8 @@ impl Package {
             // Add relationship from document to header (use relative path)
             // Extract filename from the absolute path (e.g., "/word/header1.xml" -> "header1.xml")
             let header_filename = header_path.rsplit('/').next().unwrap_or(header_path);
-            if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
-                doc_part.relate_to(header_filename, rt::HEADER);
-            }
+            let doc_part = self.opc.get_part_mut(&doc_uri)?;
+            doc_part.relate_to(header_filename, rt::HEADER);
         }
 
         Ok(())

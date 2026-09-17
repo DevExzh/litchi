@@ -161,20 +161,23 @@ impl Package {
             Import::Data(data) => {
                 data.validate()?;
                 let media_type = data.media_type();
-                let (uri, target_ref) = (1usize..=MAX_CHUNKS)
-                    .find_map(|number| {
-                        let target_ref = format!("afchunk{number}.{}", data.extension());
-                        let uri = PackURI::new(format!("/word/{target_ref}")).ok()?;
-                        self.opc
-                            .get_part(&uri)
-                            .is_err()
-                            .then_some((uri, target_ref))
-                    })
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(
-                            "alternative-format part-name space is exhausted".into(),
-                        )
-                    })?;
+                let mut selected = None;
+                for number in 1usize..=MAX_CHUNKS {
+                    let target_ref = format!("afchunk{number}.{}", data.extension());
+                    let uri = PackURI::new(format!("/word/{target_ref}"))
+                        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                    match self.opc.get_part(&uri) {
+                        Ok(_) => {},
+                        Err(litchi_opc::OpcError::PartNotFound(_)) => {
+                            selected = Some((uri, target_ref));
+                            break;
+                        },
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                let (uri, target_ref) = selected.ok_or_else(|| {
+                    Error::InvalidFormat("alternative-format part-name space is exhausted".into())
+                })?;
                 self.opc.try_add_part(Box::new(BlobPart::new(
                     uri.clone(),
                     media_type.to_string(),

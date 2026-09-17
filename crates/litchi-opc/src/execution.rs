@@ -220,8 +220,11 @@ mod tests {
 
     fn package_parts(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
         let mut parts = package
-            .iter_parts()
-            .map(|part| (part.partname().to_string(), part.blob().to_vec()))
+            .try_iter_parts()
+            .map(|part| {
+                let part = part.unwrap();
+                (part.partname().to_string(), part.blob().to_vec())
+            })
             .collect::<Vec<_>>();
         parts.sort_unstable_by(|left, right| left.0.cmp(&right.0));
         parts

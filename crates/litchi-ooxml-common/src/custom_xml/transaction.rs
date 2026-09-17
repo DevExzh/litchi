@@ -1,7 +1,7 @@
 //! Source-checked Custom XML package transactions.
 
 use crate::{Error, Result};
-use litchi_opc::{OpcPackage, PackURI, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, TargetMode};
 use std::sync::Arc;
 
 use super::codec::{
@@ -322,11 +322,15 @@ fn new_item(package: &OpcPackage, value: NewItem) -> Result<Item> {
     validate_content_type(&value.content_type)?;
     let root = validate_payload(&value.xml)?;
     require_rel_id(&value.rel_id, "custom XML relationship")?;
-    if package.get_part(&value.source).is_err() {
-        return Err(Error::Missing(format!(
-            "custom XML source '{}' is absent",
-            value.source.as_str()
-        )));
+    match package.get_part(&value.source) {
+        Ok(_) => {},
+        Err(OpcError::PartNotFound(_)) => {
+            return Err(Error::Missing(format!(
+                "custom XML source '{}' is absent",
+                value.source.as_str()
+            )));
+        },
+        Err(error) => return Err(error.into()),
     }
     if value.part.as_str() == "/" {
         return Err(Error::Invalid("custom XML data part cannot be root".into()));

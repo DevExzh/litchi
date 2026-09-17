@@ -42,7 +42,9 @@ pub fn load(package: &OpcPackage) -> Result<Package> {
         parts.push(Part {
             name: source.partname().as_str().to_owned(),
             kind,
-            document: codec::parse_part(kind, source.blob())?,
+            // Only a rich-value part's payload is parsed, so only a
+            // rich-value part's payload is decoded (ADR 0030).
+            document: codec::parse_part(kind, package.get_part(source.partname())?.blob())?,
             relationships,
         });
     }

@@ -10,7 +10,8 @@ use crate::execution::OpenSession;
 use crate::limits::ReadLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
-use crate::part::{Part, PartFactory};
+use crate::part::{Part, PartFactory, PartMetadata};
+use crate::payload::PartPayload;
 use crate::phys_pkg::{PhysPkgReader, read_limited, read_owned_path_with_limits};
 use crate::pkgreader::PackageReader;
 use crate::rel::{CanonicalRelationshipsXml, Relationships};
@@ -62,7 +63,11 @@ pub(crate) enum SourceMemberKind {
 #[derive(Debug)]
 pub(crate) struct SourcePart {
     pub(crate) content_type: String,
-    pub(crate) blob: Arc<Vec<u8>>,
+    /// The payload the source member carries, captured as the part's own
+    /// storage handle. For a deferred part this is the same cell the part
+    /// holds, so proving a part untouched costs a pointer comparison and no
+    /// decode.
+    pub(crate) blob: PartPayload,
     pub(crate) relationships_xml: Arc<CanonicalRelationshipsXml>,
     pub(crate) member_present: bool,
     pub(crate) relationships_member_present: bool,
@@ -87,8 +92,10 @@ pub struct OpcPackage {
     /// `PackURI` keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
 
-    /// Exact XML payloads materialized from the opened source package.
-    source_xml_parts: HashMap<PackURI, Arc<Vec<u8>>>,
+    /// Exact XML payloads captured from the opened source package. A
+    /// deferred part's entry shares that part's payload cell, so the audit
+    /// decides an untouched part without decoding it.
+    source_xml_parts: HashMap<PackURI, PartPayload>,
 
     /// Owned source archive retained for exact and targeted publication.
     source_archive: Option<Arc<Vec<u8>>>,
@@ -428,26 +435,33 @@ impl OpcPackage {
         // Create all parts - move data instead of cloning
         for spart in sparts {
             let partname = spart.partname.clone(); // Need to clone partname for the HashMap key
-            let blob = donor
-                .and_then(|donor| donor.parts.get(&partname))
-                .filter(|donor_part| donor_part.content_type() == spart.content_type.as_str())
-                .and_then(|donor_part| {
-                    let blob = donor_part.blob_arc();
-                    let visible = donor_part.blob();
-                    // Built-in parts take the pointer fast path. A custom
-                    // part cannot donate storage inconsistent with its blob.
-                    (std::ptr::eq(blob.as_slice(), visible) || blob.as_slice() == visible)
-                        .then_some(blob)
-                })
-                .filter(|donor_blob| {
-                    donor_blob.capacity() <= spart.blob.capacity()
-                        && donor_blob.as_slice() == spart.blob.as_slice()
-                })
-                .unwrap_or(spart.blob);
-            let mut part = PartFactory::load_shared(
+            // Donation compares payloads, so it applies only to a reader that
+            // already materialized them; a deferred payload is left alone.
+            let donated = match (donor, spart.payload.decoded()) {
+                (Some(donor), Some(read_blob)) => donor
+                    .parts
+                    .get(&partname)
+                    .filter(|donor_part| donor_part.content_type() == spart.content_type.as_str())
+                    .and_then(|donor_part| {
+                        let blob = donor_part.blob_arc();
+                        let visible = donor_part.blob();
+                        // Built-in parts take the pointer fast path. A custom
+                        // part cannot donate storage inconsistent with its blob.
+                        (std::ptr::eq(blob.as_slice(), visible) || blob.as_slice() == visible)
+                            .then_some(blob)
+                    })
+                    .filter(|donor_blob| {
+                        donor_blob.capacity() <= read_blob.capacity()
+                            && donor_blob.as_slice() == read_blob.as_slice()
+                    })
+                    .map(PartPayload::ready),
+                _ => None,
+            };
+            let payload = donated.unwrap_or(spart.payload);
+            let mut part = PartFactory::load_payload(
                 spart.partname,     // Move
                 spart.content_type, // Move
-                blob,               // Move the selected shared decompressed payload
+                payload,            // Move the selected payload storage
             )?;
 
             // Reserve the complete incoming relationship collection before
@@ -473,7 +487,7 @@ impl OpcPackage {
                         resource: "OPC source-preserved XML parts",
                         source,
                     })?;
-                source_xml_parts.insert(partname.clone(), part.blob_arc());
+                source_xml_parts.insert(partname.clone(), part.payload_handle().payload().clone());
             }
 
             parts_map.insert(partname, part);
@@ -528,7 +542,18 @@ impl OpcPackage {
     pub(crate) fn holds_original_source_xml(&self, part: &dyn Part) -> bool {
         self.source_xml_parts
             .get(part.partname())
-            .is_some_and(|source| Arc::ptr_eq(source, &part.blob_arc()))
+            .is_some_and(|source| {
+                if part.decoded_blob().is_none() {
+                    // A still-deferred original member has never exposed its
+                    // payload for replacement; ADR 0030 permits raw passthrough.
+                    return true;
+                }
+                // Keep 0665's allocation provenance. Equal replacement bytes
+                // must still pass publication audit, even after lazy ingress.
+                source
+                    .decoded()
+                    .is_some_and(|source| Arc::ptr_eq(source, &part.blob_arc()))
+            })
     }
 
     /// Get a reference to the main document part.
@@ -572,13 +597,19 @@ impl OpcPackage {
     /// # Errors
     /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
-        if let Some(part) = self.parts.get(partname) {
+        let part = if let Some(part) = self.parts.get(partname) {
             let part_ref: &dyn Part = &**part;
-            return Ok(part_ref);
-        }
-        self.find_case_insensitive(partname)
-            .map(|(_, part)| part)
-            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
+            part_ref
+        } else {
+            self.find_case_insensitive(partname)
+                .map(|(_, part)| part)
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?
+        };
+        // No part leaves this crate before its payload is decoded, so a
+        // caller never receives a part whose bytes are still compressed and
+        // never has a decode refusal swallowed by an infallible accessor.
+        part.ensure_payload()?;
+        Ok(part)
     }
 
     /// Locate a part whose name matches `partname` ignoring ASCII case.
@@ -623,6 +654,14 @@ impl OpcPackage {
                 None => return Err(OpcError::PartNotFound(partname.to_string())),
             }
         };
+        // Decode through the shared borrow before handing out the mutable
+        // one. A caller that replaces the payload must still observe the
+        // refusal a failed decode records, and a caller that reads it must
+        // never see an undecoded part.
+        match self.parts.get(&key) {
+            Some(part) => part.ensure_payload()?,
+            None => return Err(OpcError::PartNotFound(partname.to_string())),
+        }
         self.parts
             .get_mut(&key)
             .map(|b| {
@@ -702,13 +741,14 @@ impl OpcPackage {
                         resource: "OPC source-preserved XML parts",
                         source,
                     })?;
-                Some(part.blob_arc())
+                Some(part.payload_handle())
             } else {
                 None
             };
         self.parts.insert(partname.clone(), part);
         if let Some(source_blob) = source_blob {
-            self.source_xml_parts.insert(partname, source_blob);
+            self.source_xml_parts
+                .insert(partname, source_blob.payload().clone());
         }
         Ok(())
     }
@@ -735,8 +775,38 @@ impl OpcPackage {
         self.parts.remove(partname).is_some()
     }
 
-    /// Get an iterator over all parts in the package.
-    pub fn iter_parts(&self) -> impl Iterator<Item = &dyn Part> {
+    /// Get an iterator over the name and metadata of every part.
+    ///
+    /// The item type carries a part's name, content type and relationships
+    /// and has no route to its payload. A package opened from an owned source
+    /// decodes a part's payload on first access, and that decode can fail;
+    /// this iterator is infallible and has nowhere to report the refusal, so
+    /// it must not be able to reach a payload (ADR 0030). Use
+    /// [`Self::try_iter_parts`] when the iteration needs bytes.
+    pub fn iter_parts(&self) -> impl Iterator<Item = PartMetadata<'_>> {
+        self.parts.values().map(|b| PartMetadata::new(&**b))
+    }
+
+    /// Get a fallible iterator over all parts in the package.
+    ///
+    /// Each item forces that part's payload decode as it is yielded, so a
+    /// caller reading payloads sees the same typed refusal
+    /// [`Self::get_part`] would return. Iteration continues past an item
+    /// that failed; the failing part has no payload and never acquires one.
+    pub fn try_iter_parts(&self) -> impl Iterator<Item = Result<&dyn Part>> {
+        self.parts.values().map(|b| {
+            let part: &dyn Part = &**b;
+            part.ensure_payload()?;
+            Ok(part)
+        })
+    }
+
+    /// Iterate every part without decoding any payload.
+    ///
+    /// Crate-internal passes that must observe a part's storage — publication
+    /// planning, provenance capture, the signature audit's metadata scan —
+    /// use this and decide for themselves whether a payload is needed.
+    pub(crate) fn iter_parts_undecoded(&self) -> impl Iterator<Item = &dyn Part> {
         self.parts.values().map(|b| {
             let part: &dyn Part = &**b;
             part
@@ -747,6 +817,26 @@ impl OpcPackage {
     #[must_use]
     pub fn part_count(&self) -> usize {
         self.parts.len()
+    }
+
+    /// Parts inflated, and bytes inflated, from the retained source archive.
+    ///
+    /// `None` for a package whose payloads were all materialized at open —
+    /// borrowed ingress, an explicitly scheduled eager open, or a package
+    /// authored in memory. This reports what a lazy open has actually paid
+    /// and exists for measurement and regression tests; it is not part of the
+    /// supported surface.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn deferred_decode_counters(&self) -> Option<(u64, u64)> {
+        self.parts.values().find_map(|part| {
+            let handle = part.payload_handle();
+            let counters = handle
+                .payload()
+                .deferred_source()
+                .map(|source| source.counters());
+            counters
+        })
     }
 
     /// Get a reference to the package-level relationships.
@@ -1207,12 +1297,13 @@ impl OpcPackage {
     }
 
     fn from_owned_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        let data = Arc::new(data);
         let mut package = {
-            let phys_reader = PhysPkgReader::new_with_limits(&data, limits)?;
-            let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+            let phys_reader = PhysPkgReader::new_with_limits(data.as_slice(), limits)?;
+            let pkg_reader = PackageReader::from_phys_reader_deferred(&phys_reader, &data)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.authorize_owned_source(data);
+        package.authorize_shared_owned_source(data);
         Ok(package)
     }
 
@@ -1246,7 +1337,11 @@ impl OpcPackage {
     }
 
     fn authorize_owned_source(&mut self, source: Vec<u8>) {
-        let source = Arc::new(source);
+        self.authorize_shared_owned_source(Arc::new(source));
+    }
+
+    /// Retain an owned source archive that deferred payloads already share.
+    fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>) {
         let preservation = PreservationProvenance::from_package(source.as_slice(), self);
         if let Some(preservation) = preservation.as_ref() {
             self.bind_relationship_captures(preservation);
@@ -1310,7 +1405,7 @@ impl PreservationProvenance {
         relationship_members
             .try_reserve(package.part_count())
             .ok()?;
-        for part in package.iter_parts() {
+        for part in package.iter_parts_undecoded() {
             let partname = part.partname().clone();
             let member_name = try_owned_string(part.partname().membername())?;
             if part_members.insert(member_name, partname.clone()).is_some() {
@@ -1330,7 +1425,7 @@ impl PreservationProvenance {
                 partname,
                 SourcePart {
                     content_type: try_owned_string(part.content_type())?,
-                    blob: part.blob_arc(),
+                    blob: part.payload_handle().payload().clone(),
                     relationships_xml: Arc::new(CanonicalRelationshipsXml::from_relationships(
                         part.rels(),
                     )?),

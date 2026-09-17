@@ -355,7 +355,7 @@ pub fn load_slicer_parts(
 ) -> Result<Vec<SlicerPart>> {
     validate_package_graph(package)?;
     let worksheet = package.get_part(worksheet_name)?;
-    require_worksheet(worksheet)?;
+    require_worksheet(worksheet.partname(), worksheet.content_type())?;
     let relationships: Vec<_> = worksheet
         .rels()
         .iter()
@@ -389,7 +389,7 @@ pub fn store_slicer_part(
     let part_name = PackURI::new(&value.part_name)
         .map_err(|error| invalid(format!("invalid Slicers part URI: {error}")))?;
     let worksheet = package.get_part(worksheet_name)?;
-    require_worksheet(worksheet)?;
+    require_worksheet(worksheet.partname(), worksheet.content_type())?;
     let count = worksheet
         .rels()
         .iter()
@@ -446,7 +446,7 @@ pub(crate) fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             .iter()
             .filter(|relationship| relationship.reltype() == SLICERS_RELATIONSHIP_TYPE)
         {
-            require_worksheet(source)?;
+            require_worksheet(source.partname(), source.content_type())?;
             if relationship.is_external() {
                 return Err(invalid("Slicers relationship must be internal"));
             }
@@ -827,14 +827,11 @@ fn attr_u32(output: &mut Vec<u8>, name: &str, value: u32) {
     output.push(b'\"');
 }
 
-fn require_worksheet(part: &dyn Part) -> Result<()> {
-    if part.content_type() == ct::SML_WORKSHEET {
+fn require_worksheet(partname: &PackURI, content_type: &str) -> Result<()> {
+    if content_type == ct::SML_WORKSHEET {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "part '{}' is not a worksheet",
-            part.partname()
-        )))
+        Err(invalid(format!("part '{partname}' is not a worksheet")))
     }
 }
 

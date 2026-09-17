@@ -484,7 +484,10 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
         relationship_signatures(source.rels()),
         relationship_signatures(candidate.rels())
     );
-    for part in source.iter_parts() {
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = candidate.get_part(part.partname()).unwrap();
         assert_eq!(part.content_type(), output_part.content_type());
         assert_eq!(
@@ -570,7 +573,10 @@ fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
         relationship_signatures(source.rels()),
         relationship_signatures(candidate.rels())
     );
-    for part in source.iter_parts() {
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = candidate.get_part(part.partname()).unwrap();
         assert_eq!(part.content_type(), output_part.content_type());
         assert_eq!(
@@ -773,7 +779,10 @@ fn atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part() {
 
     let before = OpcPackage::from_bytes(&source).unwrap();
     let after = OpcPackage::from_bytes(&first).unwrap();
-    for part in before.iter_parts() {
+    for part in before
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate = after.get_part(part.partname()).unwrap();
         assert_eq!(part.content_type(), candidate.content_type());
         assert_eq!(

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part};
 
 use crate::error::{Result, invalid};
 
@@ -72,14 +72,16 @@ pub fn store_on_worksheet(
         };
 
     let xml = write_comments(value)?;
-    if package.get_part(&part_name).is_ok() {
-        package.get_part_mut(&part_name)?.set_blob(xml);
-    } else {
-        package.try_add_part(Box::new(BlobPart::new(
-            part_name.clone(),
-            COMMENTS_CONTENT_TYPE.into(),
-            xml,
-        )))?;
+    match package.get_part(&part_name) {
+        Ok(_) => package.get_part_mut(&part_name)?.set_blob(xml),
+        Err(OpcError::PartNotFound(_)) => {
+            package.try_add_part(Box::new(BlobPart::new(
+                part_name.clone(),
+                COMMENTS_CONTENT_TYPE.into(),
+                xml,
+            )))?;
+        },
+        Err(error) => return Err(error.into()),
     }
     if package
         .get_part(worksheet_part)?
@@ -247,8 +249,10 @@ fn next_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_536u32 {
         let candidate = PackURI::new(format!("/xl/comments{suffix}.xml"))
             .map_err(|error| invalid(error.clone()))?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free classic comments part name"))

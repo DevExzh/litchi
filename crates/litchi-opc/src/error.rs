@@ -418,6 +418,56 @@ pub(crate) fn execution_io_error(error: litchi_core::ExecutionError) -> std::io:
     std::io::Error::other(ExecutionIoError(error))
 }
 
+/// Reproduce a refusal a deferred part decode recorded.
+///
+/// A deferred payload records its decode outcome once so the refusal is
+/// stable across repeated accesses (ADR 0030). `OpcError` is not `Clone`,
+/// because [`OpcError::IoError`] wraps a [`std::io::Error`], so the recorded
+/// error is reproduced rather than cloned. Every variant a decode can produce
+/// — the closed set that `From<soapberry_zip::Error>` and this crate's own
+/// limit checks emit — is reproduced with its exact discriminant and its exact
+/// `Display` text; `IoError`'s source chain is flattened into the reproduced
+/// error's message, which is what its `Display` already renders.
+///
+/// The fallback arm is unreachable from the decode path and is written as a
+/// `ZipError` carrying the original rendering so no refusal can be lost.
+pub(crate) fn replicate_deferred_error(error: &OpcError) -> OpcError {
+    match error {
+        OpcError::ReadLimit {
+            resource,
+            actual,
+            maximum,
+        } => OpcError::ReadLimit {
+            resource: *resource,
+            actual: *actual,
+            maximum: *maximum,
+        },
+        OpcError::Allocation { resource, source } => OpcError::Allocation {
+            resource,
+            source: source.clone(),
+        },
+        OpcError::CollectionAllocation { resource } => OpcError::CollectionAllocation { resource },
+        OpcError::CentralDirectorySpool { operation, source } => OpcError::CentralDirectorySpool {
+            operation,
+            source: std::io::Error::new(source.kind(), source.to_string()),
+        },
+        OpcError::CentralDirectorySpoolLimitExceeded { actual, maximum } => {
+            OpcError::CentralDirectorySpoolLimitExceeded {
+                actual: *actual,
+                maximum: *maximum,
+            }
+        },
+        OpcError::Cancelled => OpcError::Cancelled,
+        OpcError::Execution(execution) => OpcError::Execution(execution.clone()),
+        OpcError::IoError(source) => {
+            OpcError::IoError(std::io::Error::new(source.kind(), source.to_string()))
+        },
+        OpcError::ZipError(message) => OpcError::ZipError(message.clone()),
+        OpcError::PartNotFound(name) => OpcError::PartNotFound(name.clone()),
+        other => OpcError::ZipError(other.to_string()),
+    }
+}
+
 pub(crate) fn map_io_error(error: std::io::Error) -> OpcError {
     // Format-owned cooperative adapters can carry the public execution error
     // directly through Write/Read without depending on OPC's private marker.

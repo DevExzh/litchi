@@ -282,7 +282,10 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
         .unwrap();
     let source = OpcPackage::from_bytes(&source_bytes).unwrap();
     let output_package = OpcPackage::from_bytes(&output).unwrap();
-    for part in source.iter_parts() {
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let rewritten = output_package.get_part(part.partname()).unwrap();
         assert_eq!(rewritten.content_type(), part.content_type());
         assert_eq!(

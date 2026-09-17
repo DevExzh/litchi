@@ -301,7 +301,10 @@ pub(crate) fn parse_embedded_xml_package(
         ))
     })?;
     let mut found_part_name = None;
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part.map_err(|error| {
+            Error::Corrupted(format!("{record_name} part payload is unreadable: {error}"))
+        })?;
         if part.content_type() == expected_content_type {
             if found_part_name.is_some() {
                 return Err(Error::Corrupted(format!(
@@ -346,7 +349,12 @@ pub(crate) fn parse_theme_package(data: &[u8]) -> Result<ThemePackage> {
         ))
     })?;
     let mut theme_part = None;
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part.map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripThemeAtom part payload is unreadable: {error}"
+            ))
+        })?;
         let expected = match part.content_type() {
             content_type::OFC_THEME => Some((ThemeKind::Theme, b"theme".as_slice())),
             content_type::OFC_THEME_OVERRIDE => {
@@ -602,7 +610,12 @@ pub(crate) fn parse_animation_package(data: &[u8]) -> Result<AnimationPackage> {
                 .to_string(),
         ));
     }
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part.map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripAnimationAtom part payload is unreadable: {error}"
+            ))
+        })?;
         if part.partname() == &timing_part_name || !is_xml_content_type(part.content_type()) {
             continue;
         }

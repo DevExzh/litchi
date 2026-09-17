@@ -284,8 +284,10 @@ fn next_xml_maps_part_name(package: &OpcPackage) -> Result<PackURI> {
             format!("/xl/xmlMaps{suffix}.xml")
         };
         let candidate = PackURI::new(&name)?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free custom XML maps part name"))

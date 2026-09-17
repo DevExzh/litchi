@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, TargetMode};
 
 use crate::package::error::{Error, Result};
 
@@ -520,17 +520,20 @@ fn replace_part_and_relationship(
             .remove(relationship_id);
         remove_if_unreferenced(package, old_part);
     }
-    if package.get_part(part_name).is_ok() {
-        let part = package.get_part(part_name)?;
-        validate_xml_part(part, content_type, "threaded-comments")?;
-        package.get_part_mut(part_name)?.set_blob(payload);
-    } else {
-        package.validate_new_part_name(part_name)?;
-        package.try_add_part(Box::new(BlobPart::new(
-            part_name.clone(),
-            content_type.to_owned(),
-            payload,
-        )))?;
+    match package.get_part(part_name) {
+        Ok(part) => {
+            validate_xml_part(part, content_type, "threaded-comments")?;
+            package.get_part_mut(part_name)?.set_blob(payload);
+        },
+        Err(OpcError::PartNotFound(_)) => {
+            package.validate_new_part_name(part_name)?;
+            package.try_add_part(Box::new(BlobPart::new(
+                part_name.clone(),
+                content_type.to_owned(),
+                payload,
+            )))?;
+        },
+        Err(error) => return Err(error.into()),
     }
     let target = part_name.relative_ref(source.base_uri());
     let existing_relationship =
@@ -656,17 +659,23 @@ fn choose_part_name(
     if let Some(requested) = requested {
         let part_name =
             PackURI::new(requested).map_err(|error| Error::InvalidUri(error.to_string()))?;
-        if package.get_part(&part_name).is_ok() {
-            return Ok(part_name);
+        match package.get_part(&part_name) {
+            Ok(_) => return Ok(part_name),
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
         package.validate_new_part_name(&part_name)?;
         return Ok(part_name);
     }
     for suffix in 1..=MAX_NAME_ATTEMPTS {
         let candidate = PackURI::new(template.replace("%d", &suffix.to_string()))?;
-        if package.get_part(&candidate).is_err() {
-            package.validate_new_part_name(&candidate)?;
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(OpcError::PartNotFound(_)) => {
+                package.validate_new_part_name(&candidate)?;
+                return Ok(candidate);
+            },
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free threaded-comments part name"))

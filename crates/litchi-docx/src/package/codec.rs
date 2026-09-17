@@ -26,6 +26,7 @@ use super::model::{
 };
 #[cfg(feature = "encryption")]
 pub(super) use super::model::{Limits, Mode};
+use litchi_opc::OpcError;
 
 impl Package {
     /// Create a new empty .docx package.
@@ -106,9 +107,8 @@ impl Package {
         );
 
         // Add relationship from document to styles (use relative path)
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("styles.xml", rt::STYLES);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("styles.xml", rt::STYLES);
         opc.add_part(Box::new(styles_part));
 
         // Create settings.xml part
@@ -120,9 +120,8 @@ impl Package {
             template::default_settings_xml().as_bytes().to_vec(),
         );
 
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("settings.xml", rt::SETTINGS);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("settings.xml", rt::SETTINGS);
         opc.add_part(Box::new(settings_part));
 
         // Create fontTable.xml part
@@ -134,9 +133,8 @@ impl Package {
             template::default_font_table_xml().as_bytes().to_vec(),
         );
 
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("fontTable.xml", rt::FONT_TABLE);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("fontTable.xml", rt::FONT_TABLE);
         opc.add_part(Box::new(font_table_part));
 
         // Create webSettings.xml part
@@ -152,9 +150,8 @@ impl Package {
             web_settings_xml,
         );
 
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("webSettings.xml", rt::WEB_SETTINGS);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("webSettings.xml", rt::WEB_SETTINGS);
         opc.add_part(Box::new(web_settings_part));
 
         // Create core.xml part (core properties)
@@ -191,9 +188,8 @@ impl Package {
         );
 
         // Add relationship from document to theme (use relative path)
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("theme/theme1.xml", rt::THEME);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("theme/theme1.xml", rt::THEME);
         opc.add_part(Box::new(theme_part));
 
         // Create numbering.xml part
@@ -206,9 +202,8 @@ impl Package {
         );
 
         // Add relationship from document to numbering (use relative path)
-        if let Ok(doc_part) = opc.get_part_mut(&doc_partname) {
-            doc_part.relate_to("numbering.xml", rt::NUMBERING);
-        }
+        opc.get_part_mut(&doc_partname)?
+            .relate_to("numbering.xml", rt::NUMBERING);
         opc.add_part(Box::new(numbering_part));
 
         // Create a mutable document for writing
@@ -738,10 +733,14 @@ impl Package {
                     let filename = format!("{stem}{}.xml", index + 1);
                     let uri = PackURI::new(format!("/word/{filename}"))
                         .map_err(|error| Error::InvalidUri(error.clone()))?;
-                    if self.opc.get_part(&uri).is_ok() {
-                        return Err(Error::InvalidFormat(format!(
-                            "section header/footer part {uri} already exists"
-                        )));
+                    match self.opc.get_part(&uri) {
+                        Ok(_) => {
+                            return Err(Error::InvalidFormat(format!(
+                                "section header/footer part {uri} already exists"
+                            )));
+                        },
+                        Err(OpcError::PartNotFound(_)) => {},
+                        Err(error) => return Err(error.into()),
                     }
                     planned_section_parts.push((header, part, uri, filename));
                 }
@@ -806,10 +805,11 @@ impl Package {
                 }
 
                 // Get or create the document part to add relationships to
-                let content_type = self.opc.get_part(&doc_uri).map_or_else(
-                    |_| ct::WML_DOCUMENT_MAIN.to_string(),
-                    |p| p.content_type().to_string(),
-                );
+                let content_type = match self.opc.get_part(&doc_uri) {
+                    Ok(part) => part.content_type().to_string(),
+                    Err(OpcError::PartNotFound(_)) => ct::WML_DOCUMENT_MAIN.to_string(),
+                    Err(error) => return Err(error.into()),
+                };
 
                 // Create new temporary part for relationships
                 use litchi_opc::part::{BlobPart, Part};
@@ -817,24 +817,28 @@ impl Package {
                     BlobPart::new(doc_uri.clone(), content_type.clone(), Vec::new());
 
                 // Copy existing relationships from the original document part (styles, settings, etc.)
-                if let Ok(existing_part) = self.opc.get_part(&doc_uri) {
-                    for rel in existing_part.rels().iter() {
-                        // Skip relationships we're going to recreate dynamically
-                        if !matches!(
-                            rel.reltype(),
-                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
-                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
-                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
-                        ) {
-                            temp_part.rels_mut().add_relationship(
-                                rel.reltype().to_string(),
-                                rel.target_ref().to_string(),
-                                rel.r_id().to_string(),
-                                rel.is_external(),
-                            );
+                match self.opc.get_part(&doc_uri) {
+                    Ok(existing_part) => {
+                        for rel in existing_part.rels().iter() {
+                            // Skip relationships we're going to recreate dynamically
+                            if !matches!(
+                                rel.reltype(),
+                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
+                            ) {
+                                temp_part.rels_mut().add_relationship(
+                                    rel.reltype().to_string(),
+                                    rel.target_ref().to_string(),
+                                    rel.r_id().to_string(),
+                                    rel.is_external(),
+                                );
+                            }
                         }
-                    }
+                    },
+                    Err(OpcError::PartNotFound(_)) => {},
+                    Err(error) => return Err(error.into()),
                 }
 
                 for (header, part, _, filename) in &planned_section_parts {
@@ -922,9 +926,19 @@ impl Package {
                             format!("/word/diagrams/quickStyle{diagram_index}.xml"),
                             format!("/word/diagrams/colors{diagram_index}.xml"),
                         );
-                        let taken = [&names.0, &names.1, &names.2, &names.3].iter().any(|name| {
-                            PackURI::new(*name).map_or(true, |uri| self.opc.get_part(&uri).is_ok())
-                        });
+                        let mut taken = false;
+                        for name in [&names.0, &names.1, &names.2, &names.3] {
+                            let uri = PackURI::new(name)
+                                .map_err(|error| Error::InvalidUri(error.clone()))?;
+                            match self.opc.get_part(&uri) {
+                                Ok(_) => {
+                                    taken = true;
+                                    break;
+                                },
+                                Err(OpcError::PartNotFound(_)) => {},
+                                Err(error) => return Err(error.into()),
+                            }
+                        }
                         if !taken {
                             break names;
                         }
@@ -1155,11 +1169,11 @@ impl Package {
                 if mutable_doc.protection_is_dirty() {
                     let settings_uri = PackURI::new("/word/settings.xml")
                         .map_err(|error| Error::InvalidUri(format!("settings URI: {error}")))?;
-                    let existing_settings = self
-                        .opc
-                        .get_part(&settings_uri)
-                        .ok()
-                        .map(|part| part.blob().to_vec());
+                    let existing_settings = match self.opc.get_part(&settings_uri) {
+                        Ok(part) => Some(part.blob().to_vec()),
+                        Err(OpcError::PartNotFound(_)) => None,
+                        Err(error) => return Err(error.into()),
+                    };
                     let settings_xml =
                         mutable_doc.generate_settings_xml(existing_settings.as_deref())?;
                     self.update_settings_part(settings_xml)?;

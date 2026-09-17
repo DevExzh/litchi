@@ -44,8 +44,8 @@ fn blob<'reader>(reader: &'reader PackageReader, partname: &str) -> &'reader [u8
         .iter_sparts()
         .find(|spart| spart.partname.as_str() == partname)
         .unwrap_or_else(|| panic!("package is missing {partname}"))
-        .blob
-        .as_slice()
+        .blob()
+        .unwrap_or_else(|error| panic!("decode {partname}: {error}"))
 }
 
 #[test]
@@ -126,8 +126,7 @@ fn keeps_dangling_relationships_without_inventing_their_target_part() {
     let package =
         OpcPackage::from_bytes(&bytes).expect("dangling target must not fail the package");
     let document = package
-        .iter_parts()
-        .find(|part| part.partname().as_str() == "/word/document.xml")
+        .get_part(&litchi_opc::PackURI::new("/word/document.xml").expect("part name"))
         .expect("present target must load");
     assert_eq!(document.blob(), b"<w:document/>");
     assert!(

@@ -46,6 +46,7 @@ pub mod members;
 pub mod package;
 pub mod packuri;
 pub mod part;
+mod payload;
 pub mod phys_pkg;
 pub mod pkgreader;
 pub mod pkgwriter;
@@ -67,7 +68,7 @@ pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{FontEmbedding, OpcPackage, SaveOptions};
 pub use packuri::PackURI;
-pub use part::{BlobPart, Part, XmlPart};
+pub use part::{BlobPart, Part, PartMetadata, XmlPart};
 pub use pkgreader::{
     PackageCatalog, probe_package_catalog_from_reader,
     probe_package_catalog_from_reader_with_limits,

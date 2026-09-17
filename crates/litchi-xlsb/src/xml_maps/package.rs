@@ -422,7 +422,10 @@ pub(crate) fn preflight(package: &OpcPackage, limits: super::snapshot::ReadLimit
     }
     let mut relationships = package.rels().iter().count();
     let mut total = 0usize;
-    for part in package.iter_parts() {
+    // The byte ceiling is charged against inflated bytes, so this pass
+    // decodes every payload (ADR 0030).
+    for part in package.try_iter_parts() {
+        let part = part?;
         relationships = relationships
             .checked_add(part.rels().iter().count())
             .ok_or_else(|| invalid("relationship count overflow"))?;

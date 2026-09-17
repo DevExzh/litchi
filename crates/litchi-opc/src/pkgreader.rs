@@ -11,6 +11,7 @@ use crate::execution::OpenSession;
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::payload::{DeferredPartSource, PartPayload};
 use crate::phys_pkg::PhysPkgReader;
 use crate::rel::{TargetMode, relationship_target_components};
 use quick_xml::XmlVersion;
@@ -293,11 +294,37 @@ pub struct SerializedPart {
     ///
     /// The eager reader adopts the archive reader's shared decompression
     /// allocation, so passing this value onward does not clone the payload.
-    pub blob: Arc<Vec<u8>>,
+    /// An owned-source open instead records a deferred payload that inflates
+    /// from the retained archive on first access (ADR 0030).
+    pub(crate) payload: PartPayload,
 
     /// Serialized relationships from this part
     /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pub srels: SmallVec<[SerializedRelationship; 8]>,
+}
+
+impl SerializedPart {
+    /// The part's payload, decoding it if the reader deferred it.
+    ///
+    /// The eager reader materializes every payload before it returns, so this
+    /// is infallible in practice for a borrowed open. An owned-source open
+    /// defers the payload into the retained archive, and this is where that
+    /// decode — and its refusal — happens.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the deferred decode produced: a read-limit
+    /// violation, an allocation failure, a cancellation, an I/O error, or a
+    /// ZIP error for a corrupt member.
+    pub fn blob(&self) -> Result<&[u8]> {
+        self.payload.force().map(|blob| blob.as_slice())
+    }
+
+    /// The part's payload storage, without decoding it.
+    #[cfg(test)]
+    pub(crate) fn payload(&self) -> &PartPayload {
+        &self.payload
+    }
 }
 
 /// Structural information retained by the source-backed reader for one part.
@@ -528,16 +555,22 @@ mod physical_part_tests {
         let serialized = PackageWriter::to_bytes(&source).unwrap();
         let loaded = OpcPackage::from_bytes(&serialized).unwrap();
         let orphan = loaded
-            .iter_parts()
-            .find(|part| part.partname().as_str() == ORPHAN_PART_NAME)
+            .try_iter_parts()
+            .find_map(|part| {
+                let part = part.unwrap();
+                (part.partname().as_str() == ORPHAN_PART_NAME).then_some(part)
+            })
             .expect("unreferenced physical part must be loaded");
         assert_eq!(orphan.blob(), ORPHAN_CONTENT);
 
         let reserialized = PackageWriter::to_bytes(&loaded).unwrap();
         let reloaded = OpcPackage::from_bytes(&reserialized).unwrap();
         let surviving_orphan = reloaded
-            .iter_parts()
-            .find(|part| part.partname().as_str() == ORPHAN_PART_NAME)
+            .try_iter_parts()
+            .find_map(|part| {
+                let part = part.unwrap();
+                (part.partname().as_str() == ORPHAN_PART_NAME).then_some(part)
+            })
             .expect("unreferenced physical part must survive save and reopen");
         assert_eq!(surviving_orphan.blob(), ORPHAN_CONTENT);
     }
@@ -559,7 +592,9 @@ mod physical_part_tests {
             .iter_sparts()
             .find(|spart| spart.partname.as_str() == ORPHAN_PART_NAME)
             .expect("unreferenced physical part must be loaded")
-            .blob
+            .payload()
+            .decoded()
+            .expect("an eager read materializes every payload")
             .clone();
 
         assert!(Arc::ptr_eq(&archive_blob, &serialized_blob));
@@ -716,6 +751,80 @@ impl PackageReader {
             limits,
             &mut relationship_ledger,
             |names| Ok(archive.read_many_serial_shared(names)),
+        )?;
+
+        Ok(Self {
+            pkg_srels,
+            sparts,
+            non_part_members,
+        })
+    }
+
+    /// Open an OPC package whose ordinary part payloads stay in the retained
+    /// owned source archive until something asks for them.
+    ///
+    /// Structural admission is identical to [`Self::from_phys_reader`]:
+    /// `[Content_Types].xml`, the package relationships, every part's
+    /// relationship manifest, the part-name conflict rules and the declared
+    /// part-byte limits are all read and charged here. What does not happen is
+    /// the bulk inflation of the admitted payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors [`Self::from_phys_reader`] returns for every
+    /// structural refusal. The refusals that a payload read produces — a
+    /// corrupt Deflate stream, a CRC mismatch, an actual size that exceeds a
+    /// declared one — move to the first access of the part that carries them.
+    pub(crate) fn from_phys_reader_deferred(
+        phys_reader: &PhysPkgReader<'_>,
+        source: &Arc<Vec<u8>>,
+    ) -> Result<Self> {
+        let archive = phys_reader.archive();
+        let limits = phys_reader.limits();
+        limits.check(
+            ReadResource::ArchiveMembers,
+            archive.len() as u64,
+            limits.max_archive_members() as u64,
+        )?;
+
+        let relationship_part_count = archive
+            .file_names()
+            .filter(|member_name| Self::is_relationship_member(member_name))
+            .count();
+        limits.check(
+            ReadResource::RelationshipParts,
+            relationship_part_count as u64,
+            limits.max_relationship_parts() as u64,
+        )?;
+        let mut relationship_ledger = RelationshipLedger::default();
+
+        let content_types_member = Self::locate_content_types_member(archive)?;
+        let content_types_metadata = archive.metadata(content_types_member)?;
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            content_types_metadata.uncompressed_size(),
+            limits.max_content_types_bytes() as u64,
+        )?;
+        let content_types_xml = read_structural_member(archive, content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let pkg_srels =
+            Self::load_rels_lazy(archive, &package_uri, limits, &mut relationship_ledger)?;
+
+        let mut non_part_members = Vec::new();
+        non_part_members
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC non-part members", source))?;
+        let sparts = Self::load_parts_deferred(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+            limits,
+            &mut relationship_ledger,
+            source,
         )?;
 
         Ok(Self {
@@ -1079,7 +1188,74 @@ impl PackageReader {
             sparts.push(SerializedPart {
                 partname,
                 content_type,
-                blob,
+                payload: PartPayload::ready(blob),
+                srels,
+            });
+        }
+
+        Ok(sparts)
+    }
+
+    /// Admit every part exactly as [`Self::load_parts_eager`] does, but record
+    /// a deferred payload for each instead of inflating it.
+    ///
+    /// The classification mode, the batch declared-size pass and the
+    /// relationship reads are the eager path's, in the eager path's order, so
+    /// every refusal that fires before the bulk read still fires here, at the
+    /// same point, with the same value. Only the bulk read and the
+    /// **actual**-size charge that follows it move: they become the first
+    /// access to each part (ADR 0030).
+    fn load_parts_deferred<A>(
+        archive: &A,
+        content_types_member: &str,
+        pkg_srels: &[SerializedRelationship],
+        content_types: &ContentTypeMap,
+        non_part_members: &mut Vec<NonPartMember>,
+        limits: ReadLimits,
+        ledger: &mut RelationshipLedger,
+        source: &Arc<Vec<u8>>,
+    ) -> Result<Vec<SerializedPart>>
+    where
+        A: ArchiveAccess + ?Sized,
+    {
+        let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
+        let AdmittedParts {
+            mut relationships,
+            typed_parts,
+        } = Self::classify_part_members(
+            archive,
+            content_types_member,
+            relationships,
+            content_types,
+            non_part_members,
+            limits,
+            PartClassificationMode::Eager,
+        )?;
+
+        // The declared-size pass stays exactly where the eager reader runs it:
+        // before any payload work, against the central directory, charging
+        // `PartBytes` per part and `TotalPartBytes` in aggregate.
+        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)?;
+
+        let deferred_source = Arc::new(DeferredPartSource::new(Arc::clone(source), limits));
+        let mut sparts = Vec::new();
+        sparts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC serialized parts", source))?;
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
+            };
+            let mut member = String::new();
+            member
+                .try_reserve_exact(partname.membername().len())
+                .map_err(|source| allocation("OPC deferred part member name", source))?;
+            member.push_str(partname.membername());
+            sparts.push(SerializedPart {
+                partname,
+                content_type,
+                payload: PartPayload::deferred(&deferred_source, member.into_boxed_str()),
                 srels,
             });
         }
@@ -2219,7 +2395,13 @@ mod tests {
                 .archive()
                 .read_shared(spart.partname.membername())
                 .unwrap();
-            assert!(Arc::ptr_eq(&archive_blob, &spart.blob));
+            assert!(Arc::ptr_eq(
+                &archive_blob,
+                spart
+                    .payload()
+                    .decoded()
+                    .expect("an eager read materializes every payload")
+            ));
         }
     }
 
@@ -2240,7 +2422,13 @@ mod tests {
                 .archive()
                 .read_shared(spart.partname.membername())
                 .unwrap();
-            assert!(Arc::ptr_eq(&archive_blob, &spart.blob));
+            assert!(Arc::ptr_eq(
+                &archive_blob,
+                spart
+                    .payload()
+                    .decoded()
+                    .expect("an eager read materializes every payload")
+            ));
         }
         assert_eq!(
             physical

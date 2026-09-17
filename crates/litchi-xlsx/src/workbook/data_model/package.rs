@@ -50,13 +50,15 @@ pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<
             part.partname()
         )));
     }
-    if part.blob().is_empty() {
+    // The Data Model payload is read, so it is decoded here (ADR 0030).
+    let blob = package.get_part(part.partname())?.blob();
+    if blob.is_empty() {
         return Err(invalid("Data Model payload cannot be empty"));
     }
-    if part.blob().len() > MAX_PAYLOAD_BYTES {
+    if blob.len() > MAX_PAYLOAD_BYTES {
         return Err(limit("payload bytes"));
     }
-    inspect(part.blob())?;
+    inspect(blob)?;
     if !part.rels().is_empty() {
         return Err(invalid(
             "Data Model part has forbidden outbound relationships",
@@ -68,7 +70,7 @@ pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<
         definition,
         payload: Payload {
             part_name: part.partname().to_string(),
-            data: part.blob().to_vec(),
+            data: blob.to_vec(),
         },
     }))
 }

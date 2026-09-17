@@ -231,13 +231,17 @@ fn add_external_dependency(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
 
 fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>> {
     let opc = OpcPackage::from_bytes(archive)?;
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("PPTX boundary logical payload count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("PPTX boundary logical payload count overflows usize")
+        })?;
     let entry_bytes = opc
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .find(|part| part.partname().as_str() == "/ppt/slides/slide2.xml")
         .map_or(0, |part| part.blob().len());
     Ok(CorpusManifest {
@@ -256,7 +260,8 @@ fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>
         target_entry: "slide-boundary-position".to_owned(),
         target_payload_bytes: entry_bytes,
         target_payload_sha256: sha256_hex(
-            opc.iter_parts()
+            opc.try_iter_parts()
+                .map(|part| part.expect("part payload decodes"))
                 .find(|part| part.partname().as_str() == "/ppt/slides/slide2.xml")
                 .map_or(&[][..], |part| part.blob()),
         ),

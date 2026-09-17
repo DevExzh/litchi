@@ -311,7 +311,9 @@ impl Graph {
         signatures.sort_by(|left, right| left.part.as_str().cmp(right.part.as_str()));
 
         for part in package.iter_parts() {
-            if is_infrastructure(part) && !reachable.contains(part.partname()) {
+            if is_infrastructure_named(part.partname(), part.content_type())
+                && !reachable.contains(part.partname())
+            {
                 return Err(Error::Graph(format!(
                     "orphan or spoofed signature infrastructure part {}",
                     part.partname().as_str()
@@ -352,11 +354,15 @@ impl<'a> PackageResolver<'a> {
         parts
             .try_reserve(shape.parts)
             .map_err(|_err| limit("OPC part reference allocation failed"))?;
-        parts.extend(
-            package
-                .iter_parts()
-                .filter(|part| !is_infrastructure(*part)),
-        );
+        // These references are read as bytes later, in `into_author_references`
+        // and in `Resolver::get`, so each part's payload is decoded here where
+        // a refusal can still be reported (ADR 0030).
+        for part in package.try_iter_parts() {
+            let part = part?;
+            if !is_infrastructure(part) {
+                parts.push(part);
+            }
+        }
         parts.sort_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
 
         for part in &parts {
@@ -644,7 +650,10 @@ fn author(package: &OpcPackage, signer: &Signer, limits: &Limits) -> Result<Vec<
 }
 
 fn reject_orphan_graph(package: &OpcPackage) -> Result<()> {
-    if let Some(part) = package.iter_parts().find(|part| is_infrastructure(*part)) {
+    if let Some(part) = package
+        .iter_parts()
+        .find(|part| is_infrastructure_named(part.partname(), part.content_type()))
+    {
         return Err(Error::Graph(format!(
             "orphan or spoofed signature infrastructure part {}",
             part.partname().as_str()
@@ -777,9 +786,18 @@ fn signature_hint(path: &str) -> bool {
 }
 
 pub(crate) fn is_infrastructure(part: &dyn Part) -> bool {
-    is_signature_path(part.partname().as_str())
+    is_infrastructure_named(part.partname(), part.content_type())
+}
+
+/// The metadata-only form of [`is_infrastructure`].
+///
+/// Signature infrastructure is decided from a part's name and content type,
+/// never from its bytes, so the metadata iterator can answer it without
+/// decoding a deferred payload.
+pub(crate) fn is_infrastructure_named(partname: &PackURI, content_type: &str) -> bool {
+    is_signature_path(partname.as_str())
         || matches!(
-            part.content_type(),
+            content_type,
             ORIGIN_TYPE | SIGNATURE_TYPE | CERTIFICATE_TYPE
         )
 }
@@ -799,7 +817,7 @@ fn pack_uri(value: &str) -> Result<PackURI> {
 fn resolver_shape(package: &OpcPackage, limits: &Limits) -> Result<ResolverShape> {
     let part_count = package
         .iter_parts()
-        .filter(|part| !is_infrastructure(*part))
+        .filter(|part| !is_infrastructure_named(part.partname(), part.content_type()))
         .count();
     if part_count > limits.max_references() {
         return Err(limit(format!(
@@ -814,7 +832,7 @@ fn resolver_shape(package: &OpcPackage, limits: &Limits) -> Result<ResolverShape
     };
     for part in package
         .iter_parts()
-        .filter(|part| !is_infrastructure(*part))
+        .filter(|part| !is_infrastructure_named(part.partname(), part.content_type()))
     {
         shape.add_reference(
             part_reference_len(part.partname().as_str(), part.content_type())?,
