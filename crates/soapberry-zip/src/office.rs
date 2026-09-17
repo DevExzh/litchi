@@ -50,6 +50,14 @@ use crate::{
 use flate2::read::DeflateDecoder;
 use flate2::{Decompress, FlushDecompress, Status};
 use rayon::prelude::*;
+
+mod parallel_write;
+
+pub use parallel_write::{
+    DEFAULT_MIN_PARALLELIZABLE_BYTES, DEFAULT_MIN_POOL_PARALLELIZABLE_BYTES,
+    DEFAULT_MIN_TASK_BYTES, ParallelWriteLimits, ParallelWriteSession, ScopedWorkers,
+    SerialScopedWorkers, WORKER_STATE_BYTES,
+};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, Cursor, Read, Write};
@@ -5443,7 +5451,7 @@ fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
 }
 
 #[inline]
-fn cancelled_error() -> Error {
+pub(crate) fn cancelled_error() -> Error {
     ErrorKind::Cancelled.into()
 }
 

@@ -1,0 +1,6 @@
+fixture                       leg      samples  minor_faults  major_faults  maxrss_kb  faults_per_publication
+ConditionalFormattingSamples  w1       200      58510         0             7320       292.6
+ConditionalFormattingSamples  w4       200      2548          0             9408       12.7
+ConditionalFormattingSamples  w8       200      3618          0             12320      18.1
+ConditionalFormattingSamples  w4_pool  200      2405          0             9152       12.0
+ConditionalFormattingSamples  w8_pool  200      3355          0             11200      16.8

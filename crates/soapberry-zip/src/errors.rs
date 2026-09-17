@@ -89,6 +89,15 @@ pub enum ErrorKind {
     /// A local parallel-read worker pool could not be created.
     ParallelReadWorkerPool { workers: usize, message: String },
 
+    /// An explicit parallel-write policy was internally inconsistent.
+    InvalidParallelWriteLimits { reason: &'static str },
+
+    /// A local parallel-write worker pool could not be created.
+    ParallelWriteWorkerPool { workers: usize, message: String },
+
+    /// A scheduled compression task panicked.
+    ParallelWriteWorkerPanic { ordinal: usize },
+
     /// A bounded operation could not reserve its required memory.
     Allocation {
         /// Resource whose bounded plan could not be reserved.
@@ -220,6 +229,21 @@ impl std::fmt::Display for ErrorKind {
                     f,
                     "Could not create local parallel read pool with {workers} worker(s): {message}"
                 )
+            },
+            ErrorKind::InvalidParallelWriteLimits { reason } => {
+                write!(f, "Invalid parallel write limits: {reason}")
+            },
+            ErrorKind::ParallelWriteWorkerPool {
+                workers,
+                ref message,
+            } => {
+                write!(
+                    f,
+                    "Could not create local parallel write pool with {workers} worker(s): {message}"
+                )
+            },
+            ErrorKind::ParallelWriteWorkerPanic { ordinal } => {
+                write!(f, "Parallel write task {ordinal} panicked")
             },
             ErrorKind::Allocation {
                 resource,

@@ -32,10 +32,11 @@ use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
-use soapberry_zip::office::{EntryId, IndexedArchive};
+use soapberry_zip::office::{EntryId, IndexedArchive, ParallelWriteLimits, ParallelWriteSession};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Read, Write};
 use std::mem::size_of;
+use std::num::NonZeroUsize;
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -4323,6 +4324,53 @@ struct LoadResources {
     payload_object_reservation: Option<Arc<Reservation>>,
 }
 
+/// Bridges a caller's [`litchi_core::ScopedWorkers`] facility to the ZIP
+/// crate's structurally identical trait.
+///
+/// `soapberry-zip` depends on no litchi crate and defines its own trait for
+/// the same reason it defines its own cancellation probe. This adapter is the
+/// only place the two meet, exactly as [`crate::OpenSession`] is the only
+/// place `ExecutionLimits` meets `ParallelReadLimits`.
+#[derive(Debug)]
+struct BridgedScopedWorkers(Arc<dyn litchi_core::ScopedWorkers>);
+
+impl soapberry_zip::office::ScopedWorkers for BridgedScopedWorkers {
+    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+        self.0.run_all(tasks);
+    }
+}
+
+/// Budget permits a package holds while its write session owns a worker pool.
+///
+/// The permits are released when the package is dropped, which is also when
+/// the pool they admitted is dropped.
+#[derive(Debug)]
+struct WritePermits {
+    width: NonZeroUsize,
+    _workers: Reservation,
+    _memory: Reservation,
+}
+
+/// Derives the write-session policy from a caller's execution context.
+///
+/// `workers` and `max_in_flight_tasks` are the caller's own; the per-task
+/// floor is the caller's [`litchi_core::ExecutionLimits::min_task_bytes`],
+/// taken verbatim, so a caller that imposes no floor gets none. The remainder
+/// threshold that decides whether a changed set is worth splitting at all is
+/// the ZIP crate's measured default: it is a property of deflate, not of the
+/// caller's workload.
+fn write_limits(context: &ExecutionContext) -> Option<ParallelWriteLimits> {
+    let limits = context.limits();
+    ParallelWriteLimits::new(
+        limits.workers(),
+        limits.max_in_flight_tasks(),
+        soapberry_zip::office::DEFAULT_MIN_PARALLELIZABLE_BYTES,
+        soapberry_zip::office::DEFAULT_MIN_POOL_PARALLELIZABLE_BYTES,
+        limits.min_task_bytes(),
+    )
+    .ok()
+}
+
 #[derive(Debug)]
 struct PartCache {
     limits: SourceCacheLimits,
@@ -4330,6 +4378,13 @@ struct PartCache {
     counters: CacheCounters,
     diagnostics: Arc<DiagnosticState>,
     budget: Option<ExecutionContext>,
+    /// Explicit write scheduler for this package's publications.
+    ///
+    /// Present only for a managed package, inert until a publication's changed
+    /// set earns a wave wider than one, and never shared with another package.
+    write_session: Option<ParallelWriteSession>,
+    /// Budget permits held for the lifetime of the write session's pool.
+    write_permits: Mutex<Option<WritePermits>>,
     input_reservation_failures: Option<Arc<DiagnosticCounter>>,
     output_reservation_failures: Option<Arc<DiagnosticCounter>>,
     #[cfg(test)]
@@ -4412,6 +4467,8 @@ impl PartCache {
             counters: CacheCounters::new(Arc::clone(&diagnostics)),
             diagnostics,
             budget: None,
+            write_session: None,
+            write_permits: Mutex::new(None),
             input_reservation_failures: None,
             output_reservation_failures: None,
             #[cfg(test)]
@@ -4428,12 +4485,24 @@ impl PartCache {
         input_reservation_failures: Arc<DiagnosticCounter>,
         output_reservation_failures: Arc<DiagnosticCounter>,
     ) -> Self {
+        // The session is built here and stays inert: it owns no thread until a
+        // publication's changed set earns a wave, and it is the only scheduler
+        // this package's publications may use.
+        let write_session = write_limits(&context).map(|limits| match context.scoped_workers() {
+            Some(workers) => ParallelWriteSession::with_scoped_workers(
+                limits,
+                Arc::new(BridgedScopedWorkers(Arc::clone(workers))),
+            ),
+            None => ParallelWriteSession::new(limits),
+        });
         Self {
             limits,
             state: Mutex::new(CacheStateInner::default()),
             counters: CacheCounters::new(Arc::clone(&diagnostics)),
             diagnostics,
             budget: Some(context),
+            write_session,
+            write_permits: Mutex::new(None),
             input_reservation_failures: Some(input_reservation_failures),
             output_reservation_failures: Some(output_reservation_failures),
             #[cfg(test)]
@@ -4466,6 +4535,72 @@ impl PartCache {
 
     fn context(&self) -> Option<&ExecutionContext> {
         self.budget.as_ref()
+    }
+
+    fn write_session(&self) -> Option<&ParallelWriteSession> {
+        self.write_session.as_ref()
+    }
+
+    /// Charges a publication's compression wave against this package's budget
+    /// and returns the width the budget granted.
+    ///
+    /// Every wave charges one `CpuTasks` unit per regenerated member it would
+    /// compress, at every width, because the work units exist whoever runs
+    /// them. A wave wider than one also reserves `Workers` permits and the
+    /// memory its compressor states retain; those permits are held for the
+    /// life of the pool they admit, so a package that never earns a wave holds
+    /// none. A budget that grants fewer permits than the policy asked for
+    /// narrows the wave instead of failing it.
+    fn admit_deflate_wave(
+        &self,
+        wave: soapberry_zip::DeflateWave,
+    ) -> std::result::Result<soapberry_zip::DeflateWave, ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(wave.narrowed_to(NonZeroUsize::MIN));
+        };
+        context.check()?;
+        if wave.tasks() > 0 {
+            context.consume(Resource::CpuTasks, wave.tasks() as u64)?;
+        }
+        if !wave.is_parallel() {
+            return Ok(wave);
+        }
+        let mut held = self
+            .write_permits
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(permits) = held.as_ref() {
+            return Ok(wave.narrowed_to(permits.width));
+        }
+        for width in (2..=wave.width().get()).rev() {
+            let Some(granted) = NonZeroUsize::new(width) else {
+                break;
+            };
+            match self.reserve_write_permits(context, granted) {
+                Ok(permits) => {
+                    *held = Some(permits);
+                    return Ok(wave.narrowed_to(granted));
+                },
+                Err(ExecutionError::ResourceLimit(_)) => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(wave.narrowed_to(NonZeroUsize::MIN))
+    }
+
+    fn reserve_write_permits(
+        &self,
+        context: &ExecutionContext,
+        width: NonZeroUsize,
+    ) -> std::result::Result<WritePermits, ExecutionError> {
+        let workers = context.reserve(Resource::Workers, width.get() as u64)?;
+        let retained = soapberry_zip::office::WORKER_STATE_BYTES.saturating_mul(width.get() as u64);
+        let memory = context.reserve(Resource::Memory, retained)?;
+        Ok(WritePermits {
+            width,
+            _workers: workers,
+            _memory: memory,
+        })
     }
 
     #[cfg(test)]
@@ -9893,6 +10028,21 @@ impl SourceBackedPackage {
                     "managed source output reservation counter is unavailable",
                 ));
             };
+            // Decide and charge the compression wave before a single member is
+            // compressed and long before the first byte reaches the sink, so a
+            // refused wave refuses the publication with nothing published.
+            let scheduled = match self.cache.write_session() {
+                Some(session) => {
+                    let wave = session.wave_for(&plan);
+                    let wave = self
+                        .cache
+                        .admit_deflate_wave(wave)
+                        .map_err(map_execution_error)?;
+                    wave.is_parallel().then_some((session, wave))
+                },
+                None => None,
+            };
+            let cancellation = PublicationCancellation(context.clone());
             let counted = match accounting.as_deref_mut() {
                 Some(report) => Counted::with_accounting(
                     writer,
@@ -9918,20 +10068,32 @@ impl SourceBackedPackage {
                 failure: Arc::clone(&execution_failure),
                 output_reservation_failures: output_reservation_failures.clone(),
             };
-            if has_accounting {
-                match index.write_to_with_accounting(
+            let written = match (has_accounting, scheduled) {
+                (true, Some((session, wave))) => index.write_to_with_accounting_and_session(
                     &plan,
                     Chunked { inner: budgeted },
                     &mut zip_accounting,
-                ) {
-                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
-                    Err(error) => Err(map_preservation_error(error)),
-                }
-            } else {
-                match index.write_to(&plan, Chunked { inner: budgeted }) {
-                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
-                    Err(error) => Err(map_preservation_error(error)),
-                }
+                    session,
+                    wave,
+                    &cancellation,
+                ),
+                (true, None) => index.write_to_with_accounting(
+                    &plan,
+                    Chunked { inner: budgeted },
+                    &mut zip_accounting,
+                ),
+                (false, Some((session, wave))) => index.write_to_with_session(
+                    &plan,
+                    Chunked { inner: budgeted },
+                    session,
+                    wave,
+                    &cancellation,
+                ),
+                (false, None) => index.write_to(&plan, Chunked { inner: budgeted }),
+            };
+            match written {
+                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                Err(error) => Err(map_preservation_error(error)),
             }
         } else {
             let counted = match accounting.as_deref_mut() {
@@ -11087,6 +11249,19 @@ fn adjusted_overlay_total(
 fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
     OpcError::SourceBackedOverlayUnavailable {
         reason: reason.into(),
+    }
+}
+
+/// Cooperative cancellation for a publication's compression wave.
+///
+/// Cancellation is observed between members, never inside one: a member that
+/// has started is always finished, and the wave completes before any byte is
+/// emitted, so a cancelled publication publishes nothing.
+struct PublicationCancellation(ExecutionContext);
+
+impl soapberry_zip::office::CancellationProbe for PublicationCancellation {
+    fn is_cancelled(&self) -> bool {
+        self.0.cancellation().is_cancelled()
     }
 }
 
@@ -15404,6 +15579,328 @@ mod tests {
         drop(first);
         drop(package);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    fn scheduled_payload(seed: usize, bytes: usize) -> Vec<u8> {
+        let mut data = Vec::with_capacity(bytes + 32);
+        data.extend_from_slice(b"<p>");
+        let mut state = (seed as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15).max(1);
+        while data.len() < bytes {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            data.extend_from_slice(format!("<c r=\"{}\"/>", state % 8192).as_bytes());
+        }
+        data.extend_from_slice(b"</p>");
+        data
+    }
+
+    /// A package whose ordinary Parts are deflated, so a publication that
+    /// replaces them regenerates deflate members rather than stored ones.
+    fn deflated_package_bytes(parts: usize, bytes: usize) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships())
+            .unwrap();
+        writer
+            .write_deflated("word/document.xml", &scheduled_payload(1, bytes))
+            .unwrap();
+        for index in 0..parts {
+            writer
+                .write_deflated(
+                    &format!("custom/part-{index:04}.xml"),
+                    &scheduled_payload(index + 2, bytes),
+                )
+                .unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn scheduled_context(workers: usize) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "opc-scheduled-publication-test",
+            Limits::new(
+                256 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(workers).unwrap(),
+            NonZeroUsize::new(workers.max(64)).unwrap(),
+            NonZeroU64::new(64 * 1024 * 1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, limits);
+        (budget, cancellation_source, context)
+    }
+
+    fn scheduled_replacements(parts: usize, bytes: usize) -> Vec<(PackURI, Arc<Vec<u8>>)> {
+        (0..parts)
+            .map(|index| {
+                (
+                    PackURI::new(format!("/custom/part-{index:04}.xml")).unwrap(),
+                    Arc::new(scheduled_payload(index + 100, bytes)),
+                )
+            })
+            .collect()
+    }
+
+    /// A sink that records the worker permits the publication held when the
+    /// first output byte was accepted — every member is compressed before
+    /// that byte, so this is the width the wave actually ran at.
+    struct PermitProbeSink {
+        inner: Vec<u8>,
+        budget: Budget,
+        observed: Arc<AtomicU64>,
+        seen: bool,
+    }
+
+    impl Write for PermitProbeSink {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            if !self.seen {
+                self.seen = true;
+                self.observed
+                    .store(self.budget.used(Resource::Workers), Ordering::Relaxed);
+            }
+            self.inner.write(data)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    fn publish_overlays_observing_permits(
+        source: &Arc<dyn ReadAt>,
+        budget: &Budget,
+        context: ExecutionContext,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+    ) -> (Vec<u8>, u64) {
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        let observed = Arc::new(AtomicU64::new(0));
+        let sink = PermitProbeSink {
+            inner: Vec::new(),
+            budget: budget.clone(),
+            observed: Arc::clone(&observed),
+            seen: false,
+        };
+        let mut sink = sink;
+        package
+            .write_part_overlays_shared_to_stream(&mut sink, replacements)
+            .unwrap();
+        (sink.inner, observed.load(Ordering::Relaxed))
+    }
+
+    fn publish_overlays(
+        source: &Arc<dyn ReadAt>,
+        context: Option<ExecutionContext>,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+    ) -> Vec<u8> {
+        let package = match context {
+            Some(context) => {
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    Arc::clone(source),
+                    ReadLimits::default(),
+                    SourceCacheLimits::default(),
+                    context,
+                )
+                .unwrap()
+            },
+            None => SourceBackedPackage::from_read_at_with_limits(
+                Arc::clone(source),
+                ReadLimits::default(),
+            )
+            .unwrap(),
+        };
+        let mut output = Vec::new();
+        package
+            .write_part_overlays_shared_to_stream(&mut output, replacements)
+            .unwrap();
+        output
+    }
+
+    #[test]
+    fn a_scheduled_publication_is_byte_identical_at_every_wave_width() {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
+        let replacements = scheduled_replacements(15, 6 * 1024);
+        let sequential = publish_overlays(&source, None, replacements.clone());
+
+        for workers in [1_usize, 2, 4, 8] {
+            let (budget, _cancellation, context) = scheduled_context(workers);
+            let (scheduled, permits) =
+                publish_overlays_observing_permits(&source, &budget, context, replacements.clone());
+            assert_eq!(scheduled, sequential, "width {workers} changed the bytes");
+            // A width of one takes the sequential path and holds no permits;
+            // every wider wave held exactly the permits its width asked for.
+            assert_eq!(
+                permits,
+                if workers > 1 { workers as u64 } else { 0 },
+                "width {workers} ran at the wrong width",
+            );
+            // One CPU task per regenerated deflate member, at every width.
+            assert_eq!(budget.used(Resource::CpuTasks), 15, "width {workers}");
+            // Worker permits and the memory their compressor states retain are
+            // released with the package that held them.
+            assert_eq!(budget.used(Resource::Workers), 0, "width {workers}");
+            assert_eq!(budget.used(Resource::Memory), 0, "width {workers}");
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct CountingCallerWorkers {
+        waves: AtomicU64,
+        tasks: AtomicU64,
+    }
+
+    impl litchi_core::ScopedWorkers for CountingCallerWorkers {
+        fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+            self.waves.fetch_add(1, Ordering::Relaxed);
+            self.tasks.fetch_add(tasks.len() as u64, Ordering::Relaxed);
+            for task in tasks.iter_mut() {
+                task();
+            }
+        }
+    }
+
+    #[test]
+    fn a_caller_facility_runs_every_task_and_keeps_the_bytes() {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
+        let replacements = scheduled_replacements(15, 6 * 1024);
+        let sequential = publish_overlays(&source, None, replacements.clone());
+
+        let (budget, _cancellation, context) = scheduled_context(4);
+        let workers: Arc<CountingCallerWorkers> = Arc::new(CountingCallerWorkers::default());
+        let facility: Arc<dyn litchi_core::ScopedWorkers> = workers.clone();
+        let context = context.with_scoped_workers(facility);
+        let scheduled = publish_overlays(&source, Some(context), replacements);
+
+        assert_eq!(scheduled, sequential);
+        assert_eq!(workers.waves.load(Ordering::Relaxed), 1);
+        assert_eq!(workers.tasks.load(Ordering::Relaxed), 15);
+        assert_eq!(budget.used(Resource::CpuTasks), 15);
+        assert_eq!(budget.used(Resource::Workers), 0);
+    }
+
+    #[test]
+    fn a_serial_scheduled_publication_reserves_no_worker_permits() {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
+        let budget = Budget::root(
+            "opc-scheduled-serial-test",
+            Limits::new(
+                256 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            )
+            .with_execution(0, u64::MAX),
+        );
+        let (_source_handle, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(8).unwrap(),
+            NonZeroUsize::new(64).unwrap(),
+            NonZeroU64::new(64 * 1024 * 1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, limits);
+        // A budget that grants no worker permits narrows the wave to one and
+        // publishes the sequential bytes rather than refusing.
+        let replacements = scheduled_replacements(15, 6 * 1024);
+        let sequential = publish_overlays(&source, None, replacements.clone());
+        let narrowed = publish_overlays(&source, Some(context), replacements);
+        assert_eq!(narrowed, sequential);
+        assert_eq!(budget.used(Resource::Workers), 0);
+    }
+
+    #[test]
+    fn an_exhausted_cpu_task_budget_refuses_before_any_output_byte() {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
+        let budget = Budget::root(
+            "opc-scheduled-task-budget-test",
+            Limits::new(
+                256 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            )
+            .with_execution(u64::MAX, 4),
+        );
+        let (_source_handle, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(64).unwrap(),
+            NonZeroU64::new(64 * 1024 * 1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, limits);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(&source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        let mut output = b"untouched".to_vec();
+        let error = package
+            .write_part_overlays_shared_to_stream(&mut output, scheduled_replacements(15, 6 * 1024))
+            .expect_err("fifteen tasks do not fit a four-task budget");
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(ref limit))
+                if limit.resource == Resource::CpuTasks
+        ));
+        assert_eq!(output, b"untouched");
+    }
+
+    #[test]
+    fn a_cancelled_scheduled_publication_publishes_nothing() {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
+        let (_budget, cancellation_source, context) = scheduled_context(4);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(&source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        cancellation_source.cancel();
+        let mut output = b"untouched".to_vec();
+        let error = package
+            .write_part_overlays_shared_to_stream(&mut output, scheduled_replacements(15, 6 * 1024))
+            .expect_err("a cancelled publication refuses");
+        assert!(matches!(error, OpcError::Cancelled));
+        assert_eq!(output, b"untouched");
     }
 
     #[test]

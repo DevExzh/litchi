@@ -1,0 +1,18 @@
+[package]
+name = "probe0662"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+litchi-core = { path = "../0662/crates/litchi-core" }
+litchi-opc = { path = "../0662/crates/litchi-opc" }
+soapberry-zip = { path = "../0662/crates/soapberry-zip" }
+xml-minifier = { path = "../0662/crates/xml-minifier" }
+quick-xml = "0.41"
+rayon = "1"
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+panic = "abort"
+debug = 1
