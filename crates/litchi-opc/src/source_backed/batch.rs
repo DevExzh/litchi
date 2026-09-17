@@ -157,13 +157,6 @@ pub(super) fn read_parts_ordered(
         Err(error) => return finish(package, Err(error)),
     };
 
-    if let Some(context) = context.as_ref()
-        && let Err(error) = context.consume(Resource::CpuTasks, prepared.requests.len() as u64)
-    {
-        drop(prepared);
-        return finish(package, Err(super::map_execution_error(error)));
-    }
-
     let output = match OutputAdmission::reserve(context.as_ref(), prepared.requests.len()) {
         Ok(output) => output,
         Err(error) => {
@@ -239,6 +232,21 @@ pub(super) fn read_parts_ordered(
             }
         }
         if let Some((width, scheduler)) = selected {
+            if let Err(error) = context.check() {
+                drop(scheduler);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
+            if let Err(error) = context.consume(Resource::CpuTasks, prepared.requests.len() as u64)
+            {
+                drop(scheduler);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
             let result = read_parallel(
                 package,
                 context,
@@ -263,6 +271,21 @@ pub(super) fn read_parts_ordered(
                 },
                 Err(error) => return finish(package, Err(error)),
             };
+            if let Err(error) = context.check() {
+                drop(io);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
+            if let Err(error) = context.consume(Resource::CpuTasks, prepared.requests.len() as u64)
+            {
+                drop(io);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
             let result = read_serial(package, &prepared.requests, &mut parts);
             drop(io);
             result
@@ -293,6 +316,23 @@ pub(super) fn read_parts_ordered(
         } else {
             None
         };
+        if let Some(context) = context.as_ref() {
+            if let Err(error) = context.check() {
+                drop(admission);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
+            if let Err(error) = context.consume(Resource::CpuTasks, prepared.requests.len() as u64)
+            {
+                drop(admission);
+                drop(parts);
+                drop(output);
+                drop(prepared);
+                return finish(package, Err(super::map_execution_error(error)));
+            }
+        }
         let result = read_serial(package, &prepared.requests, &mut parts);
         drop(admission);
         result

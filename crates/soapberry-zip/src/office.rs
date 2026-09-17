@@ -349,16 +349,27 @@ impl ParallelReadSession {
     /// Ensures that this session's private pool exists at its current
     /// effective width.
     ///
+    /// This compatibility entry point is suitable when the caller has
+    /// already narrowed the session with [`Self::narrow_worker_count`].
+    pub fn ensure_local_pool(&self) -> Result<(), Error> {
+        self.ensure_local_pool_at_width(self.effective_worker_count())
+    }
+
+    /// Ensures that this session's private pool exists at an admitted
+    /// operation width.
+    ///
     /// Runtime adapters use this at admission time when they retain a
     /// `Workers` reservation for the pool lifetime. A caller facility never
     /// needs a private pool, and a serial effective width leaves the session
     /// lazy.
-    pub fn ensure_local_pool(&self) -> Result<(), Error> {
-        if self.workers.is_some() || self.effective_worker_count().get() <= 1 {
+    pub fn ensure_local_pool_at_width(&self, worker_width: NonZeroUsize) -> Result<(), Error> {
+        let worker_width =
+            NonZeroUsize::new(worker_width.get().min(self.effective_worker_count().get()))
+                .expect("worker width is non-zero");
+        if self.workers.is_some() || worker_width.get() <= 1 {
             return Ok(());
         }
-        let width = self.effective_worker_count().get();
-        let _ = self.pool(width)?;
+        let _ = self.pool(worker_width.get())?;
         Ok(())
     }
 
@@ -366,6 +377,27 @@ impl ParallelReadSession {
         &self,
         names: &'name [&'name str],
         cancellation: &dyn CancellationProbe,
+        metadata_for: MetadataFor,
+        read_member: ReadMember,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+    where
+        MetadataFor: Fn(&str) -> Result<Metadata, Error> + Sync,
+        ReadMember: Fn(&str) -> Result<Vec<u8>, Error> + Sync,
+    {
+        self.read_many_with_width(
+            names,
+            cancellation,
+            self.effective_worker_count(),
+            metadata_for,
+            read_member,
+        )
+    }
+
+    fn read_many_with_width<'name, MetadataFor, ReadMember>(
+        &self,
+        names: &'name [&'name str],
+        cancellation: &dyn CancellationProbe,
+        worker_width: NonZeroUsize,
         metadata_for: MetadataFor,
         read_member: ReadMember,
     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
@@ -393,6 +425,7 @@ impl ParallelReadSession {
                         &mut batch,
                         &mut batch_bytes,
                         cancellation,
+                        worker_width,
                         &read_member,
                     )?;
                     results.push((*name, Err(error)));
@@ -422,6 +455,7 @@ impl ParallelReadSession {
                     &mut batch,
                     &mut batch_bytes,
                     cancellation,
+                    worker_width,
                     &read_member,
                 )?;
             }
@@ -438,6 +472,7 @@ impl ParallelReadSession {
             &mut batch,
             &mut batch_bytes,
             cancellation,
+            worker_width,
             &read_member,
         )?;
         Ok(results)
@@ -449,6 +484,7 @@ impl ParallelReadSession {
         batch: &mut Vec<&'name str>,
         batch_bytes: &mut u64,
         cancellation: &dyn CancellationProbe,
+        worker_width: NonZeroUsize,
         read_member: &ReadMember,
     ) -> Result<(), Error>
     where
@@ -458,13 +494,13 @@ impl ParallelReadSession {
             return Ok(());
         }
         self.check_cancelled(cancellation)?;
-        let parallel = self.effective_worker_count().get() > 1
+        let parallel = worker_width.get() > 1
             && batch.len() > 1
             && *batch_bytes >= self.limits.min_parallel_bytes();
         let batch = std::mem::take(batch);
         *batch_bytes = 0;
         let results_for_batch = if parallel {
-            self.read_parallel_batch(batch, cancellation, read_member)?
+            self.read_parallel_batch(batch, worker_width, cancellation, read_member)?
         } else {
             batch
                 .into_iter()
@@ -485,6 +521,7 @@ impl ParallelReadSession {
     fn read_parallel_batch<'name, ReadMember>(
         &self,
         batch: Vec<&'name str>,
+        worker_width: NonZeroUsize,
         cancellation: &dyn CancellationProbe,
         read_member: &ReadMember,
     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
@@ -500,7 +537,6 @@ impl ParallelReadSession {
         slots.resize_with(batch.len(), || None);
 
         {
-            let width = self.effective_worker_count();
             let mut tasks: Vec<Box<dyn FnMut() + Send + '_>> = batch
                 .iter()
                 .zip(slots.iter_mut())
@@ -515,12 +551,14 @@ impl ParallelReadSession {
             let mut task_refs: Vec<&mut (dyn FnMut() + Send + '_)> =
                 tasks.iter_mut().map(|task| &mut **task).collect();
             if let Some(workers) = self.workers.as_ref() {
-                for wave in task_refs.chunks_mut(width.get()) {
+                for wave in task_refs.chunks_mut(worker_width.get()) {
                     workers.run_all(wave);
                 }
             } else {
-                let pool = self.pool(width.get())?;
-                pool.install(|| task_refs.par_iter_mut().for_each(|task| task()));
+                let pool = self.pool(worker_width.get())?;
+                for wave in task_refs.chunks_mut(worker_width.get()) {
+                    pool.install(|| wave.par_iter_mut().for_each(|task| task()));
+                }
             }
         }
 
@@ -8547,6 +8585,30 @@ impl<'data> LazyArchiveReader<'data> {
         )
     }
 
+    /// Reads multiple members through an explicit session at an operation
+    /// width already admitted by the caller's shared budget.
+    pub fn read_many_with_session_width<'name>(
+        &self,
+        session: &ParallelReadSession,
+        names: &'name [&'name str],
+        worker_width: NonZeroUsize,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error> {
+        let worker_width = NonZeroUsize::new(
+            worker_width
+                .get()
+                .min(session.effective_worker_count().get()),
+        )
+        .expect("worker width is non-zero");
+        session.read_many_with_width(
+            names,
+            cancellation,
+            worker_width,
+            |name| self.inner.metadata(name),
+            |name| self.inner.read(name),
+        )
+    }
+
     /// Reads every member through an explicit session without populating the cache.
     ///
     /// Results retain physical source order. Cancellation discards every
@@ -12142,6 +12204,25 @@ mod tests {
         assert_eq!(results[0].0, "last");
         assert_eq!(results[1].0, "first");
         assert_eq!(session.local_pool_worker_count(), 0);
+    }
+
+    #[test]
+    fn explicit_width_cannot_exceed_session_worker_policy() {
+        let bytes = bulk_fixture();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let session = test_parallel_session(2);
+        let never_cancel = || false;
+        let results = reader
+            .read_many_with_session_width(
+                &session,
+                &["last", "first"],
+                NonZeroUsize::new(4).unwrap(),
+                &never_cancel,
+            )
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(session.local_pool_worker_count(), 2);
     }
 
     #[test]

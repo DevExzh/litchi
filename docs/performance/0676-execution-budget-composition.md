@@ -12,14 +12,24 @@ The explicit ZIP `ParallelReadSession` now builds its private pool lazily and
 can run borrowed tasks on the caller's `ScopedWorkers` facility. The OPC
 `OpenSession` adapter admits a shared worker width and positional-read width
 before the first payload read, holds private-pool worker permits for the pool's
-lifetime, and uses operation-scoped permits for a caller facility. CFB bulk
-reads use the same distinction: a private pool retains its worker reservation,
-while a caller facility receives an operation-scoped reservation. Both paths
-consume one `CpuTasks` unit per requested stream/member.
+lifetime, and uses operation-scoped permits for a caller facility. The admitted
+operation width is passed into ZIP, so a serial fallback stays serial and a
+later I/O narrowing runs width-sized waves even when a private pool is wider.
+CFB bulk reads use the same distinction: a private pool retains its worker
+reservation, while a caller facility receives an operation-scoped reservation;
+cached pools also submit only the currently admitted wave width.
+
+`CpuTasks` is charged only after deterministic request or output preflight and
+`Workers`/`IoConcurrency` admission succeed, immediately before payload work.
+ZIP and source-backed reads charge once for the admitted request set; CFB
+charges once per admitted batch. A later task setup or payload failure does
+not refund a cumulative charge, which records an accepted admission attempt.
+Deterministic preflight, output-allocation and worker/I/O refusal paths
+therefore consume no `CpuTasks` units.
 
 Source-backed ordered Part reads add `Workers` and `IoConcurrency` to their
 existing scheduler admission, narrow deterministically when the shared root
-has fewer permits, consume `CpuTasks` once per prepared request, and route
+has fewer permits, charge `CpuTasks` once per admitted request set, and route
 borrowed tasks through the caller facility when present. The private scoped
 thread path remains available otherwise. Every serial path reserves one worker
 and one positional-read permit before payload I/O; a zero `IoConcurrency`
@@ -28,12 +38,13 @@ completion, cancellation and failure, with private-pool worker reservations
 released when their owning session is dropped.
 
 The focused tests cover ordered output, caller-facility routing, lazy pool
-construction, shared-root worker narrowing, zero-I/O refusal before source
-reads, CPU-task charging, and release on serial failure. Targeted format, test,
-lint and documentation gates pass. This record makes no latency or
-throughput claim and retains no benchmark table; the change establishes
-correctness and resource-composition behavior only. Ordinary CRUD APIs remain
-unchanged and no global executor is introduced.
+construction, shared-root worker narrowing, cached-pool I/O narrowing measured
+with active source reads, zero-I/O refusal before source reads, CPU-task
+charging, and release on serial failure. Targeted format, test, lint and
+documentation gates pass. This record makes no latency or throughput claim and
+retains no benchmark table; the change establishes correctness and
+resource-composition behavior only. Ordinary CRUD APIs remain unchanged and no
+global executor is introduced.
 
 ## Scope
 
@@ -46,7 +57,7 @@ constructors and CRUD routes remain serial and outside this opt-in boundary.
 
 ## Verification boundary
 
-The tests prove admission order, deterministic output and typed refusal. They
-do not establish a speedup, a cross-platform scheduler bound, or a process-wide
-thread-count measurement. Those claims remain intentionally absent from this
-record.
+The tests prove admission order, deterministic output, typed refusal, and the
+active read/task width of the bounded CFB cases. They do not establish a
+speedup, a cross-platform scheduler bound, or a process-wide thread-count
+measurement. Those claims remain intentionally absent from this record.

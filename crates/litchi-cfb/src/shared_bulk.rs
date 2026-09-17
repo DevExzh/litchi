@@ -140,8 +140,6 @@ impl<'file> SharedOleBulkRead<'file> {
         // Work units are declared stream bytes. Charge the complete request
         // before any payload read so a rejected budget has no read side effect.
         self.context.consume(Resource::Work, total_bytes)?;
-        self.context
-            .consume(Resource::CpuTasks, requests.len() as u64)?;
 
         let mut results = Vec::new();
         results
@@ -176,9 +174,9 @@ impl<'file> SharedOleBulkRead<'file> {
                 .min(limits.max_in_flight_tasks().get())
                 .min(batch.len());
             let admission = if parallel_candidate && requested_width > 1 {
-                self.admit_workers(requested_width)?
+                self.admit_workers(requested_width, batch.len() as u64)?
             } else {
-                self.admit_serial()?
+                self.admit_serial(batch.len() as u64)?
             };
             let width = admission.width;
             let _workers = admission.workers;
@@ -221,10 +219,18 @@ impl<'file> SharedOleBulkRead<'file> {
         SharedOleBulkError::StreamExceedsInFlightBytes { declared, maximum }
     }
 
-    fn admit_serial(&self) -> Result<WorkerAdmission, SharedOleBulkError> {
+    fn consume_cpu_tasks(&self, tasks: u64) -> Result<(), SharedOleBulkError> {
+        self.context.check()?;
+        self.context
+            .consume(Resource::CpuTasks, tasks)
+            .map_err(Into::into)
+    }
+
+    fn admit_serial(&self, cpu_tasks: u64) -> Result<WorkerAdmission, SharedOleBulkError> {
         if let Ok(permits) = self.worker_permits.lock() {
             if permits.is_some() {
                 let io = self.context.reserve(Resource::IoConcurrency, 1)?;
+                self.consume_cpu_tasks(cpu_tasks)?;
                 return Ok(WorkerAdmission {
                     width: 1,
                     workers: None,
@@ -244,6 +250,7 @@ impl<'file> SharedOleBulkRead<'file> {
                 return Err(error.into());
             },
         };
+        self.consume_cpu_tasks(cpu_tasks)?;
         Ok(WorkerAdmission {
             width: 1,
             workers: Some(workers),
@@ -251,7 +258,11 @@ impl<'file> SharedOleBulkRead<'file> {
         })
     }
 
-    fn admit_workers(&self, requested: usize) -> Result<WorkerAdmission, SharedOleBulkError> {
+    fn admit_workers(
+        &self,
+        requested: usize,
+        cpu_tasks: u64,
+    ) -> Result<WorkerAdmission, SharedOleBulkError> {
         let mut permits = self.worker_permits.lock().map_err(|_error| {
             SharedOleBulkError::Scheduler("worker admission cache is poisoned".to_string())
         })?;
@@ -261,6 +272,7 @@ impl<'file> SharedOleBulkRead<'file> {
             for width in (1..=maximum).rev() {
                 match self.context.reserve(Resource::IoConcurrency, width as u64) {
                     Ok(io) => {
+                        self.consume_cpu_tasks(cpu_tasks)?;
                         return Ok(WorkerAdmission {
                             width,
                             workers: None,
@@ -302,6 +314,7 @@ impl<'file> SharedOleBulkRead<'file> {
                     return Err(error.into());
                 },
             };
+            self.consume_cpu_tasks(cpu_tasks)?;
             if self.context.scoped_workers().is_none() {
                 // Construct the private pool while the reservation is local;
                 // a failed build releases it before the error is returned.
@@ -329,7 +342,7 @@ impl<'file> SharedOleBulkRead<'file> {
             });
         }
         drop(permits);
-        self.admit_serial()
+        self.admit_serial(cpu_tasks)
     }
 
     fn read_parallel_batch(
@@ -370,7 +383,9 @@ impl<'file> SharedOleBulkRead<'file> {
                 }
             } else {
                 let pool = self.pool(width)?;
-                pool.install(|| task_refs.par_iter_mut().for_each(|task| task()));
+                for wave in task_refs.chunks_mut(width) {
+                    pool.install(|| wave.par_iter_mut().for_each(|task| task()));
+                }
             }
         }
         Ok(slots

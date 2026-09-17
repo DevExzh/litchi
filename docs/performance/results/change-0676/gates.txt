@@ -9,11 +9,14 @@ Target directory: /tmp/litchi-0676-debug0
 
 PASS  cargo fmt --all --check
 PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo check -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets
-PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo test -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets (1,871 passed; 2 ignored; 0 failed)
+PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo test -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets (1,877 passed; 2 ignored; 0 failed)
 PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo clippy -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets -- -D warnings
 PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo doc -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --no-deps
 
-The test output was captured at `/tmp/litchi-0676-debug0-tests-final2.log`,
-clippy at `/tmp/litchi-0676-debug0-clippy-final2.log`, and docs at
-`/tmp/litchi-0676-debug0-doc-final2.log` during the final pre-commit run. No
-benchmark or latency run is part of this record.
+The test output was captured at `/tmp/litchi-0676-debug0-tests-final4.log`.
+The final check output is captured at
+`/tmp/litchi-0676-debug0-check-final4.log`.
+The final clippy and documentation outputs are captured at
+`/tmp/litchi-0676-debug0-clippy-final4.log` and
+`/tmp/litchi-0676-debug0-doc-final4.log`. No benchmark or latency run is
+part of this record.
