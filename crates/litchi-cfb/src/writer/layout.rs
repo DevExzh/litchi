@@ -1586,6 +1586,15 @@ pub(super) fn plan_reuse(
         zeroed_vec(ministream_image_len, "CFB reused layout mini stream image")?;
     let carried = source.ministream_image.len().min(ministream_image_len);
     ministream_image[..carried].copy_from_slice(&source.ministream_image[..carried]);
+    // A shrinking root mini stream may retain its last physical sector.
+    // Bytes beyond its new logical end are padding, not retained streams;
+    // clear former payload bytes so an inverse edit restores canonical slack.
+    let logical_end = usize::try_from(ministream_bytes)
+        .map_err(|_error| invalid("CFB mini stream length exceeds usize"))?;
+    ministream_image
+        .get_mut(logical_end..)
+        .ok_or_else(|| invalid("CFB mini stream length exceeds its sector image"))?
+        .fill(0);
     for (index, chain) in mini_chains.iter().enumerate() {
         let bytes = model.streams[index].bytes;
         for (position, mini) in chain.iter().enumerate() {
