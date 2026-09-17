@@ -1,0 +1,19 @@
+Change 0676 targeted gates
+===========================
+
+Repository: /home/zhuhe/code/litchi-worktrees/0676
+Branch: perf/0676-execution-budget-composition
+Base: d2d7e2dcc
+Build concurrency: CARGO_BUILD_JOBS=2
+Target directory: /tmp/litchi-0676-debug0
+
+PASS  cargo fmt --all --check
+PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo check -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets
+PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo test -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets (1,871 passed; 2 ignored; 0 failed)
+PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo clippy -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --all-targets -- -D warnings
+PASS  CARGO_PROFILE_DEV_DEBUG=0 cargo doc -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-opc --no-deps
+
+The test output was captured at `/tmp/litchi-0676-debug0-tests-final2.log`,
+clippy at `/tmp/litchi-0676-debug0-clippy-final2.log`, and docs at
+`/tmp/litchi-0676-debug0-doc-final2.log` during the final pre-commit run. No
+benchmark or latency run is part of this record.

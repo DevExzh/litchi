@@ -1,0 +1,40 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0676",
+  "title": "Compose execution budgets across ZIP, CFB and source-backed read sessions",
+  "decision": "retained and implemented for the three explicit read-session boundaries",
+  "code_state": "IoConcurrency is additive in litchi-core; ZIP OpenSession and ParallelReadSession, CFB SharedOleBulkRead, and source-backed ordered Part reads compose Workers, IoConcurrency, CpuTasks and caller facilities",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "accepted ADR 0031, change 0652 decision 6, landed 0662 prerequisite",
+  "accepted_evidence": {
+    "api_compatibility": "Limits::new keeps six arguments; the existing two-argument with_execution remains available and with_execution_io opts into the third dimension",
+    "lazy_pool": "ZIP and CFB private pools are absent at session construction and appear only after an eligible batch is admitted",
+    "composition": "shared-root tests retain private-pool worker permits, narrow a second session deterministically, and release permits at session drop",
+    "io_admission": "ZIP, CFB and source-backed tests refuse zero IoConcurrency before payload read and release serial permits after failure",
+    "caller_facility": "ZIP, CFB and source-backed ordered-read tests route borrowed tasks through a caller facility without constructing a private pool",
+    "correctness": "ordered results remain byte-identical to serial results and source-backed errors retain typed failure behavior"
+  },
+  "accepted_costs": {
+    "admission": "each explicit read operation pays hierarchical reservation checks for worker and positional-read permits",
+    "retained_pool": "a private pool keeps its admitted Workers reservation until its session is dropped",
+    "api_surface": "a ninth Resource dimension and an additive execution builder are public low-level budget API changes"
+  },
+  "known_gaps": {
+    "measurement": "no latency, throughput, scaling or cross-platform scheduler measurement was run",
+    "thread_probe": "this packet does not claim a /proc/self/task process-wide thread-count capture",
+    "ordinary_api": "ordinary package CRUD and constructors remain outside explicit execution sessions",
+    "finite_profiles": "the named profiles use finite Workers, IoConcurrency and CpuTasks values; workload-specific limits remain caller-selected"
+  },
+  "withheld": [
+    "any registered performance claim",
+    "any claim that ordinary serial CRUD gained parallelism",
+    "any claim of a cross-platform latency or throughput improvement"
+  ],
+  "provenance": {
+    "base_commit": "d2d7e2dcc",
+    "branch": "perf/0676-execution-budget-composition",
+    "validation": "targeted fmt, check, tests, clippy and docs with CARGO_BUILD_JOBS=2 and a fresh target directory"
+  }
+}

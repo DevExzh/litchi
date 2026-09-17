@@ -77,7 +77,7 @@ pub trait ScopedWorkers: Send + Sync + std::fmt::Debug {
     /// Tasks may run on any thread, in any order, concurrently or serially.
     /// Tasks handed to this facility have already caught their own panics, so
     /// an implementation never observes one unwinding out of a task.
-    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]);
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]);
 }
 
 /// Validated finite limits for a local [`ParallelWriteSession`].
@@ -328,7 +328,7 @@ impl std::fmt::Debug for ParallelWriteSession {
 pub struct SerialScopedWorkers;
 
 impl ScopedWorkers for SerialScopedWorkers {
-    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
         for task in tasks.iter_mut() {
             task();
         }

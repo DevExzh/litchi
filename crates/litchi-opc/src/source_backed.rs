@@ -4335,7 +4335,7 @@ struct LoadResources {
 struct BridgedScopedWorkers(Arc<dyn litchi_core::ScopedWorkers>);
 
 impl soapberry_zip::office::ScopedWorkers for BridgedScopedWorkers {
-    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
         self.0.run_all(tasks);
     }
 }
@@ -4348,7 +4348,7 @@ impl soapberry_zip::office::ScopedWorkers for BridgedScopedWorkers {
 struct WritePermits {
     width: NonZeroUsize,
     _workers: Reservation,
-    _memory: Reservation,
+    _memory: Option<Reservation>,
 }
 
 /// Derives the write-session policy from a caller's execution context.
@@ -4554,38 +4554,46 @@ impl PartCache {
     fn admit_deflate_wave(
         &self,
         wave: soapberry_zip::DeflateWave,
-    ) -> std::result::Result<soapberry_zip::DeflateWave, ExecutionError> {
+    ) -> std::result::Result<(soapberry_zip::DeflateWave, Option<WritePermits>), ExecutionError>
+    {
         let Some(context) = self.budget.as_ref() else {
-            return Ok(wave.narrowed_to(NonZeroUsize::MIN));
+            return Ok((wave.narrowed_to(NonZeroUsize::MIN), None));
         };
         context.check()?;
         if wave.tasks() > 0 {
             context.consume(Resource::CpuTasks, wave.tasks() as u64)?;
         }
         if !wave.is_parallel() {
-            return Ok(wave);
+            return Ok((wave, None));
         }
         let mut held = self
             .write_permits
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(permits) = held.as_ref() {
-            return Ok(wave.narrowed_to(permits.width));
+            return Ok((wave.narrowed_to(permits.width), None));
         }
+        let caller_workers = self
+            .write_session
+            .as_ref()
+            .is_some_and(|session| session.scoped_workers().is_some());
         for width in (2..=wave.width().get()).rev() {
             let Some(granted) = NonZeroUsize::new(width) else {
                 break;
             };
             match self.reserve_write_permits(context, granted) {
                 Ok(permits) => {
+                    if caller_workers {
+                        return Ok((wave.narrowed_to(granted), Some(permits)));
+                    }
                     *held = Some(permits);
-                    return Ok(wave.narrowed_to(granted));
+                    return Ok((wave.narrowed_to(granted), None));
                 },
                 Err(ExecutionError::ResourceLimit(_)) => continue,
                 Err(error) => return Err(error),
             }
         }
-        Ok(wave.narrowed_to(NonZeroUsize::MIN))
+        Ok((wave.narrowed_to(NonZeroUsize::MIN), None))
     }
 
     fn reserve_write_permits(
@@ -4594,8 +4602,17 @@ impl PartCache {
         width: NonZeroUsize,
     ) -> std::result::Result<WritePermits, ExecutionError> {
         let workers = context.reserve(Resource::Workers, width.get() as u64)?;
-        let retained = soapberry_zip::office::WORKER_STATE_BYTES.saturating_mul(width.get() as u64);
-        let memory = context.reserve(Resource::Memory, retained)?;
+        let memory = if self
+            .write_session
+            .as_ref()
+            .is_some_and(|session| session.scoped_workers().is_some())
+        {
+            None
+        } else {
+            let retained =
+                soapberry_zip::office::WORKER_STATE_BYTES.saturating_mul(width.get() as u64);
+            Some(context.reserve(Resource::Memory, retained)?)
+        };
         Ok(WritePermits {
             width,
             _workers: workers,
@@ -10034,11 +10051,11 @@ impl SourceBackedPackage {
             let scheduled = match self.cache.write_session() {
                 Some(session) => {
                     let wave = session.wave_for(&plan);
-                    let wave = self
+                    let (wave, wave_permits) = self
                         .cache
                         .admit_deflate_wave(wave)
                         .map_err(map_execution_error)?;
-                    wave.is_parallel().then_some((session, wave))
+                    wave.is_parallel().then_some((session, wave, wave_permits))
                 },
                 None => None,
             };
@@ -10069,20 +10086,21 @@ impl SourceBackedPackage {
                 output_reservation_failures: output_reservation_failures.clone(),
             };
             let written = match (has_accounting, scheduled) {
-                (true, Some((session, wave))) => index.write_to_with_accounting_and_session(
-                    &plan,
-                    Chunked { inner: budgeted },
-                    &mut zip_accounting,
-                    session,
-                    wave,
-                    &cancellation,
-                ),
+                (true, Some((session, wave, _wave_permits))) => index
+                    .write_to_with_accounting_and_session(
+                        &plan,
+                        Chunked { inner: budgeted },
+                        &mut zip_accounting,
+                        session,
+                        wave,
+                        &cancellation,
+                    ),
                 (true, None) => index.write_to_with_accounting(
                     &plan,
                     Chunked { inner: budgeted },
                     &mut zip_accounting,
                 ),
-                (false, Some((session, wave))) => index.write_to_with_session(
+                (false, Some((session, wave, _wave_permits))) => index.write_to_with_session(
                     &plan,
                     Chunked { inner: budgeted },
                     session,
@@ -15649,6 +15667,34 @@ mod tests {
         (budget, cancellation_source, context)
     }
 
+    fn ordered_read_context(
+        workers: usize,
+        io_concurrency: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "opc-ordered-read-test",
+            Limits::new(
+                256 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            )
+            .with_execution_io(workers as u64, io_concurrency, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(workers).unwrap(),
+            NonZeroUsize::new(workers.max(4)).unwrap(),
+            NonZeroU64::new(64 * 1024 * 1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, limits);
+        (budget, cancellation_source, context)
+    }
+
     fn scheduled_replacements(parts: usize, bytes: usize) -> Vec<(PackURI, Arc<Vec<u8>>)> {
         (0..parts)
             .map(|index| {
@@ -15776,7 +15822,7 @@ mod tests {
     }
 
     impl litchi_core::ScopedWorkers for CountingCallerWorkers {
-        fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+        fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
             self.waves.fetch_add(1, Ordering::Relaxed);
             self.tasks.fetch_add(tasks.len() as u64, Ordering::Relaxed);
             for task in tasks.iter_mut() {
@@ -15803,6 +15849,92 @@ mod tests {
         assert_eq!(workers.tasks.load(Ordering::Relaxed), 15);
         assert_eq!(budget.used(Resource::CpuTasks), 15);
         assert_eq!(budget.used(Resource::Workers), 0);
+    }
+
+    #[test]
+    fn ordered_source_reads_use_caller_facility_and_preserve_order() {
+        let source: Arc<dyn ReadAt> = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"ordered document",
+            false,
+        )));
+        let (budget, _cancellation, context) = ordered_read_context(2, 2);
+        let workers: Arc<CountingCallerWorkers> = Arc::new(CountingCallerWorkers::default());
+        let context = context.with_scoped_workers(workers.clone());
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(&source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let batch = package.read_parts_ordered(&[orphan, document]).unwrap();
+
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch.get(0).unwrap().as_bytes(), b"<orphan/>");
+        assert_eq!(batch.get(1).unwrap().as_bytes(), b"ordered document");
+        assert!(workers.tasks.load(Ordering::Relaxed) >= 2);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+    }
+
+    #[test]
+    fn ordered_source_reads_refuse_zero_io_before_payload_reads() {
+        let source_probe = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"ordered document",
+            false,
+        )));
+        let source: Arc<dyn ReadAt> = source_probe.clone();
+        let (budget, _cancellation, context) = ordered_read_context(2, 0);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(&source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        let baseline = source_probe.reads.load(Ordering::SeqCst);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        assert!(matches!(
+            package.read_parts_ordered(&[document, orphan]),
+            Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::IoConcurrency
+        ));
+        assert_eq!(source_probe.reads.load(Ordering::SeqCst), baseline);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+    }
+
+    #[test]
+    fn ordered_serial_read_failure_releases_worker_and_io_admissions() {
+        const DOCUMENT: &[u8] = b"ordered failure";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let position = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[position] ^= 0xff;
+        let source: Arc<dyn ReadAt> = Arc::new(CountingSource::new(bytes));
+        let (budget, _cancellation, context) = ordered_read_context(1, 1);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::clone(&source),
+                ReadLimits::default(),
+                SourceCacheLimits::default(),
+                context,
+            )
+            .unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+
+        assert!(package.read_parts_ordered(&[document]).is_err());
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
     }
 
     #[test]

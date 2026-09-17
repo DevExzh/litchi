@@ -182,7 +182,7 @@ pub trait ScopedWorkers: Send + Sync + std::fmt::Debug {
     /// task never unwinds: callers hand this facility tasks that have already
     /// caught their own panics, so an implementation never has to decide what
     /// a panicking task means.
-    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]);
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]);
 }
 
 /// Handle used by an operation owner to request cooperative cancellation.

@@ -1,10 +1,11 @@
 //! Explicit, local-runtime bulk reads for [`crate::SharedOleFile`].
 
 use crate::{OleError, SharedOleFile};
-use litchi_core::{ExecutionContext, ExecutionError, Resource};
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use rayon::prelude::*;
 use std::{
     fmt,
+    panic::{AssertUnwindSafe, catch_unwind},
     sync::{Arc, Mutex},
 };
 
@@ -64,17 +65,19 @@ impl From<ExecutionError> for SharedOleBulkError {
 
 /// Reusable, caller-configured local bulk-read session for [`SharedOleFile`].
 ///
-/// The supplied [`ExecutionContext`] selects worker count, maximum outstanding
-/// tasks and bytes, cooperative cancellation, the parallel threshold, and the
-/// `Inherit` affinity policy. The implementation creates a private Rayon pool
-/// only for eligible multi-worker calls; it never installs or uses Rayon’s
-/// global pool.
+/// The supplied [`ExecutionContext`] selects worker count, positional-read
+/// concurrency, maximum outstanding tasks and bytes, cooperative cancellation,
+/// the parallel threshold, and the `Inherit` affinity policy. The
+/// implementation creates a private Rayon pool only for eligible multi-worker
+/// calls; it never installs or uses Rayon’s global pool. A caller facility
+/// attached to the context replaces that private pool.
 pub struct SharedOleBulkRead<'file> {
     file: &'file SharedOleFile,
     context: ExecutionContext,
     /// Successful construction is retained for this session. A failed build
     /// leaves this empty so a later eligible call can retry.
     pool: Mutex<Option<Arc<rayon::ThreadPool>>>,
+    worker_permits: Mutex<Option<WorkerPermits>>,
     #[cfg(test)]
     pool_builds: std::sync::atomic::AtomicUsize,
 }
@@ -85,6 +88,7 @@ impl<'file> SharedOleBulkRead<'file> {
             file,
             context,
             pool: Mutex::new(None),
+            worker_permits: Mutex::new(None),
             #[cfg(test)]
             pool_builds: std::sync::atomic::AtomicUsize::new(0),
         }
@@ -136,6 +140,8 @@ impl<'file> SharedOleBulkRead<'file> {
         // Work units are declared stream bytes. Charge the complete request
         // before any payload read so a rejected budget has no read side effect.
         self.context.consume(Resource::Work, total_bytes)?;
+        self.context
+            .consume(Resource::CpuTasks, requests.len() as u64)?;
 
         let mut results = Vec::new();
         results
@@ -157,20 +163,28 @@ impl<'file> SharedOleBulkRead<'file> {
             // A one-item MiniFAT batch keeps the prior bounded direct behavior
             // and therefore does not retain an unaccounted root cache.
             let force_minifat_cache = batch.iter().filter(|request| request.is_minifat).count() > 1;
-            let parallel = limits.workers().get() > 1
+            let parallel_candidate = limits.workers().get() > 1
                 && batch.len() > 1
-                && batch_bytes >= limits.min_parallel_bytes();
-            let batch_results = if parallel {
-                // The session constructs this private pool only after a real
-                // bounded batch qualifies, then clones its handle before
-                // installing work so the cache mutex is never held here.
-                let pool = self.pool(limits.workers().get())?;
-                pool.install(|| {
-                    batch
-                        .par_iter()
-                        .map(|request| self.read_one(request, force_minifat_cache))
-                        .collect::<Vec<_>>()
-                })
+                && batch_bytes >= limits.min_parallel_bytes()
+                && (limits.min_task_bytes() == 0
+                    || batch
+                        .iter()
+                        .all(|request| request.size >= limits.min_task_bytes()));
+            let requested_width = limits
+                .workers()
+                .get()
+                .min(limits.max_in_flight_tasks().get())
+                .min(batch.len());
+            let admission = if parallel_candidate && requested_width > 1 {
+                self.admit_workers(requested_width)?
+            } else {
+                self.admit_serial()?
+            };
+            let width = admission.width;
+            let _workers = admission.workers;
+            let _io = admission.io;
+            let batch_results = if width > 1 {
+                self.read_parallel_batch(batch, width, force_minifat_cache)?
             } else {
                 batch
                     .iter()
@@ -207,6 +221,170 @@ impl<'file> SharedOleBulkRead<'file> {
         SharedOleBulkError::StreamExceedsInFlightBytes { declared, maximum }
     }
 
+    fn admit_serial(&self) -> Result<WorkerAdmission, SharedOleBulkError> {
+        if let Ok(permits) = self.worker_permits.lock() {
+            if permits.is_some() {
+                let io = self.context.reserve(Resource::IoConcurrency, 1)?;
+                return Ok(WorkerAdmission {
+                    width: 1,
+                    workers: None,
+                    io,
+                });
+            }
+        } else {
+            return Err(SharedOleBulkError::Scheduler(
+                "worker admission cache is poisoned".to_string(),
+            ));
+        }
+        let workers = self.context.reserve(Resource::Workers, 1)?;
+        let io = match self.context.reserve(Resource::IoConcurrency, 1) {
+            Ok(io) => io,
+            Err(error) => {
+                drop(workers);
+                return Err(error.into());
+            },
+        };
+        Ok(WorkerAdmission {
+            width: 1,
+            workers: Some(workers),
+            io,
+        })
+    }
+
+    fn admit_workers(&self, requested: usize) -> Result<WorkerAdmission, SharedOleBulkError> {
+        let mut permits = self.worker_permits.lock().map_err(|_error| {
+            SharedOleBulkError::Scheduler("worker admission cache is poisoned".to_string())
+        })?;
+        if let Some(permits) = permits.as_ref() {
+            let maximum = permits.width.min(requested);
+            let mut last_limit = None;
+            for width in (1..=maximum).rev() {
+                match self.context.reserve(Resource::IoConcurrency, width as u64) {
+                    Ok(io) => {
+                        return Ok(WorkerAdmission {
+                            width,
+                            workers: None,
+                            io,
+                        });
+                    },
+                    Err(ExecutionError::ResourceLimit(limit))
+                        if limit.resource == Resource::IoConcurrency =>
+                    {
+                        last_limit = Some(limit);
+                    },
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            if let Some(limit) = last_limit {
+                return Err(ExecutionError::ResourceLimit(limit).into());
+            }
+        }
+        for width in (2..=requested).rev() {
+            let workers = match self.context.reserve(Resource::Workers, width as u64) {
+                Ok(workers) => workers,
+                Err(ExecutionError::ResourceLimit(limit))
+                    if limit.resource == Resource::Workers =>
+                {
+                    continue;
+                },
+                Err(error) => return Err(error.into()),
+            };
+            let io = match self.context.reserve(Resource::IoConcurrency, width as u64) {
+                Ok(io) => io,
+                Err(ExecutionError::ResourceLimit(limit))
+                    if limit.resource == Resource::IoConcurrency =>
+                {
+                    drop(workers);
+                    continue;
+                },
+                Err(error) => {
+                    drop(workers);
+                    return Err(error.into());
+                },
+            };
+            if self.context.scoped_workers().is_none() {
+                // Construct the private pool while the reservation is local;
+                // a failed build releases it before the error is returned.
+                if let Err(error) = self.pool(width) {
+                    drop(io);
+                    drop(workers);
+                    return Err(error);
+                }
+            }
+            if self.context.scoped_workers().is_some() {
+                return Ok(WorkerAdmission {
+                    width,
+                    workers: Some(workers),
+                    io,
+                });
+            }
+            *permits = Some(WorkerPermits {
+                width,
+                _workers: workers,
+            });
+            return Ok(WorkerAdmission {
+                width,
+                workers: None,
+                io,
+            });
+        }
+        drop(permits);
+        self.admit_serial()
+    }
+
+    fn read_parallel_batch(
+        &self,
+        batch: &[StreamRequest<'_>],
+        width: usize,
+        force_minifat_cache: bool,
+    ) -> Result<Vec<Result<Vec<u8>, SharedOleBulkError>>, SharedOleBulkError> {
+        let mut slots: Vec<Option<Result<Vec<u8>, SharedOleBulkError>>> = Vec::new();
+        slots
+            .try_reserve_exact(batch.len())
+            .map_err(|error| SharedOleBulkError::Scheduler(error.to_string()))?;
+        slots.resize_with(batch.len(), || None);
+        {
+            let mut tasks: Vec<Box<dyn FnMut() + Send + '_>> = batch
+                .iter()
+                .zip(slots.iter_mut())
+                .map(|(request, slot)| {
+                    let task: Box<dyn FnMut() + Send + '_> = Box::new(move || {
+                        let result = catch_unwind(AssertUnwindSafe(|| {
+                            self.read_one(request, force_minifat_cache)
+                        }))
+                        .unwrap_or_else(|_| {
+                            Err(SharedOleBulkError::Scheduler(
+                                "CFB bulk worker panicked".to_string(),
+                            ))
+                        });
+                        *slot = Some(result);
+                    });
+                    task
+                })
+                .collect();
+            let mut task_refs: Vec<&mut (dyn FnMut() + Send + '_)> =
+                tasks.iter_mut().map(|task| &mut **task).collect();
+            if let Some(workers) = self.context.scoped_workers() {
+                for wave in task_refs.chunks_mut(width) {
+                    workers.run_all(wave);
+                }
+            } else {
+                let pool = self.pool(width)?;
+                pool.install(|| task_refs.par_iter_mut().for_each(|task| task()));
+            }
+        }
+        Ok(slots
+            .into_iter()
+            .map(|result| {
+                result.unwrap_or_else(|| {
+                    Err(SharedOleBulkError::Scheduler(
+                        "CFB bulk worker did not produce a result".to_string(),
+                    ))
+                })
+            })
+            .collect())
+    }
+
     fn pool(&self, workers: usize) -> Result<Arc<rayon::ThreadPool>, SharedOleBulkError> {
         let mut cached = self.pool.lock().map_err(|_error| {
             SharedOleBulkError::Scheduler("pool cache is poisoned".to_string())
@@ -230,6 +408,18 @@ impl<'file> SharedOleBulkRead<'file> {
     pub(crate) fn pool_build_count(&self) -> usize {
         self.pool_builds.load(std::sync::atomic::Ordering::Relaxed)
     }
+}
+
+#[derive(Debug)]
+struct WorkerPermits {
+    width: usize,
+    _workers: Reservation,
+}
+
+struct WorkerAdmission {
+    width: usize,
+    workers: Option<Reservation>,
+    io: Reservation,
 }
 
 #[derive(Clone, Copy)]

@@ -63,7 +63,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, Cursor, Read, Write};
 use std::mem::size_of;
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 pub use crate::LimitResource;
@@ -262,12 +262,16 @@ where
 
 /// Reusable local scheduler for explicit archive bulk reads.
 ///
-/// The session owns a Rayon pool created with the requested worker count. It
-/// never initializes or installs Rayon’s process-global pool. A one-worker
-/// session uses the same bounded batching policy but executes serially.
+/// The session creates a private Rayon pool lazily, after a bounded batch has
+/// qualified for parallel work. A caller-provided [`ScopedWorkers`] facility
+/// replaces that pool entirely. It never initializes or installs Rayon’s
+/// process-global pool. A one-worker session uses the same bounded batching
+/// policy but executes serially.
 pub struct ParallelReadSession {
     limits: ParallelReadLimits,
-    pool: Option<rayon::ThreadPool>,
+    workers: Option<Arc<dyn ScopedWorkers>>,
+    pool: Mutex<Option<Arc<rayon::ThreadPool>>>,
+    worker_cap: AtomicUsize,
 }
 
 impl ParallelReadSession {
@@ -275,23 +279,28 @@ impl ParallelReadSession {
     ///
     /// # Errors
     ///
-    /// Returns an error if the local Rayon worker pool cannot be created.
+    /// Creates a session that builds its own pool lazily.
     pub fn new(limits: ParallelReadLimits) -> Result<Self, Error> {
-        let workers = limits.workers().get();
-        let pool = if workers == 1 {
-            None
-        } else {
-            Some(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(workers)
-                    .build()
-                    .map_err(|error| ErrorKind::ParallelReadWorkerPool {
-                        workers,
-                        message: error.to_string(),
-                    })?,
-            )
-        };
-        Ok(Self { limits, pool })
+        Ok(Self {
+            limits,
+            workers: None,
+            pool: Mutex::new(None),
+            worker_cap: AtomicUsize::new(limits.workers().get()),
+        })
+    }
+
+    /// Creates a session that runs every task on a caller-provided facility.
+    #[must_use]
+    pub fn with_scoped_workers(
+        limits: ParallelReadLimits,
+        workers: Arc<dyn ScopedWorkers>,
+    ) -> Self {
+        Self {
+            limits,
+            workers: Some(workers),
+            pool: Mutex::new(None),
+            worker_cap: AtomicUsize::new(limits.workers().get()),
+        }
     }
 
     /// Validated policy used by this session.
@@ -304,6 +313,53 @@ impl ParallelReadSession {
     #[must_use]
     pub const fn worker_count(&self) -> NonZeroUsize {
         self.limits.workers()
+    }
+
+    /// Narrows this session's effective width to a caller-admitted value.
+    ///
+    /// Widths only become smaller, so concurrent callers cannot accidentally
+    /// exceed an already-admitted shared budget. A value of zero is ignored.
+    pub fn narrow_worker_count(&self, workers: NonZeroUsize) {
+        let requested = workers.get();
+        let _ = self
+            .worker_cap
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                Some(current.min(requested).max(1))
+            });
+    }
+
+    /// Effective worker width after caller budget admission.
+    #[must_use]
+    pub fn effective_worker_count(&self) -> NonZeroUsize {
+        // The constructor and narrowing operation both preserve a non-zero
+        // value. Keep the fallback defensive for a future atomic migration.
+        NonZeroUsize::new(self.worker_cap.load(Ordering::Acquire).max(1))
+            .expect("worker cap is non-zero")
+    }
+
+    /// Number of threads in the lazily-created private pool, or zero while no
+    /// qualifying batch has required one.
+    #[must_use]
+    pub fn local_pool_worker_count(&self) -> usize {
+        self.pool.lock().map_or(0, |pool| {
+            pool.as_ref().map_or(0, |pool| pool.current_num_threads())
+        })
+    }
+
+    /// Ensures that this session's private pool exists at its current
+    /// effective width.
+    ///
+    /// Runtime adapters use this at admission time when they retain a
+    /// `Workers` reservation for the pool lifetime. A caller facility never
+    /// needs a private pool, and a serial effective width leaves the session
+    /// lazy.
+    pub fn ensure_local_pool(&self) -> Result<(), Error> {
+        if self.workers.is_some() || self.effective_worker_count().get() <= 1 {
+            return Ok(());
+        }
+        let width = self.effective_worker_count().get();
+        let _ = self.pool(width)?;
+        Ok(())
     }
 
     fn read_many<'name, MetadataFor, ReadMember>(
@@ -402,21 +458,18 @@ impl ParallelReadSession {
             return Ok(());
         }
         self.check_cancelled(cancellation)?;
-        let parallel = batch.len() > 1 && *batch_bytes >= self.limits.min_parallel_bytes();
+        let parallel = self.effective_worker_count().get() > 1
+            && batch.len() > 1
+            && *batch_bytes >= self.limits.min_parallel_bytes();
         let batch = std::mem::take(batch);
         *batch_bytes = 0;
-        let results_for_batch: Vec<(&'name str, Result<Vec<u8>, Error>)> = match self.pool.as_ref()
-        {
-            Some(pool) if parallel => pool.install(|| {
-                batch
-                    .par_iter()
-                    .map(|name| (*name, self.read_member(name, cancellation, read_member)))
-                    .collect()
-            }),
-            Some(_) | None => batch
+        let results_for_batch = if parallel {
+            self.read_parallel_batch(batch, cancellation, read_member)?
+        } else {
+            batch
                 .into_iter()
                 .map(|name| (name, self.read_member(name, cancellation, read_member)))
-                .collect(),
+                .collect()
         };
         if cancellation.is_cancelled()
             || results_for_batch.iter().any(|(_, result)| {
@@ -427,6 +480,87 @@ impl ParallelReadSession {
         }
         results.extend(results_for_batch);
         Ok(())
+    }
+
+    fn read_parallel_batch<'name, ReadMember>(
+        &self,
+        batch: Vec<&'name str>,
+        cancellation: &dyn CancellationProbe,
+        read_member: &ReadMember,
+    ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+    where
+        ReadMember: Fn(&str) -> Result<Vec<u8>, Error> + Sync,
+    {
+        let mut slots: Vec<Option<Result<Vec<u8>, Error>>> = Vec::new();
+        slots.try_reserve_exact(batch.len()).map_err(|error| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!("could not reserve parallel read task slots: {error}"),
+            })
+        })?;
+        slots.resize_with(batch.len(), || None);
+
+        {
+            let width = self.effective_worker_count();
+            let mut tasks: Vec<Box<dyn FnMut() + Send + '_>> = batch
+                .iter()
+                .zip(slots.iter_mut())
+                .map(|(name, slot)| {
+                    let name = *name;
+                    let task: Box<dyn FnMut() + Send + '_> = Box::new(move || {
+                        *slot = Some(self.read_member(name, cancellation, read_member));
+                    });
+                    task
+                })
+                .collect();
+            let mut task_refs: Vec<&mut (dyn FnMut() + Send + '_)> =
+                tasks.iter_mut().map(|task| &mut **task).collect();
+            if let Some(workers) = self.workers.as_ref() {
+                for wave in task_refs.chunks_mut(width.get()) {
+                    workers.run_all(wave);
+                }
+            } else {
+                let pool = self.pool(width.get())?;
+                pool.install(|| task_refs.par_iter_mut().for_each(|task| task()));
+            }
+        }
+
+        Ok(batch
+            .into_iter()
+            .zip(slots)
+            .map(|(name, result)| {
+                (
+                    name,
+                    result.unwrap_or_else(|| {
+                        Err(ErrorKind::InvalidInput {
+                            msg: "parallel read task did not produce a result".to_string(),
+                        }
+                        .into())
+                    }),
+                )
+            })
+            .collect())
+    }
+
+    fn pool(&self, workers: usize) -> Result<Arc<rayon::ThreadPool>, Error> {
+        let mut cached = self.pool.lock().map_err(|_error| {
+            Error::from(ErrorKind::ParallelReadWorkerPool {
+                workers,
+                message: "local read pool cache is poisoned".to_string(),
+            })
+        })?;
+        if let Some(pool) = cached.as_ref() {
+            return Ok(Arc::clone(pool));
+        }
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(workers)
+            .build()
+            .map_err(|error| ErrorKind::ParallelReadWorkerPool {
+                workers,
+                message: error.to_string(),
+            })?;
+        let pool = Arc::new(pool);
+        *cached = Some(Arc::clone(&pool));
+        Ok(pool)
     }
 
     fn read_member<ReadMember>(
@@ -458,7 +592,9 @@ impl std::fmt::Debug for ParallelReadSession {
         formatter
             .debug_struct("ParallelReadSession")
             .field("limits", &self.limits)
-            .field("uses_local_pool", &self.pool.is_some())
+            .field("uses_local_pool", &(self.local_pool_worker_count() > 0))
+            .field("uses_caller_workers", &self.workers.is_some())
+            .field("effective_worker_count", &self.effective_worker_count())
             .finish()
     }
 }
@@ -11986,16 +12122,26 @@ mod tests {
     }
 
     #[test]
-    fn local_session_uses_its_explicit_worker_count() {
+    fn local_session_builds_its_pool_lazily() {
         let session = test_parallel_session(4);
         assert_eq!(session.worker_count().get(), 4);
-        assert_eq!(
-            session
-                .pool
-                .as_ref()
-                .map(rayon::ThreadPool::current_num_threads),
-            Some(4)
-        );
+        assert_eq!(session.local_pool_worker_count(), 0);
+    }
+
+    #[test]
+    fn caller_worker_facility_replaces_the_local_read_pool() {
+        let archive = indexed_archive(bulk_fixture());
+        let limits = test_parallel_limits(2);
+        let session =
+            ParallelReadSession::with_scoped_workers(limits, Arc::new(SerialScopedWorkers));
+        let never_cancel = || false;
+        let results = archive
+            .read_many_with_session(&session, &["last", "first"], &never_cancel)
+            .unwrap();
+
+        assert_eq!(results[0].0, "last");
+        assert_eq!(results[1].0, "first");
+        assert_eq!(session.local_pool_worker_count(), 0);
     }
 
     #[test]
