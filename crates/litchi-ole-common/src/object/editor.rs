@@ -63,6 +63,7 @@ pub struct Editor {
     targets: Targets,
     limits: Limits,
     original: Arc<Vec<u8>>,
+    base_package: Package,
     package: Package,
     objects: Objects,
     changed: bool,
@@ -176,6 +177,7 @@ impl Editor {
             targets: resolved_targets,
             limits,
             original,
+            base_package: package.clone(),
             package,
             objects,
             changed: false,
@@ -193,6 +195,7 @@ impl Editor {
             self.targets.clone(),
             self.limits,
             Arc::clone(&self.original),
+            self.base_package.clone(),
             self.package.clone(),
             self.objects.clone(),
             self.changed,
@@ -205,6 +208,7 @@ impl Editor {
             targets: snapshot.targets().clone(),
             limits: snapshot.limits(),
             original: snapshot.original(),
+            base_package: snapshot.base_package(),
             package: snapshot.package(),
             objects: snapshot.objects_clone(),
             changed: snapshot.changed(),
@@ -609,6 +613,15 @@ impl Editor {
     /// Returns an error if the edited CFB cannot be rendered.
     pub fn finish(self) -> Result<Vec<u8>, OleError> {
         if self.changed {
+            if self.layout == SectorLayoutPolicy::Reuse
+                && let Some(rendered) = self.package.render_copy_through(
+                    &self.base_package,
+                    &self.original,
+                    self.limits,
+                )?
+            {
+                return Ok(rendered);
+            }
             self.package
                 .render_with_layout(Some(self.original.as_slice()), self.layout)
         } else {
@@ -643,9 +656,20 @@ impl Editor {
 
     fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), OleError> {
         self.package.check(self.limits)?;
-        let rendered = self
-            .package
-            .render_with_layout(Some(self.original.as_slice()), self.layout)?;
+        let rendered = if self.layout == SectorLayoutPolicy::Reuse {
+            self.package
+                .render_copy_through(&self.base_package, &self.original, self.limits)?
+                .map_or_else(
+                    || {
+                        self.package
+                            .render_with_layout(Some(self.original.as_slice()), self.layout)
+                    },
+                    Ok,
+                )?
+        } else {
+            self.package
+                .render_with_layout(Some(self.original.as_slice()), self.layout)?
+        };
         let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
         codec::open(&check)?;
         let mut parsed = Package::capture(&mut check, self.limits)?;

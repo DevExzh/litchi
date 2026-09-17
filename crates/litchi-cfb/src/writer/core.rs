@@ -302,8 +302,11 @@ pub struct OleWriter {
     streams: Vec<(Vec<String>, StreamPayload)>,
     /// Storages indexed by path
     storages: HashSet<Vec<String>>,
-    /// Non-zero CLSIDs assigned to individual storages.
+    /// Explicit CLSIDs assigned to individual storages, including clears.
     storage_clsids: HashMap<Vec<String>, [u8; 16]>,
+    /// Whether the root CLSID was explicitly supplied, including an explicit
+    /// all-zero clear for a source-backed layout.
+    root_clsid_set: bool,
     /// Where the next serialization places its sectors.
     sector_layout_policy: SectorLayoutPolicy,
     /// Bounded metadata of the artifact this writer republishes, if adopted.
@@ -354,6 +357,7 @@ impl OleWriter {
             streams: Vec::new(),
             storages: HashSet::new(),
             storage_clsids: HashMap::new(),
+            root_clsid_set: false,
             sector_layout_policy: SectorLayoutPolicy::default(),
             source_layout: None,
             last_sector_layout: None,
@@ -421,7 +425,31 @@ impl OleWriter {
         self.source_layout = None;
         match SourceLayout::parse(source) {
             Ok(layout) => {
-                self.source_layout = Some(Box::new(layout));
+                let layout = Box::new(layout);
+                // Source adoption is also the preservation boundary for a
+                // from-scratch fallback: callers that only reproduce the
+                // directory shape should retain source CLSIDs unless they
+                // explicitly set a replacement (including an all-zero clear).
+                if !self.root_clsid_set {
+                    if let Some(root) = self.entries.first_mut() {
+                        root.clsid = layout.root_class_id();
+                        self.root_clsid_set = true;
+                    }
+                }
+                for path in layout.storage_paths() {
+                    if self.storage_clsids.contains_key(path) {
+                        continue;
+                    }
+                    let class_id = layout.storage_class_id(path).unwrap_or([0; 16]);
+                    reserve_hash_map_entry(
+                        &mut self.storage_clsids,
+                        path,
+                        1,
+                        "source storage CLSID table",
+                    )?;
+                    self.storage_clsids.insert(path.clone(), class_id);
+                }
+                self.source_layout = Some(layout);
                 Ok(true)
             },
             Err(error @ OleError::Allocation { .. }) => Err(error),
@@ -486,7 +514,9 @@ impl OleWriter {
         for (path, class_id) in &self.storage_clsids {
             storage_class_ids.insert(path.clone(), *class_id);
         }
-        let root_class_id = self.entries.first().map_or([0u8; 16], |entry| entry.clsid);
+        let root_class_id = self
+            .root_clsid_set
+            .then(|| self.entries.first().map_or([0u8; 16], |entry| entry.clsid));
         plan_reuse(
             source,
             &ModelInputs {
@@ -525,6 +555,7 @@ impl OleWriter {
         // Update the root entry (always at index 0)
         if !self.entries.is_empty() {
             self.entries[0].clsid = clsid;
+            self.root_clsid_set = true;
         }
     }
 
@@ -723,17 +754,13 @@ impl OleWriter {
                 "CFB storage path {owned_path:?} does not exist"
             )));
         }
-        if clsid == [0; 16] {
-            self.storage_clsids.remove(&owned_path);
-        } else {
-            reserve_hash_map_entry(
-                &mut self.storage_clsids,
-                &owned_path,
-                1,
-                "storage CLSID table",
-            )?;
-            self.storage_clsids.insert(owned_path, clsid);
-        }
+        reserve_hash_map_entry(
+            &mut self.storage_clsids,
+            &owned_path,
+            1,
+            "storage CLSID table",
+        )?;
+        self.storage_clsids.insert(owned_path, clsid);
         Ok(())
     }
 
@@ -1097,17 +1124,27 @@ impl OleWriter {
             validate_stream_size(self.sector_size, data.len(), "user stream")?;
         }
 
-        // The reused layout is planned in full before a byte is emitted, so a
-        // gate that declines costs nothing and leaves no partial output.
+        // The reused layout is planned and reopened through the ordinary CFB
+        // reader's composed view before a byte reaches the caller's sink. A
+        // structural mismatch declines to the established from-scratch
+        // writer, so no partial output is published by the failed plan.
         let declined = match self.plan_sector_layout()? {
             Outcome::Planned(plan) => {
                 let report = plan.report();
-                writer.seek(SeekFrom::Start(0))?;
                 let inputs = self.stream_inputs()?;
-                plan.emit(&inputs, writer)?;
-                drop(inputs);
-                self.last_sector_layout = Some(report);
-                return Ok(());
+                match plan.validate(&inputs) {
+                    Ok(()) => {
+                        writer.seek(SeekFrom::Start(0))?;
+                        plan.emit(&inputs, writer)?;
+                        writer.flush()?;
+                        self.last_sector_layout = Some(report);
+                        return Ok(());
+                    },
+                    Err(error) if plan_validation_declines(&error) => {
+                        SectorLayoutFallback::PlanRejected
+                    },
+                    Err(error) => return Err(error),
+                }
             },
             Outcome::Declined(fallback) => fallback,
         };
@@ -1182,7 +1219,7 @@ impl OleWriter {
         let mut directory = DirectoryBuilder::new(ministream_start, ministream_size);
 
         // Set root CLSID if specified (e.g., for Word documents)
-        if !self.entries.is_empty() && self.entries[0].clsid != [0u8; 16] {
+        if !self.entries.is_empty() && self.root_clsid_set {
             directory.set_root_clsid(self.entries[0].clsid);
         }
 
@@ -1203,11 +1240,14 @@ impl OleWriter {
         });
 
         let mut ordered_clsids: Vec<(&Vec<String>, &[u8; 16])> = Vec::new();
+        let effective_storages = self.effective_storages();
         ordered_clsids
             .try_reserve_exact(self.storage_clsids.len())
             .map_err(|source| OleError::allocation("storage CLSID order", source))?;
         for entry in &self.storage_clsids {
-            ordered_clsids.push(entry);
+            if effective_storages.contains(entry.0) {
+                ordered_clsids.push(entry);
+            }
         }
         ordered_clsids.sort_unstable_by(|(left, _), (right, _)| {
             storage_directory_order(left.as_slice(), right.as_slice())
@@ -1770,6 +1810,22 @@ fn validate_stream_size(
         )));
     }
     Ok(())
+}
+
+fn plan_validation_declines(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::InvalidFormat(_)
+            | OleError::InvalidData(_)
+            | OleError::NotOleFile
+            | OleError::CorruptedFile(_)
+            | OleError::StreamNotFound
+            // `PlanCursor` has no external I/O source: an I/O error from the
+            // validation reader can only mean that the composed plan exposed
+            // an invalid positional view. Keep allocation and other typed
+            // resource failures on the error path above.
+            | OleError::Io(_)
+    )
 }
 
 pub(super) fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
