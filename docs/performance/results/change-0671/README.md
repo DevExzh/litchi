@@ -4,10 +4,11 @@ Change record: [`0671-doc-admission-residues.md`](../../0671-doc-admission-resid
 
 Disposition: retained correctness fix. `performance_claim: none`. The change
 keeps the normative `FBKF.ibkl` uniqueness refusal, admits one narrowly proven
-PAPX alignment byte at the PAPX consumer, and exposes existing DOC leniency
-through the unified facade. It closes the DOC portion of row 16 in 0651 under
-0652's standing trade-offs (small breaking APIs are acceptable; correctness and
-safety take priority over performance).
+PAPX alignment byte only through an explicit `OpenOptions` compatibility
+profile, and exposes existing DOC leniency through the unified facade. It
+closes the DOC portion of row 16 in 0651 under 0652's standing trade-offs
+(small breaking APIs are acceptable; correctness and safety take priority over
+performance).
 
 ## Contents
 
@@ -34,12 +35,13 @@ safety take priority over performance).
 | Fixture | Before 0671 | After 0671 | Evidence |
 |---|---|---|---|
 | `test-data/ole/doc/watermark.doc` | typed refusal: `bookmark ibkl values must be unique and in range` | same typed refusal | MS-DOC `FBKF.ibkl` explicitly requires uniqueness; the duplicate CP does not override it |
-| `test-data/poi/test-data/document/test.doc` | refusal: trailing one-byte SPRM opcode | opens and returns nonempty text | 24 PAPX entries share `cb=0`, odd valid SPRM prefix, final zero alignment byte |
+| `test-data/poi/test-data/document/test.doc` | strict refusal: trailing one-byte SPRM opcode | remains strict by default; opens and returns nonempty text with `OpenOptions::with_papx_alignment_padding()` | 24 PAPX entries share `cb=0`, odd valid SPRM prefix, final zero alignment byte |
 | `test-data/ole/doc/duplicate-style-names.doc` | default facade refusal | opens with `TolerateStylesheetDefects` through both new facade methods | existing stylesheet leniency contract; structural defects remain fatal |
 
-The PAPX compatibility rule is tested with both a complete odd SPRM prefix plus
-zero and a nonzero malformed tail. The checked-in MS-DOC reference supports the
-PAPX length arithmetic but requires whole Prl elements and does not specify this
-pad; the packet records the allowance as a bounded compatibility exception. A
-separate `sprm` unit test proves that the shared parser still rejects a trailing
-zero when called without PAPX context.
+The PAPX compatibility rule is tested with strict default refusal, explicit
+opt-in admission, a complete odd SPRM prefix plus zero, and a nonzero malformed
+tail. The checked-in MS-DOC reference supports the PAPX length arithmetic but
+requires whole Prl elements and does not specify this pad; the packet records
+the allowance as an explicit format-owned compatibility profile. A separate
+`sprm` unit test proves that the shared parser still rejects a trailing zero
+when called without PAPX context.

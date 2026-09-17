@@ -115,6 +115,7 @@ impl PapBinTable {
         data_stream: Option<&[u8]>,
         piece_table: &PieceTable,
         stylesheet: Option<&StyleSheet>,
+        allow_papx_alignment_padding: bool,
     ) -> Result<Option<Self>> {
         // PlcBtePapx = (n + 1) FCs followed by n four-byte PnFkpPapx values.
         if plcf_bte_papx_data.len() < 12 || !(plcf_bte_papx_data.len() - 4).is_multiple_of(8) {
@@ -164,7 +165,11 @@ impl PapBinTable {
                 // odd SPRM prefix plus one zero byte. Keep the shared SPRM
                 // parser strict and remove exactly that byte only when it is
                 // otherwise proven to be a final incomplete opcode.
-                let grpprl = Self::trim_papx_word_alignment_pad(&entry.grpprl);
+                let grpprl = if allow_papx_alignment_padding {
+                    Self::trim_papx_word_alignment_pad(&entry.grpprl)
+                } else {
+                    &entry.grpprl
+                };
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
                     let piece_modifier = piece_table

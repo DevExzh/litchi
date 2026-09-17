@@ -22,10 +22,12 @@ PASS  cargo test -p litchi --features doc,docx,xlsx,pptx,xls
 
 Targeted witness tests included in the litchi facade library run:
 
-  doc_admission_residues_keep_typed_fbkf_refusal_and_accept_papx_padding
+  doc_admission_residues_keep_typed_fbkf_refusal_and_gate_papx_padding
   doc_leniency_is_available_through_the_unified_facade
 
-The `litchi-doc` unit suite also covers the PAPX alignment predicate,
-non-padding trailing bytes, and strict global trailing-zero SPRM rejection.
+The facade witness test covers strict default refusal and explicit
+`OpenOptions::with_papx_alignment_padding()` admission. The `litchi-doc` unit
+suite also covers the PAPX alignment predicate, non-padding trailing bytes, and
+strict global trailing-zero SPRM rejection.
 The combined feature check reports one pre-existing dead-code warning in the
 DOCX detection module; it is outside this change.

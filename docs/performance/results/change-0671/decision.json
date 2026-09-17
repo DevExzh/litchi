@@ -4,25 +4,25 @@
   "change_id": "0671",
   "title": "Resolve the two DOC admission residues exposed by change 0640 and expose stylesheet leniency through the facade",
   "decision": "retained, correctness fix",
-  "code_state": "PapBinTable trims one proven PAPX word-alignment byte at its consumer; FBKF.ibkl uniqueness remains strict; litchi::Document adds bounded path and byte entry points carrying litchi_doc::OpenOptions; no CFB path, parser limit, writer encoding or default route changes",
+  "code_state": "PapBinTable trims one proven PAPX word-alignment byte only under OpenOptions::with_papx_alignment_padding(); FBKF.ibkl uniqueness remains strict; litchi::Document adds bounded path and byte entry points carrying litchi_doc::OpenOptions; strict defaults, CFB paths, parser limits and writer encoding remain unchanged",
   "performance_claim": "none",
   "claim_registry_entry": false,
   "reason_codes": [
     "MS-DOC FBKF explicitly requires ibkl to be unique within a Plcfbkf/Plcfbkfd, so watermark.doc remains a typed refusal even though its duplicate and unused PlcfBkl slots carry the same CP",
     "PapxInFkp's cb=0 form stores an even 2*cb' byte container; the POI witness repeats an odd SPRM prefix followed by one zero byte in all 24 PAPX entries, while the checked-in MS-DOC GrpPrlAndIstd rule requires whole Prl elements",
-    "the PAPX admission strips one byte only after strict SPRM parsing identifies an exact one-byte trailing opcode error; parse_sprms remains strict and malformed nonzero or incomplete operands remain errors",
-    "the existing OpenOptions/Leniency contract is now reachable through litchi::Document without changing default strict behavior"
+    "the opt-in PAPX admission strips one byte only after strict SPRM parsing identifies an exact one-byte trailing opcode error; parse_sprms remains strict and malformed nonzero or incomplete operands remain errors",
+    "the existing OpenOptions/Leniency contract and the new explicit PAPX compatibility profile are reachable through litchi::Document without changing default strict behavior"
   ],
   "accepted_evidence": {
     "specification": "Checked-in 3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md §§2.9.70 (FBKF, local lines 6562/6648), 2.9.114 (GrpPrlAndIstd, local lines 12380/12469-12471), and 2.9.175 (PapxInFkp, local lines 18595/18684-18688); 2 Structures/2.8 PLCs.md §2.8.10 (Plcfbkf, local lines 887-893); and 3 Structure Examples/3.5 Example of a PlcBtePapx.md papxinfkp[1] (local lines 162-181), with the corresponding Microsoft Learn pages linked by the change record",
-    "witnesses": "direct unified-facade tests over watermark.doc, poi/test-data/document/test.doc and duplicate-style-names.doc",
-    "unit_tests": "PapBinTable alignment and malformed-tail tests plus the global SPRM trailing-zero refusal test",
+    "witnesses": "direct unified-facade tests over watermark.doc, strict and opt-in poi/test-data/document/test.doc, and duplicate-style-names.doc",
+    "unit_tests": "PapBinTable alignment and malformed-tail tests plus the global SPRM trailing-zero refusal test and strict-default/explicit-profile facade gate",
     "corpus": "the 57-file inventory and 0640 retained corpus scan; no new full differential claimed",
     "facade": "both bounded path and owned-byte leniency routes produce the same text on duplicate-style-names.doc"
   },
   "accepted_costs": {
     "FBKF": "the duplicate-bookmark fixture remains unavailable under strict reading, as required by the normative uniqueness rule",
-    "PAPX": "the checked-in primary text defines the length forms and whole-Prl requirement but does not name a PapxInFkp alignment byte; acceptance is limited to repeated witness evidence and compatible implementation behavior, and remains a bounded compatibility exception",
+    "PAPX": "the checked-in primary text defines the length forms and whole-Prl requirement but does not name a PapxInFkp alignment byte; acceptance is limited to repeated witness evidence and compatible implementation behavior behind explicit OpenOptions::with_papx_alignment_padding(), while strict defaults retain the typed refusal",
     "facade": "the opt-in path eagerly reads a source into the existing bounded fallback before smart detection, while ordinary open behavior is unchanged"
   },
   "known_gaps": {

@@ -212,8 +212,13 @@ impl Document {
             }
             Ok(metadata)
         });
-        let attached_glossary =
-            AttachedGlossary::parse(&fib, &word_document, &table_stream, data_stream.as_deref());
+        let attached_glossary = AttachedGlossary::parse(
+            &fib,
+            &word_document,
+            &table_stream,
+            data_stream.as_deref(),
+            options.allows_papx_alignment_padding(),
+        );
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
@@ -274,6 +279,7 @@ impl Document {
                 data_stream.as_deref(),
                 piece_table,
                 stylesheet.as_ref(),
+                options.allows_papx_alignment_padding(),
             )?
         } else {
             None

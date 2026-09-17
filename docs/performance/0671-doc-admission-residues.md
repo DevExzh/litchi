@@ -34,7 +34,7 @@ unchanged. The facade regression test keeps the refusal typed and checks the
 existing message `bookmark ibkl values must be unique and in range`. This is a
 resolved specification question, rather than a new leniency case.
 
-## `PapxInFkp`: accept one proven word-alignment byte at the PAPX boundary
+## `PapxInFkp`: opt into one proven word-alignment byte at the PAPX boundary
 
 The POI witness has `cb = 0`, `cb' = 3`, and the six bytes
 `00 00 | 31 24 00 00`: `istd = 0`, one complete three-byte SPRM, and a final
@@ -67,18 +67,22 @@ which pads an odd grpprl with one zero byte to a word boundary. It remains a
 bounded producer compatibility exception, not a claim that the six-byte
 witness satisfies the local whole-Prl grammar.
 
-`PapBinTable::parse` now applies `trim_papx_word_alignment_pad` only to the
-`GrpPrlAndIstd` bytes obtained from a PAPX FKP. It removes one byte only when
-all of these facts hold: the stored sequence is even-sized, ends in zero,
-strict `parse_sprms` reports exactly one remaining opcode byte at the end, and
-the preceding bytes are therefore a complete SPRM sequence. Nonzero `cb`
-encodings, valid sequences ending in a zero operand, truncated operands,
-invalid lengths, nonzero tails, indirections and cycles retain the existing
-typed failure. The shared `parse_sprms` function remains exact; a direct call
-with the same trailing zero still returns `Error::Opcode`.
+`PapBinTable::parse` applies `trim_papx_word_alignment_pad` only when the
+caller explicitly selects `OpenOptions::with_papx_alignment_padding()`. The
+ordinary `Document::open`, `Document::from_bytes`, `Package::document()`, and
+`OpenOptions::default()` routes remain strict and keep the typed refusal. In
+the opt-in profile, the consumer removes one byte only when all of these facts
+hold: the stored sequence is even-sized, ends in zero, strict `parse_sprms`
+reports exactly one remaining opcode byte at the end, and the preceding bytes
+are therefore a complete SPRM sequence. Nonzero `cb` encodings, valid sequences
+ending in a zero operand, truncated operands, invalid lengths, nonzero tails,
+indirections and cycles retain the existing typed failure. The shared
+`parse_sprms` function remains exact; a direct call with the same trailing zero
+still returns `Error::Opcode`.
 
-This is a compatibility admission at the format boundary, not a general
-repair rule. The fixture now opens through the unified facade and returns
+This is an explicit format-owned compatibility profile at the boundary, not a
+general repair rule or a silent default guess. The strict facade route still
+refuses the fixture; the opt-in unified-facade route opens it and returns
 nonempty text. No writer change is made, so authored PAPX output continues to
 use its existing exact length encoding.
 
@@ -91,7 +95,9 @@ the already public `litchi::doc::OpenOptions`; callers can select
 unified facade. The path method uses the same bounded filesystem fallback as
 the ordinary document path. Options are consumed by the DOC reader only;
 other detected formats continue through their normal facade route, and the
-default `open`/`from_bytes` behavior is unchanged.
+default `open`/`from_bytes` behavior is unchanged. The same `OpenOptions` also
+exposes the opt-in `with_papx_alignment_padding()` profile; it is independent
+of `Leniency::TolerateStylesheetDefects` and is never enabled implicitly.
 
 The duplicate-style fixture remains rejected by the default facade and opens
 through both new methods with the existing leniency report behavior. Structural
@@ -116,8 +122,8 @@ Validation on this branch:
 The remaining specification gap is explicit and supported by the checked-in
 reference: §2.9.175 defines the two PAPX length forms, §2.9.114 requires whole
 Prl elements, and neither section gives a standalone normative sentence for an
-alignment pad. The narrow rule is kept as a compatibility exception because
-the witness repeats across all PAPX entries and a compatible implementation
-documents the same pad shape; it must not be generalized to arbitrary
-non-whole Prl data. A future primary clarification could refine the comment
-without widening the parser. No `litchi-cfb` path or limit was changed.
+alignment pad. The narrow rule is available only as an explicit compatibility
+exception because the witness repeats across all PAPX entries and a compatible
+implementation documents the same pad shape; it must not be generalized to
+arbitrary non-whole Prl data. A future primary clarification could refine the
+profile without widening the parser. No `litchi-cfb` path or limit was changed.

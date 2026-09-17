@@ -218,6 +218,7 @@ impl AttachedGlossary {
         word_document: &Arc<Vec<u8>>,
         table_stream: &[u8],
         data_stream: Option<&[u8]>,
+        allow_papx_alignment_padding: bool,
     ) -> Result<Option<Self>> {
         let page = main_fib.next_fib_page();
         if page == 0 {
@@ -318,6 +319,7 @@ impl AttachedGlossary {
                     data_stream,
                     piece_table,
                     stylesheet.as_ref(),
+                    allow_papx_alignment_padding,
                 )?
             } else {
                 None
