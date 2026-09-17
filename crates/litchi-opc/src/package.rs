@@ -831,11 +831,10 @@ impl OpcPackage {
     pub fn deferred_decode_counters(&self) -> Option<(u64, u64)> {
         self.parts.values().find_map(|part| {
             let handle = part.payload_handle();
-            let counters = handle
+            handle
                 .payload()
                 .deferred_source()
-                .map(|source| source.counters());
-            counters
+                .map(|source| source.counters())
         })
     }
 
