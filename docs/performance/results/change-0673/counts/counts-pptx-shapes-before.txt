@@ -1,0 +1,14 @@
+fixture=test-data/ooxml/pptx/shapes.pptx bytes=68822 members=48 cd_offset=65116 cd_size=3684 eocd=68800
+  [open] allocs=1995 alloc_bytes=541256 version_calls=4
+  open: requests=5 bytes=11145 :: eocd/tail=1/22B central-dir=1/3684B run-span=2/7175B local-window(<=640)=1/264B
+  [first read of /ppt/slides/slide1.xml (20740 B decoded)] allocs=24 alloc_bytes=107040 version_calls=4
+  first read of /ppt/slides/slide1.xml (20740 B decoded): requests=1 bytes=4807 :: member-span=1/4807B
+  [second read of same part] allocs=5 alloc_bytes=204 version_calls=2
+  second read of same part: requests=0 bytes=0 ::
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 27 parts, physical order (after open)] allocs=2214 alloc_bytes=2761969 version_calls=112
+  all 27 parts, physical order (after open): requests=27 bytes=57677 :: member-span=25/56815B local-window(<=640)=2/862B
+  [all 27 parts, reverse physical order (after open)] allocs=2163 alloc_bytes=2679027 version_calls=112
+  all 27 parts, reverse physical order (after open): requests=27 bytes=57677 :: member-span=25/56815B local-window(<=640)=2/862B
+  [stream_to of /ppt/slides/slide1.xml (20740 B)] allocs=1954 alloc_bytes=527034 version_calls=46
+  stream_to of /ppt/slides/slide1.xml (20740 B): requests=16 bytes=5227 :: local-window(<=640)=1/51B local-fixed(30)=14/420B payload=1/4756B

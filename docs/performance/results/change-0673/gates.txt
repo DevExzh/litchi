@@ -1,0 +1,20 @@
+Change 0673 verification gates
+
+All commands ran from /home/zhuhe/code/litchi-worktrees/0673 with
+CARGO_PROFILE_DEV_DEBUG=0, CARGO_PROFILE_TEST_DEBUG=0, CARGO_NET_OFFLINE=true,
+and jobs 2 where Cargo accepted a job flag.
+
+  cargo fmt --all -- --check                                      exit 0
+  cargo clippy -p soapberry-zip --all-targets -- -D warnings      exit 0
+  cargo doc -p soapberry-zip --no-deps                             exit 0
+  cargo test -p soapberry-zip --test directory_prefill           12 passed
+  cargo test -p soapberry-zip --all-targets                       477 passed, 1 ignored
+  cargo test -p litchi-opc --all-targets                          437 passed, expected ignores
+  python3 -m json.tool decision.json                              exit 0
+  bash -n probe/run.sh oracle/run.sh                              exit 0
+  probe/run.sh                                                     exit 0
+  oracle/run.sh                                                    cmp_status=0
+
+No workspace-wide gate or performance-claim registry entry is asserted by
+this packet; the coordinator's integration gate runs on the cherry-picked
+head.

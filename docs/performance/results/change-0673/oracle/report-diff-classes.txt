@@ -1,0 +1,2 @@
+    0 < open-cost
+    0 > open-cost

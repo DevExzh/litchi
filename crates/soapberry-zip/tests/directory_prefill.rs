@@ -288,6 +288,32 @@ fn a_comment_bearing_archive_keeps_the_backwards_search_and_its_members() {
 }
 
 #[test]
+fn the_stack_probe_keeps_the_search_window_only_on_a_missed_probe() {
+    let plain = stored_archive(1_600);
+    assert!(declared_directory_size(&plain) > RECOMMENDED_BUFFER_SIZE as u64);
+
+    let plain_source = Counting::new(&plain);
+    let plain_archive =
+        IndexedArchive::from_reader(&plain_source, plain.len() as u64).expect("plain opens");
+    assert_eq!(plain_archive.len(), 1_600);
+    let plain_log = plain_source.log();
+    assert_eq!(plain_log[0].1, 22, "the fast path probes only the EOCD");
+    assert_eq!(plain_log[1].1, RECOMMENDED_BUFFER_SIZE);
+
+    let commented = with_comment(&plain, b"a deliberate ZIP archive comment");
+    let comment_source = Counting::new(&commented);
+    let comment_archive = IndexedArchive::from_reader(&comment_source, commented.len() as u64)
+        .expect("commented archive opens");
+    assert_eq!(comment_archive.len(), 1_600);
+    let comment_log = comment_source.log();
+    assert_eq!(comment_log[0].1, 22, "the missed fast probe is preserved");
+    assert_eq!(
+        comment_log[1].1, RECOMMENDED_BUFFER_SIZE,
+        "the backwards search keeps the historical bounded window"
+    );
+}
+
+#[test]
 fn a_comment_that_contains_an_eocd_signature_resolves_where_it_always_did() {
     // A false EOCD signature inside the comment is the case the locator's
     // backwards search documents: it finds the *last* signature. The prefill

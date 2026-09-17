@@ -3507,16 +3507,11 @@ where
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(RECOMMENDED_BUFFER_SIZE)
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive locator scratch",
-                    source,
-                })
-            })?;
-        buffer.resize(RECOMMENDED_BUFFER_SIZE, 0);
+        // The common no-comment shape only needs the fixed EOCD probe before
+        // the locator hands its directory prefill to the index.  Keep that
+        // probe in a small stack buffer; the locator allocates its historical
+        // 64 KiB search window only if the probe misses.
+        let mut buffer = [0_u8; crate::ZipFileHeaderFixed::SIZE];
         // Change 0632: the locator's first-central-record probe and this
         // index's central-directory scan begin at the same offset, so the
         // locator reads that span once, into a buffer sized to the declared
@@ -3525,7 +3520,6 @@ where
             .directory_prefill(RECOMMENDED_BUFFER_SIZE)
             .locate_in_reader_prefilling_directory(reader, &mut buffer, end_offset)
             .map_err(|(_reader, error)| error)?;
-        drop(buffer);
         Self::from_zip_archive_with_limits_policy_and_prefill(archive, limits, policy, prefill)
     }
 
