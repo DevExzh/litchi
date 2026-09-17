@@ -269,6 +269,9 @@ fn deterministic_ascii_mutations_keep_reader_transport_parity() {
         }
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             assert_same_category(&candidate, false);
+            let mut marked = b"\xef\xbb\xbf".to_vec();
+            marked.extend_from_slice(&candidate);
+            assert_same_category(&marked, false);
             if case_index % 7 == 0 {
                 assert_same_category(&candidate, true);
             }
@@ -281,11 +284,8 @@ fn deterministic_ascii_mutations_keep_reader_transport_parity() {
 
 #[test]
 fn bom_raw_event_boundaries_match_slice_for_all_prefix_chunkings() {
-    // The slice audit intentionally validates raw event spans against the
-    // original input. quick-xml strips only the first BOM before emitting
-    // events, so a BOM can make the first raw markup span fail at a later
-    // boundary (or change an outside-root offset). Keep these cases explicit
-    // so the reader cannot silently normalize the source contract.
+    // Both auditors address physical input bytes while quick-xml excludes the
+    // initial BOM from its event positions. Exactly one leading BOM is framing.
     for xml in [
         b"\xef\xbb\xbf<a/>".as_slice(),
         b"\xef\xbb\xbf<?xml version=\"1.0\"?><a/>",
@@ -296,6 +296,8 @@ fn bom_raw_event_boundaries_match_slice_for_all_prefix_chunkings() {
         b"\xef\xbb\xbf<![CDATA[x]]><a/>",
         b"\xef\xbb\xbf<!DOCTYPE a><a/>",
         b"\xef\xbb\xbf\xef\xbb\xbf<a/>",
+        b"\xef\xbb\xbf<a>\xff</a>",
+        b"\xef\xbb\xbf\xff<a/>",
         b"\xef\xbb\xbf",
     ] {
         assert_same_result(xml, false);
@@ -313,7 +315,7 @@ fn bom_token_limit_offsets_match_slice_for_all_prefix_chunkings() {
             resource: Resource::TokenBytes,
             limit: 3,
             actual: 4,
-            offset: 0,
+            offset: 3,
         }
     ));
     for chunks in [

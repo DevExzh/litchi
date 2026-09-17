@@ -1,0 +1,16 @@
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	_rels/.rels
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	xl/_rels/workbook.xml.rels
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	xl/worksheets/_rels/sheet1.xml.rels
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	[Content_Types].xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	[Content_Types].xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/_rels/document.xml.rels
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/document.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/header1.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/header2.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/header3.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/footer3.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/footer1.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/footer2.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	word/settings.xml
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	docProps/custom.xml
+test-data/poi/test-data/slideshow/bug65551.pptx	ppt/slideMasters/slideMaster1.xml

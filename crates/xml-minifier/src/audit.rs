@@ -195,7 +195,7 @@ impl Limits {
     /// quick-xml's retained open-element names (at most one token-sized name
     /// per admitted depth, with geometric `Vec` capacity), its open-name
     /// indexes, the bounded lexical capture and exposed source window, the
-    /// optional BOM-shifted lexical window, the geometric attribute-name
+    /// conservative spare token window, the geometric attribute-name
     /// `Range<usize>` tracker and large-tag hash prefilter (including a
     /// fourfold capacity/control-byte factor and an eight-entry minimum), two
     /// transient token-sized decoded and normalized attribute-value buffers, and this
@@ -207,8 +207,8 @@ impl Limits {
     /// capacities use `min(max_attributes, max_token_bytes + 1)`. The aggregate
     /// attribute counter still uses `max_attributes` and therefore retains its
     /// document-wide acceptance policy.
-    /// The three BOM bookkeeping arrays (the 3-byte probe, 3-byte history, and
-    /// 6-byte history-combine scratch) add 12 bytes separately. The caller's
+    /// The three-byte BOM probe fits the conservative 12-byte fixed allowance
+    /// retained from the earlier streaming auditor. The caller's
     /// `BufRead` storage, other fixed-size parser values, allocator metadata,
     /// and error strings are outside this bound.
     /// `None` means the checked arithmetic could not represent the envelope in
@@ -817,25 +817,22 @@ fn verify_reader_with_policy<R: BufRead>(
         .try_reserve_capture(token_window)
         .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
     let saw_bom = guarded.saw_bom();
-    let mut bom_raw = Vec::new();
-    if saw_bom {
-        bom_raw
-            .try_reserve_exact(token_window)
-            .map_err(|_allocation| StreamError::Audit(Error::Allocation))?;
-    }
     let mut reader = Reader::from_reader(guarded);
     reader.config_mut().trim_text(false);
     let mut state = State::new();
-    let mut bom_history = [0; 3];
-    let mut bom_history_len = 0;
 
     loop {
         buffer.clear();
         reader.get_mut().begin_token();
         let start_u64 = reader.buffer_position();
         let physical_start_u64 = reader.get_ref().position();
-        let start = usize::try_from(start_u64).unwrap_or(usize::MAX);
-        let physical_start = usize::try_from(physical_start_u64).unwrap_or(usize::MAX);
+        let bom_bytes = if saw_bom { 3 } else { 0 };
+        let start = usize::try_from(start_u64)
+            .unwrap_or(usize::MAX)
+            .saturating_add(bom_bytes);
+        let physical_start = usize::try_from(physical_start_u64)
+            .unwrap_or(usize::MAX)
+            .max(bom_bytes);
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| map_stream_reader_error(error, start))?;
@@ -855,20 +852,7 @@ fn verify_reader_with_policy<R: BufRead>(
         check_limit(Resource::TokenBytes, limits.token_bytes, token_bytes, start)
             .map_err(StreamError::Audit)?;
 
-        let captured = reader.get_ref().captured();
-        let raw = if saw_bom {
-            bom_raw_for_slice(
-                captured,
-                &bom_history,
-                bom_history_len,
-                start,
-                token_bytes,
-                &mut bom_raw,
-            );
-            bom_raw.as_slice()
-        } else {
-            captured
-        };
+        let raw = reader.get_ref().captured();
 
         // `read_event_into` borrows the reusable buffer. Checking UTF-8 here
         // catches code points split across arbitrary source chunks after the
@@ -999,10 +983,6 @@ fn verify_reader_with_policy<R: BufRead>(
                 break;
             },
         }
-
-        if saw_bom {
-            remember_bom_history(&mut bom_history, &mut bom_history_len, captured);
-        }
     }
 
     let final_offset = usize::try_from(reader.get_ref().position()).unwrap_or(usize::MAX);
@@ -1046,50 +1026,6 @@ fn event_encoding_offset(
         Event::Text(_) | Event::Eof => 0,
     };
     start.saturating_add(prefix).saturating_add(event_offset)
-}
-
-fn bom_raw_for_slice(
-    captured: &[u8],
-    history: &[u8; 3],
-    history_len: usize,
-    start: usize,
-    token_bytes: usize,
-    output: &mut Vec<u8>,
-) {
-    output.clear();
-    if start < 3 {
-        let prefix = (3 - start).min(token_bytes);
-        output.extend_from_slice(&[0xEF, 0xBB, 0xBF][start..start + prefix]);
-        output
-            .extend_from_slice(&captured[..token_bytes.saturating_sub(prefix).min(captured.len())]);
-    } else {
-        let prefix = history_len.min(3).min(token_bytes);
-        output.extend_from_slice(&history[..prefix]);
-        output
-            .extend_from_slice(&captured[..token_bytes.saturating_sub(prefix).min(captured.len())]);
-    }
-    output.truncate(token_bytes);
-}
-
-fn remember_bom_history(history: &mut [u8; 3], length: &mut usize, bytes: &[u8]) {
-    if bytes.is_empty() {
-        return;
-    }
-    if bytes.len() >= 3 {
-        history.copy_from_slice(&bytes[bytes.len() - 3..]);
-        *length = 3;
-        return;
-    }
-    let mut combined = [0; 6];
-    let old_length = (*length).min(3);
-    combined[..old_length].copy_from_slice(&history[..old_length]);
-    let copied = bytes.len();
-    combined[old_length..old_length + copied].copy_from_slice(&bytes[..copied]);
-    let total = old_length + copied;
-    let start = total.saturating_sub(3);
-    let retained = &combined[start..total];
-    history[..retained.len()].copy_from_slice(retained);
-    *length = retained.len();
 }
 
 /// A `BufRead` facade that exposes at most the remaining total and per-event
@@ -1165,8 +1101,6 @@ impl<R: BufRead> GuardedBufRead<R> {
         }
         if guarded.prefix_len == 3 && guarded.prefix == [0xEF, 0xBB, 0xBF] {
             guarded.saw_bom = true;
-            guarded.prefix_pos = guarded.prefix_len;
-            guarded.total = 3;
         }
         Ok(guarded)
     }
@@ -1239,6 +1173,16 @@ impl<R: BufRead> BufRead for GuardedBufRead<R> {
             ));
         }
 
+        // Expose the complete initial BOM to quick-xml even when the token
+        // ceiling is smaller than three. It is framing, not an XML token;
+        // consume charges it to total bytes only. Keeping it in the parser's
+        // input also ensures a second BOM remains ordinary character data.
+        if self.saw_bom && self.prefix_pos == 0 {
+            self.exposed.extend_from_slice(&self.prefix);
+            self.exposed_prefix = true;
+            return Ok(&self.exposed);
+        }
+
         let total_remaining = usize::try_from(self.max_total - self.total).unwrap_or(usize::MAX);
         let token = self.token;
         let token_remaining = self.max_token_window.saturating_sub(token);
@@ -1283,21 +1227,28 @@ impl<R: BufRead> BufRead for GuardedBufRead<R> {
         // quick-xml consumes only bytes returned by `fill_buf`; saturating the
         // accounting keeps a hostile/incorrect source from causing a panic.
         let available = self.exposed.len().saturating_sub(self.exposed_pos);
-        let amount = amount
-            .min(available)
-            .min(self.max_token_window.saturating_sub(self.token));
+        let bom = self.saw_bom && self.exposed_prefix && self.prefix_pos < 3;
+        let amount = if bom {
+            amount.min(available)
+        } else {
+            amount
+                .min(available)
+                .min(self.max_token_window.saturating_sub(self.token))
+        };
         if amount == 0 {
             return;
         }
-        self.captured
-            .extend_from_slice(&self.exposed[self.exposed_pos..self.exposed_pos + amount]);
+        if !bom {
+            self.captured
+                .extend_from_slice(&self.exposed[self.exposed_pos..self.exposed_pos + amount]);
+            self.token = self.token.saturating_add(amount);
+        }
         if self.exposed_prefix {
             self.prefix_pos = self.prefix_pos.saturating_add(amount);
         } else {
             self.inner.consume(amount);
         }
         self.exposed_pos += amount;
-        self.token = self.token.saturating_add(amount);
         self.total = self.total.saturating_add(amount as u64);
     }
 }
@@ -1375,16 +1326,26 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
     let xml = std::str::from_utf8(input).map_err(|error| Error::Encoding {
         valid_up_to: error.valid_up_to(),
     })?;
+    // quick-xml excludes the leading UTF-8 BOM from buffer_position(),
+    // while raw lexical spans and diagnostics address the original input.
+    let bom_bytes = if input.starts_with(b"\xEF\xBB\xBF") {
+        3
+    } else {
+        0
+    };
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);
     let mut state = State::new();
 
     loop {
-        let start = position(&reader);
-        let event = reader
-            .read_event()
-            .map_err(|error| Error::malformed(position(&reader), error.to_string()))?;
-        let end = position(&reader);
+        let start = position(&reader).saturating_add(bom_bytes);
+        let event = reader.read_event().map_err(|error| {
+            Error::malformed(
+                position(&reader).saturating_add(bom_bytes),
+                error.to_string(),
+            )
+        })?;
+        let end = position(&reader).saturating_add(bom_bytes);
         let raw = input
             .get(start..end)
             .ok_or_else(|| Error::malformed(start, "parser position escaped input"))?;
@@ -2162,16 +2123,13 @@ mod stream_tests {
     }
 
     #[test]
-    fn reader_matches_slice_bom_rejection() {
+    fn reader_matches_slice_bom_admission() {
         let xml = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><root/>";
-        let expected = verify(xml, limits(xml)).expect_err("slice XML must reject its BOM");
+        let expected = verify(xml, limits(xml)).expect("a UTF-8 BOM is valid XML");
         let actual = verify_reader(Chunked::new(xml, 1), limits(xml))
-            .expect_err("streaming XML must preserve the slice framing rule");
-        assert_eq!(actual.to_string(), expected.to_string());
-        assert!(matches!(
-            actual,
-            StreamError::Audit(Error::Malformed { offset: 0, .. })
-        ));
+            .expect("streaming XML must preserve the slice framing rule");
+        assert_eq!(actual, expected);
+        assert_eq!(actual.bytes(), xml.len());
     }
 
     #[test]

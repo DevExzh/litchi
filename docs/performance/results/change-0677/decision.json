@@ -1,0 +1,17 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0677",
+  "decision": "retained correctness fix",
+  "performance_claim": "none",
+  "authority": "0651 row16 and0650 finding3;0652 correctness-first tradeoff",
+  "breaking_changes": "valid marked XML admitted; marked-input diagnostics address physical offsets; no signature change",
+  "corpus": {
+    "packages": 3,
+    "marked_members": 16
+  },
+  "limitations": [
+    "no performance claim",
+    "managedDOCX offset fix belongs to0670"
+  ]
+}
