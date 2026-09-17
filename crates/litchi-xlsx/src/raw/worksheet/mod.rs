@@ -26,7 +26,7 @@ use crate::error::{Result, invalid};
 use crate::layout::Defaults;
 use litchi_ooxml_common::mce::{self, process_ooxml};
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, PrefixDeclaration, ResolveResult};
 
 /// Keep speculative source parsing below the aggregate multi-sheet limit. A
 /// larger worksheet takes the established validation-then-parse path.
@@ -113,11 +113,12 @@ fn contains(content: &[u8], marker: &[u8]) -> bool {
 
 /// Cap the namespace declarations a rewritten start tag may carry.
 ///
-/// The preprocessor re-declares every in-scope binding on every start tag it
-/// writes and admits up to 4,096 of them, but `quick_xml` refuses more than 256
-/// declarations on one element. A source spread thinly enough over its
-/// ancestors parses, while its rewrite would not, so the shared traversal must
-/// not admit a source past this bound.
+/// `quick_xml` refuses more than 256 declarations on one element. The MCE
+/// writer now emits each binding at its own source boundary and only hoists a
+/// binding when a dropped ancestor requires it. The worksheet proof refuses
+/// those dropping directives and prefixed elements, so the source tag's
+/// per-element bound is the relevant one; declarations are not cumulative
+/// across the document.
 pub(crate) const MAX_REWRITTEN_DECLARATIONS: usize = 256;
 
 /// Grow one source byte to the longest escape the preprocessor can emit.
@@ -131,9 +132,11 @@ const MAX_ESCAPE_GROWTH: usize = 6;
 /// processed event stream with the source event stream. The rewrite differs
 /// from its input in four ways, none of which the worksheet parser can observe:
 ///
-/// * it re-declares every in-scope namespace on every emitted start tag. The
-///   parser resolves names through the reader and never reads an `xmlns`
-///   attribute, and re-declaring a binding already in scope resolves alike.
+/// * it emits namespace declarations at their source boundary and may hoist a
+///   declaration from a dropped ancestor. The proof refuses the directives and
+///   prefixed elements that can drop an ancestor, so a declaration is observed
+///   only on the start tag where the source reader observed it. The parser
+///   resolves names through the reader and never reads an `xmlns` attribute.
 /// * it expands `<a/>` into `<a></a>`. [`Parser::transition`] answers `Empty`
 ///   with the same `start` and `finish` pair that `Start` and `End` run, and
 ///   `finish(Context::Worksheet)` is `Ok(())`, so an empty root agrees too.
@@ -152,8 +155,6 @@ const MAX_ESCAPE_GROWTH: usize = 6;
 struct MceRewriteEquivalence {
     max_output_bytes: usize,
     root_started: bool,
-    declarations: usize,
-    declaration_bytes: usize,
     emitted_bytes: usize,
 }
 
@@ -162,14 +163,12 @@ impl MceRewriteEquivalence {
         Self {
             max_output_bytes: mce::Limits::default().max_output_bytes,
             root_started: false,
-            declarations: 0,
-            declaration_bytes: 0,
             // Every source byte is copied into the rewrite, escaped.
             emitted_bytes: content.len().saturating_mul(MAX_ESCAPE_GROWTH),
         }
     }
 
-    fn observe(&mut self, event: &Event<'_>) -> bool {
+    fn observe(&mut self, event: &Event<'_>, resolver: &NamespaceResolver) -> bool {
         match event {
             // A declaration after the root has opened is refused as late.
             Event::Decl(_) => !self.root_started,
@@ -184,14 +183,14 @@ impl MceRewriteEquivalence {
                     .is_ok_and(|name| matches!(&*name, "amp" | "lt" | "gt" | "apos" | "quot")),
                 Err(_) => false,
             },
-            Event::Start(element) | Event::Empty(element) => self.observe_start(element),
+            Event::Start(element) | Event::Empty(element) => self.observe_start(element, resolver),
             Event::End(_) | Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Eof => {
                 true
             },
         }
     }
 
-    fn observe_start(&mut self, element: &BytesStart<'_>) -> bool {
+    fn observe_start(&mut self, element: &BytesStart<'_>, resolver: &NamespaceResolver) -> bool {
         self.root_started = true;
         // A prefixed element name can name the MCE vocabulary itself, name a
         // namespace the rewrite drops or unwraps, or have no binding at all,
@@ -201,6 +200,7 @@ impl MceRewriteEquivalence {
         if !is_unprefixed_ncname(element.name().as_ref()) {
             return false;
         }
+        let mut declarations = 0usize;
         for attribute in element.attributes().with_checks(true) {
             let Ok(attribute) = attribute else {
                 // Duplicate or malformed attributes are refused while reading.
@@ -214,7 +214,7 @@ impl MceRewriteEquivalence {
             }
             let key = attribute.key.as_ref();
             if key == b"xmlns" {
-                if !self.declare(0, attribute.value.len()) {
+                if !declare(&mut declarations) {
                     return false;
                 }
             } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
@@ -224,39 +224,95 @@ impl MceRewriteEquivalence {
                 if attribute.value.is_empty()
                     || !std::str::from_utf8(prefix)
                         .is_ok_and(litchi_ooxml_common::xml_name::is_ncname)
-                    || !self.declare(prefix.len(), attribute.value.len())
+                    || !declare(&mut declarations)
                 {
                     return false;
                 }
             } else if key.starts_with(b"xml:") {
                 // The `xml` prefix is bound by definition.
-            } else if !is_unprefixed_ncname(key) {
-                // Any other prefixed attribute may be an MCE directive, may
-                // belong to a namespace the rewrite drops, or may be unbound;
-                // an unprefixed one still has to be a qualified name.
+            } else if is_unprefixed_ncname(key) {
+                // An unprefixed attribute still has to be a qualified name.
+            } else if !self.observe_prefixed_attribute(
+                attribute.key,
+                attribute.value.as_ref(),
+                resolver,
+            ) {
+                // An MCE directive still needs its exact validation. Other
+                // bound prefixes are safe here because the worksheet parser
+                // ignores every prefixed attribute; the value-only validator
+                // separately refuses relationship references in sheetData.
                 return false;
             }
         }
-        // Every in-scope declaration is re-emitted on this tag.
-        self.emitted_bytes = self.emitted_bytes.saturating_add(self.declaration_bytes);
+        // This is the processor's active-scope bound, rather than a
+        // document-wide count. Rebindings do not grow the processor's
+        // namespace set, and quick-xml exposes the same effective bindings
+        // after it has installed this start tag.
+        if resolver.bindings().count() > mce::Limits::default().max_namespace_bindings {
+            return false;
+        }
         self.emitted_bytes <= self.max_output_bytes
     }
 
-    /// Account for one namespace declaration, conservatively treating every
-    /// declaration seen so far as still in scope.
-    fn declare(&mut self, prefix_len: usize, value_len: usize) -> bool {
-        self.declarations = self.declarations.saturating_add(1);
-        if self.declarations > MAX_REWRITTEN_DECLARATIONS {
+    fn observe_prefixed_attribute(
+        &self,
+        key: quick_xml::name::QName<'_>,
+        value: &[u8],
+        resolver: &NamespaceResolver,
+    ) -> bool {
+        let (namespace, local) = resolver.resolve_attribute(key);
+        if !is_unprefixed_ncname(local.as_ref()) {
             return false;
         }
-        // ` xmlns:<prefix>="<value>"`, with the value escaped.
-        self.declaration_bytes = self
-            .declaration_bytes
-            .saturating_add(10)
-            .saturating_add(prefix_len)
-            .saturating_add(value_len.saturating_mul(MAX_ESCAPE_GROWTH));
-        true
+        match namespace {
+            ResolveResult::Bound(namespace) if namespace.as_ref() == mce::NAMESPACE.as_bytes() => {
+                local.as_ref() == b"Ignorable" && valid_ignorable_directive(value, resolver)
+            },
+            ResolveResult::Bound(_) => true,
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => false,
+        }
     }
+}
+
+/// Validate the one MCE directive that can be erased without changing the
+/// worksheet parser's event stream. The preprocessor performs the same checks
+/// before it drops the directive; malformed, duplicate, unbound, or recursive
+/// MCE prefixes therefore keep the authoritative fallback path.
+fn valid_ignorable_directive(value: &[u8], resolver: &NamespaceResolver) -> bool {
+    let Ok(value) = std::str::from_utf8(value) else {
+        return false;
+    };
+    let mut tokens = 0usize;
+    for (index, prefix) in value.split_whitespace().enumerate() {
+        tokens = tokens.saturating_add(1);
+        if tokens > mce::Limits::default().max_directive_tokens
+            || !litchi_ooxml_common::xml_name::is_ncname(prefix)
+            || value
+                .split_whitespace()
+                .take(index)
+                .any(|seen| seen == prefix)
+        {
+            return false;
+        }
+        let namespace = if prefix == "xml" {
+            Some(b"http://www.w3.org/XML/1998/namespace".as_slice())
+        } else {
+            resolver.bindings().find_map(|(declaration, namespace)| {
+                matches!(declaration, PrefixDeclaration::Named(candidate)
+                    if candidate == prefix.as_bytes())
+                .then_some(namespace.into_inner())
+            })
+        };
+        if namespace.is_none_or(|namespace| namespace == mce::NAMESPACE.as_bytes()) {
+            return false;
+        }
+    }
+    true
+}
+
+fn declare(declarations: &mut usize) -> bool {
+    *declarations = declarations.saturating_add(1);
+    *declarations <= MAX_REWRITTEN_DECLARATIONS
 }
 
 /// Return whether this name is a prefix-free qualified name.

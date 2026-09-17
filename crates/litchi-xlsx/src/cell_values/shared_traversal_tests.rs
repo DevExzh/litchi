@@ -504,6 +504,42 @@ fn admitted(content: &[u8]) -> crate::Result<crate::cell::Store> {
     }
 }
 
+/// Run only the raw shared traversal and report whether the rewrite proof
+/// reached EOF. The production validator is intentionally not part of this
+/// probe: the real-part census uses it to separate the MCE proof from the
+/// value-only vocabulary and from the authoritative fallback.
+fn rewritten_proof_completes(content: &[u8]) -> bool {
+    matches!(
+        crate::raw::worksheet::parse_source_with_observer(
+            content,
+            crate::raw::worksheet::SourceAdmission::Rewritten,
+            || Ok(None),
+            |_, _, _| true,
+        ),
+        crate::raw::worksheet::SourceParseAttempt::Complete(_)
+    )
+}
+
+/// Report whether the complete value-only admission kept the source-backed
+/// facts from the shared traversal. `None` means that the validator or the
+/// rewrite proof deliberately selected the established fallback.
+fn shared_source_completes(content: &[u8]) -> bool {
+    let Some(admission) = crate::raw::worksheet::source_stream_admission(content) else {
+        return false;
+    };
+    let mut validator = super::Validator::new(super::XmlOwner::Worksheet);
+    let attempt = crate::raw::worksheet::parse_source_with_observer(
+        content,
+        admission,
+        || Ok(None),
+        |namespace, event, _| validator.observe(namespace, event),
+    );
+    matches!(
+        attempt,
+        crate::raw::worksheet::SourceParseAttempt::Complete(_)
+    ) && validator.finish().is_ok()
+}
+
 /// Report whether admission changed the parsed value or the exact error.
 fn admission_difference(name: &str, content: &[u8]) -> Option<String> {
     match (authoritative(content), admitted(content)) {
@@ -546,6 +582,7 @@ fn declaration_only_markers_reach_the_shared_traversal() {
         source_stream_admission(&declaration_only),
         Some(SourceAdmission::Rewritten)
     );
+    assert!(rewritten_proof_completes(&declaration_only));
     assert_valid_noop(&declaration_only);
     assert_admission_is_transparent("declaration-only", &declaration_only);
 
@@ -573,6 +610,98 @@ fn declaration_only_markers_reach_the_shared_traversal() {
         "<sheetData/><mc:AlternateContent><mc:Choice Requires=\"x\"/></mc:AlternateContent>",
     );
     assert_eq!(source_stream_admission(&alternate), None);
+}
+
+#[test]
+fn rewrite_declaration_budget_is_per_start_tag() {
+    let levels = 96usize;
+    let declarations_per_level = 3usize;
+    let mut xml = format!("<worksheet xmlns=\"{SML}\" xmlns:mc=\"{MCE}\">");
+    for level in 0..levels {
+        write!(xml, "<extension{level}").expect("write extension start");
+        for declaration in 0..declarations_per_level {
+            write!(
+                xml,
+                " xmlns:p{level}_{declaration}=\"urn:litchi:{level}:{declaration}\""
+            )
+            .expect("write extension namespace");
+        }
+        xml.push('>');
+    }
+    for level in (0..levels).rev() {
+        write!(xml, "</extension{level}>").expect("write extension end");
+    }
+    xml.push_str("<sheetData/></worksheet>");
+    let xml = xml.into_bytes();
+    assert_eq!(
+        crate::raw::worksheet::source_stream_admission(&xml),
+        Some(crate::raw::worksheet::SourceAdmission::Rewritten)
+    );
+    assert!(
+        levels * declarations_per_level > crate::raw::worksheet::MAX_REWRITTEN_DECLARATIONS,
+        "fixture must exceed the old cumulative declaration budget"
+    );
+    assert!(rewritten_proof_completes(&xml));
+}
+
+#[test]
+fn ignorable_directive_proof_is_narrow_and_transparent() {
+    let tail = "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>";
+    let valid = worksheet_with_root_attributes(
+        &format!(
+            " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" xmlns:other=\"urn:litchi:other\" mc:Ignorable=\"future\""
+        ),
+        &format!(
+            "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>"
+        ),
+    );
+    assert_eq!(
+        crate::raw::worksheet::source_stream_admission(&valid),
+        Some(crate::raw::worksheet::SourceAdmission::Rewritten)
+    );
+    assert!(rewritten_proof_completes(&valid));
+    assert!(shared_source_completes(&valid));
+    assert_valid_noop(&valid);
+    assert_admission_is_transparent("valid Ignorable", &valid);
+
+    let unbound = worksheet_with_root_attributes(
+        &format!(" xmlns:mc=\"{MCE}\" mc:Ignorable=\"missing\""),
+        tail,
+    );
+    assert!(!rewritten_proof_completes(&unbound));
+    assert_admission_is_transparent("unbound Ignorable", &unbound);
+
+    let recursive =
+        worksheet_with_root_attributes(&format!(" xmlns:mc=\"{MCE}\" mc:Ignorable=\"mc\""), tail);
+    assert!(!rewritten_proof_completes(&recursive));
+    assert_admission_is_transparent("MCE Ignorable", &recursive);
+
+    let duplicate = worksheet_with_root_attributes(
+        &format!(
+            " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" mc:Ignorable=\"future future\""
+        ),
+        tail,
+    );
+    assert!(!rewritten_proof_completes(&duplicate));
+    assert_admission_is_transparent("duplicate Ignorable", &duplicate);
+
+    let process = worksheet_with_root_attributes(
+        &format!(
+            " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" mc:Ignorable=\"future\" mc:ProcessContent=\"future:future\""
+        ),
+        &format!("<future:future><marker/></future:future>{tail}"),
+    );
+    assert!(!rewritten_proof_completes(&process));
+    assert_admission_is_transparent("ProcessContent", &process);
+
+    let preserve = worksheet_with_root_attributes(
+        &format!(
+            " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" mc:Ignorable=\"future\" mc:PreserveAttributes=\"future:flag\""
+        ),
+        &format!("<future:future future:flag=\"kept\"/>{tail}"),
+    );
+    assert!(!rewritten_proof_completes(&preserve));
+    assert_admission_is_transparent("PreserveAttributes", &preserve);
 }
 
 #[test]
@@ -611,14 +740,6 @@ fn rewrite_only_refusals_survive_marker_admission() {
         (
             "empty namespace value",
             worksheet_with_root_attributes(&format!("{declared} xmlns:empty=\"\""), tail),
-        ),
-        // A markup-compatibility directive is dropped by the preprocessor.
-        (
-            "ignorable directive",
-            worksheet_with_root_attributes(
-                &format!("{declared} xmlns:x14ac=\"{X14AC}\" mc:Ignorable=\"x14ac\""),
-                tail,
-            ),
         ),
         // A name the reader accepts but the preprocessor refuses as an
         // invalid QName.
@@ -703,6 +824,7 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
 
     let mut parts = 0usize;
     let mut rewritten = 0usize;
+    let mut rewritten_shared = 0usize;
     let mut borrowed = 0usize;
     for path in &paths {
         let Ok(package) = OpcPackage::open(path) else {
@@ -716,7 +838,10 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
             let content = part.blob();
             parts += 1;
             match crate::raw::worksheet::source_stream_admission(content) {
-                Some(crate::raw::worksheet::SourceAdmission::Rewritten) => rewritten += 1,
+                Some(crate::raw::worksheet::SourceAdmission::Rewritten) => {
+                    rewritten += 1;
+                    rewritten_shared += usize::from(shared_source_completes(content));
+                },
                 Some(crate::raw::worksheet::SourceAdmission::Borrowed) => borrowed += 1,
                 None => {},
             }
@@ -728,5 +853,13 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
     assert!(
         rewritten > 0,
         "no real worksheet exercised the rewrite-equivalence proof"
+    );
+    println!(
+        "worksheet MCE admission census: parts={parts} borrowed={borrowed} rewritten={rewritten} rewritten_shared_complete={rewritten_shared} fallback={}",
+        parts - borrowed - rewritten
+    );
+    assert!(
+        rewritten_shared > 0,
+        "no real worksheet completed the updated shared admission"
     );
 }

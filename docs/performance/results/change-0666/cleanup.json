@@ -1,0 +1,28 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0666",
+  "retained_in_repository": [
+    "docs/performance/0666-mce-rewrite-residue.md",
+    "docs/performance/results/change-0666/README.md",
+    "docs/performance/results/change-0666/decision.json",
+    "docs/performance/results/change-0666/measurements.tsv",
+    "docs/performance/results/change-0666/summary.txt",
+    "docs/performance/results/change-0666/gates.txt",
+    "docs/performance/results/change-0666/log-sections.md",
+    "docs/performance/results/change-0666/cleanup.json"
+  ],
+  "deleted_after_extraction": [
+    "no external fixture copies or release benchmark output were created",
+    "the debug target remains outside the packet and is disposable build output"
+  ],
+  "kept_for_a_following_batch": [
+    "dyDescent/x14ac capture integration",
+    "AlternateContent and ProcessContent prefix admission design",
+    "a separate ownership-preserving design for the four adjacent processed-buffer consumers"
+  ],
+  "notes": [
+    "the packet avoids shared HOTSPOTS, GOAL_AUDIT, REPORT and ADR_COMPLIANCE rollups",
+    "the focused test output is summarized in gates.txt and the machine-readable counts are in measurements.tsv"
+  ]
+}

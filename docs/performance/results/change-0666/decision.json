@@ -1,0 +1,65 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0666",
+  "title": "The remaining XLSX worksheet MCE rewrite proof charges declarations per tag and admits safe bound attributes",
+  "decision": "retained, implemented in litchi-xlsx",
+  "authority": "decision 1 of change 0652, carrying the MCE rewrite row from change 0651; change 0657's D4 supplies the admitted attribute contract",
+  "code_state": "crates/litchi-xlsx raw worksheet admission and focused tests; no public API, dependency, unsafe code or parser limit changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0653 explicitly left MceRewriteEquivalence's cumulative declaration budget and stale writer description behind after the namespace writer changed",
+    "0657 D4 admits unfamiliar attributes outside composed spans and preserves them byte for byte, so a bound prefixed attribute can be admitted when the worksheet parser ignores it",
+    "the proof still refuses prefixed elements and every MCE directive that can remove or unwrap content, preserving the source-versus-processed event contract",
+    "the declaration witness spreads 288 declarations over 96 start tags: it exceeds the old cumulative accounting while staying within quick-xml's 256 declarations per tag",
+    "the real worksheet census is the retained measurement: 205 parts, 71 borrowed, 30 rewritten candidates, 25 validator-backed shared completions and 104 admission fallbacks",
+    "adjacent query-table, auto-filter, data-validation and named-sheet-view consumers retain owned or namespace-adapted fragments whose publication contracts do not admit a borrowed slice without a separate design"
+  ],
+  "accepted_evidence": {
+    "adversarial": "focused shared-traversal tests cover valid Ignorable plus a bound prefixed attribute, unbound and duplicate Ignorable prefixes, MCE-recursive Ignorable, ProcessContent, PreserveAttributes and the per-start declaration witness",
+    "preservation": "authoritative-versus-admitted differential over every worksheet part keeps both successful stores and exact errors identical; the valid Ignorable fixture also opens and commits a source-backed no-op",
+    "admission_census": "marker_admission_matches_the_authoritative_path_on_every_real_worksheet prints the 205-part borrowed, rewritten, shared-complete and fallback counts",
+    "marker_census": "an independent ZIP read over test-data/ooxml/xlsx counts 130 mc:Ignorable, 104 dyDescent, three other MCE-directive and zero AlternateContent worksheet markers",
+    "limits": "the unchanged source-size, event, XML-depth, quick-xml per-start declaration and MCE processing bounds remain covered by the existing boundary suite plus the new declaration witness",
+    "adjacent_consumer_audit": "query_table/codec.rs, auto_filter/package.rs, data_validation/codec/wire.rs and named_sheet_view/codec.rs were inspected; no code change is justified without changing ownership, namespace-context or typed-publication contracts"
+  },
+  "accepted_costs": {
+    "proof_work": "the Rewritten path resolves bound prefixed attributes and validates Ignorable tokens without allocating a directive set; duplicate detection is bounded by the existing directive-token limit",
+    "fallback_surface": "dyDescent, AlternateContent, ProcessContent, PreserveElements, PreserveAttributes, MustUnderstand, unknown MCE attributes, prefixed elements and unbound prefixes remain fallback gates",
+    "no_speed_claim": "no release timing, allocation, RSS, cold-cache, throughput or cross-platform measurement was taken; the census is an admission measurement only"
+  },
+  "known_gaps": {
+    "dy_descent": "x14ac:dyDescent still needs the separate x14ac capture to be joined to the shared parser",
+    "alternate_content": "branch selection remains authoritative because the source traversal cannot model dropped branches",
+    "process_content_prefix": "the pre-existing prefixed-element refusal under ProcessContent remains pinned",
+    "consumer_slices": "the four adjacent processed-buffer consumers remain unchanged and have no separate borrowed-fragment design",
+    "corpus_scope": "the admission counts cover the repository's XLSX fixtures and do not generalize to external producers",
+    "performance": "no wall-clock or allocation claim is registered"
+  },
+  "withheld": [
+    "any registered speedup, throughput, allocation, RSS, cold-cache, concurrency or cross-platform result",
+    "any claim that dyDescent or AlternateContent worksheets use the shared path",
+    "any claim that the four adjacent consumer slices can be borrowed safely"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ce",
+    "branch": "perf/0666-mce-rewrite-residue",
+    "commit": "the tip of perf/0666-mce-rewrite-residue; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, Linux, rustc 1.95.0",
+    "build": "debug profile, CARGO_BUILD_JOBS=2",
+    "focused_command": "CARGO_BUILD_JOBS=2 cargo test -p litchi-xlsx --lib cell_values::validation::shared_traversal_tests -- --nocapture",
+    "measurements": {
+      "worksheet_parts": 205,
+      "borrowed": 71,
+      "rewritten_candidates": 30,
+      "rewritten_shared_complete": 25,
+      "admission_fallback": 104,
+      "mc_ignorable_markers": 130,
+      "dy_descent_markers": 104,
+      "other_mce_directive_parts": 3,
+      "alternate_content_markers": 0,
+      "preservation_differences": 0
+    }
+  }
+}
