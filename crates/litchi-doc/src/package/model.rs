@@ -364,6 +364,10 @@ pub struct OpenOptions {
     ///
     /// Defaults to [`crate::Leniency::Strict`], which is the historical behaviour.
     pub leniency: crate::leniency::Leniency,
+    /// Whether to accept the narrow producer PAPX alignment compatibility
+    /// profile. This is disabled by default; it is independent of stylesheet
+    /// leniency and does not relax the shared SPRM parser.
+    papx_alignment_padding: bool,
 }
 
 impl OpenOptions {
@@ -382,8 +386,25 @@ impl OpenOptions {
         self
     }
 
+    /// Opt into the bounded PAPX producer-compatibility profile.
+    ///
+    /// The profile admits one zero byte after a complete odd-length paragraph
+    /// SPRM sequence when the `PapxInFkp` consumer proves that the byte is the
+    /// exact one-byte tail that the strict parser reports as an incomplete
+    /// opcode. The default remains strict because the MS-DOC whole-Prl rule
+    /// does not specify this byte as padding.
+    #[must_use]
+    pub const fn with_papx_alignment_padding(mut self) -> Self {
+        self.papx_alignment_padding = true;
+        self
+    }
+
     pub(crate) fn password(&self) -> Option<&str> {
         self.password.as_ref().map(Password::as_str)
+    }
+
+    pub(crate) const fn allows_papx_alignment_padding(&self) -> bool {
+        self.papx_alignment_padding
     }
 }
 

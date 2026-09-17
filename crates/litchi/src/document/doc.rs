@@ -853,9 +853,10 @@ impl Document {
     }
 
     /// Open a legacy `.doc` through the format-specific options exposed by
-    /// [`crate::doc`].  The option is consulted only when detection selects
-    /// the DOC reader; other recognized document formats use their normal
-    /// facade path.
+    /// [`crate::doc`]. This includes stylesheet leniency and the explicit
+    /// PAPX producer-compatibility profile. The option is consulted only when
+    /// detection selects the DOC reader; other recognized document formats use
+    /// their normal facade path.
     #[cfg(feature = "doc")]
     pub fn open_with_doc_options<P: AsRef<Path>>(
         path: P,
@@ -871,8 +872,10 @@ impl Document {
 
     /// Create a document from bytes while passing explicit options to the
     /// legacy `.doc` reader.  In particular, this makes the existing
-    /// [`doc::Leniency::TolerateStylesheetDefects`] escape hatch available
-    /// through the unified facade.
+    /// [`doc::Leniency::TolerateStylesheetDefects`] escape hatch and the
+    /// explicit `doc::OpenOptions::with_papx_alignment_padding()` producer
+    /// compatibility profile available through the unified facade. Both are
+    /// opt-in; the ordinary `from_bytes` route remains strict.
     #[cfg(feature = "doc")]
     pub fn from_bytes_with_doc_options(bytes: Vec<u8>, options: doc::OpenOptions) -> Result<Self> {
         let detected =
@@ -3820,7 +3823,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "doc")]
-    fn doc_admission_residues_keep_typed_fbkf_refusal_and_accept_papx_padding() {
+    fn doc_admission_residues_keep_typed_fbkf_refusal_and_gate_papx_padding() {
         let watermark = test_data_path().join("ole/doc/watermark.doc");
         let watermark_error = match Document::open(&watermark) {
             Ok(_) => panic!("duplicate FBKF ibkl should remain a strict refusal"),
@@ -3833,8 +3836,16 @@ mod tests {
         );
 
         let poi_test = test_data_path().join("poi/test-data/document/test.doc");
-        let document = Document::open(&poi_test)
-            .expect("an odd PAPX SPRM followed by one zero alignment byte should be accepted");
+        let papx_error = match Document::open(&poi_test) {
+            Ok(_) => panic!("PAPX alignment compatibility must be opt-in"),
+            Err(error) => error,
+        };
+        assert!(papx_error.to_string().contains("truncated SPRM opcode"));
+
+        let options = doc::OpenOptions::default().with_papx_alignment_padding();
+        let document = Document::open_with_doc_options(&poi_test, options).expect(
+            "the explicit PAPX compatibility profile should admit the repeated producer shape",
+        );
         assert!(!document.text().expect("read PAPX witness text").is_empty());
     }
 
