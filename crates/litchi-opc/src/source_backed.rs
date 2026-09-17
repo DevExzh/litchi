@@ -15909,6 +15909,7 @@ mod tests {
         assert_eq!(source_probe.reads.load(Ordering::SeqCst), baseline);
         assert_eq!(budget.used(Resource::Workers), 0);
         assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
     }
 
     #[test]

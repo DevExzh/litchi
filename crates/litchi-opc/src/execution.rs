@@ -156,6 +156,38 @@ impl OpenSession {
             return Ok(Vec::new());
         }
         let limits = self.context.limits();
+        let max_tasks = limits.max_in_flight_tasks().get();
+        let max_bytes = limits.max_in_flight_bytes().get();
+        let mut batch_tasks = 0usize;
+        let mut batch_bytes = 0u64;
+        let mut has_parallel_batch = false;
+        for name in names {
+            let metadata = archive.metadata(name).map_err(OpcError::from)?;
+            let bytes = metadata.uncompressed_size();
+            if bytes > max_bytes {
+                return Err(OpcError::ParallelRead(
+                    soapberry_zip::ErrorKind::ParallelReadInFlightBytesExceeded {
+                        actual: bytes,
+                        maximum: max_bytes,
+                    }
+                    .into(),
+                ));
+            }
+            let exceeds_bytes = batch_tasks > 0
+                && batch_bytes
+                    .checked_add(bytes)
+                    .is_none_or(|next_bytes| next_bytes > max_bytes);
+            if batch_tasks == max_tasks || exceeds_bytes {
+                has_parallel_batch |= batch_tasks > 1 && batch_bytes >= limits.min_parallel_bytes();
+                batch_tasks = 0;
+                batch_bytes = 0;
+            }
+            batch_tasks += 1;
+            batch_bytes = batch_bytes
+                .checked_add(bytes)
+                .expect("validated ZIP batch byte total fits u64");
+        }
+        has_parallel_batch |= batch_tasks > 1 && batch_bytes >= limits.min_parallel_bytes();
         let in_flight = declared_bytes.min(limits.max_in_flight_bytes().get());
         let reservation = self
             .context
@@ -164,11 +196,8 @@ impl OpenSession {
         self.context
             .consume(Resource::Work, declared_bytes)
             .map_err(map_execution_error)?;
-        self.context
-            .consume(Resource::CpuTasks, names.len() as u64)
-            .map_err(map_execution_error)?;
 
-        let candidate = names.len() > 1
+        let candidate = has_parallel_batch
             && declared_bytes >= limits.min_parallel_bytes()
             && (limits.min_task_bytes() == 0
                 || names.iter().all(|name| {
@@ -183,40 +212,34 @@ impl OpenSession {
             .min(limits.max_in_flight_tasks().get())
             .min(names.len());
         let admission = if candidate && requested_width > 1 {
-            self.admit_parallel_workers(requested_width)?
+            self.admit_parallel_workers(requested_width, names.len() as u64)?
         } else {
-            self.admit_serial_workers()?
+            self.admit_serial_workers(names.len() as u64)?
         };
         let parallel_width = admission.width;
         let _workers = admission.workers;
         let _io = admission.io;
-        if parallel_width > 1 {
-            self.zip.narrow_worker_count(
-                NonZeroUsize::new(parallel_width).expect("parallel width is non-zero"),
-            );
-        }
+        let parallel_width =
+            NonZeroUsize::new(parallel_width).expect("read admission width is non-zero");
 
         let cancellation = ContextCancellation(&self.context);
         let results = archive
-            .read_many_with_session(&self.zip, names, &cancellation)
+            .read_many_with_session_width(&self.zip, names, parallel_width, &cancellation)
             .map_err(map_parallel_read_error);
         drop(reservation);
         results
     }
 
-    fn admit_serial_workers(&self) -> Result<ReadAdmission> {
-        if let Ok(permits) = self.read_permits.lock() {
-            if permits.is_some() {
-                let io = self
-                    .context
-                    .reserve(Resource::IoConcurrency, 1)
-                    .map_err(map_execution_error)?;
-                return Ok(ReadAdmission {
-                    width: 1,
-                    workers: None,
-                    io,
-                });
-            }
+    fn consume_read_cpu_tasks(&self, tasks: u64) -> Result<()> {
+        self.context.check().map_err(map_execution_error)?;
+        self.context
+            .consume(Resource::CpuTasks, tasks)
+            .map_err(map_execution_error)
+    }
+
+    fn admit_serial_workers(&self, cpu_tasks: u64) -> Result<ReadAdmission> {
+        let permits = if let Ok(permits) = self.read_permits.lock() {
+            permits
         } else {
             return Err(OpcError::Execution(ExecutionError::ResourceLimit(
                 litchi_core::ResourceLimit {
@@ -226,6 +249,18 @@ impl OpenSession {
                     scope: Arc::from("opc-open read permits"),
                 },
             )));
+        };
+        if permits.is_some() {
+            let io = self
+                .context
+                .reserve(Resource::IoConcurrency, 1)
+                .map_err(map_execution_error)?;
+            self.consume_read_cpu_tasks(cpu_tasks)?;
+            return Ok(ReadAdmission {
+                width: 1,
+                workers: None,
+                io,
+            });
         }
         let workers = self
             .context
@@ -238,6 +273,7 @@ impl OpenSession {
                 return Err(map_execution_error(error));
             },
         };
+        self.consume_read_cpu_tasks(cpu_tasks)?;
         Ok(ReadAdmission {
             width: 1,
             workers: Some(workers),
@@ -245,32 +281,9 @@ impl OpenSession {
         })
     }
 
-    fn admit_parallel_workers(&self, requested: usize) -> Result<ReadAdmission> {
-        if let Ok(permits) = self.read_permits.lock() {
-            if let Some(permits) = permits.as_ref() {
-                let maximum = permits.width.min(requested);
-                let mut last_limit = None;
-                for width in (1..=maximum).rev() {
-                    match self.context.reserve(Resource::IoConcurrency, width as u64) {
-                        Ok(io) => {
-                            return Ok(ReadAdmission {
-                                width,
-                                workers: None,
-                                io,
-                            });
-                        },
-                        Err(ExecutionError::ResourceLimit(limit))
-                            if limit.resource == Resource::IoConcurrency =>
-                        {
-                            last_limit = Some(limit);
-                        },
-                        Err(error) => return Err(map_execution_error(error)),
-                    }
-                }
-                if let Some(limit) = last_limit {
-                    return Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)));
-                }
-            }
+    fn admit_parallel_workers(&self, requested: usize, cpu_tasks: u64) -> Result<ReadAdmission> {
+        let mut permits = if let Ok(permits) = self.read_permits.lock() {
+            permits
         } else {
             return Err(OpcError::Execution(ExecutionError::ResourceLimit(
                 litchi_core::ResourceLimit {
@@ -280,6 +293,31 @@ impl OpenSession {
                     scope: Arc::from("opc-open read permits"),
                 },
             )));
+        };
+        if let Some(retained) = permits.as_ref() {
+            let maximum = retained.width.min(requested);
+            let mut last_limit = None;
+            for width in (1..=maximum).rev() {
+                match self.context.reserve(Resource::IoConcurrency, width as u64) {
+                    Ok(io) => {
+                        self.consume_read_cpu_tasks(cpu_tasks)?;
+                        return Ok(ReadAdmission {
+                            width,
+                            workers: None,
+                            io,
+                        });
+                    },
+                    Err(ExecutionError::ResourceLimit(limit))
+                        if limit.resource == Resource::IoConcurrency =>
+                    {
+                        last_limit = Some(limit);
+                    },
+                    Err(error) => return Err(map_execution_error(error)),
+                }
+            }
+            if let Some(limit) = last_limit {
+                return Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)));
+            }
         }
 
         for width in (2..=requested).rev() {
@@ -305,43 +343,48 @@ impl OpenSession {
                     return Err(map_execution_error(error));
                 },
             };
-            if let Ok(mut permits) = self.read_permits.lock() {
-                if self.context.scoped_workers().is_some() {
-                    drop(permits);
-                    return Ok(ReadAdmission {
-                        width,
-                        workers: Some(workers),
-                        io,
-                    });
-                }
-                if let Err(error) = self.zip.ensure_local_pool() {
-                    drop(permits);
-                    drop(io);
-                    drop(workers);
-                    return Err(OpcError::ParallelRead(error));
-                }
-                *permits = Some(ReadPermits {
-                    width,
-                    _workers: workers,
-                });
+            if self.context.scoped_workers().is_some() {
+                self.consume_read_cpu_tasks(cpu_tasks)?;
                 return Ok(ReadAdmission {
                     width,
-                    workers: None,
+                    workers: Some(workers),
                     io,
                 });
             }
-            drop(io);
-            drop(workers);
-            return Err(OpcError::Execution(ExecutionError::ResourceLimit(
-                litchi_core::ResourceLimit {
-                    resource: Resource::Workers,
-                    observed: 1,
-                    limit: 0,
-                    scope: Arc::from("opc-open read permits"),
-                },
-            )));
+            let worker_width = NonZeroUsize::new(width).expect("parallel width is non-zero");
+            self.consume_read_cpu_tasks(cpu_tasks)?;
+            if let Err(error) = self.zip.ensure_local_pool_at_width(worker_width) {
+                drop(io);
+                drop(workers);
+                return Err(OpcError::ParallelRead(error));
+            }
+            *permits = Some(ReadPermits {
+                width,
+                _workers: workers,
+            });
+            return Ok(ReadAdmission {
+                width,
+                workers: None,
+                io,
+            });
         }
-        self.admit_serial_workers()
+        let workers = self
+            .context
+            .reserve(Resource::Workers, 1)
+            .map_err(map_execution_error)?;
+        let io = match self.context.reserve(Resource::IoConcurrency, 1) {
+            Ok(io) => io,
+            Err(error) => {
+                drop(workers);
+                return Err(map_execution_error(error));
+            },
+        };
+        self.consume_read_cpu_tasks(cpu_tasks)?;
+        Ok(ReadAdmission {
+            width: 1,
+            workers: Some(workers),
+            io,
+        })
     }
 }
 
@@ -545,6 +588,7 @@ mod tests {
         ));
         assert_eq!(budget.used(Resource::IoConcurrency), 0);
         assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
     }
 
     #[test]
@@ -572,6 +616,7 @@ mod tests {
         let second_reader = LazyArchiveReader::new(&bytes).unwrap();
 
         let first_result = first.read_many(&first_reader, &names).unwrap();
+        assert_eq!(first.zip.local_pool_worker_count(), 2);
         assert_eq!(root.used(Resource::Workers), 2);
         let second_result = second.read_many(&second_reader, &names).unwrap();
         assert_eq!(first_result.len(), second_result.len());
@@ -579,12 +624,111 @@ mod tests {
         // deterministically narrows to one under the shared root cap of three
         // and releases its serial admission at return.
         assert!(second.read_permits.lock().unwrap().is_none());
+        assert_eq!(second.zip.local_pool_worker_count(), 0);
         assert_eq!(root.used(Resource::Workers), 2);
         assert_eq!(root.used(Resource::IoConcurrency), 0);
         drop(first);
         assert_eq!(root.used(Resource::Workers), 0);
         drop(second);
         assert_eq!(root.used(Resource::Workers), 0);
+    }
+
+    #[test]
+    fn zero_cpu_budget_refuses_before_retaining_a_zip_pool() {
+        let bytes = archive();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let budget = Budget::root(
+            "opc-open-zero-cpu",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(4, 4, 0),
+        );
+        let (_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroU64::new(16 * 1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let session =
+            OpenSession::new(ExecutionContext::new(budget.clone(), cancellation, limits)).unwrap();
+        let names = ["benchmark/0.bin", "benchmark/1.bin"];
+
+        assert!(matches!(
+            session.read_many(&reader, &names),
+            Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::CpuTasks
+        ));
+        assert_eq!(session.zip.local_pool_worker_count(), 0);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
+    }
+
+    #[test]
+    fn zip_byte_cap_that_splits_every_batch_does_not_retain_a_pool() {
+        let bytes = archive();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let budget = Budget::root(
+            "opc-open-serial-batches",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(4, 4, u64::MAX),
+        );
+        let (_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroU64::new(1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let session =
+            OpenSession::new(ExecutionContext::new(budget.clone(), cancellation, limits)).unwrap();
+        let names = ["benchmark/0.bin", "benchmark/1.bin"];
+        let results = session.read_many(&reader, &names).unwrap();
+
+        assert!(results.iter().all(|(_, result)| result.is_ok()));
+        assert_eq!(session.zip.local_pool_worker_count(), 0);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 2);
+    }
+
+    #[test]
+    fn explicit_zip_read_preflights_oversized_members_before_cpu_admission() {
+        let bytes = archive();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let budget = Budget::root(
+            "opc-open-oversized-member",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(4, 4, u64::MAX),
+        );
+        let (_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroU64::new(512).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, limits);
+        let session = OpenSession::new(context).unwrap();
+        let names = ["benchmark/0.bin", "benchmark/1.bin"];
+
+        assert!(matches!(
+            session.read_many(&reader, &names),
+            Err(OpcError::ParallelRead(error))
+                if matches!(
+                    error.kind(),
+                    soapberry_zip::ErrorKind::ParallelReadInFlightBytesExceeded {
+                        actual: 1024,
+                        maximum: 512,
+                    }
+                )
+        ));
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
     }
 
     #[test]

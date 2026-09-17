@@ -35,12 +35,17 @@ ZIP `OpenSession`/`ParallelReadSession`, CFB `SharedOleBulkRead`, and
 source-backed ordered Part reads. `Workers`, `IoConcurrency` and `CpuTasks`
 compose through the hierarchical budget. Private pools retain worker permits
 for their pool lifetime; caller facilities use operation-scoped worker
-reservations. Serial paths still admit one worker and one positional-read
-permit. The existing constructors retain their no-op, unbounded behavior.
+reservations. Every operation passes its admitted width into task submission,
+including waves on a cached private pool. Serial paths still admit one worker
+and one positional-read permit. Deterministic request/output preflight and
+worker/I/O refusal happen before the cumulative `CpuTasks` charge; CFB charges
+per admitted batch. The existing constructors retain their no-op, unbounded
+behavior.
 
-The final four-crate debug0 run passed 1,871 tests with two pre-existing
+The final four-crate debug0 run passed 1,877 tests with two pre-existing
 ignored tests and no failures; its raw output is retained at
-`/tmp/litchi-0676-debug0-tests-final2.log` during review. The tests prove deterministic
-order, caller-facility use, shared-root narrowing, zero-I/O refusal before
-payload reads, and release after serial failure. They do not claim performance
-movement or complete the separate ordinary-CRUD API surface.
+`/tmp/litchi-0676-debug0-tests-final4.log` during review. The tests prove
+deterministic order, caller-facility use, shared-root narrowing, measured
+cached-pool read width, zero-I/O refusal before payload reads, and release after
+serial failure. They do not claim performance movement or complete the separate
+ordinary-CRUD API surface.

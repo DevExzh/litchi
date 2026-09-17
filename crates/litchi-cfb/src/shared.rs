@@ -8065,6 +8065,7 @@ mod tests {
         assert_eq!(source.reads.load(AtomicOrdering::SeqCst), baseline);
         assert_eq!(budget.used(Resource::Workers), 0);
         assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
     }
 
     #[test]
@@ -8245,6 +8246,81 @@ mod tests {
             .read_streams(&[&["First"], &["Second"]])
             .unwrap();
         assert!(source.max_active_reads.load(AtomicOrdering::SeqCst) >= 2);
+    }
+
+    #[test]
+    fn cached_bulk_pool_caps_later_io_narrowing() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(Arc::clone(&source));
+        let budget = Budget::root(
+            "shared-cfb-cached-pool-narrowing",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(4, 4, u64::MAX),
+        );
+        let (_cancel, token) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroU64::new(64 * 1024).unwrap(),
+            1,
+        )
+        .unwrap();
+        let session = file.bulk_read(ExecutionContext::new(budget.clone(), token, limits));
+        let first_paths: &[&[&str]] = &[&["First"], &["Second"], &["First"], &["Second"]];
+        session.read_streams(first_paths).unwrap();
+        assert_eq!(session.pool_build_count(), 1);
+
+        // Keep two of the four root I/O permits occupied while reusing the
+        // cached four-thread pool. The operation must submit two-wide waves,
+        // rather than handing the whole batch to that pool.
+        let io_hold = budget.reserve(Resource::IoConcurrency, 2).unwrap();
+        let second_paths: &[&[&str]] = &[&["First"], &["Second"]];
+        source.synchronize_next_two_reads();
+        session.read_streams(second_paths).unwrap();
+        let max_active = source.max_active_reads.load(AtomicOrdering::SeqCst);
+        assert!(
+            max_active >= 2,
+            "the narrowed operation did not overlap reads"
+        );
+        assert!(
+            max_active <= 2,
+            "cached pool exceeded the admitted I/O width"
+        );
+        assert_eq!(budget.used(Resource::Workers), 4);
+        drop(io_hold);
+        drop(session);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+    }
+
+    #[test]
+    fn zero_cpu_budget_refuses_before_building_a_bulk_pool() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(source);
+        let budget = Budget::root(
+            "shared-cfb-zero-cpu",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(4, 4, 0),
+        );
+        let (_cancel, token) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroUsize::new(4).unwrap(),
+            NonZeroU64::new(64 * 1024).unwrap(),
+            1,
+        )
+        .unwrap();
+        let session = file.bulk_read(ExecutionContext::new(budget.clone(), token, limits));
+
+        assert!(matches!(
+            session.read_streams(&[&["First"], &["Second"]]),
+            Err(SharedOleBulkError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::CpuTasks
+        ));
+        assert_eq!(session.pool_build_count(), 0);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        assert_eq!(budget.used(Resource::CpuTasks), 0);
     }
 
     #[test]

@@ -11,10 +11,11 @@
   "accepted_evidence": {
     "api_compatibility": "Limits::new keeps six arguments; the existing two-argument with_execution remains available and with_execution_io opts into the third dimension",
     "lazy_pool": "ZIP and CFB private pools are absent at session construction and appear only after an eligible batch is admitted",
-    "composition": "shared-root tests retain private-pool worker permits, narrow a second session deterministically, and release permits at session drop",
+    "composition": "shared-root tests retain private-pool worker permits, narrow a second session deterministically, pass the admitted width into each task wave including cached pools, and release permits at session drop",
     "io_admission": "ZIP, CFB and source-backed tests refuse zero IoConcurrency before payload read and release serial permits after failure",
     "caller_facility": "ZIP, CFB and source-backed ordered-read tests route borrowed tasks through a caller facility without constructing a private pool",
-    "correctness": "ordered results remain byte-identical to serial results and source-backed errors retain typed failure behavior"
+    "correctness": "ordered results remain byte-identical to serial results, active CFB reads stay within a narrowed cached-pool width, and source-backed errors retain typed failure behavior",
+    "cpu_admission": "ZIP and source-backed reads charge CpuTasks after deterministic preflight/output admission and worker/I/O admission; CFB charges per admitted batch, so refusal paths before payload work consume no CPU units"
   },
   "accepted_costs": {
     "admission": "each explicit read operation pays hierarchical reservation checks for worker and positional-read permits",
@@ -35,6 +36,6 @@
   "provenance": {
     "base_commit": "d2d7e2dcc",
     "branch": "perf/0676-execution-budget-composition",
-    "validation": "targeted fmt, check, tests, clippy and docs with CARGO_BUILD_JOBS=2 and a fresh target directory"
+    "validation": "targeted fmt, full four-crate tests (1,877 passed, 2 ignored), clippy and docs with CARGO_BUILD_JOBS=2 and target /tmp/litchi-0676-debug0"
   }
 }
