@@ -1,6 +1,7 @@
 Change 0674 gate transcript
 Base: 5fa92d7ce
 Branch: perf/0674-performance-gate-hygiene
+Follow-up: closes 0651 row 13 / 0669 XLSB selector handoff and structural claims hygiene
 Toolchain: rustc 1.95.0, cargo 1.95.0
 
 === formatting and diff hygiene ===
@@ -20,6 +21,16 @@ $ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS
 test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
 $ cargo run --manifest-path tools/perf-baseline/Cargo.toml --quiet -- --semantic-shape tiny --case pptx_semantic_opened_transaction_phases --json /tmp/0674-pptx-phases.json
 exit 0; JSON contains six phase vectors, total_ns, phase_sum_verified=true,
+semantic_reopen_verified=true and deterministic_output_verified=true.
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib selectable_case_count_matches_current_enumeration -- --test-threads=1
+test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
+
+=== XLSB workbook-structure selector (follow-up) ===
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib xlsb_lifecycle_selectors_are_opt_in_and_hash_stable -- --test-threads=1
+test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_PROFILE_DEV_DEBUG=0 cargo run --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline -- --case xlsb_semantic_workbook_structure_edit_save --xlsb-shape tiny --warmup 0 --samples 1 --json /tmp/0674-xlsb-structure.json
+exit 0; warm and cold result records contain planning_ns, publication_ns,
+save_ns and total_ns, with phase_sum_verified=true,
 semantic_reopen_verified=true and deterministic_output_verified=true.
 $ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib selectable_case_count_matches_current_enumeration -- --test-threads=1
 test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
@@ -52,32 +63,39 @@ $ python3 -m unittest tools.test_crud_coverage_index
 Ran 41 tests; OK; exit 0
 $ python3 -m unittest tools.test_perf_corpus_binding
 Ran 9 tests; OK; exit 0
+$ python3 -m unittest tools.test_perf_claims
+Ran 50 tests; OK; exit 0
 
-=== claims structural diagnostic (preexisting, intentionally deferred) ===
+=== claims structural validation (follow-up) ===
 $ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
-INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
-STRUCTURAL_STATUS=2
-This is the landed claim/checker policy recorded by 0651 and earlier packets;
-0674 does not alter the schema or suppress the diagnostic.
+OK: 10 performance claims validated (structural)
+STRUCTURAL_STATUS=0
+Structural mode validates shape, repository references and cross-field policy
+without opening retained evidence. The direct API also rejects strict mode
+when --evidence-root is omitted.
 
 === claims strict gate ===
 $ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
 OK: 10 performance claims validated (strict)
 exit 0
 
-=== full harness sweep before the count assertion update ===
+=== full harness sweep and follow-up selector ===
 The existing 527-selector sweep completed in about 568 seconds: 526 tests
 passed, 1 failed only at selectable_case_count_matches_current_enumeration
 (actual 528 versus stale expected 527), and 1 was ignored. All integration
-targets passed. Updating the expected count to 528 was followed by the
-affected count test above, which passed. The complete 528-test sweep was not
-repeated to avoid another heavyweight run; no library code changed in the
-count fix.
+targets passed. The first 0674 commit updated that assertion to 528. The
+follow-up XLSB structure selector raises the registry to 529; its lifecycle
+test and the count test both pass. The complete 529-test sweep was not
+repeated to avoid another heavyweight run; the focused selector test exercises
+the planning/publication/save phases and typed reopen oracle.
 
 === packet ignore proof ===
-$ git check-ignore --no-index -v docs/performance/results/change-0674/gates.log
-.gitignore:317:!docs/performance/results/change-0674/*.log docs/performance/results/change-0674/gates.log
-$ git check-ignore --no-index -v docs/performance/results/change-0651/integration-gate.log
-.gitignore:150:*.log docs/performance/results/change-0651/integration-gate.log
-The packet-local negative rule tracks this log and does not unignore
-historical change-0651 logs.
+$ git check-ignore --no-index docs/performance/results/change-0674/gates.log
+exit 1; no ignore match (result packet logs are visible)
+$ git check-ignore --no-index docs/performance/results/change-0651/integration-gate.log
+exit 1; no ignore match (historical result logs are visible for explicit selection)
+$ git check-ignore --no-index -v docs/performance/README.log
+.gitignore:150:*.log docs/performance/README.log; exit 0
+The final !docs/performance/results/**/*.log negation covers result packets;
+the broad *.log rule continues to ignore unrelated paths. No historical
+untracked result log was staged by this follow-up.

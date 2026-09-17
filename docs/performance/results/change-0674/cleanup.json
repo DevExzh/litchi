@@ -5,25 +5,27 @@
   "retained_in_repository": [
     "docs/performance/0674-performance-gate-hygiene.md",
     "docs/performance/results/change-0674/README.md, decision.json, cleanup.json, gates.log and log-sections.md",
-    "the seven implementation and test files listed by git status on perf/0674-performance-gate-hygiene"
+    ".gitignore, .github/workflows/perf-baseline.yml, docs/performance/claim-registry-v1.md",
+    "tools/check_perf_claims.py, tools/test_perf_claims.py and tools/perf-baseline/src/lib.rs"
   ],
   "removed_after_the_evidence_was_copied": [],
   "retained_outside_repository": [
-    "/home/zhuhe/code/litchi-targets/0674-harness — about 7.3 GiB of isolated Cargo output; removable after the coordinator cherry-picks this branch",
-    "/tmp/0674-facade-polyglot.json — gate report retained only as summarized in gates.log",
-    "/tmp/0674-native-metadata.json and /tmp/0674-native-metadata.err — locked metadata probe outputs",
-    "/tmp/0674-pptx-phases.json — phase-selector smoke report retained only as summarized in gates.log",
-    "/tmp/0674-strict.out and /tmp/0674-structural.out — claims probe outputs retained only as summarized in gates.log",
-    "/home/zhuhe/code/litchi-worktrees/0674 — the clean worktree and branch, removable after cherry-pick and review"
+    "/home/zhuhe/code/litchi-targets/0674-harness \u2014 about 7.3 GiB of isolated Cargo output; removable after the coordinator cherry-picks this branch",
+    "/tmp/0674-facade-polyglot.json \u2014 gate report retained only as summarized in gates.log",
+    "/tmp/0674-native-metadata.json and /tmp/0674-native-metadata.err \u2014 locked metadata probe outputs",
+    "/tmp/0674-pptx-phases.json \u2014 phase-selector smoke report retained only as summarized in gates.log",
+    "/tmp/0674-xlsb-structure.json \u2014 selector smoke report retained only as summarized in gates.log",
+    "/tmp/0674-strict.out and /tmp/0674-structural.out \u2014 claims probe outputs retained only as summarized in gates.log",
+    "/home/zhuhe/code/litchi-worktrees/0674 \u2014 the clean worktree and branch, removable after cherry-pick and review"
   ],
   "not_created": [
     "no release or workspace-wide Cargo target; no staged timing binary; no profiler output; no fixture copy",
-    "no historical result log was unignored; the only tracked .log is this packet's gates.log",
-    "no claim-registry, evidence-schema or structural-checker change for claim-0251"
+    "no historical result log was added by this follow-up; the packet log is explicitly tracked through the general result-path negation",
+    "no claim-registry evidence-schema change; structural mode only restores its documented structural-only contract"
   ],
   "notes": [
     "The parent owns the root target and unrelated worktrees; only the 0674 target, scratch files and worktree above belong to this change.",
-    "The packet log is tracked by the final scoped .gitignore negation !docs/performance/results/change-0674/*.log; broad *.log rules continue to ignore other paths.",
+    "The result-log negation is after the broad rules and applies to docs/performance/results/**/*.log; callers still stage only intended packet logs.",
     "The target was kept through verification to avoid repeating the focused harness build; it is safe to remove after the commit is cherry-picked."
   ]
 }

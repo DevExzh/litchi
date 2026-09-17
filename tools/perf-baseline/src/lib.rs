@@ -1322,6 +1322,7 @@ enum Case {
     XlsbSemanticListWorksheets,
     XlsbSemanticOneCell,
     XlsbSemanticFullCellScan,
+    XlsbSemanticWorkbookStructureEditSave,
     XlsValidationReport,
     XlsCommentsEagerEditSave,
     XlsCommentsSourceBackedEditSave,
@@ -1987,6 +1988,9 @@ impl Case {
             Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
             Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
             Self::XlsbSemanticFullCellScan => "xlsb_semantic_full_cell_scan",
+            Self::XlsbSemanticWorkbookStructureEditSave => {
+                "xlsb_semantic_workbook_structure_edit_save"
+            },
             Self::XlsValidationReport => "xls_validation_report",
             Self::XlsCommentsEagerEditSave => "xls_comments_eager_edit_save",
             Self::XlsCommentsSourceBackedEditSave => "xls_comments_source_backed_edit_save",
@@ -2550,6 +2554,7 @@ impl Case {
                 | Self::XlsbSemanticListWorksheets
                 | Self::XlsbSemanticOneCell
                 | Self::XlsbSemanticFullCellScan
+                | Self::XlsbSemanticWorkbookStructureEditSave
         )
     }
 
@@ -5013,6 +5018,29 @@ struct PptxOpenedTransactionPhaseSummary {
     deterministic_output_verified: bool,
 }
 
+/// Per-sample phase evidence for the XLSB workbook-structure transaction.
+/// Workbook construction, semantic reopening, and digesting remain outside
+/// the clocks. The enclosing total covers only detached planning/commit,
+/// atomic publication, and package save.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct XlsbWorkbookStructureSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_archive_sha256: String,
+    selected_operation: &'static str,
+    source_sheet_names: Vec<String>,
+    expected_sheet_names: Vec<String>,
+    planning_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    save_ns: Vec<u64>,
+    total_ns: Vec<u64>,
+    output_sha256: Vec<String>,
+    phase_sum_verified: bool,
+    semantic_reopen_verified: bool,
+    deterministic_output_verified: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct OdsScalarRowsSummary {
     role: &'static str,
@@ -5109,6 +5137,8 @@ struct SourceSummary {
     pptx_source_image_query: Option<PptxSourceImageQuerySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_opened_transaction_phases: Option<PptxOpenedTransactionPhaseSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsb_workbook_structure: Option<XlsbWorkbookStructureSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_casefold_lookup: Option<OpcCasefoldLookupSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -12837,6 +12867,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
         "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
         "xlsb_semantic_full_cell_scan" => Some(Case::XlsbSemanticFullCellScan),
+        "xlsb_semantic_workbook_structure_edit_save" => {
+            Some(Case::XlsbSemanticWorkbookStructureEditSave)
+        },
         "xls_validation_report" => Some(Case::XlsValidationReport),
         "xls_comments_eager_edit_save" => Some(Case::XlsCommentsEagerEditSave),
         "xls_comments_source_backed_edit_save" => Some(Case::XlsCommentsSourceBackedEditSave),
@@ -13483,6 +13516,7 @@ fn usage_text() -> String {
                                        xls_owned_source_control_open_full_text,\n\
                                        xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
                                        xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
+                                       xlsb_semantic_workbook_structure_edit_save,\n\
                                        xls_comments_eager_edit_save,\n\
                                        xls_comments_source_backed_edit_save,\n\
                                        xls_comments_eager_batch_edit_save,\n\
@@ -24558,6 +24592,9 @@ fn run_case_with_config(
         | Case::XlsbSemanticFullCellScan => {
             run_semantic_xlsb(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsbSemanticWorkbookStructureEditSave => {
+            run_xlsb_workbook_structure_edit_save(corpus, warmup_iterations, samples)
+        },
         Case::XlsValidationReport => run_xls_validation_report(corpus, warmup_iterations, samples),
         Case::XlsCommentsEagerEditSave
         | Case::XlsCommentsSourceBackedEditSave
@@ -30030,6 +30067,144 @@ fn run_semantic_xlsb(
     let mut measured = result(case, corpus, elapsed, None);
     measured.output_sha256 = Some(expected_digest);
     Ok(measured)
+}
+
+/// Decompose the public XLSB workbook-structure edit lifecycle. The detached
+/// edit is planned against a fresh workbook, published atomically, and saved
+/// as a package. Reopening the saved bytes checks the renamed sheet and an
+/// independent numeric cell oracle after every iteration.
+fn run_xlsb_workbook_structure_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, WorkbookTrait as _};
+
+    let shape = xlsb_shape(corpus)?;
+    let source_sheet_names = (0..shape.sheet_count())
+        .map(|sheet| format!("Sheet{sheet:02}"))
+        .collect::<Vec<_>>();
+    let mut expected_sheet_names = source_sheet_names.clone();
+    let first_sheet = expected_sheet_names
+        .first_mut()
+        .ok_or("XLSB structure corpus has no worksheets")?;
+    *first_sheet = "Renamed".to_owned();
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = XlsbWorkbookStructureSummary {
+        implementation: "litchi_xlsb::Workbook::edit_workbook_structure + apply_workbook_structure",
+        timing_scope: "total_ns encloses detached edit planning/commit, Workbook::apply_workbook_structure, and Workbook::save; workbook construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        selected_operation: "rename_sheet(0, \"Renamed\")",
+        source_sheet_names: source_sheet_names.clone(),
+        expected_sheet_names: expected_sheet_names.clone(),
+        planning_ns: Vec::with_capacity(samples),
+        publication_ns: Vec::with_capacity(samples),
+        save_ns: Vec::with_capacity(samples),
+        total_ns: Vec::with_capacity(samples),
+        output_sha256: Vec::with_capacity(samples),
+        ..XlsbWorkbookStructureSummary::default()
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+        if workbook.worksheet_names() != source_sheet_names.as_slice() {
+            return Err("XLSB structure source worksheet names differ from specification".into());
+        }
+        let total_started = Instant::now();
+
+        let started = Instant::now();
+        let mut edit = workbook.edit_workbook_structure()?;
+        edit.rename_sheet(0, "Renamed".to_owned())?;
+        let commit = edit.commit()?;
+        let planning_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        workbook.apply_workbook_structure(&commit)?;
+        let publication_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output)?;
+        let output = output.into_inner();
+        let save_ns = elapsed_ns(started.elapsed())?;
+        let total_ns = elapsed_ns(total_started.elapsed())?;
+
+        let phase_sum = planning_ns
+            .checked_add(publication_ns)
+            .and_then(|value| value.checked_add(save_ns))
+            .ok_or("XLSB structure phase duration sum overflows u64")?;
+        if phase_sum > total_ns {
+            return Err("XLSB structure phase durations exceed their enclosing total".into());
+        }
+
+        let reopened = litchi_xlsb::Workbook::new(Cursor::new(output.as_slice()))?;
+        if reopened.worksheet_names() != expected_sheet_names.as_slice() {
+            return Err("XLSB structure reopened worksheet names differ from edit oracle".into());
+        }
+        let worksheet = reopened.worksheet(0)?;
+        let cell = worksheet
+            .get_cell(0, 0)
+            .ok_or("XLSB structure reopened target cell is missing")?;
+        let value = cell
+            .value()
+            .as_float()
+            .ok_or("XLSB structure reopened target cell is not numeric")?;
+        if value.to_bits() != xlsb_cell_value(shape, 0, 0, 0)?.to_bits() {
+            return Err("XLSB structure reopened target cell differs from specification".into());
+        }
+        let output_sha256 = sha256_hex(&output);
+        std::hint::black_box((&workbook, &output));
+
+        if iteration >= warmup_iterations {
+            elapsed.push(total_ns);
+            summary.planning_ns.push(planning_ns);
+            summary.publication_ns.push(publication_ns);
+            summary.save_ns.push(save_ns);
+            summary.total_ns.push(total_ns);
+            summary.output_sha256.push(output_sha256);
+        }
+    }
+
+    let expected_output_sha256 = summary
+        .output_sha256
+        .first()
+        .cloned()
+        .ok_or("XLSB structure selector retained no output samples")?;
+    summary.deterministic_output_verified = summary
+        .output_sha256
+        .iter()
+        .all(|digest| digest == &expected_output_sha256);
+    if !summary.deterministic_output_verified {
+        return Err("XLSB structure output digest changed across samples".into());
+    }
+    summary.phase_sum_verified = true;
+    summary.semantic_reopen_verified = true;
+
+    let elapsed_ns = statistics(elapsed);
+    let sample_order = elapsed_ns.sample_order.clone();
+    reorder_sample_vector(&mut summary.planning_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.publication_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.save_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.total_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.output_sha256, &sample_order)?;
+
+    let source = SourceSummary {
+        xlsb_workbook_structure: Some(summary),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: Case::XlsbSemanticWorkbookStructureEditSave.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns,
+        sink: None,
+        source: boxed_source(source),
+        execution: None,
+        output_sha256: Some(expected_output_sha256),
+        operation_metrics: None,
+    })
 }
 
 fn verify_semantic_ppt(
@@ -60873,7 +61048,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 528);
+        assert_eq!(selectable_count, 529);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 
@@ -60957,6 +61132,7 @@ mod tests {
             Case::XlsbSemanticListWorksheets,
             Case::XlsbSemanticOneCell,
             Case::XlsbSemanticFullCellScan,
+            Case::XlsbSemanticWorkbookStructureEditSave,
         ];
         for case in cases {
             assert_eq!(parse_case(case.name()), Some(case));
@@ -60996,6 +61172,25 @@ mod tests {
             xlsb_cells_digest(&xlsb_expected_cells(XlsbShape::Tiny).unwrap()).unwrap();
         let scan = run_case(Case::XlsbSemanticFullCellScan, &corpora[0], 0, 1).unwrap();
         assert_eq!(scan.output_sha256.as_deref(), Some(expected_scan.as_str()));
+
+        let structure = run_case(
+            Case::XlsbSemanticWorkbookStructureEditSave,
+            &corpora[0],
+            0,
+            1,
+        )
+        .unwrap();
+        let structure_source = structure
+            .source
+            .as_ref()
+            .and_then(|source| source.xlsb_workbook_structure.as_ref())
+            .expect("XLSB structure phase summary");
+        assert_eq!(structure_source.source_sheet_names, vec!["Sheet00"]);
+        assert_eq!(structure_source.expected_sheet_names, vec!["Renamed"]);
+        assert!(structure_source.phase_sum_verified);
+        assert!(structure_source.semantic_reopen_verified);
+        assert!(structure_source.deterministic_output_verified);
+        assert_eq!(structure_source.output_sha256.len(), 1);
     }
 
     #[test]

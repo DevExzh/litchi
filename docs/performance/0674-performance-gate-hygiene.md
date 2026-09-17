@@ -7,8 +7,8 @@ evidence infrastructure, and this record registers no performance result.
 OLE2 and OOXML remain the active priority. ODF optimization stays deferred
 until that goal completes; iWork is excluded.
 
-Change [0651](0651-queue-refresh-after-the-second-wave.md) left three small
-follow-ups in rows 17, 19 and 20. Change [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md)
+Change [0651](0651-queue-refresh-after-the-second-wave.md) left small selector
+and gate follow-ups in rows 13, 17, 19 and 20. Change [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md)
 had already landed marker-bearing corpora, ordinary-save allocation regions and
 the DOCX text-sink selectors. This change finishes the remaining harness
 selector, standing feature gate, allocator isolation and evidence hygiene from
@@ -35,7 +35,15 @@ sample order, every output digest must agree, and the reopened package must
 pass the same semantic oracle as the existing one-edit selector. The selector
 is attribution evidence; it makes no speedup, allocation, RSS, physical-I/O,
 cold-cache or producer claim. It is opt-in, so `Case::DEFAULT` and its catalog
-hash remain unchanged. The selector count rises from 527 to 528.
+hash remain unchanged. The PPTX selector raised the count from 527 to 528;
+the XLSB selector below raises it to 529.
+
+The XLSB semantic matrix also has the opt-in
+`xlsb_semantic_workbook_structure_edit_save` selector. It measures detached
+`edit_workbook_structure` planning and commit, `apply_workbook_structure`, and
+`Workbook::save` as separate phases. Each sample reopens the saved package and
+checks the renamed worksheet and original typed numeric cell, with
+deterministic output and phase-sum gates.
 
 ### Standing gates and hygiene
 
@@ -50,9 +58,10 @@ parallelism.
 `tools/native-resave/Cargo.lock` was regenerated with the current offline
 index, and `cargo metadata --locked` plus `cargo check --locked --offline`
 now agree with it. The repository's broad `*.log` rule remains in place, with
-one final, packet-local exception for
-`docs/performance/results/change-0674/*.log`; historical and ad-hoc result logs
-remain ignored. The harness README records that the root release profile's
+a final negation for `docs/performance/results/**/*.log`. This makes result
+packet logs visible to Git while callers still choose which historical or new
+logs to add explicitly; the parent rollup does not sweep unrelated untracked
+logs. The harness README records that the root release profile's
 `lto = true` means a rebuild need not have the same bytes as the executable
 whose digest appears in a report.
 
@@ -62,7 +71,7 @@ without weakening an overflow check or suppressing a lint.
 
 ## Authority and scope
 
-This is queue rows 17, 19 and 20 of change 0651, read with the standing
+This is queue rows 13, 17, 19 and 20 of change 0651, read with the standing
 correctness and safety decisions in [0652](0652-owner-decisions-for-the-third-wave.md).
 No production crate, public API, malformed-input defense or output contract
 changed. The harness remains under `tools/`, and its library continues to
@@ -80,16 +89,17 @@ and `cargo clippy --lib --tests -- -D warnings` is clean for the harness.
 
 The full pre-fix harness sweep reached 526 passing tests, one failure in the
 hard-coded selectable-case count, and one ignored test; every integration
-target passed. The assertion was updated from 527 to 528, and the affected
-count test passes. The sweep failure was therefore a stale harness expectation
-caused by this selector, not a semantic or integration failure.
+target passed. The assertion was updated from 528 to 529, and the affected
+count and XLSB lifecycle tests pass. The sweep failure was therefore a stale
+harness expectation caused by this selector, not a semantic or integration
+failure.
 
-`check_perf_claims.py --mode structural` still returns status 2 with the
-landed diagnostic that `claim-0251-xlsx-xml-borrowed` requires strict evidence
-verification. This is a preexisting registry/checker policy issue recorded by
-0651 and earlier packets, so this change leaves the schema and checker alone.
-The corresponding strict command with `--evidence-root .` returns status 0 and
-validates all ten claims.
+`check_perf_claims.py --mode structural` now returns status 0 and validates all
+ten claims without opening retained evidence. The strict command with
+`--evidence-root .` remains the named evidence gate and also returns status 0;
+it independently verifies all ten claims and their retained evidence. Strict
+mode still requires an evidence root when called directly, preserving the
+required-evidence contract.
 
 ## Evidence
 

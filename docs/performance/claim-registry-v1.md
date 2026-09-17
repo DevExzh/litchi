@@ -6,9 +6,13 @@ it does not express relationships between independent fields that JSON
 Schema cannot safely derive here.
 
 [`tools/check_perf_claims.py`](../../tools/check_perf_claims.py) is the policy
-authority. Structural validation accepts the shape, while strict validation
-checks accepted/adverse counts and disjointness, status/code-state
-consistency, scope cell sets, and recomputed evidence identities.
+authority. Structural mode validates the registry shape, repository-backed
+references, cross-field counts and status/code-state policy without opening
+retained evidence packages. Strict mode is the evidence gate: it requires an
+evidence root and additionally checks accepted/adverse counts and
+disjointness, scope cell sets, and recomputed package/member identities. A
+landed claim can therefore pass structural validation while strict mode still
+refuses to certify it until its declared evidence is independently verified.
 
 The optional `latency_evidence.metric_profile` defaults to `elapsed_ns` for
 legacy entries. `publication_ns` binds the custom 0402 summary producer and
