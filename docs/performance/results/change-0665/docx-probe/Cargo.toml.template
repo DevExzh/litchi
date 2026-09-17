@@ -1,0 +1,18 @@
+[package]
+name = "docx-compaction-policy-probe"
+version = "0.0.1"
+edition = "2024"
+
+[features]
+# Enabled only on the change leg, where `CompactionPolicy` exists.
+policy = []
+
+[dependencies]
+litchi-core = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-core" }
+litchi-docx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-docx" }
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+xml-minifier = { path = "REPLACE_WITH_CHECKOUT/crates/xml-minifier" }
+sha2 = "0.10"
+
+[profile.release]
+lto = true

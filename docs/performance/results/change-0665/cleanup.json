@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0665",
+  "retained_in_repository": [
+    "docs/performance/0665-opc-eager-writer-publication-audit.md",
+    "docs/performance/results/change-0665/ (every file cited by README.md)",
+    "docs/adr/0006-validation-security-and-compatibility.md (amended)",
+    "crates/litchi-opc/src/{error,package,pkgwriter}.rs",
+    "crates/litchi-docx/src/document/transaction.rs"
+  ],
+  "removed_after_the_evidence_was_copied": [],
+  "kept_for_a_following_batch": [],
+  "notes": [
+    "The before leg is the detached checkout at 5af158123; the target integration branch already carries the 0657 source-backed replacement landing.",
+    "The 0650 BOM and managed-transaction witnesses remain retained under results/change-0650 and are not duplicated here.",
+    "The XML-minifier BOM/offset follow-up is 0677; the managed DOCX transaction follow-up is 0670.",
+    "The branch perf/0665-opc-eager-writer-source-provenance is kept for coordinator cherry-pick.",
+    "No new performance claim or claim-registry entry is created."
+  ]
+}

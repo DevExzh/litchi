@@ -1,0 +1,34 @@
+fixtures: 63
+aspect                unchanged  moved
+  open                       63      0
+  source                     63      0
+  gate                       63      0
+  gate_source                63      0
+  noop_save                  63      0
+  exact_noop                 63      0
+  managed_edit               10     53
+  one_edit                   38     25
+  one_edit_optin             63      0
+  one_edit_span              38     25
+  one_edit_reopen            63      0
+
+gate verdict transition (verify_authored -> verify_source):
+  compact -> accepts: 1
+  noncompact -> accepts: 53
+  noncompact -> refuses: 1
+  skipped -> skipped: 8
+  still refused: libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx :: refuses:malformed XML at byte 0: invalid XML declaration boundary
+
+one_edit_span, 26 fixtures that admit the edit:
+  before: source bytes rewritten total=203203 median=981.5 max=176552 published total=352461
+  after: source bytes rewritten total=1007 median=0.0 max=425 published total=352981
+  fixtures whose published bytes moved: 25
+  source bytes rewritten on those: before 203203 -> after 1007
+
+  largest reductions:
+    drawing.docx                                            source= 288070 rewritten  176552 ->      0
+    OPCCompliance_CoreProperties_AlternateTimezones.docx    source=   6031 rewritten    2759 ->      0
+    alt-chunk.docx                                          source=   2096 rewritten    2041 ->    425
+    NumberingWithOutOfOrderId.docx                          source=   1983 rewritten    1915 ->    320
+    alt-chunk-html.docx                                     source=   1453 rewritten    1415 ->     62
+    Numbering.docx                                          source=   5411 rewritten    1340 ->      0

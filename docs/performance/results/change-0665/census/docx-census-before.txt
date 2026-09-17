@@ -1,0 +1,693 @@
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx open ok
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx source bytes=2361 dc2ed8f108807bee66d18e5ca6bc40ec62423c972f5e19ab8d6cbc3da30168d8
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx gate_source accepts
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx noop_save 9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx exact_noop 9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx managed_edit d681a4b4a5f38bdd6290881709c7113ca899411320928273fde67dd8638de9c6
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit refused:no paragraph with text
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit_span skipped
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit_reopen skipped
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx open ok
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx source bytes=24534 4558775fa6e11a1307b8bebfd1f8cf79ce76ed98c6492d14c86b668fbb07db91
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx gate_source accepts
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx noop_save 06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx exact_noop 06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx managed_edit acd087d64bdcb42565b030caaeb03b1dd8d705038295078dacb889b6314f667f
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit_span skipped
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx source bytes=4563 6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx noop_save ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx exact_noop ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx managed_edit 3b51772dcce04b4a82bebd3ae05acc9344d48912f59246a748f9b78c6269df69
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx source bytes=1670 f6eee25f8ba8e674e6ebed1d50e4fd6e9665dc1d1a2a3a05fbb463ebb8106c98
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx noop_save 33d8229124a25622cf8c497564dab93d24e5047f42dba2feb6d06266430a99e4
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx exact_noop 33d8229124a25622cf8c497564dab93d24e5047f42dba2feb6d06266430a99e4
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx managed_edit f128d30ab750d426b41f076b510623e885c16035c1967b1b269dea90b1051d58
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx source bytes=823 4c4f4597659c8a458e7aba4864b4959c6c0838f03e9736aaa830253b6f225401
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx noop_save 13fd0f120e2c7ea578c098e03f2d5bf871d24f6494c7df73c0aaed3cf246f7b9
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx exact_noop 13fd0f120e2c7ea578c098e03f2d5bf871d24f6494c7df73c0aaed3cf246f7b9
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx managed_edit 237d5422aa24b4fd467a6508ffc641497f50b6085bbb83923778ff50cb1ed998
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit 4044d618f5cd6da980cba55731382ae771346a8b756065ffa0ad615d94ca370c
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit_span source=823 published=452 prefix=55 suffix=13 moved_source=755 moved_published=384
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit_reopen ok paragraphs=4 tables=0 controls=0 edited=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit_optin 4044d618f5cd6da980cba55731382ae771346a8b756065ffa0ad615d94ca370c
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx source bytes=12302 479e65b636de90a0f2775a130d8458041bc11ea3d36a1693f91a6c12631f1f69
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx noop_save c3d8821ad7c2a0bced52881dbb3d317f7aa29f4363349bc9b665d9dd03517ca0
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx exact_noop c3d8821ad7c2a0bced52881dbb3d317f7aa29f4363349bc9b665d9dd03517ca0
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx managed_edit 4dfb33efc7064bee2793e20446414e68a7fddc00e422d2fb33f9892efd05cce2
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx source bytes=2106 882f5662b7ac5fd463032dce939f9f8b66bbe1e5bc54009fa7c80a247746ac35
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx noop_save 94f76ba6a717d33eb1bd48e122ca25fc3aedff3b87498165dc7ed78595535e19
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx exact_noop 94f76ba6a717d33eb1bd48e122ca25fc3aedff3b87498165dc7ed78595535e19
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx managed_edit c7d7101047a69bb629e798ae8c5e0648bff5486492b01574e2a92869a419af4a
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx source bytes=5536 651a7eef6559fdf7990c23515b5383cf333f6c189012ee9001e2d956d07e9555
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx noop_save 6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx exact_noop 6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx managed_edit 3f75361dd1a5b42723e6ac1563d9afdf03be555b61fc25991b0dd49e815468f1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit refused:paragraph 0 edit refused: selected content has no editable Word text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit_optin refused:paragraph 0 edit refused: selected content has no editable Word text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx source bytes=6213 fe9eaa49ed0b3570c901f90877bd396960740ce8ee0dac1aa750e6f224559f0d
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx noop_save f1ee43208fa25ac26f4708a38516ab86051bd23cd3c0bdc6209ca7718351dd5c
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx exact_noop f1ee43208fa25ac26f4708a38516ab86051bd23cd3c0bdc6209ca7718351dd5c
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx managed_edit a7d87ee28488764631b86ca8d25fee102457f3ea13b9404866354fa16a0155b8
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx source bytes=2694 e13057a38c6bf9d38a9b163201ef95496f5d1e367bdcb1f51dc941e3d22f508b
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx noop_save 8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx exact_noop 8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx managed_edit c9a817f59e185c7902eeff3305a6919b9cf2133bbbcd150d68c2bb7bd69d31e1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx source bytes=1347 b449c942fd50b459bc66c91a5982824c8fef438da01a4002621aa21b4b972c6c
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx noop_save 4c61fc7730baecf784d392e9ab50a83a1538c33df5b629a180da7dc2764e5467
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx exact_noop 4c61fc7730baecf784d392e9ab50a83a1538c33df5b629a180da7dc2764e5467
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx managed_edit 617cbd69a8f19da4be199fa33501639ae6175bf7d0a06b6189ffe67fbdb2a1d1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit 3b2089b6c31977730302bb672d31e639d17ce5afcc18feeff358812d3dc56eee
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit_span source=1347 published=1357 prefix=55 suffix=315 moved_source=977 moved_published=987
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit_optin 3b2089b6c31977730302bb672d31e639d17ce5afcc18feeff358812d3dc56eee
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx source bytes=3121 5059b93e49e77c82860180c9e383bd71fc73eb8bf31580077b9e73cbfe0323a4
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx noop_save 68e19d06420bfb93bd66c280b96f3095a40f753da4658634a778e474496148d3
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx exact_noop 68e19d06420bfb93bd66c280b96f3095a40f753da4658634a778e474496148d3
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx managed_edit 85ca676943cd30be796af8b9e5742564750d23ef7e1ae4369a1caf20a5e07a84
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit 12d3a9bd71840f165c762e642ae2402b3bb88bc1664018b909f51fbb3fd49241
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit_span source=3121 published=3130 prefix=55 suffix=1853 moved_source=1213 moved_published=1222
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit_reopen ok paragraphs=2 tables=0 controls=0 edited=1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit_optin 12d3a9bd71840f165c762e642ae2402b3bb88bc1664018b909f51fbb3fd49241
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx source bytes=3861 a5fa1b89645e908ed72121d90857bc238ec3b91c97d9a4ef2fce030ade45486b
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx gate_source accepts
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx noop_save cf00dab76363981763545dce5cb62eefa84e24d77fc2abe28ae5163538f52607
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx exact_noop cf00dab76363981763545dce5cb62eefa84e24d77fc2abe28ae5163538f52607
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx managed_edit 65141be6f63f8421be9d45642835e18606f0136f237b185f8cce9db1ab8c6d99
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit_span skipped
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit_optin refused:no paragraph with text
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx open ok
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx source bytes=2460 32e88fb22862cb69b58895d54ce72eb2149a96c340e76385c0506a2e7ab8973c
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx gate_source accepts
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx noop_save 3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx exact_noop 3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx managed_edit f1a5ad787bd32f8a1d49430f44450bc65e894acafa2ee919a4ac823943a919ac
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit_span skipped
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit_reopen skipped
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx source bytes=3476 f573a236ac24f491ef2728208b8fdb7d63c70013f57aeae95dd737ae6ad840ee
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx gate noncompact:malformed XML at byte 0: invalid XML declaration boundary
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx gate_source refuses:malformed XML at byte 0: invalid XML declaration boundary
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx noop_save 8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx exact_noop refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx managed_edit refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit_span skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit_optin refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx source bytes=1453 4c986cbf64362e1fa899c1bb0d7ad86519e735c63398516cfe43401fb4294212
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx gate noncompact:noncompact XML FormattingWhitespace at byte 38
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx gate_source accepts
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx noop_save 9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx exact_noop 9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx managed_edit 5366652a06e19fe04e0c9aa34554eab210154212f0c7a07d8845da8d0157cb2c
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit 7760dc02463c39143ac567dfa4ac02cd9dcbb5bd706e01911f84c91e7955a6b4
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit_span source=1453 published=1384 prefix=38 suffix=0 moved_source=1415 moved_published=1346
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit_reopen ok paragraphs=2 tables=0 controls=0 edited=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit_optin 7760dc02463c39143ac567dfa4ac02cd9dcbb5bd706e01911f84c91e7955a6b4
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx source bytes=2096 094405db4e9cac04bebf9c18fa69b5f72a9e213e6d181ae2211797574fb0f315
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx gate_source accepts
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx noop_save d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx exact_noop d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx managed_edit e46ea92213a77a131b5567fd950865cc731500e4bbc0552e5d15a8ca3f751172
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit 312a906f7f5e2e06a9dcc5a6690b7a30982c3455256ee30113a8ae1ae6629960
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit_span source=2096 published=1885 prefix=55 suffix=0 moved_source=2041 moved_published=1830
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit_reopen ok paragraphs=2 tables=0 controls=0 edited=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit_optin 312a906f7f5e2e06a9dcc5a6690b7a30982c3455256ee30113a8ae1ae6629960
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx source bytes=6146 8e23d60310a4a8c690e067e5ed7149b3c9ae56032b9de606cca72ed55c8bbffc
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx gate_source accepts
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx noop_save 4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx exact_noop 4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx managed_edit 260edbaf2d106a332862c1a2fb1c5da6fdb632444c0276367d26ba03c4b049d0
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit refused:paragraph 1 edit refused: text requires structural WordprocessingML elements
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit_span skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit_optin refused:paragraph 1 edit refused: text requires structural WordprocessingML elements
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx source bytes=3695 df174bf2b1b1b5c4ccae18f4c53d46b7b615739cbbf2f2086fee00bf63282cd6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx gate_source accepts
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx noop_save 27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx exact_noop 27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx managed_edit 12d059f276e1a6e1224959046a49509767f95aafa3f2c6bc30f59914cc60c54f
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit refused:no paragraph with text
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit_span skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit_reopen skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit_optin refused:no paragraph with text
+office-interop/libreoffice-resaved/document-properties-litchi.docx open ok
+office-interop/libreoffice-resaved/document-properties-litchi.docx source bytes=1523 0446eb19b2eb9f4c276c0e22c4da26113a110cbcd6c1936bf5bef87765c624e9
+office-interop/libreoffice-resaved/document-properties-litchi.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+office-interop/libreoffice-resaved/document-properties-litchi.docx gate_source accepts
+office-interop/libreoffice-resaved/document-properties-litchi.docx noop_save a0ad84ab78a73090028d33fede42cc3cbb698d19218cc185e24e96a7d1da70e9
+office-interop/libreoffice-resaved/document-properties-litchi.docx exact_noop a0ad84ab78a73090028d33fede42cc3cbb698d19218cc185e24e96a7d1da70e9
+office-interop/libreoffice-resaved/document-properties-litchi.docx managed_edit e6e7e4b89dd87e400f0cab24da4901eaf710172e91770838d0c82e4b8e06173c
+office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit 470e13a88de497237248cf32f7434487c34a4b5b3641a072fa6ed3e2df2f3bcb
+office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit_span source=1523 published=1533 prefix=55 suffix=379 moved_source=1089 moved_published=1099
+office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit_optin 470e13a88de497237248cf32f7434487c34a4b5b3641a072fa6ed3e2df2f3bcb
+office-interop/litchi-changed/document-properties-litchi.docx open ok
+office-interop/litchi-changed/document-properties-litchi.docx source bytes=1336 2ee8329f6628d35a89d65e18bcb4b70c9c5e96a66ec6677d1790f642a4782631
+office-interop/litchi-changed/document-properties-litchi.docx gate compact
+office-interop/litchi-changed/document-properties-litchi.docx gate_source accepts
+office-interop/litchi-changed/document-properties-litchi.docx noop_save e4c76a4cd17a2cc5e66d52fe2109ec62f0a09aa510e97fd291b87073b84697f2
+office-interop/litchi-changed/document-properties-litchi.docx exact_noop e4c76a4cd17a2cc5e66d52fe2109ec62f0a09aa510e97fd291b87073b84697f2
+office-interop/litchi-changed/document-properties-litchi.docx managed_edit a99105a883efb8f7907813df99c411a035f6ccb69e166ea6338ddac992be1e14
+office-interop/litchi-changed/document-properties-litchi.docx one_edit b33747c9fee8ab070d97e5791413b85d1e67b1bc16f5e7939f1ad46f2acd9245
+office-interop/litchi-changed/document-properties-litchi.docx one_edit_span source=1336 published=1347 prefix=1046 suffix=290 moved_source=0 moved_published=11
+office-interop/litchi-changed/document-properties-litchi.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+office-interop/litchi-changed/document-properties-litchi.docx one_edit_optin b33747c9fee8ab070d97e5791413b85d1e67b1bc16f5e7939f1ad46f2acd9245
+ooxml/docx/ComplexNumberedLists.docx open ok
+ooxml/docx/ComplexNumberedLists.docx source bytes=4948 24c0ac5a73bae93d9f966a7e0957b2b97d232859a86d8f2d0614639afea8d10d
+ooxml/docx/ComplexNumberedLists.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/ComplexNumberedLists.docx gate_source accepts
+ooxml/docx/ComplexNumberedLists.docx noop_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6
+ooxml/docx/ComplexNumberedLists.docx exact_noop 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6
+ooxml/docx/ComplexNumberedLists.docx managed_edit 108460ae863614f2e36816733330789b5ed0bcca1e09065a470423c5da0fce71
+ooxml/docx/ComplexNumberedLists.docx one_edit a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+ooxml/docx/ComplexNumberedLists.docx one_edit_span source=4948 published=4957 prefix=55 suffix=3716 moved_source=1177 moved_published=1186
+ooxml/docx/ComplexNumberedLists.docx one_edit_reopen ok paragraphs=17 tables=0 controls=0 edited=1
+ooxml/docx/ComplexNumberedLists.docx one_edit_optin a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+ooxml/docx/FancyFoot.docx open ok
+ooxml/docx/FancyFoot.docx source bytes=2891 f6b59c03f36c5c24186b5053a9535f2153787e6f8a53d346427fcd48c35393b4
+ooxml/docx/FancyFoot.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/FancyFoot.docx gate_source accepts
+ooxml/docx/FancyFoot.docx noop_save 1cfd2b4fb1f7233062671b0f58789e1b0b437fbf79deb7d62167cffb85191f7a
+ooxml/docx/FancyFoot.docx exact_noop 1cfd2b4fb1f7233062671b0f58789e1b0b437fbf79deb7d62167cffb85191f7a
+ooxml/docx/FancyFoot.docx managed_edit f0be12fc96899d15b806433912ac790803a3acba7f3c59918bde61c291066571
+ooxml/docx/FancyFoot.docx one_edit dbc976ed877ab9d6e8c4dbfda928b4e8949219cd94d1966f547240f1ec05d280
+ooxml/docx/FancyFoot.docx one_edit_span source=2891 published=2900 prefix=55 suffix=1718 moved_source=1118 moved_published=1127
+ooxml/docx/FancyFoot.docx one_edit_reopen ok paragraphs=10 tables=0 controls=0 edited=1
+ooxml/docx/FancyFoot.docx one_edit_optin dbc976ed877ab9d6e8c4dbfda928b4e8949219cd94d1966f547240f1ec05d280
+ooxml/docx/Headers.docx open ok
+ooxml/docx/Headers.docx source bytes=2213 de094891cdc9184ecb977f8af57850a6edda4bec5ff1d1008cf44f02a86f00f0
+ooxml/docx/Headers.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/Headers.docx gate_source accepts
+ooxml/docx/Headers.docx noop_save bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b
+ooxml/docx/Headers.docx exact_noop bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b
+ooxml/docx/Headers.docx managed_edit 99a5a65d98af33dc8ce96946ebf3da7b4dacddb510dc7c7977a8954a6db6056a
+ooxml/docx/Headers.docx one_edit refused:no paragraph with text
+ooxml/docx/Headers.docx one_edit_span skipped
+ooxml/docx/Headers.docx one_edit_reopen skipped
+ooxml/docx/Headers.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/Hyperlink.docx open ok
+ooxml/docx/Hyperlink.docx source bytes=1862 22a6d4000351afcd943dffe0f04a0fd4a646a7816fff1d3848714c7f85e8bc46
+ooxml/docx/Hyperlink.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/Hyperlink.docx gate_source accepts
+ooxml/docx/Hyperlink.docx noop_save ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66
+ooxml/docx/Hyperlink.docx exact_noop ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66
+ooxml/docx/Hyperlink.docx managed_edit 3d1a5d98ca0c46dd72684d29ef805fbdff2b272a9299c630d3abfa7650dbbc57
+ooxml/docx/Hyperlink.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+ooxml/docx/Hyperlink.docx one_edit_span skipped
+ooxml/docx/Hyperlink.docx one_edit_reopen skipped
+ooxml/docx/Hyperlink.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+ooxml/docx/comment.docx open ok
+ooxml/docx/comment.docx source bytes=1264 f8ba580b5c8efff6f0b281a7360cfe1444e74fc505130be737fbfbc404a966e9
+ooxml/docx/comment.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/comment.docx gate_source accepts
+ooxml/docx/comment.docx noop_save 23bbfe33e1acf7073253bd87552cbee5be0a07cbd08a479a4bf139f09b1dd6dc
+ooxml/docx/comment.docx exact_noop 23bbfe33e1acf7073253bd87552cbee5be0a07cbd08a479a4bf139f09b1dd6dc
+ooxml/docx/comment.docx managed_edit b021270cf8a4e7b2ba4b2f66a41ff0eefb5c3d9643f5c6873070f2ba79cc009f
+ooxml/docx/comment.docx one_edit refused:no paragraph with text
+ooxml/docx/comment.docx one_edit_span skipped
+ooxml/docx/comment.docx one_edit_reopen skipped
+ooxml/docx/comment.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/documentProperties.docx open ok
+ooxml/docx/documentProperties.docx source bytes=1319 10b39588b3cd710291b9268db93bed9b00238f547d24f80b53024205753087c0
+ooxml/docx/documentProperties.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/documentProperties.docx gate_source accepts
+ooxml/docx/documentProperties.docx noop_save 1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5
+ooxml/docx/documentProperties.docx exact_noop 1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5
+ooxml/docx/documentProperties.docx managed_edit c4fdf7e5ba2f5b322e0f76686cc622b2309bd9f71689c28cfd51718391295f36
+ooxml/docx/documentProperties.docx one_edit 6fc2123fc08646c50208f315d2a1ad0423fe4ef4b624d1f0a48ab1dc17a6d5dd
+ooxml/docx/documentProperties.docx one_edit_span source=1319 published=1328 prefix=55 suffix=290 moved_source=974 moved_published=983
+ooxml/docx/documentProperties.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/documentProperties.docx one_edit_optin 6fc2123fc08646c50208f315d2a1ad0423fe4ef4b624d1f0a48ab1dc17a6d5dd
+ooxml/docx/documentProtection_comments_no_password.docx open ok
+ooxml/docx/documentProtection_comments_no_password.docx source bytes=1036 d6c3113f462a1ee56b286664c113a7de4f3b3c86291d52081c7e47c7cfa7ee17
+ooxml/docx/documentProtection_comments_no_password.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/documentProtection_comments_no_password.docx gate_source accepts
+ooxml/docx/documentProtection_comments_no_password.docx noop_save d15cd04edecf3489c2028864e70736494a1c5259b6e92097e50457efd934d78c
+ooxml/docx/documentProtection_comments_no_password.docx exact_noop d15cd04edecf3489c2028864e70736494a1c5259b6e92097e50457efd934d78c
+ooxml/docx/documentProtection_comments_no_password.docx managed_edit 67eb7f521005dfda89d7c966a632e0341439260c396540ac476e02a6f2dde1a2
+ooxml/docx/documentProtection_comments_no_password.docx one_edit a9ff01fce3f65c415f9522fa2563b48034520c4b946475bfbc9005504e277c45
+ooxml/docx/documentProtection_comments_no_password.docx one_edit_span source=1036 published=1045 prefix=55 suffix=299 moved_source=682 moved_published=691
+ooxml/docx/documentProtection_comments_no_password.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/documentProtection_comments_no_password.docx one_edit_optin a9ff01fce3f65c415f9522fa2563b48034520c4b946475bfbc9005504e277c45
+ooxml/docx/documentProtection_forms_no_password.docx open ok
+ooxml/docx/documentProtection_forms_no_password.docx source bytes=1041 6b205f617b523c8e9c094fe31ad49145f28237d61d7a0cbdf182505094366026
+ooxml/docx/documentProtection_forms_no_password.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/documentProtection_forms_no_password.docx gate_source accepts
+ooxml/docx/documentProtection_forms_no_password.docx noop_save 5c299d134577cb3a752548e6891701d2b3447570bd2bb0b38bf16efc026ee0a2
+ooxml/docx/documentProtection_forms_no_password.docx exact_noop 5c299d134577cb3a752548e6891701d2b3447570bd2bb0b38bf16efc026ee0a2
+ooxml/docx/documentProtection_forms_no_password.docx managed_edit b6707c3aec64bb9e8fdb5661b0d224c30072b821c2e0e6db0be757cb5da6c7f9
+ooxml/docx/documentProtection_forms_no_password.docx one_edit b2957c99743912c8c40d41e785b9f647af327a02d43f6577dfaaed25ed0de11d
+ooxml/docx/documentProtection_forms_no_password.docx one_edit_span source=1041 published=1050 prefix=55 suffix=299 moved_source=687 moved_published=696
+ooxml/docx/documentProtection_forms_no_password.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/documentProtection_forms_no_password.docx one_edit_optin b2957c99743912c8c40d41e785b9f647af327a02d43f6577dfaaed25ed0de11d
+ooxml/docx/documentProtection_no_protection.docx open ok
+ooxml/docx/documentProtection_no_protection.docx source bytes=1025 1e6108d9654cab9d2bfb5b6745ee921256479aae873edf0fa96d460b72c33feb
+ooxml/docx/documentProtection_no_protection.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/documentProtection_no_protection.docx gate_source accepts
+ooxml/docx/documentProtection_no_protection.docx noop_save 5d1cce05b576fc527981c56dd9844df3b6669967bcd9b981adfc043bd516f62c
+ooxml/docx/documentProtection_no_protection.docx exact_noop 5d1cce05b576fc527981c56dd9844df3b6669967bcd9b981adfc043bd516f62c
+ooxml/docx/documentProtection_no_protection.docx managed_edit e404a8614e1bfd8776ae4bbda967cf170a25cc874a0c44064c52f2b7940a7bf6
+ooxml/docx/documentProtection_no_protection.docx one_edit 84e67e2ad74fb3eed44a57f73bf2f19a714fc1518f2a9cce81fd98dc48d3ff07
+ooxml/docx/documentProtection_no_protection.docx one_edit_span source=1025 published=1034 prefix=55 suffix=299 moved_source=671 moved_published=680
+ooxml/docx/documentProtection_no_protection.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/documentProtection_no_protection.docx one_edit_optin 84e67e2ad74fb3eed44a57f73bf2f19a714fc1518f2a9cce81fd98dc48d3ff07
+ooxml/docx/documentProtection_readonly_no_password.docx open ok
+ooxml/docx/documentProtection_readonly_no_password.docx source bytes=1036 0e7f44b4afe62edc61447bf332d38c43a68f018f3f1eb29e509fb1cf348f151a
+ooxml/docx/documentProtection_readonly_no_password.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/documentProtection_readonly_no_password.docx gate_source accepts
+ooxml/docx/documentProtection_readonly_no_password.docx noop_save 5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544
+ooxml/docx/documentProtection_readonly_no_password.docx exact_noop 5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544
+ooxml/docx/documentProtection_readonly_no_password.docx managed_edit a7906dd61d1bab0b5fcef920ed3ca6e46ca06acecef48296eb9571e2f42b7ddc
+ooxml/docx/documentProtection_readonly_no_password.docx one_edit 0b2bb3221f73e3ce8ab92b06205059b9cb4017abd1d04f2c72e92b32b163c792
+ooxml/docx/documentProtection_readonly_no_password.docx one_edit_span source=1036 published=1045 prefix=55 suffix=299 moved_source=682 moved_published=691
+ooxml/docx/documentProtection_readonly_no_password.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/documentProtection_readonly_no_password.docx one_edit_optin 0b2bb3221f73e3ce8ab92b06205059b9cb4017abd1d04f2c72e92b32b163c792
+ooxml/docx/drawing.docx open ok
+ooxml/docx/drawing.docx source bytes=288070 985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee
+ooxml/docx/drawing.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/drawing.docx gate_source accepts
+ooxml/docx/drawing.docx noop_save 5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8
+ooxml/docx/drawing.docx exact_noop 5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8
+ooxml/docx/drawing.docx managed_edit 0a677f34ce47d8341411a9ed6fd19ba42705283e1a39a00bb6624adc714a6059
+ooxml/docx/drawing.docx one_edit 06e9964fc373d967dffabc9b7c0bd84385bad121ba30e6a29980b6688210edba
+ooxml/docx/drawing.docx one_edit_span source=288070 published=288139 prefix=55 suffix=111463 moved_source=176552 moved_published=176621
+ooxml/docx/drawing.docx one_edit_reopen ok paragraphs=185 tables=5 controls=0 edited=1
+ooxml/docx/drawing.docx one_edit_optin 06e9964fc373d967dffabc9b7c0bd84385bad121ba30e6a29980b6688210edba
+ooxml/docx/endnotes.docx open ok
+ooxml/docx/endnotes.docx source bytes=4906 7012b1170175fab7422e357b85d83511e37e0622d7df46b341c8081a6f2283e4
+ooxml/docx/endnotes.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/endnotes.docx gate_source accepts
+ooxml/docx/endnotes.docx noop_save 6e2e1b2dabb0ae6b9b26ddd613dca446ba0710ecc8b4008722abc4ed592934e3
+ooxml/docx/endnotes.docx exact_noop 6e2e1b2dabb0ae6b9b26ddd613dca446ba0710ecc8b4008722abc4ed592934e3
+ooxml/docx/endnotes.docx managed_edit e98c47bf9e25a68e39129c2fca60b7e7e229f0a46284600e38f3456d3784719b
+ooxml/docx/endnotes.docx one_edit bcd001f76b5f491113b64e0ae6368c81d74d90080fc120e20add089a46ea3314
+ooxml/docx/endnotes.docx one_edit_span source=4906 published=4915 prefix=55 suffix=3988 moved_source=863 moved_published=872
+ooxml/docx/endnotes.docx one_edit_reopen ok paragraphs=12 tables=0 controls=0 edited=1
+ooxml/docx/endnotes.docx one_edit_optin bcd001f76b5f491113b64e0ae6368c81d74d90080fc120e20add089a46ea3314
+ooxml/docx/footnotes.docx open ok
+ooxml/docx/footnotes.docx source bytes=1360 5dd557723da3fb8f62787ed19dd3d0a8c20bb51c98b183df3cd262561b28bdce
+ooxml/docx/footnotes.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/footnotes.docx gate_source accepts
+ooxml/docx/footnotes.docx noop_save 9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1
+ooxml/docx/footnotes.docx exact_noop 9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1
+ooxml/docx/footnotes.docx managed_edit f4c14dd7f344a7c18bf050220b4f92d30b9dd1be37fbd7b4780f482ee4c0ea7e
+ooxml/docx/footnotes.docx one_edit fb12bb852d9af64dded445ae88900cbf95ab1f9cf822306d1649259fe137e375
+ooxml/docx/footnotes.docx one_edit_span source=1360 published=1369 prefix=55 suffix=319 moved_source=986 moved_published=995
+ooxml/docx/footnotes.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+ooxml/docx/footnotes.docx one_edit_optin fb12bb852d9af64dded445ae88900cbf95ab1f9cf822306d1649259fe137e375
+ooxml/docx/headerFooter.docx open ok
+ooxml/docx/headerFooter.docx source bytes=1352 c1486265ebc80d76bc3e2f2314507e7633c81e02191775c493fb1f5523cf128a
+ooxml/docx/headerFooter.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/headerFooter.docx gate_source accepts
+ooxml/docx/headerFooter.docx noop_save 0ad90c6ee8ec8b9fab1ae8219387eca8d934b739580918d76a1b6c911bc41913
+ooxml/docx/headerFooter.docx exact_noop 0ad90c6ee8ec8b9fab1ae8219387eca8d934b739580918d76a1b6c911bc41913
+ooxml/docx/headerFooter.docx managed_edit 7ab67c395f6ab3ed463a2896a9b407bf67182a00995c762d79529415c092e562
+ooxml/docx/headerFooter.docx one_edit refused:no paragraph with text
+ooxml/docx/headerFooter.docx one_edit_span skipped
+ooxml/docx/headerFooter.docx one_edit_reopen skipped
+ooxml/docx/headerFooter.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/headerPic.docx open ok
+ooxml/docx/headerPic.docx source bytes=1170 d7c55223db795b9aff190a62061423cdb1bd368e0ecc1e86bf3abd456552ca6d
+ooxml/docx/headerPic.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/headerPic.docx gate_source accepts
+ooxml/docx/headerPic.docx noop_save 50d9b17f7575c8a91129fd8a3e6a70feec886480ab9f089e29a7f8ac7e5ed51a
+ooxml/docx/headerPic.docx exact_noop 50d9b17f7575c8a91129fd8a3e6a70feec886480ab9f089e29a7f8ac7e5ed51a
+ooxml/docx/headerPic.docx managed_edit dd283e9d3716439974dba8dd72bedf8c447770ec1e2050751815aad5d495013e
+ooxml/docx/headerPic.docx one_edit refused:no paragraph with text
+ooxml/docx/headerPic.docx one_edit_span skipped
+ooxml/docx/headerPic.docx one_edit_reopen skipped
+ooxml/docx/headerPic.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/table-alignment.docx open ok
+ooxml/docx/table-alignment.docx source bytes=40151 7ccda5d73f5a75721f15e0217251840bcbf8b9056a533681b7b1d4cc60195680
+ooxml/docx/table-alignment.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/table-alignment.docx gate_source accepts
+ooxml/docx/table-alignment.docx noop_save ee36729e0d050e529fea0b444006a194bea72b35cf8958ae58c6624c26156b41
+ooxml/docx/table-alignment.docx exact_noop ee36729e0d050e529fea0b444006a194bea72b35cf8958ae58c6624c26156b41
+ooxml/docx/table-alignment.docx managed_edit 23c0e213113547034a5547326fad4ac1aa49c845bfbc2b71eb3d0619eae6da53
+ooxml/docx/table-alignment.docx one_edit refused:no paragraph with text
+ooxml/docx/table-alignment.docx one_edit_span skipped
+ooxml/docx/table-alignment.docx one_edit_reopen skipped
+ooxml/docx/table-alignment.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/table-indent.docx open refused:shared OOXML error: invalid OOXML relationship: core-properties part '/docProps/core.xml' is orphaned
+ooxml/docx/table-indent.docx gate skipped
+ooxml/docx/table-indent.docx gate_source skipped
+ooxml/docx/table-indent.docx source skipped
+ooxml/docx/table-indent.docx noop_save skipped
+ooxml/docx/table-indent.docx exact_noop skipped
+ooxml/docx/table-indent.docx managed_edit skipped
+ooxml/docx/table-indent.docx one_edit skipped
+ooxml/docx/table-indent.docx one_edit_optin skipped
+ooxml/docx/table-indent.docx one_edit_span skipped
+ooxml/docx/table-indent.docx one_edit_reopen skipped
+ooxml/docx/table_footnotes.docx open ok
+ooxml/docx/table_footnotes.docx source bytes=2478 8b1aa7eb19015295cba5d0eb402242105ccaa2eac664e736ddf1045a4128bc21
+ooxml/docx/table_footnotes.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/table_footnotes.docx gate_source accepts
+ooxml/docx/table_footnotes.docx noop_save 69666500a7dd00600da64cc7676f8939c84df8804967ec2fc75567fad41f21a9
+ooxml/docx/table_footnotes.docx exact_noop 69666500a7dd00600da64cc7676f8939c84df8804967ec2fc75567fad41f21a9
+ooxml/docx/table_footnotes.docx managed_edit ae703a5a0c62cf085030d66c9ff0c4c1afb0c34bd1c9126d8a4e95b99fccea50
+ooxml/docx/table_footnotes.docx one_edit refused:no paragraph with text
+ooxml/docx/table_footnotes.docx one_edit_span skipped
+ooxml/docx/table_footnotes.docx one_edit_reopen skipped
+ooxml/docx/table_footnotes.docx one_edit_optin refused:no paragraph with text
+ooxml/docx/testComment.docx open ok
+ooxml/docx/testComment.docx source bytes=3108 febfd7e5927d2d21494744d5598b81f6c3b389413fdb9f647acdd0b8c3b0ab08
+ooxml/docx/testComment.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+ooxml/docx/testComment.docx gate_source accepts
+ooxml/docx/testComment.docx noop_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97
+ooxml/docx/testComment.docx exact_noop 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97
+ooxml/docx/testComment.docx managed_edit 57f6414f04d2205e44f1796008d51388f35dc13fc69b8a044a2c7bf626148af6
+ooxml/docx/testComment.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+ooxml/docx/testComment.docx one_edit_span skipped
+ooxml/docx/testComment.docx one_edit_reopen skipped
+ooxml/docx/testComment.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/61745.docx open ok
+poi/test-data/document/61745.docx source bytes=2910 8bfcb89166b52d5c2fa3958205fc3a8c596aa97c7bf49e157699c4366e814f08
+poi/test-data/document/61745.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/61745.docx gate_source accepts
+poi/test-data/document/61745.docx noop_save ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2
+poi/test-data/document/61745.docx exact_noop ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2
+poi/test-data/document/61745.docx managed_edit f4b8837a43d1c9ec8775800e44401c3914c89ede976b55c26b9a821fa0772d31
+poi/test-data/document/61745.docx one_edit refused:no paragraph with text
+poi/test-data/document/61745.docx one_edit_span skipped
+poi/test-data/document/61745.docx one_edit_reopen skipped
+poi/test-data/document/61745.docx one_edit_optin refused:no paragraph with text
+poi/test-data/document/Bug54849.docx open ok
+poi/test-data/document/Bug54849.docx source bytes=12086 33ca98bd28715a871cec7ead4f15982c52d98f054d07395d75b4d68d9e1c70db
+poi/test-data/document/Bug54849.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/Bug54849.docx gate_source accepts
+poi/test-data/document/Bug54849.docx noop_save f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3
+poi/test-data/document/Bug54849.docx exact_noop f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3
+poi/test-data/document/Bug54849.docx managed_edit 10dd7f7c6071033b7bc9abc4ad835c853068f9b80afa31663395cd2cf4e9bde4
+poi/test-data/document/Bug54849.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/Bug54849.docx one_edit_span skipped
+poi/test-data/document/Bug54849.docx one_edit_reopen skipped
+poi/test-data/document/Bug54849.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/ComplexNumberedLists.docx open ok
+poi/test-data/document/ComplexNumberedLists.docx source bytes=4948 24c0ac5a73bae93d9f966a7e0957b2b97d232859a86d8f2d0614639afea8d10d
+poi/test-data/document/ComplexNumberedLists.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/ComplexNumberedLists.docx gate_source accepts
+poi/test-data/document/ComplexNumberedLists.docx noop_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6
+poi/test-data/document/ComplexNumberedLists.docx exact_noop 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6
+poi/test-data/document/ComplexNumberedLists.docx managed_edit 108460ae863614f2e36816733330789b5ed0bcca1e09065a470423c5da0fce71
+poi/test-data/document/ComplexNumberedLists.docx one_edit a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+poi/test-data/document/ComplexNumberedLists.docx one_edit_span source=4948 published=4957 prefix=55 suffix=3716 moved_source=1177 moved_published=1186
+poi/test-data/document/ComplexNumberedLists.docx one_edit_reopen ok paragraphs=17 tables=0 controls=0 edited=1
+poi/test-data/document/ComplexNumberedLists.docx one_edit_optin a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+poi/test-data/document/EmbeddedDocument.docx open ok
+poi/test-data/document/EmbeddedDocument.docx source bytes=2160 a6d36eddd03efe28578ce49c83e51283da89952156f8c2aa5dd47eeb66f2c528
+poi/test-data/document/EmbeddedDocument.docx gate noncompact:noncompact XML FormattingWhitespace at byte 38
+poi/test-data/document/EmbeddedDocument.docx gate_source accepts
+poi/test-data/document/EmbeddedDocument.docx noop_save 3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2
+poi/test-data/document/EmbeddedDocument.docx exact_noop 3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2
+poi/test-data/document/EmbeddedDocument.docx managed_edit deb1cd9771c988981f7c2212bfdd67a5eb8b4d95defe39d73693e939fdc14e07
+poi/test-data/document/EmbeddedDocument.docx one_edit 099a50cfea12724267a53e6de95642bc46c32784940aa2a046d8b73aab0eea5e
+poi/test-data/document/EmbeddedDocument.docx one_edit_span source=2160 published=2169 prefix=38 suffix=1416 moved_source=706 moved_published=715
+poi/test-data/document/EmbeddedDocument.docx one_edit_reopen ok paragraphs=3 tables=0 controls=0 edited=1
+poi/test-data/document/EmbeddedDocument.docx one_edit_optin 099a50cfea12724267a53e6de95642bc46c32784940aa2a046d8b73aab0eea5e
+poi/test-data/document/Numbering.docx open ok
+poi/test-data/document/Numbering.docx source bytes=5411 02c4799e12543ea48d03a9619c77aa1f099feb4bee59f4c6d02f57b87dadb229
+poi/test-data/document/Numbering.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/Numbering.docx gate_source accepts
+poi/test-data/document/Numbering.docx noop_save 776a59dcf0e290f1988602e6305e2d9cb2e31f631dc4aa751593c23cddbaad4d
+poi/test-data/document/Numbering.docx exact_noop 776a59dcf0e290f1988602e6305e2d9cb2e31f631dc4aa751593c23cddbaad4d
+poi/test-data/document/Numbering.docx managed_edit 9379b7b7ec129c860b072efe81083a5ff038a238bc42e081dfe9933fc9e2335d
+poi/test-data/document/Numbering.docx one_edit adf5c5a06a66c4e211446ecc40284fdfc548439ba3c62e4a696f4a0fdf6d9672
+poi/test-data/document/Numbering.docx one_edit_span source=5411 published=5420 prefix=55 suffix=4016 moved_source=1340 moved_published=1349
+poi/test-data/document/Numbering.docx one_edit_reopen ok paragraphs=22 tables=0 controls=0 edited=1
+poi/test-data/document/Numbering.docx one_edit_optin adf5c5a06a66c4e211446ecc40284fdfc548439ba3c62e4a696f4a0fdf6d9672
+poi/test-data/document/NumberingWOverrides.docx open ok
+poi/test-data/document/NumberingWOverrides.docx source bytes=3891 9d9b7c7aa41531ebcf2858b99c22cd007b546bce7e3011bd873144aa3537e59b
+poi/test-data/document/NumberingWOverrides.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/NumberingWOverrides.docx gate_source accepts
+poi/test-data/document/NumberingWOverrides.docx noop_save 3754dee43880ce4c9e962eca41ac78c353999888282c9ada528efbb826e2bee6
+poi/test-data/document/NumberingWOverrides.docx exact_noop 3754dee43880ce4c9e962eca41ac78c353999888282c9ada528efbb826e2bee6
+poi/test-data/document/NumberingWOverrides.docx managed_edit ad36e7047999d83d3bcb19ef898372a97bdbd95c49585186362527c077b2add8
+poi/test-data/document/NumberingWOverrides.docx one_edit refused:paragraph 1 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/NumberingWOverrides.docx one_edit_span skipped
+poi/test-data/document/NumberingWOverrides.docx one_edit_reopen skipped
+poi/test-data/document/NumberingWOverrides.docx one_edit_optin refused:paragraph 1 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/NumberingWithOutOfOrderId.docx open ok
+poi/test-data/document/NumberingWithOutOfOrderId.docx source bytes=1983 7a60056ebf92b75300899ad9602a5e03d41410a4c6868b2267f14410b6fe3659
+poi/test-data/document/NumberingWithOutOfOrderId.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/NumberingWithOutOfOrderId.docx gate_source accepts
+poi/test-data/document/NumberingWithOutOfOrderId.docx noop_save fa2843a6297bb3e874f9c6dc8aac944704fba4d0d631b94627be7dbeaf12ed0f
+poi/test-data/document/NumberingWithOutOfOrderId.docx exact_noop fa2843a6297bb3e874f9c6dc8aac944704fba4d0d631b94627be7dbeaf12ed0f
+poi/test-data/document/NumberingWithOutOfOrderId.docx managed_edit e1d070fbf2cdbfed5b4569eab10f3916f4543a3b5544d2ac74d2a3e949da9555
+poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit e205a42a4d59bb0272e2afdf1dda1eba8190b8aaa4bc4488bf6e2bff00baa04b
+poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit_span source=1983 published=1703 prefix=55 suffix=13 moved_source=1915 moved_published=1635
+poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit_reopen ok paragraphs=1 tables=0 controls=0 edited=1
+poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit_optin e205a42a4d59bb0272e2afdf1dda1eba8190b8aaa4bc4488bf6e2bff00baa04b
+poi/test-data/document/heading123.docx open ok
+poi/test-data/document/heading123.docx source bytes=8103 75493b737565c7e4071b5fa04c1693582d05c80c0997243e8f6f6b5515449e56
+poi/test-data/document/heading123.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/heading123.docx gate_source accepts
+poi/test-data/document/heading123.docx noop_save dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550
+poi/test-data/document/heading123.docx exact_noop dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550
+poi/test-data/document/heading123.docx managed_edit 16701cf1d99f8ab0fb529729ff645a0640d3e5c8cc791c8948f06bb9b0be9a45
+poi/test-data/document/heading123.docx one_edit 1d11e1f64cc7bd9336cc7f4d507e9d18df5c81018a5ed54444a15fa45ec9d9bf
+poi/test-data/document/heading123.docx one_edit_span source=8103 published=8112 prefix=55 suffix=7200 moved_source=848 moved_published=857
+poi/test-data/document/heading123.docx one_edit_reopen ok paragraphs=6 tables=0 controls=0 edited=1
+poi/test-data/document/heading123.docx one_edit_optin 1d11e1f64cc7bd9336cc7f4d507e9d18df5c81018a5ed54444a15fa45ec9d9bf
+poi/test-data/document/saut_page.docx open ok
+poi/test-data/document/saut_page.docx source bytes=2459 deacc10212caf959b2e392b6d1fbeb259cb8eae1ba7e1cafdd73cc6d3d3c75f1
+poi/test-data/document/saut_page.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/saut_page.docx gate_source accepts
+poi/test-data/document/saut_page.docx noop_save bfb60b6218e151c0d6f226f6cb716db67b8a96aed2e487e9141e638617e1bd51
+poi/test-data/document/saut_page.docx exact_noop bfb60b6218e151c0d6f226f6cb716db67b8a96aed2e487e9141e638617e1bd51
+poi/test-data/document/saut_page.docx managed_edit 6fea940ef47d93f71a246ecac4cd640cf07825e3ff6d4292e0c0acdb8694ef70
+poi/test-data/document/saut_page.docx one_edit refused:paragraph 0 edit refused: text requires structural WordprocessingML elements
+poi/test-data/document/saut_page.docx one_edit_span skipped
+poi/test-data/document/saut_page.docx one_edit_reopen skipped
+poi/test-data/document/saut_page.docx one_edit_optin refused:paragraph 0 edit refused: text requires structural WordprocessingML elements
+poi/test-data/document/testComment.docx open ok
+poi/test-data/document/testComment.docx source bytes=3108 febfd7e5927d2d21494744d5598b81f6c3b389413fdb9f647acdd0b8c3b0ab08
+poi/test-data/document/testComment.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/document/testComment.docx gate_source accepts
+poi/test-data/document/testComment.docx noop_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97
+poi/test-data/document/testComment.docx exact_noop 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97
+poi/test-data/document/testComment.docx managed_edit 57f6414f04d2205e44f1796008d51388f35dc13fc69b8a044a2c7bf626148af6
+poi/test-data/document/testComment.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/document/testComment.docx one_edit_span skipped
+poi/test-data/document/testComment.docx one_edit_reopen skipped
+poi/test-data/document/testComment.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/integration/test_recursive_embedded.docx open ok
+poi/test-data/integration/test_recursive_embedded.docx source bytes=3036 e9349b59b3a17577207b028fbf44cba9d9b23bbdb97e6d9519e1213300b9f9b5
+poi/test-data/integration/test_recursive_embedded.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/integration/test_recursive_embedded.docx gate_source accepts
+poi/test-data/integration/test_recursive_embedded.docx noop_save c4b7fab030a8b6a9d6691f6699ac8e6f82bc53764a0f1430d134ae3b70c32654
+poi/test-data/integration/test_recursive_embedded.docx exact_noop c4b7fab030a8b6a9d6691f6699ac8e6f82bc53764a0f1430d134ae3b70c32654
+poi/test-data/integration/test_recursive_embedded.docx managed_edit 7326973a44da51f3a40ae511ff71e43eec4c07e986f780cf63bedd3bb3c2aeb5
+poi/test-data/integration/test_recursive_embedded.docx one_edit 619ef48c95ce6edaba4391a22e94c310de7742cb0aafc293e43dd13a6c7e85e8
+poi/test-data/integration/test_recursive_embedded.docx one_edit_span source=3036 published=3024 prefix=55 suffix=1743 moved_source=1238 moved_published=1226
+poi/test-data/integration/test_recursive_embedded.docx one_edit_reopen ok paragraphs=3 tables=0 controls=0 edited=1
+poi/test-data/integration/test_recursive_embedded.docx one_edit_optin 619ef48c95ce6edaba4391a22e94c310de7742cb0aafc293e43dd13a6c7e85e8
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx open ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx source bytes=6031 e8fa044cff27bd26ac152d1800a629162ae478ecad4f96df49f80cb35838bf73
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx gate_source accepts
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx noop_save 2d1856ab17ee065074572a6d16f7823e5416a69d97863f5d7c91406b0d4628c3
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx exact_noop 2d1856ab17ee065074572a6d16f7823e5416a69d97863f5d7c91406b0d4628c3
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx managed_edit 8d09bb7eb8158203d2615d73fe0e453b3a1e95f59019b99268b029609b706868
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit 166ef3e27d6ad805e5c0223ef23621ede09aa7bbca9cb7240d2a117d511be3a1
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit_span source=6031 published=6040 prefix=55 suffix=3217 moved_source=2759 moved_published=2768
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit_reopen ok paragraphs=11 tables=0 controls=0 edited=1
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit_optin 166ef3e27d6ad805e5c0223ef23621ede09aa7bbca9cb7240d2a117d511be3a1
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.3 permits only dcterms:created and dcterms:modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type on created and modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type="dcterms:W3CDTF"
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx open refused:OPC error: A package cannot contain more than one core-properties relationship
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx open ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx source bytes=963 f3bf021780821ffa7b53ae5c8f7991f4e666c63e9668f37e1fa47492c969802b
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx gate_source accepts
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx noop_save e2e8b6c95a034bbcb6f9239ce1519b7814e45d165d261775ac2ff58eef0a2b60
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx exact_noop e2e8b6c95a034bbcb6f9239ce1519b7814e45d165d261775ac2ff58eef0a2b60
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx managed_edit ef73a776f412d55055536a5da01ec1be739c9c8e6658ee835d6e6acec77fa46a
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit refused:no paragraph with text
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit_optin refused:no paragraph with text
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.4 forbids xml:lang in core properties
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx one_edit_reopen skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx open refused:OPC error: Derived OPC part names coexist: '/word/document.xml' and '/word/document.xml/image1.gif'
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx gate skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx gate_source skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx source skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx exact_noop skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx one_edit skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx one_edit_optin skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx one_edit_span skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx one_edit_reopen skipped
+poi/test-data/xmldsign/hello-world-signed-twice.docx open ok
+poi/test-data/xmldsign/hello-world-signed-twice.docx source bytes=1074 cfc7ef7c0edbfe7d2a9d4938df43f634d1552025ec1917f092ecaf05a8e7277e
+poi/test-data/xmldsign/hello-world-signed-twice.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/xmldsign/hello-world-signed-twice.docx gate_source accepts
+poi/test-data/xmldsign/hello-world-signed-twice.docx noop_save e95ff2845328a023bb326f99c01a6acbe156a834aec4dd965944adbd03a5277a
+poi/test-data/xmldsign/hello-world-signed-twice.docx exact_noop e95ff2845328a023bb326f99c01a6acbe156a834aec4dd965944adbd03a5277a
+poi/test-data/xmldsign/hello-world-signed-twice.docx managed_edit b83ddd6cdebf90152a07fb7eec486ac538b01bd198d2001588f7af6ca19ec354
+poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit_span source=1074 published=1083 prefix=55 suffix=350 moved_source=669 moved_published=678
+poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit_reopen ok paragraphs=2 tables=0 controls=0 edited=1
+poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit_optin 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+poi/test-data/xmldsign/hello-world-signed.docx open ok
+poi/test-data/xmldsign/hello-world-signed.docx source bytes=1074 cfc7ef7c0edbfe7d2a9d4938df43f634d1552025ec1917f092ecaf05a8e7277e
+poi/test-data/xmldsign/hello-world-signed.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/xmldsign/hello-world-signed.docx gate_source accepts
+poi/test-data/xmldsign/hello-world-signed.docx noop_save 9b29a40d57508d1f53d1066792c2da0064a4c36110949d1fad52119ede0ab05e
+poi/test-data/xmldsign/hello-world-signed.docx exact_noop 9b29a40d57508d1f53d1066792c2da0064a4c36110949d1fad52119ede0ab05e
+poi/test-data/xmldsign/hello-world-signed.docx managed_edit b83ddd6cdebf90152a07fb7eec486ac538b01bd198d2001588f7af6ca19ec354
+poi/test-data/xmldsign/hello-world-signed.docx one_edit 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+poi/test-data/xmldsign/hello-world-signed.docx one_edit_span source=1074 published=1083 prefix=55 suffix=350 moved_source=669 moved_published=678
+poi/test-data/xmldsign/hello-world-signed.docx one_edit_reopen ok paragraphs=2 tables=0 controls=0 edited=1
+poi/test-data/xmldsign/hello-world-signed.docx one_edit_optin 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+poi/test-data/xmldsign/ms-office-2010-signed.docx open ok
+poi/test-data/xmldsign/ms-office-2010-signed.docx source bytes=1551 b39faed210af5cbbbb2742f44a3422fdbd7db1a51e0e4c41bb188bf712005701
+poi/test-data/xmldsign/ms-office-2010-signed.docx gate noncompact:noncompact XML FormattingWhitespace at byte 55
+poi/test-data/xmldsign/ms-office-2010-signed.docx gate_source accepts
+poi/test-data/xmldsign/ms-office-2010-signed.docx noop_save bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f
+poi/test-data/xmldsign/ms-office-2010-signed.docx exact_noop bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f
+poi/test-data/xmldsign/ms-office-2010-signed.docx managed_edit ef3af5d928753d711a14cd75ee6b5dcd9f2bc521d9dafdd386de53df6d2b7b05
+poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit_span skipped
+poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit_reopen skipped
+poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content

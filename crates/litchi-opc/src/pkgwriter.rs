@@ -69,7 +69,17 @@ struct PlannedPart<'package> {
     partname: &'package PackURI,
     content_type: &'package str,
     blob: &'package [u8],
-    authored_xml: bool,
+    /// Whether publication audits this payload.
+    ///
+    /// An XML payload the package still holds in the very allocation it was
+    /// decoded from is republished exactly as the source wrote it, and the
+    /// eager reader already admitted it, so the plan does not parse it again.
+    /// Every other XML payload — authored, replaced, or spliced from the
+    /// source by a caller — is audited by
+    /// [`PackageWriter::audit_published_xml`] before the plan completes. This
+    /// is a provenance decision, not a byte comparison: see
+    /// [`OpcPackage::holds_original_source_xml`](crate::OpcPackage).
+    audit_payload: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
     /// The source `.rels` member still holds these relationships, proven by
@@ -152,10 +162,10 @@ impl<'package> PublicationPlan<'package> {
                 partname: part.partname(),
                 content_type: part.content_type(),
                 blob: part.blob(),
-                authored_xml: xml_minifier::audit::package::is_xml_part(
+                audit_payload: xml_minifier::audit::package::is_xml_part(
                     part.partname().as_str(),
                     part.content_type(),
-                ) && !package.is_exact_source_xml(part),
+                ) && !package.holds_original_source_xml(part),
                 rels: part.rels(),
                 relationships_member_present: package
                     .source_relationships_member_present(part.partname()),
@@ -179,10 +189,7 @@ impl<'package> PublicationPlan<'package> {
             None
         } else {
             let content_types_xml = ContentTypesItem::from_parts(&parts)?.to_xml();
-            PackageWriter::validate_authored_xml(
-                "[Content_Types].xml",
-                content_types_xml.as_bytes(),
-            )?;
+            PackageWriter::audit_authored_xml("[Content_Types].xml", content_types_xml.as_bytes())?;
             Some(content_types_xml)
         };
 
@@ -194,13 +201,13 @@ impl<'package> PublicationPlan<'package> {
             None
         } else {
             let package_rels_xml = package.rels().try_to_xml_bytes()?;
-            PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
+            PackageWriter::audit_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
             Some(package_rels_xml)
         };
 
         for part in &mut parts {
-            if part.authored_xml {
-                PackageWriter::validate_authored_xml(part.partname.as_str(), part.blob)?;
+            if part.audit_payload {
+                PackageWriter::audit_published_xml(part.partname.as_str(), part.blob)?;
             }
             if part.relationships_pristine {
                 continue;
@@ -211,7 +218,7 @@ impl<'package> PublicationPlan<'package> {
                     .rels_uri()
                     .map_err(crate::OpcError::InvalidPackUri)?;
                 let xml = part.rels.try_to_xml_bytes()?;
-                PackageWriter::validate_authored_xml(uri.as_str(), xml.as_slice())?;
+                PackageWriter::audit_authored_xml(uri.as_str(), xml.as_slice())?;
                 part.relationships = Some(PlannedRelationships { uri, xml });
             }
         }
@@ -235,15 +242,12 @@ impl<'package> PublicationPlan<'package> {
     fn materialize_pristine(&mut self, package: &OpcPackage) -> Result<()> {
         if self.content_types_xml.is_none() {
             let content_types_xml = ContentTypesItem::from_parts(&self.parts)?.to_xml();
-            PackageWriter::validate_authored_xml(
-                "[Content_Types].xml",
-                content_types_xml.as_bytes(),
-            )?;
+            PackageWriter::audit_authored_xml("[Content_Types].xml", content_types_xml.as_bytes())?;
             self.content_types_xml = Some(content_types_xml);
         }
         if self.package_rels_xml.is_none() {
             let package_rels_xml = package.rels().try_to_xml_bytes()?;
-            PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
+            PackageWriter::audit_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
             self.package_rels_xml = Some(package_rels_xml);
         }
         for part in &mut self.parts {
@@ -255,7 +259,7 @@ impl<'package> PublicationPlan<'package> {
                 .rels_uri()
                 .map_err(crate::OpcError::InvalidPackUri)?;
             let xml = part.rels.try_to_xml_bytes()?;
-            PackageWriter::validate_authored_xml(uri.as_str(), xml.as_slice())?;
+            PackageWriter::audit_authored_xml(uri.as_str(), xml.as_slice())?;
             part.relationships_pristine = false;
             part.relationships = Some(PlannedRelationships { uri, xml });
         }
@@ -1125,13 +1129,53 @@ impl PackageWriter {
         physical.finish()
     }
 
-    fn validate_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
-        xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+    /// Audit one XML member the eager writer is about to publish.
+    ///
+    /// The audit keeps every check that protects the published archive — UTF-8
+    /// decoding, well-formed XML, exactly one document element, no character
+    /// data or CDATA outside it, no DTD or DOCTYPE, the attribute grammar, a
+    /// valid `xml:space`, and each finite budget — and asserts no compactness
+    /// contract on any member, whatever its provenance. Change 0652's decision
+    /// 2 names original bytes; change 0665 records this eager-route extension
+    /// as an implementation interpretation informed by the source profile
+    /// established in 0654 and 0657, not as a new owner decision. Compactness
+    /// of this repository's own serializers remains a quality property,
+    /// verified by test and by the debug assertions at the three sites that
+    /// author XML here, not a publication refusal.
+    ///
+    /// Refusals keep their identity: the same
+    /// [`OpcError::XmlPublication`](crate::OpcError::XmlPublication) is
+    /// constructed from the same [`xml_minifier::audit::Error`], and it still
+    /// precedes every emitted byte because the whole plan is built before a
+    /// sink sees anything.
+    fn audit_published_xml(name: &str, bytes: &[u8]) -> Result<()> {
+        xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
             .map(|_report| ())
             .map_err(|source| crate::OpcError::XmlPublication {
                 part: name.to_string(),
                 source,
             })
+    }
+
+    /// Audit XML this writer authored, and hold it to the compact output
+    /// contract in debug builds only.
+    ///
+    /// The manifest and the relationship members are serialized here, so their
+    /// spelling is this repository's own and `docs/CRUD_Scenario_Checklist.md`'s
+    /// "every generated XML part is byte-minimal" applies to them. Publication
+    /// no longer refuses a member for breaking it (change 0665); the debug
+    /// assertion keeps every test run and every debug build checking it, so a
+    /// serializer that regresses is caught where it is written rather than
+    /// where a caller's package is refused.
+    fn audit_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
+        debug_assert!(
+            xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+                .is_ok(),
+            "this writer authored XML for '{name}' that is not compact: {:?}",
+            xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+                .err()
+        );
+        Self::audit_published_xml(name, bytes)
     }
 
     fn validate_source_publication(package: &OpcPackage) -> Result<()> {
@@ -3129,8 +3173,11 @@ mod tests {
         ));
     }
 
+    /// Every XML part name the publication audit recognizes is still audited
+    /// for the structural defects that would corrupt the published archive,
+    /// whoever authored its bytes.
     #[test]
-    fn refuses_arbitrary_authored_xml_bytes_before_publication() {
+    fn refuses_malformed_authored_xml_bytes_before_publication() {
         for (part_name, content_type) in [
             ("/custom/manifest.rdf", "application/octet-stream"),
             ("/custom/metadata", "application/rdf+xml"),
@@ -3143,7 +3190,7 @@ mod tests {
             package.add_part(Box::new(crate::BlobPart::new(
                 PackURI::new(part_name).expect("valid part URI"),
                 content_type.to_string(),
-                b"<root> <child/></root>".to_vec(),
+                b"<root><child/>".to_vec(),
             )));
 
             assert!(matches!(
@@ -3153,13 +3200,173 @@ mod tests {
         }
     }
 
+    /// Change 0665: no member is refused for its spelling on this route any
+    /// more. Each of these four payloads is one of the compactness verdicts
+    /// change 0654 enumerated, and each one publishes here byte for byte.
+    #[test]
+    fn publishes_every_noncompact_spelling_the_authored_contract_refuses() {
+        for payload in [
+            b"<?xml version=\"1.0\"?>\r\n<root>\n  <child/>\n</root>".as_slice(),
+            b"<root> <child/></root>".as_slice(),
+            b"<root a=\"1\"\n      b=\"2\"/>".as_slice(),
+            b"<root a=\"1\" />".as_slice(),
+        ] {
+            let part_name = "/custom/metadata.xml";
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                ct::XML.to_owned(),
+                payload.to_vec(),
+            )));
+
+            let published = PackageWriter::to_bytes(&package).expect("non-compact XML publishes");
+            let reopened = OpcPackage::from_vec(published).expect("published package reopens");
+            let uri = PackURI::new(part_name).expect("valid part URI");
+            assert_eq!(
+                reopened.get_part(&uri).expect("part survives").blob(),
+                payload,
+                "the published member must carry the payload byte for byte",
+            );
+        }
+    }
+
+    /// The members this writer serializes itself stay byte-minimal. The
+    /// contract is no longer a publication refusal (change 0665), so it is
+    /// asserted here and by the debug assertion in
+    /// [`PackageWriter::audit_authored_xml`].
+    #[test]
+    fn every_member_this_writer_authors_is_compact() {
+        let mut package = OpcPackage::new();
+        let part_name = PackURI::new("/custom/metadata.xml").expect("valid part URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            part_name.clone(),
+            ct::XML.to_owned(),
+            b"<root>\n  <child/>\n</root>".to_vec(),
+        )));
+        package
+            .rels_mut()
+            .get_or_add("urn:test:reltype", "/custom/metadata.xml");
+        package
+            .get_part_mut(&part_name)
+            .expect("part exists")
+            .relate_to("/custom/metadata.xml", "urn:test:selfref");
+
+        let plan = PublicationPlan::from_package(&package).expect("plan builds");
+        let limits = xml_minifier::audit::Limits::default();
+        let mut audited = 0_usize;
+        for (name, bytes) in [
+            (
+                "[Content_Types].xml",
+                plan.content_types_xml
+                    .as_ref()
+                    .expect("manifest is serialized")
+                    .as_bytes(),
+            ),
+            (
+                "_rels/.rels",
+                plan.package_rels_xml
+                    .as_ref()
+                    .expect("package relationships are serialized")
+                    .as_slice(),
+            ),
+        ] {
+            let _report =
+                xml_minifier::audit::verify_authored(bytes, limits).unwrap_or_else(|error| {
+                    panic!("member '{name}' this writer authored is not compact: {error}")
+                });
+            audited += 1;
+        }
+        for part in &plan.parts {
+            let relationships = part
+                .relationships
+                .as_ref()
+                .expect("the part carries a serialized relationships member");
+            let _report =
+                xml_minifier::audit::verify_authored(relationships.xml.as_slice(), limits)
+                    .unwrap_or_else(|error| {
+                        panic!(
+                            "member '{}' this writer authored is not compact: {error}",
+                            relationships.uri.as_str()
+                        )
+                    });
+            audited += 1;
+        }
+        assert!(
+            PackageWriter::to_bytes(&package).is_ok(),
+            "the non-compact part payload still publishes",
+        );
+        assert_eq!(audited, 3, "manifest, package .rels and the part .rels");
+    }
+
+    /// Every refusal family change 0654 kept for original bytes is kept here
+    /// too, and each one still precedes every emitted byte.
+    #[test]
+    fn every_structural_encoding_doctype_and_budget_refusal_survives_with_no_output() {
+        let oversized_token = format!("<root a=\"{}\"/>", "a".repeat(4 * 1024 * 1024 + 1));
+        let cases: [(&str, Vec<u8>); 10] = [
+            ("unclosed root", b"<root>".to_vec()),
+            ("two document elements", b"<a/><b/>".to_vec()),
+            ("mismatched end tag", b"<a></b>".to_vec()),
+            ("character data outside the root", b"text<a/>".to_vec()),
+            ("CDATA outside the root", b"<![CDATA[x]]><a/>".to_vec()),
+            ("a document type declaration", b"<!DOCTYPE a><a/>".to_vec()),
+            ("an attribute with no value", b"<a b/>".to_vec()),
+            ("an invalid xml:space", b"<a xml:space=\"maybe\"/>".to_vec()),
+            ("an empty document", Vec::new()),
+            ("a token over the budget", oversized_token.into_bytes()),
+        ];
+        let invalid_utf8 = {
+            let mut bytes = b"<root>".to_vec();
+            bytes.push(0xff);
+            bytes.extend_from_slice(b"</root>");
+            bytes
+        };
+        for (label, payload) in cases.into_iter().chain([("invalid UTF-8", invalid_utf8)]) {
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new("/custom/metadata.xml").expect("valid part URI"),
+                ct::XML.to_owned(),
+                payload,
+            )));
+            let mut sink = ChunkSink {
+                total: 0,
+                writes: 0,
+                largest: 0,
+                limit: usize::MAX,
+            };
+            let Err(error) = PackageWriter::write_to_stream(&mut sink, &package) else {
+                panic!("{label} must be refused before publication");
+            };
+            assert!(
+                matches!(
+                    &error,
+                    crate::OpcError::XmlPublication { part, .. }
+                        if part == "/custom/metadata.xml"
+                ),
+                "{label} must keep the publication refusal, got {error:?}"
+            );
+            assert!(
+                !matches!(
+                    &error,
+                    crate::OpcError::XmlPublication {
+                        source: xml_minifier::audit::Error::NotCompact(_),
+                        ..
+                    }
+                ),
+                "{label} must not be a compactness verdict"
+            );
+            assert_eq!(sink.total, 0, "{label} emitted bytes");
+            assert_eq!(sink.writes, 0, "{label} reached the sink");
+        }
+    }
+
     #[test]
     fn publication_plan_failure_leaves_sequential_sink_untouched() {
         let mut package = OpcPackage::new();
         package.add_part(Box::new(crate::BlobPart::new(
             PackURI::new("/custom/metadata.xml").expect("valid part URI"),
             ct::XML.to_owned(),
-            b"<root> <child/></root>".to_vec(),
+            b"<root><child/>".to_vec(),
         )));
         let mut sink = ChunkSink {
             total: 0,

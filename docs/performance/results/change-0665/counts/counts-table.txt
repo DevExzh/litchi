@@ -1,0 +1,29 @@
+
+== docx_semantic_one_edit_save
+  whole iteration Ir: 483,906,287 -> 482,906,261 (-0.21%)
+    from_package                           Ir     45,393,150 ->     44,835,292   calls     3.0 ->     3.0
+    audit_published_xml                    Ir              0 ->     44,665,067   calls     0.0 ->     9.0
+    validate_authored_xml                  Ir     45,224,412 ->              0   calls     9.0 ->     0.0
+    write_to_stream                        Ir     74,796,114 ->     74,238,772   calls     3.0 ->     3.0
+    scan_document_with_context             Ir     70,063,721 ->     70,132,533   calls     3.0 ->     3.0
+    apply_document_patch                   Ir      1,516,481 ->      2,272,769   calls     3.0 ->     3.0
+    compact_changed_document_xml           Ir         19,718 ->         44,388   calls     3.0 ->     3.0
+    verify_with_policy                     Ir     90,530,688 ->     89,484,290   calls    12.0 ->    12.0
+    commit                                 Ir     45,896,199 ->     45,403,841   calls     3.0 ->     3.0
+
+== xlsx_eager_cell_values_one_edit_save
+  whole iteration Ir: 1,717,661,569 -> 1,713,208,847 (-0.26%)
+    from_package                           Ir     52,601,052 ->     51,771,714   calls     2.0 ->     2.0
+    audit_published_xml                    Ir              0 ->     51,720,746   calls     0.0 ->     4.0
+    validate_authored_xml                  Ir     52,545,853 ->              0   calls     4.0 ->     0.0
+    to_bytes                               Ir        -62,983 ->        301,544   calls     0.0 ->     0.0
+    write_to_stream                        Ir    135,855,044 ->    135,027,996   calls     2.0 ->     2.0
+    verify_with_policy                     Ir     52,545,411 ->     51,721,074   calls     4.0 ->     4.0
+
+== pptx_eager_batch_edit_save
+  whole iteration Ir: 9,886,980,793 -> 9,887,775,778 (+0.01%)
+    from_package                           Ir      8,278,620 ->      8,243,451   calls     1.0 ->     1.0
+    audit_published_xml                    Ir              0 ->    -28,466,792   calls     0.0 ->   217.0
+    validate_authored_xml                  Ir    -28,695,848 ->              0   calls   217.0 ->     0.0
+    to_bytes                               Ir  3,217,149,598 ->  3,217,185,420   calls     1.0 ->     1.0
+    verify_with_policy                     Ir    -28,672,306 ->    -28,443,250   calls   217.0 ->   217.0

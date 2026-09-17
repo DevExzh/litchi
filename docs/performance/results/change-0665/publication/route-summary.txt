@@ -1,0 +1,46 @@
+### noop: 321 fixtures
+    error -> error: 2
+    ok -> ok: 319
+    published on both, identical digest: 319; differing: 0
+    newly published: 0
+      of which the before-leg error was NotCompact: 0
+    refused on both: 2; identical error text: 2
+    residual NotCompact refusals on the after leg: 0
+
+### edit: 321 fixtures
+    error -> error: 11
+    ok -> ok: 310
+    published on both, identical digest: 310; differing: 0
+    newly published: 0
+      of which the before-leg error was NotCompact: 0
+    refused on both: 11; identical error text: 11
+    residual NotCompact refusals on the after leg: 0
+
+### editnc: 321 fixtures
+    error -> error: 11
+    error -> ok: 310
+    published on both, identical digest: 0; differing: 0
+    newly published: 310
+      of which the before-leg error was NotCompact: 310
+    refused on both: 11; identical error text: 9
+      ERROR TEXT MOVED bug62513.pptx
+        before=XmlPublication { part: "/docProps/app.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset:
+        after =PreservationUnavailable { reason: "source ZIP framing or opaque members cannot be preserved after this mutatio
+      ERROR TEXT MOVED 49609.xlsx
+        before=XmlPublication { part: "/xl/sharedstrings.xml", source: NotCompact(Violation { kind: FormattingWhitespace, off
+        after =PreservationUnavailable { reason: "source ZIP framing or opaque members cannot be preserved after this mutatio
+    residual NotCompact refusals on the after leg: 0
+
+### hide: 180 fixtures
+    error -> error: 89
+    error -> ok: 58
+    ok -> ok: 33
+    published on both, identical digest: 33; differing: 0
+    newly published: 58
+      of which the before-leg error was NotCompact: 58
+    refused on both: 89; identical error text: 88
+      ERROR TEXT MOVED 49609.xlsx
+        before=Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhi
+        after =Package(PreservationUnavailable { reason: "source ZIP framing or opaque members cannot be preserved after this
+    residual NotCompact refusals on the after leg: 0
+
