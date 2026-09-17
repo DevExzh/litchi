@@ -1,0 +1,2373 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-target-0667/release/litchi-perf-baseline",
+    "binary_sha256": "444d4ff970cf5c59cf656f097e8035daa7b81e9f421656dcb2f2766985540ad2",
+    "binary_bytes": 61788808,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "2009e7d9cc3d9d21ea16214b6bcf094ebe11890e",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 32,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "0-31",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_producer_medium_source_open",
+      "xlsx_producer_medium_source_selected_cell",
+      "xlsx_producer_medium_source_planning",
+      "xlsx_producer_medium_source_one_edit_save",
+      "xlsx_producer_medium_control_selected_cell",
+      "xlsx_producer_medium_control_planning",
+      "xlsx_producer_dense_source_open",
+      "xlsx_producer_dense_source_selected_cell",
+      "xlsx_producer_dense_source_planning",
+      "xlsx_producer_dense_source_one_edit_save",
+      "xlsx_producer_dense_control_selected_cell",
+      "xlsx_producer_dense_control_planning"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1,
+      2,
+      4,
+      8,
+      32
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1,
+        2,
+        4,
+        8,
+        32
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_producer_medium_source_open",
+        "corpus_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_medium_source_selected_cell",
+        "corpus_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_medium_source_planning",
+        "corpus_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_medium_source_one_edit_save",
+        "corpus_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_medium_control_selected_cell",
+        "corpus_sha256": "d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_medium_control_planning",
+        "corpus_sha256": "d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_source_open",
+        "corpus_sha256": "3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_source_selected_cell",
+        "corpus_sha256": "3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_source_planning",
+        "corpus_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_source_one_edit_save",
+        "corpus_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_control_selected_cell",
+        "corpus_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_producer_dense_control_planning",
+        "corpus_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_producer_medium_source_open",
+      "corpus": {
+        "name": "xlsx-producer-medium-read",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-read",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 12,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 127499,
+        "archive_bytes": 22739,
+        "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+        "target_entry": "Bench01!D17",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          60190,
+          60570,
+          60610,
+          61040,
+          61470,
+          61480,
+          61530,
+          61551,
+          61580,
+          61770,
+          61960,
+          62080,
+          62790,
+          63620,
+          64031
+        ],
+        "sample_order": [
+          13,
+          9,
+          14,
+          12,
+          8,
+          5,
+          7,
+          11,
+          10,
+          1,
+          6,
+          2,
+          4,
+          3,
+          0
+        ],
+        "min": 60190,
+        "p50": 61551,
+        "p95": 64031,
+        "p99": 64031,
+        "max": 64031,
+        "mean": 61751.46666666667,
+        "standard_deviation": 1063.4421783372475,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 61162.49344663795,
+          "upper": 62340.439886695385
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_medium_source_selected_cell",
+      "corpus": {
+        "name": "xlsx-producer-medium-read",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-read",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 12,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 127499,
+        "archive_bytes": 22739,
+        "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+        "target_entry": "Bench01!D17",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1327254,
+          1327263,
+          1327444,
+          1329433,
+          1331344,
+          1331963,
+          1332424,
+          1333873,
+          1334093,
+          1334464,
+          1334803,
+          1342174,
+          1343224,
+          1345934,
+          1354113
+        ],
+        "sample_order": [
+          14,
+          12,
+          10,
+          9,
+          7,
+          13,
+          11,
+          0,
+          8,
+          2,
+          5,
+          6,
+          1,
+          3,
+          4
+        ],
+        "min": 1327254,
+        "p50": 1333873,
+        "p95": 1354113,
+        "p99": 1354113,
+        "max": 1354113,
+        "mean": 1335320.2000000002,
+        "standard_deviation": 7755.239382876089,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1331025.0644444707,
+          "upper": 1339615.3355555297
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_medium_source_planning",
+      "corpus": {
+        "name": "xlsx-producer-medium-edit",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-edit",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 10,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 123724,
+        "archive_bytes": 21131,
+        "archive_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+        "target_entry": "Bench01!D17",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          784192,
+          784892,
+          784982,
+          788142,
+          788652,
+          789112,
+          789422,
+          789482,
+          791142,
+          791502,
+          791592,
+          791962,
+          794932,
+          795002,
+          797492
+        ],
+        "sample_order": [
+          10,
+          4,
+          11,
+          14,
+          9,
+          12,
+          8,
+          7,
+          5,
+          3,
+          13,
+          6,
+          0,
+          1,
+          2
+        ],
+        "min": 784192,
+        "p50": 789482,
+        "p95": 797492,
+        "p99": 797492,
+        "max": 797492,
+        "mean": 790166.6666666667,
+        "standard_deviation": 3842.127139018273,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 788038.7559641163,
+          "upper": 792294.5773692172
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_medium_source_one_edit_save",
+      "corpus": {
+        "name": "xlsx-producer-medium-edit",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-edit",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 10,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 123724,
+        "archive_bytes": 21131,
+        "archive_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+        "target_entry": "Bench01!D17",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1761874,
+          1762585,
+          1763444,
+          1764775,
+          1766725,
+          1768995,
+          1769265,
+          1769955,
+          1770035,
+          1770434,
+          1772314,
+          1772755,
+          1780194,
+          1782104,
+          1800285
+        ],
+        "sample_order": [
+          5,
+          8,
+          13,
+          0,
+          1,
+          7,
+          11,
+          9,
+          12,
+          14,
+          4,
+          2,
+          6,
+          3,
+          10
+        ],
+        "min": 1761874,
+        "p50": 1769955,
+        "p95": 1800285,
+        "p99": 1800285,
+        "max": 1800285,
+        "mean": 1771715.9333333333,
+        "standard_deviation": 9783.905271024487,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1766297.2483222298,
+          "upper": 1777134.6183444369
+        }
+      },
+      "sink": {
+        "accepted_bytes": 21131,
+        "write_calls": 43,
+        "largest_write": 4712,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 39,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "output_sha256": "2ca9afacd9acdd47a9eac043b6e913154f5ea9095122fc9c51fcd3651bfd58d9",
+      "operation_metrics": {
+        "sample_count": 15,
+        "sample_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131,
+              21131
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43,
+              43
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712,
+              4712
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39,
+                39
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "xlsx_producer_medium_control_selected_cell",
+      "corpus": {
+        "name": "xlsx-producer-medium-control",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-control",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 121550,
+        "archive_bytes": 19787,
+        "archive_sha256": "d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60",
+        "target_entry": "Bench01!A17",
+        "target_payload_bytes": 14,
+        "target_payload_sha256": "f4bed4c49b095db9601fe38736d323f8438326beb3fbf524d7ad08d52a818e80",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          531592,
+          532071,
+          532331,
+          532681,
+          532732,
+          535781,
+          537701,
+          538471,
+          538512,
+          538761,
+          538902,
+          539001,
+          539002,
+          540102,
+          540462
+        ],
+        "sample_order": [
+          11,
+          6,
+          10,
+          3,
+          13,
+          8,
+          1,
+          12,
+          7,
+          5,
+          2,
+          14,
+          4,
+          9,
+          0
+        ],
+        "min": 531592,
+        "p50": 538471,
+        "p95": 540462,
+        "p99": 540462,
+        "max": 540462,
+        "mean": 536540.1333333334,
+        "standard_deviation": 3292.897288465071,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 534716.4062339969,
+          "upper": 538363.86043267
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_medium_control_planning",
+      "corpus": {
+        "name": "xlsx-producer-medium-control",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-medium-control",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 121550,
+        "archive_bytes": 19787,
+        "archive_sha256": "d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60",
+        "target_entry": "Bench01!A17",
+        "target_payload_bytes": 14,
+        "target_payload_sha256": "f4bed4c49b095db9601fe38736d323f8438326beb3fbf524d7ad08d52a818e80",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          684892,
+          685732,
+          686572,
+          691412,
+          692292,
+          693132,
+          693192,
+          693422,
+          694072,
+          694442,
+          694702,
+          696011,
+          696161,
+          698402,
+          699342
+        ],
+        "sample_order": [
+          14,
+          10,
+          6,
+          2,
+          3,
+          4,
+          8,
+          11,
+          12,
+          5,
+          9,
+          1,
+          0,
+          13,
+          7
+        ],
+        "min": 684892,
+        "p50": 693422,
+        "p95": 699342,
+        "p99": 699342,
+        "max": 699342,
+        "mean": 692918.5333333332,
+        "standard_deviation": 4289.725779891636,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 690542.726113073,
+          "upper": 695294.3405535935
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_dense_source_open",
+      "corpus": {
+        "name": "xlsx-producer-dense-read",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-read",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 11,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1471545,
+        "archive_bytes": 204756,
+        "archive_sha256": "3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8",
+        "target_entry": "Bench01!D65",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          54100,
+          54521,
+          54680,
+          54800,
+          54850,
+          55150,
+          55390,
+          55790,
+          55800,
+          55971,
+          56280,
+          56650,
+          56700,
+          58820,
+          64330
+        ],
+        "sample_order": [
+          13,
+          11,
+          14,
+          9,
+          12,
+          8,
+          3,
+          2,
+          4,
+          5,
+          10,
+          7,
+          1,
+          0,
+          6
+        ],
+        "min": 54100,
+        "p50": 55790,
+        "p95": 64330,
+        "p99": 64330,
+        "max": 64330,
+        "mean": 56255.46666666667,
+        "standard_deviation": 2519.0011304558993,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 54860.351598557994,
+          "upper": 57650.58173477534
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_dense_source_selected_cell",
+      "corpus": {
+        "name": "xlsx-producer-dense-read",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-read",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 11,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1471545,
+        "archive_bytes": 204756,
+        "archive_sha256": "3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8",
+        "target_entry": "Bench01!D65",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          18881750,
+          18895420,
+          18897250,
+          18911860,
+          18912180,
+          18923340,
+          18941719,
+          18968419,
+          18982640,
+          18998530,
+          19006830,
+          19012330,
+          19018970,
+          19060700,
+          19070961
+        ],
+        "sample_order": [
+          11,
+          12,
+          13,
+          7,
+          14,
+          9,
+          10,
+          6,
+          4,
+          1,
+          8,
+          5,
+          2,
+          3,
+          0
+        ],
+        "min": 18881750,
+        "p50": 18968419,
+        "p95": 19070961,
+        "p99": 19070961,
+        "max": 19070961,
+        "mean": 18965526.599999998,
+        "standard_deviation": 61519.565197701726,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 18931454.812038843,
+          "upper": 18999598.387961153
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_dense_source_planning",
+      "corpus": {
+        "name": "xlsx-producer-dense-edit",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-edit",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1462073,
+        "archive_bytes": 203072,
+        "archive_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+        "target_entry": "Bench01!D65",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          11325529,
+          11328070,
+          11333270,
+          11350430,
+          11352079,
+          11361499,
+          11363320,
+          11365660,
+          11365960,
+          11375410,
+          11379780,
+          11386570,
+          11391300,
+          11391930,
+          11411290
+        ],
+        "sample_order": [
+          0,
+          6,
+          11,
+          7,
+          3,
+          10,
+          13,
+          12,
+          8,
+          14,
+          5,
+          9,
+          2,
+          1,
+          4
+        ],
+        "min": 11325529,
+        "p50": 11365660,
+        "p95": 11411290,
+        "p99": 11411290,
+        "max": 11411290,
+        "mean": 11365473.133333333,
+        "standard_deviation": 24889.26038580466,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 11351688.549524102,
+          "upper": 11379257.717142563
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_dense_source_one_edit_save",
+      "corpus": {
+        "name": "xlsx-producer-dense-edit",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-edit",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1462073,
+        "archive_bytes": 203072,
+        "archive_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+        "target_entry": "Bench01!D65",
+        "target_payload_bytes": 37,
+        "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": "xl/sharedStrings.xml",
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          23490941,
+          23525251,
+          23529492,
+          23551101,
+          23551702,
+          23555392,
+          23567212,
+          23568962,
+          23580152,
+          23584922,
+          23620022,
+          23647022,
+          23654422,
+          23687022,
+          23831772
+        ],
+        "sample_order": [
+          8,
+          14,
+          4,
+          13,
+          0,
+          1,
+          3,
+          9,
+          5,
+          11,
+          7,
+          6,
+          2,
+          12,
+          10
+        ],
+        "min": 23490941,
+        "p50": 23568962,
+        "p95": 23831772,
+        "p99": 23831772,
+        "max": 23831772,
+        "mean": 23596359.133333333,
+        "standard_deviation": 83875.75490813526,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 23549905.668860234,
+          "upper": 23642812.59780643
+        }
+      },
+      "sink": {
+        "accepted_bytes": 203075,
+        "write_calls": 40,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 36,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "output_sha256": "2db2f36d4e27c215510ccfa8cc5f8f52242b177050c352b417a64d05c764d8e6",
+      "operation_metrics": {
+        "sample_count": 15,
+        "sample_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075,
+              203075
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40,
+              40
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36,
+                36
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "xlsx_producer_dense_control_selected_cell",
+      "corpus": {
+        "name": "xlsx-producer-dense-control",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-control",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1455169,
+        "archive_bytes": 197093,
+        "archive_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "target_entry": "Bench01!A65",
+        "target_payload_bytes": 14,
+        "target_payload_sha256": "5eb3b5e8b315def42b3d3fcd0d082201ea276f97fe7b8dc72b529dee8009ae02",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          7902510,
+          7905311,
+          7907630,
+          7912890,
+          7914001,
+          7915671,
+          7916521,
+          7917801,
+          7920361,
+          7930281,
+          8107401,
+          8126081,
+          8126662,
+          8127521,
+          8135322
+        ],
+        "sample_order": [
+          2,
+          6,
+          11,
+          4,
+          9,
+          5,
+          10,
+          13,
+          12,
+          14,
+          1,
+          0,
+          8,
+          3,
+          7
+        ],
+        "min": 7902510,
+        "p50": 7917801,
+        "p95": 8135322,
+        "p99": 8135322,
+        "max": 8135322,
+        "mean": 7984397.6,
+        "standard_deviation": 102964.34675292777,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 7927372.174367508,
+          "upper": 8041423.025632491
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_producer_dense_control_planning",
+      "corpus": {
+        "name": "xlsx-producer-dense-control",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-control",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1455169,
+        "archive_bytes": 197093,
+        "archive_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "target_entry": "Bench01!A65",
+        "target_payload_bytes": 14,
+        "target_payload_sha256": "5eb3b5e8b315def42b3d3fcd0d082201ea276f97fe7b8dc72b529dee8009ae02",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10072026,
+          10087086,
+          10095927,
+          10097216,
+          10102906,
+          10103076,
+          10105496,
+          10107727,
+          10108167,
+          10113557,
+          10115366,
+          10120337,
+          10124827,
+          10129816,
+          10358417
+        ],
+        "sample_order": [
+          7,
+          9,
+          5,
+          14,
+          12,
+          0,
+          1,
+          2,
+          10,
+          3,
+          8,
+          6,
+          11,
+          4,
+          13
+        ],
+        "min": 10072026,
+        "p50": 10107727,
+        "p95": 10358417,
+        "p99": 10358417,
+        "max": 10358417,
+        "mean": 10122796.466666667,
+        "standard_deviation": 66799.92042538735,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10085800.224621689,
+          "upper": 10159792.708711645
+        }
+      },
+      "sink": null
+    }
+  ]
+}

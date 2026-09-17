@@ -8,7 +8,9 @@
 //! dates are supported; every effective mutation invalidates workbook
 //! calculation properties and removes a captured calculation chain atomically.
 //! It creates only unstyled numeric cell records and never creates styles,
-//! shared strings, or formulas. Workbooks outside the statically provable
+//! shared-string entries, or formulas. Existing shared-string tables are
+//! retained and resolved lazily; a mutation of a cell that references one is
+//! refused so its index identity cannot change. Workbooks outside the statically provable
 //! closure are refused.
 //!
 //! # What this module admits
@@ -29,7 +31,7 @@
 //!
 //! | construct | verdict |
 //! | --- | --- |
-//! | a shared-string part | refused: the value of a `t="s"` cell lives there |
+//! | a shared-string part | admitted and retained; cells that reference it are readable, but cannot be mutated |
 //! | a pivot cache | refused: it holds a copy of the source cells |
 //! | a table or query table | refused: a column is named after its header cell |
 //! | cell metadata (`cm`, `vm`) | refused: it describes the value being replaced |

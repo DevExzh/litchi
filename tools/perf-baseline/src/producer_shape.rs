@@ -143,14 +143,14 @@ impl XlsxProducerShape {
 
 /// Which producer-shape package a scenario runs on.
 ///
-/// One archive cannot serve both.  Excel writes a shared-string part, a
-/// `sharedStrings` workbook relationship, worksheet relationships and an
-/// `mc:Ignorable` workbook root, and the value-only editor refuses each of
-/// those four before it looks at a single cell.  Splitting the family keeps
-/// the read scenarios on the complete producer signature while giving the
-/// planning and edit/save scenarios the largest producer-shaped package the
-/// library actually admits; the refusals are proven, untimed, at
-/// construction, so the split is evidence rather than an omission.
+/// One archive cannot serve both. Excel writes a shared-string part, worksheet
+/// relationships and markup-compatibility roots together. The value-only
+/// editor now retains and resolves the shared-string part, while it still
+/// refuses the relationship-bearing worksheet and qualified root attributes.
+/// Splitting the family keeps the read scenarios on the complete producer
+/// signature while giving the planning and edit/save scenarios the largest
+/// producer-shaped package the library admits; the remaining refusals are
+/// proven, untimed, at construction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum XlsxProducerVariant {
     /// The complete producer signature: markup-compatibility worksheet roots,
@@ -189,11 +189,9 @@ impl XlsxProducerVariant {
 
 /// Which producer facts one generated archive carries.
 ///
-/// The value-only editor's XML validator
-/// (`crates/litchi-xlsx/src/cell_values/validation.rs:420,478`) admits only a
-/// fixed element set and refuses every qualified attribute, so the producer
-/// signature has to be split into facts that can be switched on one at a time.
-/// That is what makes the refusal census exact instead of narrative.
+/// The producer facts are split into switches so the value-only editor's
+/// dependency and preservation verdict can be observed one at a time. That is
+/// what makes the census exact instead of narrative.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ArchiveOptions {
     /// `xmlns:mc`, `xmlns:x14ac`, `xmlns:xr`, `xmlns:xr2` and `xmlns:xr3` on
@@ -241,14 +239,15 @@ impl ArchiveOptions {
         workbook_root_markers: false,
     };
     /// The largest subset of that signature the value-only editor admits.
-    /// Everything else in `ALL` draws a typed refusal, each proven in the
-    /// census.
+    /// Shared strings are retained even though the planning worksheet uses
+    /// numeric cells; the selected shared-string worksheet proves its read
+    /// path separately.
     const ADMITTED: Self = Self {
         namespace_declarations: true,
         markup_compatibility_attributes: false,
         cols: true,
         page_setup: false,
-        shared_strings: false,
+        shared_strings: true,
         worksheet_relationships: false,
         workbook_root_markers: false,
     };
@@ -265,9 +264,9 @@ impl ArchiveOptions {
 /// What a worksheet of the producer shape carries beyond the plain grid.
 ///
 /// The roles are deliberately separated so one corpus can prove each library
-/// gate independently: the value-only editor refuses a relationship-bearing
-/// worksheet before it parses, and refuses a shared-string worksheet when it
-/// parses, so a sheet carrying both can only witness the first.
+/// gate independently: the value-only editor admits a shared-string worksheet
+/// but refuses a relationship-bearing worksheet before it parses, so a sheet
+/// carrying both can only witness the latter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum SheetRole {
@@ -1125,12 +1124,11 @@ fn prove_edit_variant_is_admitted(archive: &[u8]) -> Result<(), Box<dyn Error>> 
 ///
 /// Change 0601 wrote this as a *refusal* census and treated an admitted row as
 /// a corpus-build failure, because at the time the editor refused all five
-/// facts and its reach on Excel output was zero.  Change 0657 replaced the
-/// editor's allow-lists with a dependency rule, and four of the five are now
-/// admitted and copied through; only the shared-string relationship still
-/// refuses.  So the census records the verdict rather than asserting it: an
+/// facts and its reach on Excel output was zero. Changes 0657 and 0667
+/// replaced those allow-lists with a dependency rule and a retained shared
+/// string table. The census records the verdict rather than asserting it: an
 /// admitted row carries [`ADMITTED_VERDICT`] as its message, and the corpus
-/// still builds.  The schema is unchanged.
+/// still builds. The schema is unchanged.
 fn prove_value_editor_refusals(
     shape: XlsxProducerShape,
     read_archive: &[u8],
@@ -1994,7 +1992,7 @@ mod tests {
         assert_eq!(read.corpus.manifest.shape, "producer-medium-read");
         assert_eq!(edit.corpus.manifest.shape, "producer-medium-edit");
         assert!(read.evidence.shared_string_part.is_some());
-        assert!(edit.evidence.shared_string_part.is_none());
+        assert!(edit.evidence.shared_string_part.is_some());
     }
 
     #[test]
@@ -2121,35 +2119,24 @@ mod tests {
         let corpus = xlsx_medium(XlsxProducerVariant::Read);
         let refusals = &corpus.evidence.proven_refusals;
         assert_eq!(refusals.len(), 6);
-        // Change 0657 replaced the value-only editor's allow-lists with a
-        // dependency rule. Four of these five producer facts are outside every
-        // span the rewrite composes, so they are copied through and the
-        // package is admitted; the shared-string relationship is the one whose
-        // meaning depends on the edited value, so it still refuses, with its
-        // message unchanged.
+        // Changes 0657 and 0667 replaced the value-only editor's allow-lists
+        // with a dependency rule and a retained shared-string table. Each
+        // isolated producer fact, and the complete signature when planning
+        // the numeric worksheet, is therefore admitted.
         assert_eq!(refusals[0].role, "producer-worksheet-mc-attributes");
         assert_eq!(refusals[0].message, ADMITTED_VERDICT);
         assert_eq!(refusals[1].role, "producer-page-setup");
         assert_eq!(refusals[1].message, ADMITTED_VERDICT);
         assert_eq!(refusals[2].role, "producer-shared-strings");
-        assert!(
-            refusals[2].message.contains("workbook relationship")
-                && refusals[2].message.contains("sharedStrings"),
-            "{:?}",
-            refusals[2]
-        );
+        assert_eq!(refusals[2].message, ADMITTED_VERDICT);
         assert_eq!(refusals[3].role, "producer-worksheet-relationship");
         assert_eq!(refusals[3].message, ADMITTED_VERDICT);
         assert_eq!(refusals[4].role, "producer-workbook-root");
         assert_eq!(refusals[4].message, ADMITTED_VERDICT);
-        // The complete signature still refuses, because it carries the
-        // shared-string relationship together with everything else.
+        // The complete signature is admitted for the selected numeric
+        // worksheet; its other worksheets remain independently selectable.
         assert_eq!(refusals[5].role, "producer-complete");
-        assert!(
-            refusals[5].message.contains("sharedStrings"),
-            "{:?}",
-            refusals[5]
-        );
+        assert_eq!(refusals[5].message, ADMITTED_VERDICT);
     }
 
     #[test]

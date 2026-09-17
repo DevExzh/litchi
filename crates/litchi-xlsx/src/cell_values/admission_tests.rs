@@ -18,7 +18,7 @@ use litchi_core::OwnedSource;
 use litchi_opc::constants::content_type as ct;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::{CellValueEdit, SheetCellValueEdit, SourceBackedEditor};
 use crate::error::EditBlock;
 use crate::{Address, Error, Number, Value};
 
@@ -68,8 +68,20 @@ fn relationships(entries: &[(&'static str, String, &'static str, bool)]) -> Stri
 }
 
 fn package(sheet: &str, shape: &PackageShape) -> Vec<u8> {
+    let shared_strings_override = if shape
+        .members
+        .iter()
+        .any(|(name, _)| *name == "xl/sharedStrings.xml")
+    {
+        format!(
+            r#"<Override PartName="/xl/sharedStrings.xml" ContentType="{}"/>"#,
+            ct::SML_SHARED_STRINGS
+        )
+    } else {
+        String::new()
+    };
     let content_types = format!(
-        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Default Extension=\"bin\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/calcChain.xml\" ContentType=\"{}\"/></Types>",
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Default Extension=\"bin\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/calcChain.xml\" ContentType=\"{}\"/>{shared_strings_override}</Types>",
         ct::SML_SHEET_MAIN,
         ct::SML_WORKSHEET,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml",
@@ -469,10 +481,10 @@ fn the_calculation_chain_is_dropped_with_its_relationship() {
     );
 }
 
-// ----------------------------------------------------------------- refused
+// ---------------------------------------------------------------- adjusted
 
 #[test]
-fn a_shared_string_part_is_refused_by_name() {
+fn a_shared_string_part_is_admitted_and_preserved() {
     let shape = PackageShape {
         workbook_relationships: vec![(
             "rIdSst",
@@ -487,12 +499,232 @@ fn a_shared_string_part_is_refused_by_name() {
         )],
         ..PackageShape::default()
     };
-    let error = edit_a1(&worksheet("", ""), &shape).expect_err("shared strings are refused");
+    let source = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1:B1\"/><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c><c r=\"B1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
+    );
+    let output = edit_a1(&source, &shape).expect("shared strings are readable");
+    assert_only_the_edited_cell_changed_beside(
+        &source,
+        &output,
+        "A1",
+        "<c r=\"B1\" t=\"s\"><v>0</v></c>",
+    );
+
+    let bytes = package(&source, &shape);
+    let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("shared-string package");
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set(
+            "Sheet1",
+            Address::from_a1("A1").expect("A1"),
+            Value::Number(Number::new("42").expect("numeral")),
+        )])
+        .expect("plan beside a shared-string cell")
+        .commit()
+        .expect("commit beside a shared-string cell");
+    assert_eq!(
+        commit
+            .snapshot()
+            .value(0, Address::from_a1("B1").expect("B1")),
+        Some(&Value::Text("a".into()))
+    );
+    let mut published = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut published, &commit)
+        .expect("publish shared-string package");
+    let published = String::from_utf8_lossy(&published);
+    assert!(
+        published.contains("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" count=\"1\" uniqueCount=\"1\"><si><t>a</t></si></sst>"),
+        "the shared-string part must be transferred byte-for-byte"
+    );
+}
+
+#[test]
+fn a_shared_string_cell_cannot_be_mutated_or_removed() {
+    let shape = PackageShape {
+        workbook_relationships: vec![(
+            "rIdSst",
+            format!("{REL}/sharedStrings"),
+            "sharedStrings.xml",
+            false,
+        )],
+        members: vec![(
+            "xl/sharedStrings.xml",
+            format!("<sst xmlns=\"{SML}\" count=\"1\" uniqueCount=\"1\"><si><t>a</t></si></sst>")
+                .into_bytes(),
+        )],
+        ..PackageShape::default()
+    };
+    let source = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
+    );
+    for edit in [
+        CellValueEdit::set(
+            Address::from_a1("A1").expect("A1"),
+            Value::Number(Number::new("42").expect("numeral")),
+        ),
+        CellValueEdit::clear(Address::from_a1("A1").expect("A1")),
+        CellValueEdit::remove(Address::from_a1("A1").expect("A1")),
+    ] {
+        let error = match editor(&source, &shape).and_then(|editor| {
+            editor.edit_many([SheetCellValueEdit {
+                selector: "Sheet1".into(),
+                edit,
+            }])
+        }) {
+            Err(error) => error,
+            Ok(_) => panic!("a shared-string cell mutation must be refused"),
+        };
+        assert_eq!(
+            message(&error),
+            "invalid XLSX structure: value-only edits cannot add, remove, or renumber shared strings"
+        );
+    }
+}
+
+#[test]
+fn a_shared_string_table_is_lazy_when_no_cell_references_it() {
+    let shape = PackageShape {
+        workbook_relationships: vec![(
+            "rIdSst",
+            format!("{REL}/sharedStrings"),
+            "sharedStrings.xml",
+            false,
+        )],
+        members: vec![("xl/sharedStrings.xml", b"<sst".to_vec())],
+        ..PackageShape::default()
+    };
+    let output = edit_a1(&worksheet("", ""), &shape)
+        .expect("a malformed but unreferenced shared-string table stays lazy");
+    assert_only_the_edited_cell_changed(&worksheet("", ""), &output, "A1");
+}
+
+#[test]
+fn a_large_shared_string_table_stays_within_the_retained_part_bound() {
+    const ITEMS: usize = 66_935;
+    let mut table = String::with_capacity(ITEMS * 30);
+    table.push_str(&format!(
+        "<sst xmlns=\"{SML}\" count=\"{ITEMS}\" uniqueCount=\"{ITEMS}\">"
+    ));
+    for index in 0..ITEMS {
+        table.push_str(&format!("<si><t>shared-{index}</t></si>"));
+    }
+    table.push_str("</sst>");
+    let shape = PackageShape {
+        workbook_relationships: vec![(
+            "rIdSst",
+            format!("{REL}/sharedStrings"),
+            "sharedStrings.xml",
+            false,
+        )],
+        members: vec![("xl/sharedStrings.xml", table.into_bytes())],
+        ..PackageShape::default()
+    };
+    let source = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1:B1\"/><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c><c r=\"B1\" t=\"s\"><v>{}</v></c></row></sheetData></worksheet>",
+        ITEMS - 1
+    );
+    let editor = editor(&source, &shape).expect("large shared-string package");
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set(
+            "Sheet1",
+            Address::from_a1("A1").expect("A1"),
+            Value::Number(Number::new("42").expect("numeral")),
+        )])
+        .expect("numeric edit beside the table")
+        .commit()
+        .expect("large shared-string table is bounded and readable");
+    assert_eq!(
+        commit
+            .snapshot()
+            .value(0, Address::from_a1("B1").expect("B1")),
+        Some(&Value::Text(format!("shared-{}", ITEMS - 1).into()))
+    );
+}
+
+#[test]
+fn shared_string_cells_require_a_valid_table_and_index() {
+    let missing_relationship = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
+    );
+    let error = edit_a1(&missing_relationship, &PackageShape::default())
+        .expect_err("a shared-string cell without a relationship is invalid");
     assert_eq!(
         message(&error),
-        format!(
-            "invalid XLSX structure: value-only edits refuse workbook relationship '{REL}/sharedStrings'"
-        )
+        "invalid XLSX structure: worksheet uses shared strings but the workbook has no shared-string part"
+    );
+
+    let shape = PackageShape {
+        workbook_relationships: vec![(
+            "rIdSst",
+            format!("{REL}/sharedStrings"),
+            "sharedStrings.xml",
+            false,
+        )],
+        members: vec![(
+            "xl/sharedStrings.xml",
+            format!("<sst xmlns=\"{SML}\" count=\"1\" uniqueCount=\"1\"><si><t>a</t></si></sst>")
+                .into_bytes(),
+        )],
+        ..PackageShape::default()
+    };
+    let out_of_range = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>1</v></c></row></sheetData></worksheet>"
+    );
+    let error =
+        edit_a1(&out_of_range, &shape).expect_err("an out-of-range shared index is invalid");
+    assert_eq!(
+        message(&error),
+        "invalid XLSX structure: shared-string index 1 exceeds table length 1"
+    );
+
+    let malformed = PackageShape {
+        members: vec![(
+            "xl/sharedStrings.xml",
+            format!("<sst xmlns=\"{SML}\"><si><t>a</t></si>").into_bytes(),
+        )],
+        ..shape
+    };
+    let valid_reference = format!(
+        "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
+    );
+    let error = edit_a1(&valid_reference, &malformed)
+        .expect_err("a referenced malformed shared-string table is invalid");
+    assert_eq!(
+        message(&error),
+        "invalid XLSX structure: shared strings XML has a missing or unterminated SpreadsheetML sst root"
+    );
+}
+
+#[test]
+fn multiple_shared_string_relationships_are_refused_before_parsing() {
+    let shape = PackageShape {
+        workbook_relationships: vec![
+            (
+                "rIdSst1",
+                format!("{REL}/sharedStrings"),
+                "sharedStrings.xml",
+                false,
+            ),
+            (
+                "rIdSst2",
+                format!("{REL}/sharedStrings"),
+                "sharedStrings.xml",
+                false,
+            ),
+        ],
+        members: vec![(
+            "xl/sharedStrings.xml",
+            format!("<sst xmlns=\"{SML}\" count=\"1\" uniqueCount=\"1\"><si><t>a</t></si></sst>")
+                .into_bytes(),
+        )],
+        ..PackageShape::default()
+    };
+    let error = edit_a1(&worksheet("", ""), &shape)
+        .expect_err("multiple shared-string relationships are ambiguous");
+    assert_eq!(
+        message(&error),
+        "invalid XLSX structure: cell edits require worksheet relationships and at most one styles, theme, shared-string, and calculation-chain relationship"
     );
 }
 

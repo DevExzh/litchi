@@ -30,7 +30,7 @@ use crate::raw::worksheet::edit::{Action, Payload, rewrite_value_only_with_prove
 /// does, and return the facts it published.
 fn plan(content: &[u8]) -> Option<SourceFacts> {
     let admission = raw::worksheet::source_stream_admission(content)?;
-    super::validation::worksheet_xml_and_parse_source(content, admission)
+    super::validation::worksheet_xml_and_parse_source(content, admission, || Ok(None))
         .ok()
         .and_then(|(_, facts)| facts)
 }

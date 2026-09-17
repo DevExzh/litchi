@@ -1,7 +1,7 @@
 //! Immutable source closure for one value-only worksheet capability.
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -12,7 +12,7 @@ use litchi_opc::{
 use litchi_sheet::{Cell as Address, Rect};
 use smallvec::SmallVec;
 
-use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Value};
+use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Text, Value};
 use crate::error::{EditBlock, Error, Result, allocation, invalid};
 use crate::formula::Kind;
 use crate::source_payload::SourcePayload;
@@ -99,6 +99,7 @@ struct SourceCatalogCapture {
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
     calculation_chain: Option<CalculationChainState>,
+    shared_strings: Option<SharedStringsState>,
     style_count: u32,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
@@ -116,6 +117,7 @@ struct OwnedCatalogCapture {
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
     calculation_chain: Option<CalculationChainState>,
+    shared_strings: Option<SharedStringsState>,
     style_count: u32,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
@@ -135,7 +137,8 @@ pub(super) fn checked_multi_bytes(total: usize, next: usize, maximum: usize) -> 
 
 /// Maximum worksheet owners in one source-backed scalar transaction.
 pub const MAX_SHEET_OWNERS: usize = 64;
-/// Maximum aggregate worksheet XML retained by one multi-sheet transaction.
+/// Maximum aggregate worksheet and shared-string XML retained by one
+/// multi-sheet transaction.
 pub const MAX_MULTI_WORKSHEET_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,6 +171,16 @@ impl MultiSnapshot {
             )));
         }
         let mut total_bytes = 0usize;
+        if let Some(shared_strings) = sheets
+            .first()
+            .and_then(|snapshot| snapshot.source.shared_strings.as_ref())
+        {
+            total_bytes = checked_multi_bytes(
+                total_bytes,
+                shared_strings.part.bytes.len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
         for snapshot in &sheets {
             total_bytes = checked_multi_bytes(
                 total_bytes,
@@ -224,6 +237,13 @@ impl MultiSnapshot {
         let capture = load_source_catalog(package)?;
         let positions = resolve_selectors(&capture.sheets, selectors)?;
         let mut aggregate_bytes = 0usize;
+        if let Some(shared_strings) = capture.shared_strings.as_ref() {
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                shared_strings.part.bytes.len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
         for position in positions {
             let remaining = MAX_MULTI_WORKSHEET_BYTES.saturating_sub(aggregate_bytes);
             let snapshot = Snapshot::from_source_selected(package, position, &capture, remaining)?;
@@ -273,6 +293,13 @@ impl MultiSnapshot {
             .try_reserve_exact(selected.len())
             .map_err(|source| allocation("multi-sheet owned snapshots", source))?;
         let mut aggregate_bytes = 0usize;
+        if let Some(shared_strings) = capture.shared_strings.as_ref() {
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                shared_strings.part.bytes.len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
         for position in selected {
             if position >= capture.sheets.len() {
                 return Err(invalid("multi-sheet worksheet position did not resolve"));
@@ -376,10 +403,7 @@ impl MultiSnapshot {
 }
 
 fn stored_entry_is_supported(entry: &Stored) -> bool {
-    entry.shared_string.is_none()
-        && !entry.inline_rich
-        && entry.cell_metadata.is_none()
-        && entry.value_metadata.is_none()
+    !entry.inline_rich && entry.cell_metadata.is_none() && entry.value_metadata.is_none()
 }
 
 impl Snapshot {
@@ -401,7 +425,10 @@ impl Snapshot {
         let worksheet_xml = worksheet.blob_arc();
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
         validation::worksheet_xml(worksheet_xml.as_slice())?;
-        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
+        let shared_strings = capture.shared_strings.as_ref();
+        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || {
+            shared_strings.map(SharedStringsState::strings).transpose()
+        })?;
         validate_style_references(&cells, capture.style_count)?;
         validate_scalar_cells(&cells)?;
         let graph = &capture.graph[position];
@@ -426,6 +453,7 @@ impl Snapshot {
                 package_relationships: Arc::clone(&capture.package_relationships),
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
                 calculation_chain: capture.calculation_chain.clone(),
+                shared_strings: capture.shared_strings.clone(),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
                 context: None,
@@ -453,14 +481,19 @@ impl Snapshot {
         validate_worksheet_relationships(worksheet.rels())?;
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+        let shared_strings = capture.shared_strings.as_ref();
         let (cells, facts) = if let Some(admission) =
             raw::worksheet::source_stream_admission(worksheet_xml.as_bytes())
         {
-            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes(), admission)?
+            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes(), admission, || {
+                shared_strings.map(SharedStringsState::strings).transpose()
+            })?
         } else {
             validation::worksheet_xml(worksheet_xml.as_bytes())?;
             (
-                raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?,
+                raw::worksheet::parse(worksheet_xml.as_bytes(), || {
+                    shared_strings.map(SharedStringsState::strings).transpose()
+                })?,
                 None,
             )
         };
@@ -489,6 +522,7 @@ impl Snapshot {
                 package_relationships: Arc::clone(&capture.package_relationships),
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
                 calculation_chain: capture.calculation_chain.clone(),
+                shared_strings: capture.shared_strings.clone(),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
                 context: package.execution_context(),
@@ -547,6 +581,14 @@ impl Snapshot {
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+        let shared_strings = capture_shared_strings_source(package, &workbook)?;
+        checked_multi_bytes(
+            0,
+            shared_strings
+                .as_ref()
+                .map_or(0, |state| state.part.bytes.len()),
+            MAX_MULTI_WORKSHEET_BYTES,
+        )?;
         let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
         let owner = unique_owner(package.rels())?;
         let snapshot = Self::from_parts(
@@ -564,6 +606,7 @@ impl Snapshot {
             sheet_relationship,
             style_count,
             calculation_chain,
+            shared_strings,
             auxiliary,
             capture_sheet_graph_source(package, &workbook, &catalog.sheets, &sheet_parts)?,
             package.execution_context(),
@@ -629,6 +672,14 @@ impl Snapshot {
         let worksheet_xml = SourcePayload::Owned(worksheet.blob_arc());
         validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+        let shared_strings = capture_shared_strings_owned(package, workbook)?;
+        checked_multi_bytes(
+            0,
+            shared_strings
+                .as_ref()
+                .map_or(0, |state| state.part.bytes.len()),
+            MAX_MULTI_WORKSHEET_BYTES,
+        )?;
         let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
         let owner = unique_owner(package.rels())?;
         Self::from_parts(
@@ -646,6 +697,7 @@ impl Snapshot {
             relationship,
             style_count,
             calculation_chain,
+            shared_strings,
             auxiliary,
             capture_sheet_graph_owned(package, workbook, &catalog.sheets, &sheet_parts)?,
             None,
@@ -670,6 +722,7 @@ impl Snapshot {
         sheet_relationship: &Relationship,
         style_count: u32,
         calculation_chain: Option<CalculationChainState>,
+        shared_strings: Option<SharedStringsState>,
         auxiliary: Box<[PartState]>,
         graph: Box<[SheetGraphState]>,
         context: Option<ExecutionContext>,
@@ -682,7 +735,12 @@ impl Snapshot {
                 "selected worksheet relationship does not target its captured Part",
             ));
         }
-        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?;
+        let shared_strings_ref = shared_strings.as_ref();
+        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || {
+            shared_strings_ref
+                .map(SharedStringsState::strings)
+                .transpose()
+        })?;
         validate_style_references(&cells, style_count)?;
         validate_scalar_cells(&cells)?;
         Ok(Self {
@@ -698,6 +756,7 @@ impl Snapshot {
                 package_relationships: Arc::from(capture_relationships(package_relationships)?),
                 workbook_relationships: Arc::from(capture_relationships(workbook_relationships)?),
                 calculation_chain,
+                shared_strings,
                 auxiliary: Arc::from(auxiliary),
                 graph: Arc::from(graph),
                 context,
@@ -710,7 +769,10 @@ impl Snapshot {
     pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
         source.source.check_execution()?;
         validation::worksheet_xml(&bytes)?;
-        let cells = raw::worksheet::parse(&bytes, || Ok(None))?;
+        let shared_strings = source.source.shared_strings.as_ref();
+        let cells = raw::worksheet::parse(&bytes, || {
+            shared_strings.map(SharedStringsState::strings).transpose()
+        })?;
         let mut result = source.clone();
         result.cells = Arc::new(cells);
         result.facts = None;
@@ -738,7 +800,12 @@ impl Snapshot {
         // Speculative buffers are dropped before the complete parser fallback.
         let cells = match Self::try_rewritten_value_cells(source, &rewrite) {
             Some(cells) => cells,
-            None => raw::worksheet::parse(&rewrite.bytes, || Ok(None))?,
+            None => {
+                let shared_strings = source.source.shared_strings.as_ref();
+                raw::worksheet::parse(&rewrite.bytes, || {
+                    shared_strings.map(SharedStringsState::strings).transpose()
+                })?
+            },
         };
         let mut result = source.clone();
         result.cells = Arc::new(cells);
@@ -754,7 +821,11 @@ impl Snapshot {
     ) -> Option<Store> {
         let reduced =
             raw::worksheet::edit::reduced_readback(&rewrite.bytes, &rewrite.omitted).ok()?;
-        let parsed = raw::worksheet::parse(&reduced, || Ok(None)).ok()?;
+        let shared_strings = source.source.shared_strings.as_ref();
+        let parsed = raw::worksheet::parse(&reduced, || {
+            shared_strings.map(SharedStringsState::strings).transpose()
+        })
+        .ok()?;
         let mut omitted = Vec::new();
         omitted.try_reserve_exact(rewrite.omitted.len()).ok()?;
         for span in &rewrite.omitted {
@@ -915,6 +986,26 @@ impl Snapshot {
                 address,
                 reason: EditBlock::CoveredMerge,
             });
+        }
+        Ok(())
+    }
+
+    /// Keep the shared-string table's indexes stable across a value rewrite.
+    ///
+    /// Existing shared-string cells are readable because their table is part of
+    /// the retained source closure, but this editor does not author a new
+    /// table entry or rewrite an existing index. A mutation at such a cell
+    /// would remove or replace its source reference, so it is refused before
+    /// staging can produce a partial candidate.
+    pub(super) fn require_shared_string_free_target(&self, address: Address) -> Result<()> {
+        if self
+            .cells
+            .entry(address)
+            .is_some_and(|entry| entry.shared_string.is_some())
+        {
+            return Err(invalid(
+                "value-only edits cannot add, remove, or renumber shared strings",
+            ));
         }
         Ok(())
     }
@@ -1190,6 +1281,11 @@ impl Snapshot {
         {
             return false;
         }
+        if let Some(shared_strings) = self.source.shared_strings.as_ref()
+            && !shared_strings.matches_current_source(package, workbook)
+        {
+            return false;
+        }
         // Change 0602's D3 restates this assertion rather than deleting it:
         // where it used to require the readback worksheet to carry no
         // relationship at all, it now requires the readback part's
@@ -1361,6 +1457,7 @@ struct SourceState {
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
     calculation_chain: Option<CalculationChainState>,
+    shared_strings: Option<SharedStringsState>,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
     context: Option<ExecutionContext>,
@@ -1381,6 +1478,7 @@ impl SourceState {
             && self.package_relationships == other.package_relationships
             && self.workbook_relationships == other.workbook_relationships
             && self.calculation_chain == other.calculation_chain
+            && optional_shared_strings_same(&self.shared_strings, &other.shared_strings)
             && self.auxiliary == other.auxiliary
             && self.graph == other.graph
             && match (&self.source_lineage, &other.source_lineage) {
@@ -1405,6 +1503,69 @@ struct PartState {
 struct CalculationChainState {
     part: PartState,
     relationship: SourceRelationship,
+}
+
+/// The source-backed shared-string relationship and its retained bytes.
+///
+/// The part is captured with the rest of the source closure so publication can
+/// prove that the table was not replaced or renumbered. The parsed table is
+/// shared by snapshots and initialized only when a worksheet parser actually
+/// encounters a `t="s"` cell.
+#[derive(Clone, Debug)]
+struct SharedStringsState {
+    relationship: SourceRelationship,
+    part: PartState,
+    table: Arc<OnceLock<Box<[Text]>>>,
+}
+
+impl SharedStringsState {
+    fn new(
+        relationship: &Relationship,
+        uri: PackURI,
+        content_type: &str,
+        bytes: SourcePayload,
+    ) -> Result<Self> {
+        Ok(Self {
+            relationship: SourceRelationship::capture(relationship)?,
+            part: PartState::new(uri, content_type, bytes)?,
+            table: Arc::new(OnceLock::new()),
+        })
+    }
+
+    fn strings(&self) -> Result<&[Text]> {
+        if let Some(table) = self.table.get() {
+            return Ok(table);
+        }
+        let parsed = raw::strings::parse(self.part.bytes.as_bytes())?;
+        let _ = self.table.set(parsed);
+        self.table.get().map_or_else(
+            || {
+                Err(invalid(
+                    "shared-string table initialization did not publish a value",
+                ))
+            },
+            |table| Ok(table.as_ref()),
+        )
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.relationship == other.relationship && self.part == other.part
+    }
+
+    fn matches_current_source(&self, package: &OpcPackage, workbook: &dyn Part) -> bool {
+        let Some(relationship) = workbook.rels().get(self.relationship.id.as_ref()) else {
+            return false;
+        };
+        let Ok(uri) = relationship.target_partname() else {
+            return false;
+        };
+        let Ok(part) = package.get_part(&uri) else {
+            return false;
+        };
+        self.relationship.matches(relationship)
+            && self.part.matches_part(part)
+            && part.rels().is_empty()
+    }
 }
 
 impl PartState {
@@ -1773,15 +1934,87 @@ fn capture_calculation_chain_owned(
     }))
 }
 
+fn shared_strings_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS
+        )
+    });
+    let first = matching.next();
+    if matching.next().is_some() {
+        return Err(invalid("workbook has multiple shared-string relationships"));
+    }
+    Ok(first)
+}
+
+fn capture_shared_strings_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+) -> Result<Option<SharedStringsState>> {
+    let Some(relationship) = shared_strings_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("shared-string relationship cannot be external"));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if !part.rels().is_empty() {
+        return Err(invalid("shared-string Part has unsupported topology"));
+    }
+    if part.content_type() != ct::SML_SHARED_STRINGS {
+        return Err(invalid(format!(
+            "shared-string part has content type '{}', expected '{}'",
+            part.content_type(),
+            ct::SML_SHARED_STRINGS
+        )));
+    }
+    let bytes = SourcePayload::from_part_data(package, part.data()?)?;
+    SharedStringsState::new(
+        relationship,
+        part.partname().clone(),
+        part.content_type(),
+        bytes,
+    )
+    .map(Some)
+}
+
+fn capture_shared_strings_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+) -> Result<Option<SharedStringsState>> {
+    let Some(relationship) = shared_strings_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("shared-string relationship cannot be external"));
+    }
+    let part = package.get_part(&relationship.target_partname()?)?;
+    if !part.rels().is_empty() {
+        return Err(invalid("shared-string Part has unsupported topology"));
+    }
+    if part.content_type() != ct::SML_SHARED_STRINGS {
+        return Err(invalid(format!(
+            "shared-string part has content type '{}', expected '{}'",
+            part.content_type(),
+            ct::SML_SHARED_STRINGS
+        )));
+    }
+    SharedStringsState::new(
+        relationship,
+        part.partname().clone(),
+        part.content_type(),
+        SourcePayload::Owned(part.blob_arc()),
+    )
+    .map(Some)
+}
+
 /// Relationship types whose target's meaning depends on a cell's value.
 ///
 /// This is the dependency rule's refusal set, and the reason each member is
 /// in it is that the target stores a copy of, or a name derived from, a value
 /// the editor may replace:
 ///
-/// * `sharedStrings` — the text of every `t="s"` cell lives in that part, so
-///   reading or writing such a cell means modelling the table. D2 of change
-///   0602 designs that; decision 7 of change 0652 does not authorize it.
 /// * `pivotCacheDefinition`, `pivotCacheRecords` — the cache holds a copy of
 ///   the source cells, which an edit would silently disagree with.
 /// * `table`, `queryTable` — a table column is named after the text of its
@@ -1794,9 +2027,7 @@ fn capture_calculation_chain_owned(
 fn value_dependent_relationship(reltype: &str) -> bool {
     matches!(
         reltype,
-        rt::SHARED_STRINGS
-            | rt::STRICT_SHARED_STRINGS
-            | rt::PIVOT_CACHE_DEFINITION
+        rt::PIVOT_CACHE_DEFINITION
             | rt::STRICT_PIVOT_CACHE_DEFINITION
             | rt::PIVOT_CACHE_RECORDS
             | rt::STRICT_PIVOT_CACHE_RECORDS
@@ -1835,10 +2066,11 @@ fn validate_worksheet_relationships(relationships: &Relationships) -> Result<()>
 
 /// Admit a workbook relationship the value-only closure does not interpret.
 ///
-/// The four types this function counts are the ones the closure models: the
+/// The five types this function counts are the ones the closure models: the
 /// worksheets it edits, the styles table it validates cell style indexes
-/// against, the theme it retains beside it, and the calculation chain it
-/// drops atomically with its relationship. Their cardinalities are unchanged.
+/// against, the theme and shared-string table it retains beside it, and the
+/// calculation chain it drops atomically with its relationship. Their
+/// cardinalities are bounded to one except for worksheets.
 /// Every other type is unfamiliar and is transferred verbatim, except the
 /// value-dependent set above.
 fn validate_workbook_relationships(
@@ -1848,6 +2080,7 @@ fn validate_workbook_relationships(
     let mut worksheets = 0usize;
     let mut styles = 0usize;
     let mut themes = 0usize;
+    let mut shared_strings = 0usize;
     let mut calculation_chains = 0usize;
     for relationship in relationships.iter() {
         if relationship.is_external() {
@@ -1865,6 +2098,7 @@ fn validate_workbook_relationships(
             rt::WORKSHEET | rt::STRICT_WORKSHEET => worksheets += 1,
             rt::STYLES | rt::STRICT_STYLES => styles += 1,
             rt::THEME => themes += 1,
+            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS => shared_strings += 1,
             rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN => calculation_chains += 1,
             _ => {},
         }
@@ -1874,9 +2108,10 @@ fn validate_workbook_relationships(
     } else {
         worksheets > 0
     };
-    if !worksheets_valid || styles > 1 || themes > 1 || calculation_chains > 1 {
+    if !worksheets_valid || styles > 1 || themes > 1 || shared_strings > 1 || calculation_chains > 1
+    {
         return Err(invalid(
-            "cell edits require worksheet relationships and at most one styles, theme, and calculation-chain relationship",
+            "cell edits require worksheet relationships and at most one styles, theme, shared-string, and calculation-chain relationship",
         ));
     }
     Ok(())
@@ -1993,6 +2228,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
     let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+    let shared_strings = capture_shared_strings_source(package, &workbook)?;
     let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
     let graph = capture_sheet_graph_source(package, &workbook, &catalog.sheets, &parts)?;
     package.check_execution()?;
@@ -2009,6 +2245,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
         package_relationships: Arc::from(capture_relationships(package.rels())?),
         workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
         calculation_chain,
+        shared_strings,
         style_count,
         auxiliary: Arc::from(auxiliary),
         graph: Arc::from(graph),
@@ -2032,6 +2269,7 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
     let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+    let shared_strings = capture_shared_strings_owned(package, workbook)?;
     let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
     let graph = capture_sheet_graph_owned(package, workbook, &catalog.sheets, &parts)?;
     Ok(OwnedCatalogCapture {
@@ -2047,6 +2285,7 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
         package_relationships: Arc::from(capture_relationships(package.rels())?),
         workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
         calculation_chain,
+        shared_strings,
         style_count,
         auxiliary: Arc::from(auxiliary),
         graph: Arc::from(graph),
@@ -2091,6 +2330,17 @@ fn validate_package_relationships(relationships: &Relationships) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn optional_shared_strings_same(
+    left: &Option<SharedStringsState>,
+    right: &Option<SharedStringsState>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => left.same_source(right),
+        (None, None) => true,
+        (None, Some(_)) | (Some(_), None) => false,
+    }
 }
 
 /// The workbook's styles and theme relationships in rId byte order.
