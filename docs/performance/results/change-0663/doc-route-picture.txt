@@ -1,0 +1,34 @@
+Fixture: `test-data/ole/doc/FloatingPictures.doc` (335,360 source bytes)
+Probe: `docs/performance/results/change-0617/probe` `cfb_save_probe`
+Method: hyperfine, 3 warmups, 30 runs, process wall time, no CPU pinning.
+
+The before binary was built from the clean `70d7768cc` checkout; the after
+binary was built from this 0663 worktree. Both `--report` runs produced the
+same logical edit: 13 streams, 324,540 source stream bytes, 264,190 unchanged
+bytes, `1Table` 21,575 -> 26,726 bytes, `WordDocument` 38,775 -> 44,032
+bytes, and 342,528 output bytes.
+
+leg                         median_ms  mean_ms
+before opened-DOC commit       2.4811    2.5551
+after opened-DOC Reuse commit  2.5383    2.5601
+after container Reuse          2.9724    2.9871
+after container Rewrite        3.9763    4.0321
+
+The before/after opened-DOC comparison is approximately +2.30% at the median,
+without a paired A/A floor, so it is recorded as an attribution check and no
+DOC latency claim is made. The two container-only legs are a current-policy
+control: Reuse retains source placement while Rewrite compacts, and their
+25.25% median separation does not establish an end-to-end DOC speedup. The
+container control is distinct from the CFB `picture.doc` release timing in
+`timing-picture-doc.txt`, which uses 24 ABBA samples and reports a regression
+for Reuse.
+
+Commands (paths shortened only for readability):
+
+```text
+hyperfine -N --warmup 3 --runs 30 \
+  -n before-doc '<before>/release/cfb_save_probe --input <before-repo>/test-data/ole/doc/FloatingPictures.doc --format doc --operation commit --warmups 0 --samples 1' \
+  -n after-doc-reuse '<after>/release/cfb_save_probe --input <repo>/test-data/ole/doc/FloatingPictures.doc --format doc --operation commit --warmups 0 --samples 1' \
+  -n after-container-reuse '<after>/release/cfb_save_probe --input <repo>/test-data/ole/doc/FloatingPictures.doc --format doc --operation container --warmups 0 --samples 1' \
+  -n after-container-rewrite 'LITCHI_PROBE_REWRITE=1 <rewrite>/release/cfb_save_probe --input <repo>/test-data/ole/doc/FloatingPictures.doc --format doc --operation container --warmups 0 --samples 1'
+```

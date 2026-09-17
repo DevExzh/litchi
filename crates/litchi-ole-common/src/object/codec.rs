@@ -6,7 +6,11 @@ use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
 use crate::property_set::Guid;
 use crate::protection::reject_protected_container;
-use litchi_cfb::{OleError, OleFile, OleWriter, SectorLayoutPolicy};
+use litchi_cfb::{
+    OleError, OleFile, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay,
+    SectorLayoutPolicy, SharedOleFile,
+};
+use litchi_core::OwnedSource;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -130,7 +134,12 @@ impl Package {
             .iter_mut()
             .find(|stream| stream.path() == path)
             .ok_or(OleError::StreamNotFound)?;
-        *stream = Stream::new(path.to_vec(), data, None);
+        // Replacing bytes does not edit the stream's directory metadata. Keep
+        // that projection available so an equal-length replacement can use
+        // the validated physical overlay; length changes still decline that
+        // path and let the source-layout writer patch start/size fields.
+        let directory = stream.directory().copied();
+        *stream = Stream::new(path.to_vec(), data, directory);
         self.check(limits)
     }
 
@@ -461,9 +470,10 @@ impl Package {
         if let Some(source) = source {
             writer.adopt_source_layout(source)?;
         }
-        if let Some(clsid) = self.root_clsid {
-            writer.set_root_clsid(*clsid.as_bytes());
-        }
+        // A missing class ID is an explicit clear for a source-backed render;
+        // otherwise the source-layout planner would preserve the old bytes and
+        // make a directory transaction that removed a CLSID ineffective.
+        writer.set_root_clsid(self.root_clsid.map_or([0; 16], |clsid| *clsid.as_bytes()));
         let mut storages = self.storages.clone();
         storages.sort_by(|left, right| {
             left.path()
@@ -474,9 +484,12 @@ impl Package {
         for storage in &storages {
             let refs = path_refs(storage.path());
             writer.create_storage(&refs)?;
-            if let Some(clsid) = storage.class_id() {
-                writer.set_storage_clsid(&refs, *clsid.as_bytes())?;
-            }
+            writer.set_storage_clsid(
+                &refs,
+                storage
+                    .class_id()
+                    .map_or([0; 16], |clsid| *clsid.as_bytes()),
+            )?;
         }
         for stream in &self.streams {
             let refs = path_refs(stream.path());
@@ -485,6 +498,155 @@ impl Package {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output)?;
         Ok(output.into_inner())
+    }
+
+    /// Publishes equal-length stream edits through the validated source-backed
+    /// overlay path.  The source model and directory topology must be the
+    /// original one; a length change, entry change, or metadata edit returns
+    /// `Ok(None)` so the caller can use the sector-layout writer instead.
+    ///
+    /// The composed positional view is reopened and every stream is read back
+    /// before the returned bytes are materialized.  This keeps the 0617
+    /// pre-emission invariant: a sink never observes an unvalidated candidate,
+    /// and untouched streams are checked against their captured source bytes.
+    pub(crate) fn render_copy_through(
+        &self,
+        baseline: &Self,
+        source: &Arc<Vec<u8>>,
+        limits: Limits,
+    ) -> Result<Option<Vec<u8>>, OleError> {
+        let Some(overlays) = self.same_length_overlays(baseline, limits)? else {
+            return Ok(None);
+        };
+        if overlays.is_empty() {
+            return Ok(Some(source.as_ref().clone()));
+        }
+        // The overlay plan changes payload spans only. A version-3 directory
+        // entry stores a reserved high size word that the CFB writer
+        // canonicalizes to zero even for an unchanged empty stream. If an
+        // adopted source carries a nonzero reserved word, decline this path so
+        // the source-layout writer can normalize it before publication.
+        match source_v3_stream_size_needs_normalization(source) {
+            Ok(true) => return Ok(None),
+            Ok(false) => {},
+            Err(error @ OleError::Allocation { .. }) => return Err(error),
+            Err(_) => return Ok(None),
+        }
+
+        let source_adapter = OwnedSource::from_arc(Arc::clone(source));
+        let shared = match SharedOleFile::open(Arc::new(source_adapter)) {
+            Ok(shared) => shared,
+            Err(error) => return overlay_fallback(error.into()),
+        };
+        let overlay_limits = match OverlayLimits::new(
+            limits.max_streams.min(65_536),
+            65_536,
+            limits.max_total_size,
+        ) {
+            Ok(limits) => limits,
+            Err(error) => return overlay_fallback(error),
+        };
+        let plan = match shared.plan_same_length_stream_overlays(overlays, overlay_limits) {
+            Ok(plan) => plan,
+            Err(error) => return overlay_fallback(error),
+        };
+
+        // Reopen the composed read-only view before allocating the output.
+        // This validates the complete CFB partition and the stream identities
+        // for both changed and untouched streams without a second artifact.
+        let composed = match plan.composed_source() {
+            Ok(composed) => composed,
+            Err(error) => return overlay_fallback(error),
+        };
+        let candidate = match SharedOleFile::open(Arc::new(composed)) {
+            Ok(candidate) => candidate,
+            Err(error) => return overlay_fallback(error.into()),
+        };
+        for stream in &self.streams {
+            let refs: Vec<&str> = stream.path().iter().map(String::as_str).collect();
+            let bytes = match candidate.open_stream(&refs) {
+                Ok(bytes) => bytes,
+                Err(error) => return overlay_fallback(error.into()),
+            };
+            if bytes.as_slice() != stream.bytes() {
+                return Ok(None);
+            }
+            if let Some(original) = baseline.stream(stream.path())
+                && original == stream.bytes()
+                && bytes.as_slice() != original
+            {
+                return Ok(None);
+            }
+        }
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(source.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "copy-through output",
+                source,
+            })?;
+        if let Err(error) = plan.write_to(&mut output) {
+            return overlay_fallback(error);
+        }
+        Ok(Some(output))
+    }
+
+    fn same_length_overlays(
+        &self,
+        baseline: &Self,
+        limits: Limits,
+    ) -> Result<Option<Vec<SameLengthStreamOverlay>>, OleError> {
+        if self.streams.len() > limits.max_streams {
+            return Ok(None);
+        }
+        if self.sector_size != baseline.sector_size
+            || self.root_clsid != baseline.root_clsid
+            || self.storages != baseline.storages
+            || self.streams.len() != baseline.streams.len()
+        {
+            return Ok(None);
+        }
+        let mut by_path = HashMap::new();
+        by_path
+            .try_reserve(baseline.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB copy-through stream index",
+                source,
+            })?;
+        for stream in &baseline.streams {
+            by_path.insert(stream.path(), stream);
+        }
+
+        let mut overlays = Vec::new();
+        overlays
+            .try_reserve(self.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB copy-through overlays",
+                source,
+            })?;
+        for stream in &self.streams {
+            let Some(original) = by_path.get(stream.path()).copied() else {
+                return Ok(None);
+            };
+            if stream.bytes().len() != original.bytes().len() {
+                return Ok(None);
+            }
+            if stream.directory() != original.directory() {
+                return Ok(None);
+            }
+            if stream.bytes() == original.bytes() {
+                continue;
+            }
+            overlays.push(SameLengthStreamOverlay::new(
+                stream.path().to_vec(),
+                stream.bytes_shared(),
+            ));
+        }
+        if by_path.len() != self.streams.len() {
+            return Ok(None);
+        }
+        Ok(Some(overlays))
     }
 
     pub(crate) fn check(&self, limits: Limits) -> Result<(), OleError> {
@@ -541,6 +703,168 @@ impl Package {
             Arc::from(compound),
         ))
     }
+}
+
+fn overlay_fallback(error: OverlayError) -> Result<Option<Vec<u8>>, OleError> {
+    match error {
+        OverlayError::Unavailable { .. }
+        | OverlayError::Ole(_)
+        | OverlayError::SourceChanged { .. }
+        | OverlayError::SourceFingerprintChanged { .. }
+        | OverlayError::PreconditionFailed { .. }
+        | OverlayError::TargetFingerprintChanged { .. } => Ok(None),
+        OverlayError::Allocation { resource, source } => {
+            Err(OleError::Allocation { resource, source })
+        },
+        OverlayError::Io(source) => Err(OleError::Io(source)),
+        OverlayError::Committed { source } => Err(OleError::Committed { source }),
+        OverlayError::IncompleteOutput { source, .. } => overlay_fallback(*source),
+        _ => Ok(None),
+    }
+}
+
+/// Returns whether a version-3 source has a nonzero reserved high size word
+/// in any stream directory entry. The source has already passed the ordinary
+/// CFB parser at this point, so this bounded raw walk only decides whether the
+/// payload-only overlay may preserve the directory image. DIFAT sources are
+/// conservatively declined to the layout writer as well.
+fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, OleError> {
+    const MAJOR_VERSION_OFFSET: usize = 0x1A;
+    const SECTOR_SHIFT_OFFSET: usize = 0x1E;
+    const FAT_COUNT_OFFSET: usize = 0x2C;
+    const FIRST_DIRECTORY_SECTOR_OFFSET: usize = 0x30;
+    const DIFAT_SECTOR_COUNT_OFFSET: usize = 0x48;
+    const HEADER_DIFAT_OFFSET: usize = 0x4C;
+    const DIRECTORY_ENTRY_SIZE: usize = 128;
+    const ENTRY_TYPE_OFFSET: usize = 0x42;
+    const ENTRY_SIZE_HIGH_OFFSET: usize = 0x7C;
+    const ENDOFCHAIN: u32 = 0xFFFF_FFFE;
+    const HEADER_DIFAT_ENTRIES: usize = 109;
+
+    let major = u16::from_le_bytes(
+        source
+            .get(MAJOR_VERSION_OFFSET..MAJOR_VERSION_OFFSET + 2)
+            .ok_or_else(|| OleError::InvalidFormat("CFB header is truncated".into()))?
+            .try_into()
+            .map_err(|_| OleError::InvalidFormat("CFB header version is truncated".into()))?,
+    );
+    if major != 3 {
+        return Ok(false);
+    }
+    let shift = u16::from_le_bytes(
+        source
+            .get(SECTOR_SHIFT_OFFSET..SECTOR_SHIFT_OFFSET + 2)
+            .ok_or_else(|| OleError::InvalidFormat("CFB sector shift is truncated".into()))?
+            .try_into()
+            .map_err(|_| OleError::InvalidFormat("CFB sector shift is truncated".into()))?,
+    );
+    let sector_size = match shift {
+        9 => 512usize,
+        12 => 4096usize,
+        _ => {
+            return Err(OleError::InvalidFormat(
+                "CFB sector shift is invalid".into(),
+            ));
+        },
+    };
+    let header = source
+        .get(..sector_size)
+        .ok_or_else(|| OleError::InvalidFormat("CFB header is truncated".into()))?;
+    let read_u32 = |offset: usize| -> Result<u32, OleError> {
+        Ok(u32::from_le_bytes(
+            header
+                .get(offset..offset + 4)
+                .ok_or_else(|| OleError::InvalidFormat("CFB header field is truncated".into()))?
+                .try_into()
+                .map_err(|_| OleError::InvalidFormat("CFB header field is truncated".into()))?,
+        ))
+    };
+    if read_u32(DIFAT_SECTOR_COUNT_OFFSET)? != 0 {
+        return Ok(true);
+    }
+    let fat_count = usize::try_from(read_u32(FAT_COUNT_OFFSET)?)
+        .map_err(|_| OleError::InvalidFormat("CFB FAT count does not fit usize".into()))?;
+    if fat_count > HEADER_DIFAT_ENTRIES {
+        return Ok(true);
+    }
+    let entries_per_sector = sector_size / 4;
+    let fat_entries = fat_count
+        .checked_mul(entries_per_sector)
+        .ok_or_else(|| OleError::InvalidFormat("CFB FAT count overflows usize".into()))?;
+    let mut fat = Vec::new();
+    fat.try_reserve_exact(fat_entries)
+        .map_err(|source| OleError::Allocation {
+            resource: "CFB v3 overlay FAT",
+            source,
+        })?;
+    for index in 0..fat_count {
+        let difat_offset = HEADER_DIFAT_OFFSET
+            .checked_add(index.checked_mul(4).ok_or_else(|| {
+                OleError::InvalidFormat("CFB DIFAT offset overflows usize".into())
+            })?)
+            .ok_or_else(|| OleError::InvalidFormat("CFB DIFAT offset overflows usize".into()))?;
+        let sector = u32::from_le_bytes(
+            header
+                .get(difat_offset..difat_offset + 4)
+                .ok_or_else(|| OleError::InvalidFormat("CFB DIFAT entry is truncated".into()))?
+                .try_into()
+                .map_err(|_| OleError::InvalidFormat("CFB DIFAT entry is truncated".into()))?,
+        );
+        let start = usize::try_from(sector)
+            .ok()
+            .and_then(|sector| sector.checked_add(1))
+            .and_then(|sector| sector.checked_mul(sector_size))
+            .ok_or_else(|| OleError::InvalidFormat("CFB FAT sector offset overflows".into()))?;
+        let end = start
+            .checked_add(sector_size)
+            .ok_or_else(|| OleError::InvalidFormat("CFB FAT sector end overflows".into()))?;
+        let fat_sector = source
+            .get(start..end)
+            .ok_or_else(|| OleError::InvalidFormat("CFB FAT sector is truncated".into()))?;
+        for word in fat_sector.chunks_exact(4) {
+            fat.push(u32::from_le_bytes(word.try_into().map_err(|_| {
+                OleError::InvalidFormat("CFB FAT word is truncated".into())
+            })?));
+        }
+    }
+
+    let mut sector = read_u32(FIRST_DIRECTORY_SECTOR_OFFSET)?;
+    let max_steps = source.len() / sector_size + 1;
+    for _ in 0..=max_steps {
+        if sector == ENDOFCHAIN {
+            return Ok(false);
+        }
+        let sector_index = usize::try_from(sector).map_err(|_| {
+            OleError::InvalidFormat("CFB directory sector does not fit usize".into())
+        })?;
+        let start = sector_index
+            .checked_add(1)
+            .and_then(|value| value.checked_mul(sector_size))
+            .ok_or_else(|| {
+                OleError::InvalidFormat("CFB directory sector offset overflows".into())
+            })?;
+        let end = start
+            .checked_add(sector_size)
+            .ok_or_else(|| OleError::InvalidFormat("CFB directory sector end overflows".into()))?;
+        let directory_sector = source
+            .get(start..end)
+            .ok_or_else(|| OleError::InvalidFormat("CFB directory sector is truncated".into()))?;
+        for entry in directory_sector.chunks_exact(DIRECTORY_ENTRY_SIZE) {
+            if entry[ENTRY_TYPE_OFFSET] == 2
+                && entry[ENTRY_SIZE_HIGH_OFFSET..ENTRY_SIZE_HIGH_OFFSET + 4]
+                    .iter()
+                    .any(|byte| *byte != 0)
+            {
+                return Ok(true);
+            }
+        }
+        sector = *fat
+            .get(sector_index)
+            .ok_or_else(|| OleError::InvalidFormat("CFB directory chain leaves FAT".into()))?;
+    }
+    Err(OleError::InvalidFormat(
+        "CFB directory chain exceeds the source bound".into(),
+    ))
 }
 
 struct Budget {

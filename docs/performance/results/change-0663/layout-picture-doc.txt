@@ -8,6 +8,7 @@ noop                 1448448        1447936            2828  2795         32    
 same-length          1448448        1447936            2828  2795         32         0          0     1
 length-changing      1449984        1449984            2831  2795         36         3          1     0
 
-`kept` is source placement retention. The emitter still writes the output
-sectors through the generic sink; these numbers do not measure avoided payload
-copies.
+`kept` is source placement retention. Length-changing and metadata edits use
+the source-layout emitter. Same-length common-editor edits can use validated
+source-backed spans, but the final result is still materialized after
+readback; these numbers do not establish avoided end-to-end payload copies.

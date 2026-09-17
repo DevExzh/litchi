@@ -18,6 +18,7 @@ struct State {
     targets: Targets,
     limits: super::model::Limits,
     original: Arc<Vec<u8>>,
+    base_package: Package,
     package: Package,
     objects: Objects,
     changed: bool,
@@ -41,6 +42,7 @@ impl Snapshot {
         targets: Targets,
         limits: super::model::Limits,
         original: Arc<Vec<u8>>,
+        base_package: Package,
         package: Package,
         objects: Objects,
         changed: bool,
@@ -51,6 +53,7 @@ impl Snapshot {
                 targets,
                 limits,
                 original,
+                base_package,
                 package,
                 objects,
                 changed,
@@ -142,6 +145,15 @@ impl Snapshot {
     /// Returns an error when the captured package cannot be rendered.
     pub fn finish(&self) -> Result<Vec<u8>, OleError> {
         if self.state.changed {
+            if self.state.layout == SectorLayoutPolicy::Reuse
+                && let Some(rendered) = self.state.package.render_copy_through(
+                    &self.state.base_package,
+                    &self.state.original,
+                    self.state.limits,
+                )?
+            {
+                return Ok(rendered);
+            }
             self.state
                 .package
                 .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)
@@ -160,6 +172,10 @@ impl Snapshot {
 
     pub(crate) fn package(&self) -> Package {
         self.state.package.clone()
+    }
+
+    pub(crate) fn base_package(&self) -> Package {
+        self.state.base_package.clone()
     }
 
     pub(crate) fn objects_clone(&self) -> Objects {

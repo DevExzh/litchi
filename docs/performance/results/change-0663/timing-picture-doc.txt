@@ -3,10 +3,14 @@ Method: release integration test, 24 ABBA samples per window, source adopted
 for both Reuse and Rewrite, three warmups, same-window paired A/A floor.
 
 window  reuse_p50_ns  rewrite_p50_ns  reuse_AA_floor_p50  rewrite_AA_floor_p50
-1             265081          252786               2.58%                 2.65%
-2             255796          241471               3.33%                 1.99%
-3             263856          245191               7.47%                 4.19%
+1             350291          248411               1.74%                 2.15%
+2             344796          246556               1.80%                 2.66%
+3             348376          249481               2.64%                 2.21%
 
-The observed Reuse p50 difference is within the noisy floor range across the
-windows. No timing claim is registered. The measurement includes source-layout
-parsing and planning and does not claim avoided payload-copy work.
+Reuse is slower than Rewrite in all three windows: +41.01%, +39.93%, and
++39.64% respectively. Each exceeds that window's Reuse A/A floor (1.74%,
+1.80%, and 2.64%), so this is recorded as an engineering regression signal for
+this fixture and no latency claim is registered. The measurement includes
+source-layout parsing, planning, composed-view validation and one final sink
+emission; it does not isolate the same-length common-editor overlay path or
+claim avoided payload-copy work.

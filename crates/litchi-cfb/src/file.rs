@@ -364,6 +364,42 @@ impl OleFileLimits {
     /// Largest directory stream ceiling accepted by the low-level CFB reader.
     pub const MAX_DIRECTORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
+    /// Largest v4 artifact a checked writer plan can describe. This is kept
+    /// separate from the public ingress ceiling so ordinary untrusted input
+    /// remains bounded at 2 GiB while a writer validates its already checked
+    /// `MAXREGSECT` plan without imposing a hidden v3-sized cap on 4096-byte
+    /// output.
+    pub(crate) const MAX_WRITER_INPUT_BYTES: u64 =
+        (MAXREGSECT as u64 + 1) * (SECTOR_SIZE_V4 as u64);
+
+    /// Builds limits for a checked writer candidate. The writer has already
+    /// bounded its sector count and supplies the exact directory image size,
+    /// so validation may use the v4 representable bound and avoid the public
+    /// default's 64 MiB directory ceiling.
+    pub(crate) fn for_writer(
+        max_input_bytes: u64,
+        max_directory_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_input_bytes == 0 || max_input_bytes > Self::MAX_WRITER_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB writer candidate bytes",
+                value: max_input_bytes,
+                maximum: Self::MAX_WRITER_INPUT_BYTES,
+            });
+        }
+        if max_directory_bytes == 0 || max_directory_bytes > Self::MAX_WRITER_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB writer candidate directory bytes",
+                value: max_directory_bytes,
+                maximum: Self::MAX_WRITER_INPUT_BYTES,
+            });
+        }
+        Ok(Self {
+            max_input_bytes,
+            max_directory_bytes,
+        })
+    }
+
     /// Creates a finite input ceiling for one CFB source.
     ///
     /// # Errors

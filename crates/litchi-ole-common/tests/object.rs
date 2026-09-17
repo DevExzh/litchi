@@ -23,6 +23,28 @@ fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
     output.into_inner()
 }
 
+fn first_free_sector(bytes: &[u8]) -> usize {
+    let sector_size = 1usize << u16::from_le_bytes(bytes[0x1E..0x20].try_into().unwrap());
+    let fat_count = u32::from_le_bytes(bytes[0x2C..0x30].try_into().unwrap()) as usize;
+    let mut fat = Vec::new();
+    for index in 0..fat_count {
+        let sector = u32::from_le_bytes(
+            bytes[0x4C + index * 4..0x50 + index * 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let start = (sector + 1) * sector_size;
+        for word in bytes[start..start + sector_size].chunks_exact(4) {
+            fat.push(u32::from_le_bytes(word.try_into().unwrap()));
+        }
+    }
+    let physical_sectors = bytes.len() / sector_size - 1;
+    fat.iter()
+        .take(physical_sectors)
+        .position(|entry| *entry == 0xFFFF_FFFF)
+        .expect("source should contain a free sector")
+}
+
 fn target(key: &str, path: &[&str]) -> Target {
     Target::new(key, path.iter().copied()).expect("test target should validate")
 }
@@ -350,6 +372,95 @@ fn shared_stream_replacement_reuses_validated_allocation() {
     assert_eq!(metadata.kind(), EntryKind::Stream);
     assert_eq!(metadata.stream_size(), replacement.len() as u64);
     assert!(metadata.uses_mini_stream());
+}
+
+#[test]
+fn same_length_editor_edit_uses_source_backed_copy_through() {
+    let base = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], &vec![0x11u8; 40_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source stream should write");
+    });
+    let source = {
+        let mut writer = OleWriter::new();
+        assert!(writer.adopt_source_layout(&base).unwrap());
+        writer
+            .create_stream(&["A"], &vec![0x33u8; 6_000])
+            .expect("source edit should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source edit should write");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    };
+    let free_sector = first_free_sector(&source);
+    let sector_size = 1usize << u16::from_le_bytes(source[0x1E..0x20].try_into().unwrap());
+    let free_offset = (free_sector + 1) * sector_size;
+    let mut mutated = source.clone();
+    mutated[free_offset] = 0xA7;
+
+    let mut editor = Editor::open(mutated.clone(), Targets::default(), Limits::default())
+        .expect("source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x44u8; 6_000])
+        .expect("same-length edit should commit");
+    let output = editor.finish().expect("same-length edit should finish");
+
+    assert_eq!(output.len(), mutated.len());
+    assert_eq!(
+        output[free_offset], 0xA7,
+        "copy-through retains untouched bytes"
+    );
+    let mut ole = OleFile::open(Cursor::new(output)).expect("copy-through output should reopen");
+    assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 6_000]);
+    assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
+}
+
+#[test]
+fn same_length_overlay_declines_noncanonical_v3_empty_size_word() {
+    let source = write_cfb(|writer| {
+        writer
+            .create_stream(&["Empty"], &[])
+            .expect("empty stream should write");
+        writer
+            .create_stream(&["A"], &[0x11u8; 128])
+            .expect("edited stream should write");
+    });
+    let empty_sid = {
+        let ole = OleFile::open(Cursor::new(source.clone())).expect("source should open");
+        ole.list_directory_entries(&[])
+            .expect("root entries should list")
+            .into_iter()
+            .find(|entry| entry.name == "Empty")
+            .expect("empty stream should be present")
+            .sid
+    };
+    let sector_size = 1usize << u16::from_le_bytes(source[0x1E..0x20].try_into().unwrap());
+    let first_directory_sector =
+        u32::from_le_bytes(source[0x30..0x34].try_into().unwrap()) as usize;
+    let size_high = (first_directory_sector + 1) * sector_size + empty_sid as usize * 128 + 0x7C;
+    let mut mutated = source;
+    mutated[size_high..size_high + 4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes());
+
+    let mut editor = Editor::open(mutated, Targets::default(), Limits::default())
+        .expect("mutated source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x44u8; 128])
+        .expect("same-length edit should commit");
+    let output = editor.finish().expect("fallback layout should finish");
+    let mut ole = OleFile::open(Cursor::new(output.clone())).expect("output should reopen");
+    assert_eq!(ole.open_stream(&["Empty"]).unwrap(), Vec::<u8>::new());
+    assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 128]);
+    let output_size_high =
+        (first_directory_sector + 1) * sector_size + empty_sid as usize * 128 + 0x7C;
+    assert_eq!(
+        &output[output_size_high..output_size_high + 4],
+        &[0, 0, 0, 0]
+    );
 }
 
 #[test]

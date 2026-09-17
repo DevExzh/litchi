@@ -12,6 +12,7 @@ use litchi_cfb::{
     DirectoryEntry, OleError, OleFile, OleWriter, SectorLayoutPolicy, validate_source,
 };
 use litchi_core::OwnedSource;
+use std::collections::BTreeSet;
 use std::hint::black_box;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -166,11 +167,47 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(raw)
 }
 
-/// Returns the source and reused directory streams with allocation fields
-/// blanked. This checks the byte-preservation boundary directly: sibling
-/// links, names, CLSIDs, state bits and timestamps must remain source bytes;
-/// only each stream/root start-sector and size pair may change.
-fn normalized_directory_image(bytes: &[u8]) -> Vec<u8> {
+fn directory_catalog(
+    bytes: &[u8],
+) -> std::collections::BTreeMap<Vec<String>, (u32, u8, u64, bool)> {
+    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("directory catalog");
+    let mut out = std::collections::BTreeMap::new();
+    let root = ole.root_entry().expect("root entry");
+    out.insert(
+        Vec::new(),
+        (root.sid, root.entry_type, root.size, root.is_minifat),
+    );
+    let mut pending: Vec<Vec<String>> = vec![Vec::new()];
+    while let Some(prefix) = pending.pop() {
+        let refs: Vec<&str> = prefix.iter().map(String::as_str).collect();
+        for entry in ole
+            .list_directory_entries(&refs)
+            .expect("directory entries")
+        {
+            let mut path = prefix.clone();
+            path.push(entry.name.clone());
+            out.insert(
+                path.clone(),
+                (entry.sid, entry.entry_type, entry.size, entry.is_minifat),
+            );
+            if entry.entry_type == 1 {
+                pending.push(path);
+            }
+        }
+    }
+    out
+}
+
+/// Returns the raw directory image with only planner-owned allocation fields
+/// blanked. Sibling links, names, node colours, CLSIDs, state bits and both
+/// timestamps remain byte-for-byte compared with the source. Version-3 files
+/// also have an unused high size word; that word is normalized separately so
+/// the low size and starting sector remain part of the comparison.
+fn normalized_directory_image(
+    bytes: &[u8],
+    allocation_sids: &BTreeSet<u32>,
+    v3_size_sids: &BTreeSet<u32>,
+) -> Vec<u8> {
     let sector_shift = u16::from_le_bytes(bytes[0x1E..0x20].try_into().expect("sector shift"));
     let sector_size = 1usize << sector_shift;
     assert!(sector_size == 512 || sector_size == 4096, "sector size");
@@ -192,7 +229,7 @@ fn normalized_directory_image(bytes: &[u8]) -> Vec<u8> {
     }
     let mut image = Vec::new();
     let mut sector = u32_at(header, 0x30);
-    let mut seen = std::collections::BTreeSet::new();
+    let mut seen = BTreeSet::new();
     while sector != ENDOFCHAIN {
         assert!(seen.insert(sector), "directory chain cycle");
         let start = (sector as usize + 1) * sector_size;
@@ -200,8 +237,12 @@ fn normalized_directory_image(bytes: &[u8]) -> Vec<u8> {
         sector = fat[sector as usize];
     }
     assert_eq!(image.len() % DIRECTORY_ENTRY_SIZE, 0);
-    for entry in image.chunks_exact_mut(DIRECTORY_ENTRY_SIZE) {
-        entry[ENTRY_START_SECTOR_OFFSET..ENTRY_STREAM_SIZE_OFFSET + 8].fill(0);
+    for (sid, entry) in image.chunks_exact_mut(DIRECTORY_ENTRY_SIZE).enumerate() {
+        if allocation_sids.contains(&(sid as u32)) {
+            entry[ENTRY_START_SECTOR_OFFSET..ENTRY_STREAM_SIZE_OFFSET + 8].fill(0);
+        } else if v3_size_sids.contains(&(sid as u32)) {
+            entry[ENTRY_STREAM_SIZE_OFFSET + 4..ENTRY_STREAM_SIZE_OFFSET + 8].fill(0);
+        }
     }
     image
 }
@@ -236,9 +277,31 @@ fn compare(
         "{label}: reused directory metadata"
     );
     if reused_layout {
+        let source_catalog = directory_catalog(source);
+        let sector_shift = u16::from_le_bytes(source[0x1E..0x20].try_into().unwrap());
+        let sector_size = 1usize << sector_shift;
+        let cutoff = u64::from(u32_at(source, 0x38));
+        let mut allocation_sids = BTreeSet::new();
+        // The root allocation is always serialized by the planner. Version-3
+        // files also require its unused high size word to be canonicalized.
+        allocation_sids.insert(0);
+        let mut v3_size_sids = BTreeSet::new();
+        for (path, bytes) in &expected.streams {
+            let Some((sid, _kind, old_size, old_is_mini)) = source_catalog.get(path) else {
+                continue;
+            };
+            let new_size = u64::try_from(bytes.len()).expect("stream size");
+            let new_is_mini = new_size > 0 && new_size < cutoff;
+            if *old_size != new_size || *old_is_mini != new_is_mini {
+                allocation_sids.insert(*sid);
+            }
+            if sector_size == 512 {
+                v3_size_sids.insert(*sid);
+            }
+        }
         assert_eq!(
-            normalized_directory_image(reused),
-            normalized_directory_image(source),
+            normalized_directory_image(reused, &allocation_sids, &v3_size_sids),
+            normalized_directory_image(source, &allocation_sids, &v3_size_sids),
             "{label}: reused directory bytes changed outside stream allocation fields"
         );
     }

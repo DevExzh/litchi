@@ -26,9 +26,9 @@ use super::super::consts::{
     DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET,
     MAXREGSECT, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
-use super::super::file::{OleError, OleFile};
+use super::super::file::{OleError, OleFile, OleFileLimits};
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{Cursor, Write};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 /// Header offset of the Number of Directory Sectors field (MS-CFB 2.2).
 const NUM_DIR_SECTORS_OFFSET: usize = 0x28;
@@ -300,6 +300,54 @@ fn filled_vec(len: usize, value: u32, resource: &'static str) -> Result<Vec<u32>
     Ok(out)
 }
 
+const BITSET_WORD_BITS: usize = u64::BITS as usize;
+
+/// Fallible membership tracking for source-sized indexes.  Source directory
+/// and MiniFAT counts are untrusted, so a `vec![false; count]` would turn a
+/// hostile but representable count into an infallible allocation.
+#[derive(Debug)]
+struct LayoutBitSet {
+    words: Vec<u64>,
+    bit_len: usize,
+}
+
+impl LayoutBitSet {
+    fn try_with_capacity(bit_len: usize, resource: &'static str) -> Result<Self, OleError> {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(word_count)
+            .map_err(|source| OleError::allocation(resource, source))?;
+        words.resize(word_count, 0);
+        Ok(Self { words, bit_len })
+    }
+
+    fn contains(&self, bit: usize) -> bool {
+        if bit >= self.bit_len {
+            return false;
+        }
+        self.words
+            .get(bit / BITSET_WORD_BITS)
+            .is_some_and(|word| word & (1u64 << (bit % BITSET_WORD_BITS)) != 0)
+    }
+
+    fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+        if bit >= self.bit_len {
+            return Err(invalid("CFB source layout bit index is outside its bound"));
+        }
+        let word = self
+            .words
+            .get_mut(bit / BITSET_WORD_BITS)
+            .ok_or_else(|| invalid("CFB source layout bit index has no word"))?;
+        *word |= 1u64 << (bit % BITSET_WORD_BITS);
+        Ok(())
+    }
+}
+
+fn usize_from_u32(value: u32, resource: &'static str) -> Result<usize, OleError> {
+    usize::try_from(value).map_err(|_err| invalid(resource))
+}
+
 fn read_u32(bytes: &[u8], offset: usize) -> Result<u32, OleError> {
     let slice = bytes
         .get(offset..offset + 4)
@@ -377,16 +425,22 @@ impl SourceLayout {
 
         // The owner map is local: it proves the source's sectors partition
         // cleanly before any of the derived chains are trusted.
+        let sector_count_usize = usize_from_u32(
+            sector_count,
+            "CFB source sector count does not fit this platform",
+        )?;
         let mut owners =
-            reserved_vec::<SectorOwner>(sector_count as usize, "CFB source sector owners")?;
-        owners.resize(sector_count as usize, SectorOwner::Free);
+            reserved_vec::<SectorOwner>(sector_count_usize, "CFB source sector owners")?;
+        owners.resize(sector_count_usize, SectorOwner::Free);
         let fat = index.fat;
         let minifat = index.minifat;
 
         // FAT and DIFAT sectors announce themselves inside the FAT itself.
         let mut fat_sectors = Vec::new();
         for sector in 0..sector_count {
-            let entry = fat.get(sector as usize).copied().unwrap_or(FREESECT);
+            let sector_index =
+                usize_from_u32(sector, "CFB source sector index does not fit this platform")?;
+            let entry = fat.get(sector_index).copied().unwrap_or(FREESECT);
             match entry {
                 FATSECT => {
                     fat_sectors
@@ -493,11 +547,26 @@ impl SourceLayout {
                 || read_u32(&self.header_sector, FIRST_DIFAT_SECTOR_OFFSET)? != ENDOFCHAIN,
         )
     }
+
+    pub(super) const fn root_class_id(&self) -> [u8; 16] {
+        self.root_class_id
+    }
+
+    pub(super) fn storage_paths(&self) -> impl Iterator<Item = &Vec<String>> {
+        self.storage_paths.keys()
+    }
+
+    pub(super) fn storage_class_id(&self, path: &[String]) -> Option<[u8; 16]> {
+        let sid = self.storage_paths.get(path).copied()?;
+        let index = usize::try_from(sid).ok()?;
+        self.entries.get(index).map(|entry| entry.class_id)
+    }
 }
 
 fn claim(owners: &mut [SectorOwner], sector: u32, owner: SectorOwner) -> Result<(), OleError> {
+    let index = usize_from_u32(sector, "CFB source layout sector does not fit usize")?;
     let slot = owners
-        .get_mut(sector as usize)
+        .get_mut(index)
         .ok_or_else(|| invalid("CFB source layout sector is outside the artifact"))?;
     if *slot != SectorOwner::Free {
         return Err(invalid("CFB source layout sector is claimed twice"));
@@ -530,8 +599,9 @@ fn walk_chain(
             .try_reserve(1)
             .map_err(|source| OleError::allocation(resource, source))?;
         chain.push(current);
+        let index = usize_from_u32(current, "CFB source layout chain index does not fit usize")?;
         current = fat
-            .get(current as usize)
+            .get(index)
             .copied()
             .ok_or_else(|| invalid(&format!("CFB source {resource} chain leaves the FAT")))?;
     }
@@ -552,7 +622,7 @@ fn gather_sectors(
         .ok_or_else(|| invalid("CFB source layout image size overflows usize"))?;
     let mut image = reserved_vec::<u8>(bytes, resource)?;
     for sector in chain {
-        let start = (*sector as usize)
+        let start = usize_from_u32(*sector, "CFB source layout sector does not fit usize")?
             .checked_add(1)
             .and_then(|index| index.checked_mul(sector_size))
             .ok_or_else(|| invalid("CFB source layout sector offset overflows usize"))?;
@@ -568,12 +638,15 @@ fn gather_sectors(
 }
 
 fn entry_class_id(directory_image: &[u8], sid: u32) -> Result<[u8; 16], OleError> {
-    let start = (sid as usize)
+    let start = usize_from_u32(sid, "CFB directory SID does not fit usize")?
         .checked_mul(DIRENTRY_SIZE)
         .and_then(|offset| offset.checked_add(0x50))
         .ok_or_else(|| invalid("CFB directory entry offset overflows usize"))?;
+    let end = start
+        .checked_add(16)
+        .ok_or_else(|| invalid("CFB directory entry class-ID offset overflows usize"))?;
     let slice = directory_image
-        .get(start..start + 16)
+        .get(start..end)
         .ok_or_else(|| invalid("CFB directory entry is outside the directory image"))?;
     let mut class_id = [0u8; 16];
     class_id.copy_from_slice(slice);
@@ -589,24 +662,27 @@ fn collect_paths(
         .first()
         .and_then(Option::as_ref)
         .ok_or_else(|| invalid("CFB source layout has no root entry"))?;
-    let mut visited = vec![false; entries.len()];
-    visited[0] = true;
+    let mut visited = LayoutBitSet::try_with_capacity(entries.len(), "CFB source directory walk")?;
+    visited.insert(0)?;
     let mut pending: Vec<(Vec<String>, u32)> = Vec::new();
     if root.sid_child != super::super::consts::NOSTREAM {
         pending.push((Vec::new(), root.sid_child));
     }
     while let Some((prefix, sid)) = pending.pop() {
-        let slot = visited
-            .get_mut(sid as usize)
-            .ok_or_else(|| invalid("CFB source layout child SID is outside the directory"))?;
-        if *slot {
+        let sid_index = usize_from_u32(sid, "CFB source layout child SID does not fit usize")?;
+        if sid_index >= entries.len() {
+            return Err(invalid(
+                "CFB source layout child SID is outside the directory",
+            ));
+        }
+        if visited.contains(sid_index) {
             return Err(invalid(
                 "CFB source layout directory tree revisits an entry",
             ));
         }
-        *slot = true;
+        visited.insert(sid_index)?;
         let entry = entries
-            .get(sid as usize)
+            .get(sid_index)
             .and_then(Option::as_ref)
             .ok_or_else(|| invalid("CFB source layout child SID is unallocated"))?;
         let mut path = prefix.clone();
@@ -676,9 +752,232 @@ pub(super) struct ReusePlan {
     report: SectorLayoutReport,
 }
 
+/// Cursor over the bytes a reuse plan would publish. It lets the ordinary
+/// reader validate a planned artifact without first allocating a second full
+/// output buffer.
+struct PlanCursor<'a> {
+    plan: &'a ReusePlan,
+    streams: &'a [StreamInput<'a>],
+    position: u64,
+}
+
+impl<'a> PlanCursor<'a> {
+    fn new(plan: &'a ReusePlan, streams: &'a [StreamInput<'a>]) -> Self {
+        Self {
+            plan,
+            streams,
+            position: 0,
+        }
+    }
+
+    fn io_error(error: OleError) -> io::Error {
+        io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+    }
+}
+
+impl Read for PlanCursor<'_> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let read = self
+            .plan
+            .read_at(self.streams, self.position, output)
+            .map_err(Self::io_error)?;
+        self.position = self
+            .position
+            .checked_add(u64::try_from(read).map_err(|_error| {
+                io::Error::new(io::ErrorKind::InvalidData, "planned read exceeds u64")
+            })?)
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidData, "planned cursor overflows")
+            })?;
+        Ok(read)
+    }
+}
+
+impl Seek for PlanCursor<'_> {
+    fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+        let length = self.plan.output_len().map_err(Self::io_error)?;
+        let (base, offset) = match from {
+            SeekFrom::Start(position) => (i128::from(position), 0),
+            SeekFrom::Current(offset) => (i128::from(self.position), i128::from(offset)),
+            SeekFrom::End(offset) => (i128::from(length), i128::from(offset)),
+        };
+        let position = base
+            .checked_add(offset)
+            .filter(|position| *position >= 0)
+            .and_then(|position| u64::try_from(position).ok())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "planned seek overflows"))?;
+        self.position = position;
+        Ok(position)
+    }
+}
+
 impl ReusePlan {
     pub(super) const fn report(&self) -> SectorLayoutReport {
         self.report
+    }
+
+    /// Reopens a read-only composed view of the planned artifact before a
+    /// caller-owned sink sees any bytes. The ordinary CFB reader checks the
+    /// complete FAT/MiniFAT, directory and physical-sector partition; stream
+    /// readback proves that the planner emitted the model payloads at their
+    /// assigned chains. The validation view is positional and does not
+    /// allocate a second full output artifact.
+    pub(super) fn validate(&self, streams: &[StreamInput<'_>]) -> Result<(), OleError> {
+        let output_length = self.output_len()?;
+        let directory_length = u64::try_from(self.directory_image.len())
+            .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
+        let limits = OleFileLimits::for_writer(output_length, directory_length)?;
+        let mut check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        for stream in streams {
+            let mut refs = Vec::new();
+            refs.try_reserve_exact(stream.path.len())
+                .map_err(|source| OleError::allocation("CFB planned stream path", source))?;
+            refs.extend(stream.path.iter().map(String::as_str));
+            let actual = check.open_stream(&refs)?;
+            if actual.as_slice() != stream.bytes {
+                return Err(invalid("CFB reused layout stream readback differs"));
+            }
+        }
+        Ok(())
+    }
+
+    fn output_len(&self) -> Result<u64, OleError> {
+        let body = self
+            .sectors
+            .len()
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| invalid("CFB reused layout output size overflows usize"))?;
+        let length = self
+            .header_sector
+            .len()
+            .checked_add(body)
+            .ok_or_else(|| invalid("CFB reused layout output length overflows usize"))?;
+        u64::try_from(length).map_err(|_error| invalid("CFB reused layout output exceeds u64"))
+    }
+
+    fn read_at(
+        &self,
+        streams: &[StreamInput<'_>],
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<usize, OleError> {
+        let length = self.output_len()?;
+        if output.is_empty() || offset >= length {
+            return Ok(0);
+        }
+        let available = usize::try_from(
+            (length - offset).min(
+                u64::try_from(output.len())
+                    .map_err(|_error| invalid("CFB planned read length exceeds u64"))?,
+            ),
+        )
+        .map_err(|_error| invalid("CFB planned read length exceeds usize"))?;
+        let header_len = u64::try_from(self.header_sector.len())
+            .map_err(|_error| invalid("CFB planned header length exceeds u64"))?;
+        let mut written = 0usize;
+        while written < available {
+            let absolute = offset
+                .checked_add(
+                    u64::try_from(written)
+                        .map_err(|_error| invalid("CFB planned read offset exceeds u64"))?,
+                )
+                .ok_or_else(|| invalid("CFB planned read offset overflows u64"))?;
+            if absolute < header_len {
+                let source_offset = usize::try_from(absolute)
+                    .map_err(|_error| invalid("CFB planned header offset exceeds usize"))?;
+                let count = (self.header_sector.len() - source_offset).min(available - written);
+                output[written..written + count]
+                    .copy_from_slice(&self.header_sector[source_offset..source_offset + count]);
+                written += count;
+                continue;
+            }
+
+            let body_offset = absolute - header_len;
+            let sector_size_u64 = u64::try_from(self.sector_size)
+                .map_err(|_error| invalid("CFB sector size exceeds u64"))?;
+            let sector_index_u64 = body_offset / sector_size_u64;
+            let sector_index = usize::try_from(sector_index_u64)
+                .map_err(|_error| invalid("CFB planned sector index exceeds usize"))?;
+            let within = usize::try_from(body_offset % sector_size_u64)
+                .map_err(|_error| invalid("CFB planned sector offset exceeds usize"))?;
+            let count = (self.sector_size - within).min(available - written);
+            let planned = *self
+                .sectors
+                .get(sector_index)
+                .ok_or_else(|| invalid("CFB planned read sector is outside the output"))?;
+            self.read_sector(
+                planned,
+                streams,
+                within,
+                &mut output[written..written + count],
+            )?;
+            written += count;
+        }
+        Ok(written)
+    }
+
+    fn read_sector(
+        &self,
+        planned: PlannedSector,
+        streams: &[StreamInput<'_>],
+        within: usize,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        match planned {
+            PlannedSector::Free => output.fill(0),
+            PlannedSector::Fat(position) => {
+                let image = Self::image_run(&self.fat_image, position, 1, self.sector_size, "FAT")?;
+                output.copy_from_slice(&image[within..within + output.len()]);
+            },
+            PlannedSector::MiniFat(position) => {
+                let image = Self::image_run(
+                    &self.minifat_image,
+                    position,
+                    1,
+                    self.sector_size,
+                    "MiniFAT",
+                )?;
+                output.copy_from_slice(&image[within..within + output.len()]);
+            },
+            PlannedSector::Directory(position) => {
+                let image = Self::image_run(
+                    &self.directory_image,
+                    position,
+                    1,
+                    self.sector_size,
+                    "directory",
+                )?;
+                output.copy_from_slice(&image[within..within + output.len()]);
+            },
+            PlannedSector::MiniStream(position) => {
+                let image = Self::image_run(
+                    &self.ministream_image,
+                    position,
+                    1,
+                    self.sector_size,
+                    "mini stream",
+                )?;
+                output.copy_from_slice(&image[within..within + output.len()]);
+            },
+            PlannedSector::Stream { index, chunk } => {
+                let stream_index =
+                    usize_from_u32(index, "CFB reused layout stream index does not fit usize")?;
+                let bytes = streams
+                    .get(stream_index)
+                    .ok_or_else(|| invalid("CFB reused layout names a missing stream"))?
+                    .bytes;
+                output.fill(0);
+                let source_start = usize_from_u32(chunk, "CFB stream chunk does not fit usize")?
+                    .checked_mul(self.sector_size)
+                    .and_then(|start| start.checked_add(within))
+                    .ok_or_else(|| invalid("CFB reused layout chunk offset overflows usize"))?;
+                if source_start < bytes.len() {
+                    let count = output.len().min(bytes.len() - source_start);
+                    output[..count].copy_from_slice(&bytes[source_start..source_start + count]);
+                }
+            },
+        }
+        Ok(())
     }
 }
 
@@ -699,7 +998,9 @@ pub(super) struct ModelInputs<'a> {
     pub(super) streams: &'a [StreamInput<'a>],
     pub(super) storages: &'a BTreeSet<Vec<String>>,
     pub(super) storage_class_ids: &'a BTreeMap<Vec<String>, [u8; 16]>,
-    pub(super) root_class_id: [u8; 16],
+    /// `None` preserves the source root CLSID; `Some([0; 16])` explicitly
+    /// clears it while `Some(nonzero)` requests the supplied identifier.
+    pub(super) root_class_id: Option<[u8; 16]>,
 }
 
 struct SectorPool {
@@ -711,9 +1012,10 @@ struct SectorPool {
 
 impl SectorPool {
     fn claim(&mut self, sector: u32, owner: SectorOwner) -> Result<(), OleError> {
+        let index = usize_from_u32(sector, "CFB reused layout sector does not fit usize")?;
         let slot = self
             .claimed
-            .get_mut(sector as usize)
+            .get_mut(index)
             .ok_or_else(|| invalid("CFB reused layout claims a sector outside the artifact"))?;
         if *slot != SectorOwner::Free {
             return Err(invalid("CFB reused layout claims a sector twice"));
@@ -723,9 +1025,10 @@ impl SectorPool {
     }
 
     fn release(&mut self, sector: u32) -> Result<(), OleError> {
+        let index = usize_from_u32(sector, "CFB reused layout sector does not fit usize")?;
         let slot = self
             .claimed
-            .get_mut(sector as usize)
+            .get_mut(index)
             .ok_or_else(|| invalid("CFB reused layout releases a sector outside the artifact"))?;
         *slot = SectorOwner::Free;
         self.free.insert(sector);
@@ -752,14 +1055,18 @@ impl SectorPool {
         Ok(sector)
     }
 
-    fn high_water(&self) -> u32 {
+    fn high_water(&self) -> Result<u32, OleError> {
         let mut high = 0u32;
         for (index, owner) in self.claimed.iter().enumerate() {
             if *owner != SectorOwner::Free {
-                high = u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1);
+                let index = u32::try_from(index)
+                    .map_err(|_err| invalid("CFB reused layout sector index exceeds u32"))?;
+                high = index
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("CFB reused layout high-water mark overflows u32"))?;
             }
         }
-        high
+        Ok(high)
     }
 }
 
@@ -830,10 +1137,13 @@ pub(super) fn plan_reuse(
             ));
         }
     }
-    // A zero class identifier is how the writer's model says "not specified".
-    // A reused layout then keeps the source's, which preserves strictly more
-    // than the from-scratch serializer, which would write zeroes.
-    if model.root_class_id != [0u8; 16] && model.root_class_id != source.root_class_id {
+    // An explicitly cleared class identifier is safe to patch in place. A
+    // different nonzero identifier still declines, keeping the historical
+    // class-ID gate for callers that request a new object identity.
+    if let Some(root_class_id) = model.root_class_id
+        && root_class_id != source.root_class_id
+        && root_class_id != [0u8; 16]
+    {
         return Ok(Outcome::Declined(SectorLayoutFallback::ClassIdChanged));
     }
     for (path, class_id) in model.storage_class_ids {
@@ -842,11 +1152,12 @@ pub(super) fn plan_reuse(
                 SectorLayoutFallback::DirectoryShapeChanged,
             ));
         };
+        let sid_index = usize_from_u32(sid, "CFB reused layout storage SID does not fit usize")?;
         let entry = source
             .entries
-            .get(sid as usize)
+            .get(sid_index)
             .ok_or_else(|| invalid("CFB reused layout storage SID is outside the directory"))?;
-        if *class_id != [0u8; 16] && entry.class_id != *class_id {
+        if *class_id != entry.class_id && *class_id != [0u8; 16] {
             return Ok(Outcome::Declined(SectorLayoutFallback::ClassIdChanged));
         }
     }
@@ -854,7 +1165,14 @@ pub(super) fn plan_reuse(
     // --- mini sector allocation, inside the mini stream ---
     let source_mini_count = u32::try_from(source.ministream_size / mini_unit_u64)
         .map_err(|_err| invalid("CFB source mini sector count exceeds u32"))?;
-    let mut mini_seen = vec![false; source_mini_count as usize];
+    let source_mini_count_usize = usize_from_u32(
+        source_mini_count,
+        "CFB source mini sector count does not fit this platform",
+    )?;
+    let mut mini_seen = LayoutBitSet::try_with_capacity(
+        source_mini_count_usize,
+        "CFB reused layout mini-sector bitmap",
+    )?;
     let mut mini_free: BTreeSet<u32> = BTreeSet::new();
     let mut mini_chains: Vec<Vec<u32>> = Vec::new();
     mini_chains
@@ -867,9 +1185,10 @@ pub(super) fn plan_reuse(
 
     for (index, stream) in model.streams.iter().enumerate() {
         let sid = stream_sid[index];
+        let sid_index = usize_from_u32(sid, "CFB reused layout stream SID does not fit usize")?;
         let entry = source
             .entries
-            .get(sid as usize)
+            .get(sid_index)
             .ok_or_else(|| invalid("CFB reused layout stream SID is outside the directory"))?;
         if entry.entry_type != STGTY_STREAM {
             return Ok(Outcome::Declined(
@@ -893,20 +1212,28 @@ pub(super) fn plan_reuse(
                 source_mini_count,
                 "mini stream",
             )?;
-            if u64::from(units_for(entry.size, mini_unit)?) != old.len() as u64 {
+            if u64::from(units_for(entry.size, mini_unit)?)
+                != u64::try_from(old.len())
+                    .map_err(|_err| invalid("CFB source mini chain length exceeds u64"))?
+            {
                 return Ok(Outcome::Declined(SectorLayoutFallback::PlanRejected));
             }
             let keep = if new_is_mini {
-                need.min(u32::try_from(old.len()).unwrap_or(u32::MAX))
+                need.min(
+                    u32::try_from(old.len())
+                        .map_err(|_err| invalid("CFB source mini chain length exceeds u32"))?,
+                )
             } else {
                 0
             };
             for (position, mini) in old.iter().enumerate() {
-                let slot = mini_seen
-                    .get_mut(*mini as usize)
-                    .ok_or_else(|| invalid("CFB source mini sector is outside the mini stream"))?;
-                *slot = true;
-                if u32::try_from(position).unwrap_or(u32::MAX) < keep {
+                let mini_index =
+                    usize_from_u32(*mini, "CFB source mini sector does not fit this platform")?;
+                mini_seen.insert(mini_index)?;
+                if u32::try_from(position)
+                    .map_err(|_err| invalid("CFB source mini position exceeds u32"))?
+                    < keep
+                {
                     kept.try_reserve(1).map_err(|source| {
                         OleError::allocation("CFB reused layout mini chain", source)
                     })?;
@@ -919,15 +1246,9 @@ pub(super) fn plan_reuse(
         mini_chains.push(kept);
     }
     for mini in 0..source_mini_count {
-        let seen = mini_seen
-            .get(mini as usize)
-            .copied()
-            .ok_or_else(|| invalid("CFB source mini sector is outside the mini stream"))?;
-        let entry = source
-            .minifat
-            .get(mini as usize)
-            .copied()
-            .unwrap_or(FREESECT);
+        let mini_index = usize_from_u32(mini, "CFB source mini sector does not fit this platform")?;
+        let seen = mini_seen.contains(mini_index);
+        let entry = source.minifat.get(mini_index).copied().unwrap_or(FREESECT);
         if !seen && entry == FREESECT {
             mini_free.insert(mini);
         }
@@ -938,7 +1259,10 @@ pub(super) fn plan_reuse(
         if !is_mini {
             continue;
         }
-        while u32::try_from(mini_chains[index].len()).unwrap_or(u32::MAX) < need {
+        while u32::try_from(mini_chains[index].len())
+            .map_err(|_err| invalid("CFB reused layout mini chain length exceeds u32"))?
+            < need
+        {
             let mini = if let Some(free) = mini_free.iter().next().copied() {
                 mini_free.remove(&free);
                 free
@@ -967,10 +1291,14 @@ pub(super) fn plan_reuse(
 
     // --- sector allocation, inside the artifact ---
     let mut claimed = Vec::new();
+    let source_sector_count = usize_from_u32(
+        source.sector_count,
+        "CFB source sector count does not fit this platform",
+    )?;
     claimed
-        .try_reserve_exact(source.sector_count as usize)
+        .try_reserve_exact(source_sector_count)
         .map_err(|source| OleError::allocation("CFB reused layout sector map", source))?;
-    claimed.resize(source.sector_count as usize, SectorOwner::Free);
+    claimed.resize(source_sector_count, SectorOwner::Free);
     let mut pool = SectorPool {
         claimed,
         free: BTreeSet::new(),
@@ -996,9 +1324,14 @@ pub(super) fn plan_reuse(
     let mut kept_sectors = 0u32;
     for (index, stream) in model.streams.iter().enumerate() {
         let sid = stream_sid[index];
-        let entry = &source.entries[sid as usize];
+        let sid_index = usize_from_u32(sid, "CFB reused layout stream SID does not fit usize")?;
+        let entry = source
+            .entries
+            .get(sid_index)
+            .ok_or_else(|| invalid("CFB reused layout stream SID is outside the directory"))?;
         let (is_mini, _) = needs[index];
-        let new_len = stream.bytes.len() as u64;
+        let new_len = u64::try_from(stream.bytes.len())
+            .map_err(|_err| invalid("CFB stream length exceeds u64"))?;
         let need = if is_mini || new_len == 0 {
             0
         } else {
@@ -1013,11 +1346,18 @@ pub(super) fn plan_reuse(
                 source.sector_count,
                 "stream",
             )?;
-            if u64::from(units_for(entry.size, model.sector_size)?) != old.len() as u64 {
+            if u64::from(units_for(entry.size, model.sector_size)?)
+                != u64::try_from(old.len())
+                    .map_err(|_err| invalid("CFB source stream chain length exceeds u64"))?
+            {
                 return Ok(Outcome::Declined(SectorLayoutFallback::PlanRejected));
             }
-            let keep = need.min(u32::try_from(old.len()).unwrap_or(u32::MAX));
-            for sector in old.iter().take(keep as usize) {
+            let keep = need.min(
+                u32::try_from(old.len())
+                    .map_err(|_err| invalid("CFB source stream chain length exceeds u32"))?,
+            );
+            let keep_usize = usize_from_u32(keep, "CFB stream chain length does not fit usize")?;
+            for sector in old.iter().take(keep_usize) {
                 pool.claim(*sector, SectorOwner::Stream(sid))?;
                 kept.try_reserve(1).map_err(|source| {
                     OleError::allocation("CFB reused layout stream chain", source)
@@ -1031,7 +1371,8 @@ pub(super) fn plan_reuse(
 
     let root_need = units_for(ministream_bytes, model.sector_size)?;
     let mut root_chain: Vec<u32> = Vec::new();
-    for sector in source.root_chain.iter().take(root_need as usize) {
+    let root_need_usize = usize_from_u32(root_need, "CFB root chain length does not fit usize")?;
+    for sector in source.root_chain.iter().take(root_need_usize) {
         pool.claim(*sector, SectorOwner::MiniStream)?;
         root_chain.try_reserve(1).map_err(|source| {
             OleError::allocation("CFB reused layout mini stream chain", source)
@@ -1044,7 +1385,9 @@ pub(super) fn plan_reuse(
         .ok_or_else(|| invalid("CFB MiniFAT size overflows u64"))?;
     let minifat_need = units_for(minifat_bytes, model.sector_size)?;
     let mut minifat_chain: Vec<u32> = Vec::new();
-    for sector in source.minifat_chain.iter().take(minifat_need as usize) {
+    let minifat_need_usize =
+        usize_from_u32(minifat_need, "CFB MiniFAT chain length does not fit usize")?;
+    for sector in source.minifat_chain.iter().take(minifat_need_usize) {
         pool.claim(*sector, SectorOwner::MiniFat)?;
         minifat_chain
             .try_reserve(1)
@@ -1054,14 +1397,18 @@ pub(super) fn plan_reuse(
 
     // Everything the source held that this save did not keep is available.
     for sector in 0..source.sector_count {
-        if pool.claimed[sector as usize] == SectorOwner::Free {
+        let sector_index = usize_from_u32(sector, "CFB reused layout sector does not fit usize")?;
+        if pool.claimed[sector_index] == SectorOwner::Free {
             pool.free.insert(sector);
         }
     }
 
     for (index, need) in stream_needs.iter().copied().enumerate() {
         let sid = stream_sid[index];
-        while u32::try_from(stream_chains[index].len()).unwrap_or(u32::MAX) < need {
+        while u32::try_from(stream_chains[index].len())
+            .map_err(|_err| invalid("CFB reused layout stream chain length exceeds u32"))?
+            < need
+        {
             let sector = pool.allocate(SectorOwner::Stream(sid))?;
             stream_chains[index]
                 .try_reserve(1)
@@ -1069,14 +1416,20 @@ pub(super) fn plan_reuse(
             stream_chains[index].push(sector);
         }
     }
-    while u32::try_from(root_chain.len()).unwrap_or(u32::MAX) < root_need {
+    while u32::try_from(root_chain.len())
+        .map_err(|_err| invalid("CFB reused layout root chain length exceeds u32"))?
+        < root_need
+    {
         let sector = pool.allocate(SectorOwner::MiniStream)?;
         root_chain.try_reserve(1).map_err(|source| {
             OleError::allocation("CFB reused layout mini stream chain", source)
         })?;
         root_chain.push(sector);
     }
-    while u32::try_from(minifat_chain.len()).unwrap_or(u32::MAX) < minifat_need {
+    while u32::try_from(minifat_chain.len())
+        .map_err(|_err| invalid("CFB reused layout MiniFAT chain length exceeds u32"))?
+        < minifat_need
+    {
         let sector = pool.allocate(SectorOwner::MiniFat)?;
         minifat_chain
             .try_reserve(1)
@@ -1093,12 +1446,15 @@ pub(super) fn plan_reuse(
     let mut fat_sectors = source.fat_sectors.clone();
     let mut converged = false;
     for _ in 0..LAYOUT_FIXED_POINT_ROUNDS {
-        let high = pool.high_water();
+        let high = pool.high_water()?;
         let need = high.div_ceil(entries_per_fat_sector);
-        if need > u32::try_from(HEADER_DIFAT_ENTRIES).unwrap_or(u32::MAX) {
+        let header_difat_entries = u32::try_from(HEADER_DIFAT_ENTRIES)
+            .map_err(|_err| invalid("CFB header DIFAT entry count exceeds u32"))?;
+        if need > header_difat_entries {
             return Ok(Outcome::Declined(SectorLayoutFallback::OutputNeedsDifat));
         }
-        let have = u32::try_from(fat_sectors.len()).unwrap_or(u32::MAX);
+        let have = u32::try_from(fat_sectors.len())
+            .map_err(|_err| invalid("CFB reused layout FAT sector count exceeds u32"))?;
         if need == have {
             converged = true;
             break;
@@ -1125,27 +1481,37 @@ pub(super) fn plan_reuse(
         return Ok(Outcome::Declined(SectorLayoutFallback::PlanRejected));
     }
     fat_sectors.sort_unstable();
-    let output_sectors = pool.high_water();
+    let output_sectors = pool.high_water()?;
     if output_sectors == 0 {
         return Ok(Outcome::Declined(SectorLayoutFallback::PlanRejected));
     }
     super::core::validate_output_size(model.sector_size, output_sectors)?;
 
     // --- images ---
-    let fat_entries = u64::from(u32::try_from(fat_sectors.len()).unwrap_or(u32::MAX))
+    let fat_sector_count = u32::try_from(fat_sectors.len())
+        .map_err(|_err| invalid("CFB reused layout FAT sector count exceeds u32"))?;
+    let fat_entry_count = u64::from(fat_sector_count)
         .checked_mul(u64::from(entries_per_fat_sector))
         .ok_or_else(|| invalid("CFB FAT entry count overflows u64"))?;
-    let fat_entries = usize::try_from(fat_entries)
+    let fat_entries = usize::try_from(fat_entry_count)
         .map_err(|_err| invalid("CFB FAT entry count exceeds usize"))?;
-    if fat_entries < output_sectors as usize {
+    let output_sectors_usize = usize_from_u32(
+        output_sectors,
+        "CFB reused layout output sector count does not fit this platform",
+    )?;
+    if fat_entries < output_sectors_usize {
         return Ok(Outcome::Declined(SectorLayoutFallback::PlanRejected));
     }
     let mut fat = filled_vec(fat_entries, FREESECT, "CFB reused layout FAT")?;
     let link = |chain: &[u32], fat: &mut Vec<u32>| -> Result<(), OleError> {
         for (position, sector) in chain.iter().enumerate() {
             let next = chain.get(position + 1).copied().unwrap_or(ENDOFCHAIN);
+            let sector_index = usize_from_u32(
+                *sector,
+                "CFB reused layout FAT sector does not fit this platform",
+            )?;
             let slot = fat
-                .get_mut(*sector as usize)
+                .get_mut(sector_index)
                 .ok_or_else(|| invalid("CFB reused layout FAT entry is outside the table"))?;
             if *slot != FREESECT {
                 return Err(invalid("CFB reused layout links a sector into two chains"));
@@ -1161,29 +1527,39 @@ pub(super) fn plan_reuse(
     link(&minifat_chain, &mut fat)?;
     link(&source.dir_chain, &mut fat)?;
     for sector in &fat_sectors {
+        let sector_index = usize_from_u32(
+            *sector,
+            "CFB reused layout FAT sector does not fit this platform",
+        )?;
         let slot = fat
-            .get_mut(*sector as usize)
+            .get_mut(sector_index)
             .ok_or_else(|| invalid("CFB reused layout FAT sector is outside the table"))?;
         if *slot != FREESECT {
             return Err(invalid("CFB reused layout stores the FAT inside a chain"));
         }
         *slot = FATSECT;
     }
-    let mut fat_image = reserved_vec::<u8>(fat_entries * 4, "CFB reused layout FAT image")?;
+    let fat_image_bytes = fat_entries
+        .checked_mul(4)
+        .ok_or_else(|| invalid("CFB reused layout FAT image size overflows usize"))?;
+    let mut fat_image = reserved_vec::<u8>(fat_image_bytes, "CFB reused layout FAT image")?;
     for entry in &fat {
         fat_image.extend_from_slice(&entry.to_le_bytes());
     }
 
-    let mut minifat = filled_vec(
-        minifat_need as usize * (model.sector_size / 4),
-        FREESECT,
-        "CFB reused layout MiniFAT",
-    )?;
+    let minifat_entry_count = minifat_need_usize
+        .checked_mul(model.sector_size / 4)
+        .ok_or_else(|| invalid("CFB reused layout MiniFAT entry count overflows usize"))?;
+    let mut minifat = filled_vec(minifat_entry_count, FREESECT, "CFB reused layout MiniFAT")?;
     for chain in &mini_chains {
         for (position, mini) in chain.iter().enumerate() {
             let next = chain.get(position + 1).copied().unwrap_or(ENDOFCHAIN);
+            let mini_index = usize_from_u32(
+                *mini,
+                "CFB reused layout mini sector does not fit this platform",
+            )?;
             let slot = minifat
-                .get_mut(*mini as usize)
+                .get_mut(mini_index)
                 .ok_or_else(|| invalid("CFB reused layout MiniFAT entry is outside the table"))?;
             if *slot != FREESECT {
                 return Err(invalid(
@@ -1193,13 +1569,19 @@ pub(super) fn plan_reuse(
             *slot = next;
         }
     }
+    let minifat_image_bytes = minifat
+        .len()
+        .checked_mul(4)
+        .ok_or_else(|| invalid("CFB reused layout MiniFAT image size overflows usize"))?;
     let mut minifat_image =
-        reserved_vec::<u8>(minifat.len() * 4, "CFB reused layout MiniFAT image")?;
+        reserved_vec::<u8>(minifat_image_bytes, "CFB reused layout MiniFAT image")?;
     for entry in &minifat {
         minifat_image.extend_from_slice(&entry.to_le_bytes());
     }
 
-    let ministream_image_len = root_need as usize * model.sector_size;
+    let ministream_image_len = root_need_usize
+        .checked_mul(model.sector_size)
+        .ok_or_else(|| invalid("CFB reused layout mini stream image size overflows usize"))?;
     let mut ministream_image =
         zeroed_vec(ministream_image_len, "CFB reused layout mini stream image")?;
     let carried = source.ministream_image.len().min(ministream_image_len);
@@ -1207,15 +1589,21 @@ pub(super) fn plan_reuse(
     for (index, chain) in mini_chains.iter().enumerate() {
         let bytes = model.streams[index].bytes;
         for (position, mini) in chain.iter().enumerate() {
-            let start = (*mini as usize)
+            let mini_index = usize_from_u32(*mini, "CFB mini sector does not fit this platform")?;
+            let start = mini_index
                 .checked_mul(mini_unit)
                 .ok_or_else(|| invalid("CFB mini sector offset overflows usize"))?;
             let end = start
                 .checked_add(mini_unit)
                 .ok_or_else(|| invalid("CFB mini sector end overflows usize"))?;
-            let taken = position * mini_unit;
+            let taken = position
+                .checked_mul(mini_unit)
+                .ok_or_else(|| invalid("CFB mini stream payload offset overflows usize"))?;
+            let chunk_end = taken
+                .checked_add(mini_unit)
+                .ok_or_else(|| invalid("CFB mini stream payload end overflows usize"))?;
             let chunk = bytes
-                .get(taken..(taken + mini_unit).min(bytes.len()))
+                .get(taken..chunk_end.min(bytes.len()))
                 .ok_or_else(|| invalid("CFB mini sector chunk is outside the stream"))?;
             let target = ministream_image
                 .get_mut(start..end)
@@ -1228,11 +1616,8 @@ pub(super) fn plan_reuse(
     let mut directory_image = source.directory_image.clone();
     for (index, stream) in model.streams.iter().enumerate() {
         let sid = stream_sid[index];
-        let entry = &source.entries[sid as usize];
-        let new_len = stream.bytes.len() as u64;
-        if new_len == 0 && entry.size == 0 {
-            continue;
-        }
+        let new_len = u64::try_from(stream.bytes.len())
+            .map_err(|_err| invalid("CFB stream length exceeds u64"))?;
         let (is_mini, _) = needs[index];
         let start = if new_len == 0 {
             ENDOFCHAIN
@@ -1243,15 +1628,40 @@ pub(super) fn plan_reuse(
         };
         patch_entry(&mut directory_image, sid, start, new_len)?;
     }
+    if let Some(root_class_id) = model.root_class_id
+        && root_class_id == [0u8; 16]
+        && source.root_class_id != [0u8; 16]
+    {
+        patch_class_id(&mut directory_image, 0, root_class_id)?;
+    }
+    for (path, class_id) in model.storage_class_ids {
+        let Some(sid) = source.storage_paths.get(path).copied() else {
+            return Ok(Outcome::Declined(
+                SectorLayoutFallback::DirectoryShapeChanged,
+            ));
+        };
+        if *class_id == [0u8; 16] {
+            let sid_index =
+                usize_from_u32(sid, "CFB reused layout storage SID does not fit usize")?;
+            let source_class_id = source
+                .entries
+                .get(sid_index)
+                .ok_or_else(|| invalid("CFB reused layout storage SID is outside the directory"))?
+                .class_id;
+            if source_class_id != [0u8; 16] {
+                patch_class_id(&mut directory_image, sid, *class_id)?;
+            }
+        }
+    }
     let root_start = root_chain.first().copied().unwrap_or(ENDOFCHAIN);
     patch_entry(&mut directory_image, 0, root_start, ministream_bytes)?;
 
     let mut header_sector = source.header_sector.clone();
-    write_u32(
-        &mut header_sector,
-        NUM_FAT_SECTORS_OFFSET,
-        u32::try_from(fat_sectors.len()).unwrap_or(u32::MAX),
-    )?;
+    let fat_sector_count = u32::try_from(fat_sectors.len())
+        .map_err(|_err| invalid("CFB reused layout FAT sector count exceeds u32"))?;
+    let minifat_chain_count = u32::try_from(minifat_chain.len())
+        .map_err(|_err| invalid("CFB reused layout MiniFAT sector count exceeds u32"))?;
+    write_u32(&mut header_sector, NUM_FAT_SECTORS_OFFSET, fat_sector_count)?;
     write_u32(
         &mut header_sector,
         FIRST_DIR_SECTOR_OFFSET,
@@ -1265,7 +1675,7 @@ pub(super) fn plan_reuse(
     write_u32(
         &mut header_sector,
         NUM_MINIFAT_SECTORS_OFFSET,
-        u32::try_from(minifat_chain.len()).unwrap_or(u32::MAX),
+        minifat_chain_count,
     )?;
     write_u32(&mut header_sector, FIRST_DIFAT_SECTOR_OFFSET, ENDOFCHAIN)?;
     write_u32(&mut header_sector, NUM_DIFAT_SECTORS_OFFSET, 0)?;
@@ -1278,12 +1688,13 @@ pub(super) fn plan_reuse(
     // --- the emission plan, and the partition invariant it must satisfy ---
     let mut sectors = Vec::new();
     sectors
-        .try_reserve_exact(output_sectors as usize)
+        .try_reserve_exact(output_sectors_usize)
         .map_err(|source| OleError::allocation("CFB reused layout sector plan", source))?;
-    sectors.resize(output_sectors as usize, PlannedSector::Free);
+    sectors.resize(output_sectors_usize, PlannedSector::Free);
     let mut place = |sector: u32, value: PlannedSector| -> Result<(), OleError> {
+        let sector_index = usize_from_u32(sector, "CFB reused layout sector does not fit usize")?;
         let slot = sectors
-            .get_mut(sector as usize)
+            .get_mut(sector_index)
             .ok_or_else(|| invalid("CFB reused layout plans a sector outside the output"))?;
         if *slot != PlannedSector::Free {
             return Err(invalid("CFB reused layout plans a sector twice"));
@@ -1292,36 +1703,36 @@ pub(super) fn plan_reuse(
         Ok(())
     };
     for (position, sector) in fat_sectors.iter().enumerate() {
-        place(
-            *sector,
-            PlannedSector::Fat(u32::try_from(position).unwrap_or(u32::MAX)),
-        )?;
+        let position = u32::try_from(position)
+            .map_err(|_err| invalid("CFB reused layout FAT position exceeds u32"))?;
+        place(*sector, PlannedSector::Fat(position))?;
     }
     for (position, sector) in minifat_chain.iter().enumerate() {
-        place(
-            *sector,
-            PlannedSector::MiniFat(u32::try_from(position).unwrap_or(u32::MAX)),
-        )?;
+        let position = u32::try_from(position)
+            .map_err(|_err| invalid("CFB reused layout MiniFAT position exceeds u32"))?;
+        place(*sector, PlannedSector::MiniFat(position))?;
     }
     for (position, sector) in source.dir_chain.iter().enumerate() {
-        place(
-            *sector,
-            PlannedSector::Directory(u32::try_from(position).unwrap_or(u32::MAX)),
-        )?;
+        let position = u32::try_from(position)
+            .map_err(|_err| invalid("CFB reused layout directory position exceeds u32"))?;
+        place(*sector, PlannedSector::Directory(position))?;
     }
     for (position, sector) in root_chain.iter().enumerate() {
-        place(
-            *sector,
-            PlannedSector::MiniStream(u32::try_from(position).unwrap_or(u32::MAX)),
-        )?;
+        let position = u32::try_from(position)
+            .map_err(|_err| invalid("CFB reused layout mini stream position exceeds u32"))?;
+        place(*sector, PlannedSector::MiniStream(position))?;
     }
     for (index, chain) in stream_chains.iter().enumerate() {
         for (position, sector) in chain.iter().enumerate() {
+            let index_u32 = u32::try_from(index)
+                .map_err(|_err| invalid("CFB reused layout stream index exceeds u32"))?;
+            let position = u32::try_from(position)
+                .map_err(|_err| invalid("CFB reused layout stream position exceeds u32"))?;
             place(
                 *sector,
                 PlannedSector::Stream {
-                    index: u32::try_from(index).unwrap_or(u32::MAX),
-                    chunk: u32::try_from(position).unwrap_or(u32::MAX),
+                    index: index_u32,
+                    chunk: position,
                 },
             )?;
         }
@@ -1333,7 +1744,7 @@ pub(super) fn plan_reuse(
             .filter(|planned| **planned == PlannedSector::Free)
             .count(),
     )
-    .unwrap_or(u32::MAX);
+    .map_err(|_err| invalid("CFB reused layout free-sector count exceeds u32"))?;
     let appended_sectors = output_sectors.saturating_sub(source.sector_count);
     let report = SectorLayoutReport {
         reused: true,
@@ -1366,14 +1777,38 @@ fn patch_entry(
     start_sector: u32,
     size: u64,
 ) -> Result<(), OleError> {
-    let base = (sid as usize)
+    let base = usize_from_u32(sid, "CFB directory SID does not fit usize")?
         .checked_mul(DIRENTRY_SIZE)
         .ok_or_else(|| invalid("CFB directory entry offset overflows usize"))?;
+    let end = base
+        .checked_add(DIRENTRY_SIZE)
+        .ok_or_else(|| invalid("CFB directory entry end overflows usize"))?;
     let entry = directory_image
-        .get_mut(base..base + DIRENTRY_SIZE)
+        .get_mut(base..end)
         .ok_or_else(|| invalid("CFB directory entry is outside the directory image"))?;
     write_u32(entry, ENTRY_START_SECTOR_OFFSET, start_sector)?;
     write_u64(entry, ENTRY_STREAM_SIZE_OFFSET, size)?;
+    Ok(())
+}
+
+fn patch_class_id(
+    directory_image: &mut [u8],
+    sid: u32,
+    class_id: [u8; 16],
+) -> Result<(), OleError> {
+    let base = usize_from_u32(sid, "CFB directory SID does not fit usize")?
+        .checked_mul(DIRENTRY_SIZE)
+        .ok_or_else(|| invalid("CFB directory entry offset overflows usize"))?;
+    let start = base
+        .checked_add(0x50)
+        .ok_or_else(|| invalid("CFB directory class-ID offset overflows usize"))?;
+    let end = start
+        .checked_add(16)
+        .ok_or_else(|| invalid("CFB directory class-ID end overflows usize"))?;
+    let entry = directory_image
+        .get_mut(start..end)
+        .ok_or_else(|| invalid("CFB directory entry class-ID is outside the image"))?;
+    entry.copy_from_slice(&class_id);
     Ok(())
 }
 
@@ -1423,7 +1858,7 @@ impl ReusePlan {
         sector_size: usize,
         resource: &'static str,
     ) -> Result<&'a [u8], OleError> {
-        let start = (position as usize)
+        let start = usize_from_u32(position, "CFB image position does not fit usize")?
             .checked_mul(sector_size)
             .ok_or_else(|| invalid("CFB reused layout image offset overflows usize"))?;
         let end = run
@@ -1435,7 +1870,9 @@ impl ReusePlan {
             .ok_or_else(|| invalid(&format!("CFB reused layout {resource} run is truncated")))
     }
 
-    /// Writes the planned artifact to `sink` in ascending sector order.
+    /// Writes the already validated planned artifact to `sink` in ascending
+    /// sector order. Callers use [`Self::validate`] first when the destination
+    /// must not observe a candidate before ordinary CFB validation.
     ///
     /// Runs of consecutive sectors that come from the same image — a stream's
     /// payload, the FAT, the directory — are written in one call, so a stream
@@ -1457,7 +1894,9 @@ impl ReusePlan {
         while index < self.sectors.len() {
             let planned = self.sectors[index];
             let mut run = 1usize;
-            while index + run < self.sectors.len()
+            while index
+                .checked_add(run)
+                .is_some_and(|next| next < self.sectors.len())
                 && follows(self.sectors[index + run - 1], self.sectors[index + run])
             {
                 run += 1;
@@ -1501,11 +1940,15 @@ impl ReusePlan {
                     index: stream,
                     chunk,
                 } => {
+                    let stream_index = usize_from_u32(
+                        stream,
+                        "CFB reused layout stream index does not fit usize",
+                    )?;
                     let bytes = streams
-                        .get(stream as usize)
+                        .get(stream_index)
                         .ok_or_else(|| invalid("CFB reused layout names a missing stream"))?
                         .bytes;
-                    let start = (chunk as usize)
+                    let start = usize_from_u32(chunk, "CFB stream chunk does not fit usize")?
                         .checked_mul(sector_size)
                         .ok_or_else(|| invalid("CFB reused layout chunk offset overflows usize"))?;
                     let end = run

@@ -7,7 +7,7 @@ Result: ok
 mutations declined=37 admitted=5
 
 Additional gates in the corpus suite:
-- source directory metadata, including every directory-entry CLSID, matches the adopted source on all reused outputs;
+- source directory metadata outside planner-owned allocation fields, including every unedited directory-entry CLSID, matches the adopted source on all reused outputs; explicit zero CLSID clears are tested separately;
 - all stream paths and bytes match the edited model and the rewrite-policy reopen;
 - the CFB validation walk completes without errors;
 - both MiniFAT cutoff directions and shrink/reclaim are covered by sector_layout_smoke;
