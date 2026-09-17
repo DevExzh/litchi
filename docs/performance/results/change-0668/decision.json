@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0668",
+  "title": "Remove unwanted packed XLS cell records and the source-open SST locator pointer vector",
+  "decision": "retained, implemented in litchi-xls; retained cross-query indexing and framing fusion remain deferred",
+  "code_state": "crates/litchi-xls only; no public API, limit, error, fence, or output-byte change; no new unsafe or dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0651 row 12 identified MulRk and MulBlank as 60,575 of 127,072 corpus cell values (47.7%); an unwanted selected-cell query still built and dropped one 88-byte CellRecord per packed cell",
+    "the packed range validator already proves complete payload length, count, and column coverage, so a measured visitor can validate every XF and materialize only a selected target while preserving refusal order",
+    "the source-open SST locator scan already owns the RecordRef slice; constructing a second Vec<&[u8]> only copied one fat pointer per SST record and did not change the bytes walked",
+    "0651 row 11 remains gated by ADR 0005: a retained sheet index and snapshot chain hint need a bounded weighted evictable clean-value cache, which no crate supplies",
+    "0633 measured the two framing passes at about 1.6% each and froze fusion because its coverage proof and refusal order must remain intact"
+  ],
+  "accepted_evidence": {
+    "packed_census": "0641's frozen corpus census: 126 fixtures, 127,072 cell values, 33,758 MulBlank cells and 26,817 MulRk cells",
+    "locator_allocations": "the existing sst_scan_allocations counting allocator over 54016.xls and WithCustomViews.xls, base 5fa92d7ce versus this branch: 246/754,968 to 245/754,520 and 208/153,205 to 207/152,997 allocations/bytes",
+    "allocation_floor": "the exact one-allocation deltas are 448 bytes for 28 SST records and 208 bytes for 13 records; &[u8] is a 16-byte fat pointer on the measured target",
+    "sst_differential": "the pinned SST digest remains 0x9cb14f5daa02eebc; 117 corpus fixtures index identically and the four malformed fixtures are refused identically",
+    "tests": "cargo fmt --all -- --check, cargo check -p litchi-xls, focused packed/SST tests, sst_scan_allocations, and the complete cargo test -p litchi-xls suite; 1,068 unit tests and all integration/doc tests pass"
+  },
+  "accepted_costs": {
+    "packed_validation": "every packed cell is still visited and its XF is validated; only target CellRecord construction and RK numeric conversion move behind the coordinate match",
+    "locator_scan": "the open still scans the whole SST/Continue chain and retains its segment and entry locator vectors; only the temporary payload fat-pointer vector is removed",
+    "runtime_shape": "the direct RecordRef cursor keeps the same logical offsets, source offsets, framing and error order; no source read set changes are claimed"
+  },
+  "known_gaps": {
+    "no_timing_floor": "no release timing, cycles, instruction, RSS, or physical-I/O run was retained; deterministic allocation evidence is used and no speedup is claimed",
+    "retained_index": "row 11 is deferred until ADR 0005's bounded weighted evictable cache exists and can account for retained clean values",
+    "framing": "row 12's two framing passes remain deferred under 0633's coverage-proof and refusal-order gate",
+    "open_scan": "open still performs the complete string-table scan to build locators; this change removes pointer scratch only and does not make locator construction lazy",
+    "corpus_scope": "the packed-cell share and SST index evidence are from the checked-in XLS corpus; no real-producer expansion or cross-platform run was performed"
+  },
+  "withheld": [
+    "any registered speedup, throughput, wall-clock, cold-cache, physical-I/O, RSS, concurrency-scaling or cross-platform result",
+    "any retained-index or snapshot-chain cache design",
+    "any fused framing implementation"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "branch": "perf/0668-xls-query-residues",
+    "before_checkout": "/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce",
+    "host": "AMD EPYC, Linux; shared multi-agent host",
+    "toolchain": "rustc 1.95.0, cargo 1.95.0",
+    "build": "CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0",
+    "note": "the before checkout was restored to read-only after its allocation leg; no release binary was built because this change makes no timing claim"
+  }
+}
