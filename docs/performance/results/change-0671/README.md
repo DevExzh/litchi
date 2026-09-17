@@ -5,7 +5,9 @@ Change record: [`0671-doc-admission-residues.md`](../../0671-doc-admission-resid
 Disposition: retained correctness fix. `performance_claim: none`. The change
 keeps the normative `FBKF.ibkl` uniqueness refusal, admits one narrowly proven
 PAPX alignment byte at the PAPX consumer, and exposes existing DOC leniency
-through the unified facade.
+through the unified facade. It closes the DOC portion of row 16 in 0651 under
+0652's standing trade-offs (small breaking APIs are acceptable; correctness and
+safety take priority over performance).
 
 ## Contents
 
@@ -14,7 +16,7 @@ through the unified facade.
 | `decision.json` | The `litchi-perf-change-decision` record and the specification-based disposition of both residues. |
 | `log-sections.md` | Four paragraphs for the coordinator to merge into `HOTSPOTS.md`, `GOAL_AUDIT.md`, `REPORT.md` and `ADR_COMPLIANCE.md`. |
 | `gates.txt` | The deterministic commands and results run in this worktree. |
-| `../../0671-doc-admission-residues.md` | The full byte reading, primary MS-DOC links, implementation rule and limitations. |
+| `../../0671-doc-admission-residues.md` | The full byte reading, checked-in MS-DOC section citations, implementation rule and limitations. |
 
 ## Provenance
 
@@ -36,6 +38,8 @@ through the unified facade.
 | `test-data/ole/doc/duplicate-style-names.doc` | default facade refusal | opens with `TolerateStylesheetDefects` through both new facade methods | existing stylesheet leniency contract; structural defects remain fatal |
 
 The PAPX compatibility rule is tested with both a complete odd SPRM prefix plus
-zero and a nonzero malformed tail. A separate `sprm` unit test proves that the
-shared parser still rejects a trailing zero when called without PAPX context.
-
+zero and a nonzero malformed tail. The checked-in MS-DOC reference supports the
+PAPX length arithmetic but requires whole Prl elements and does not specify this
+pad; the packet records the allowance as a bounded compatibility exception. A
+separate `sprm` unit test proves that the shared parser still rejects a trailing
+zero when called without PAPX context.

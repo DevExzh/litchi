@@ -5,7 +5,7 @@ Change 0671 is a correctness fix; `performance_claim: none`.
 
 ## For `HOTSPOTS.md`
 
-## 0671 — one DOC residue was a real MUST and the other was a word-boundary byte
+## 0671 — one DOC residue was a real MUST and the other was a bounded compatibility byte
 
 Record: [0671](../../0671-doc-admission-residues.md). Change 0640's two
 remaining DOC refusals now have different dispositions. `watermark.doc` repeats
@@ -20,7 +20,12 @@ other malformed tails remain errors and `parse_sprms` is unchanged. The witness
 opens and returns text. The unified facade adds bounded
 `Document::open_with_doc_options` and `from_bytes_with_doc_options`, making the
 existing stylesheet leniency opt-in reachable without changing strict defaults.
-No timing or performance result is claimed. [Record and limitations](../../0671-doc-admission-residues.md).
+The checked-in MS-DOC snapshot confirms the FBKF rule at §2.9.70 (local line
+6648), but its §2.9.175 PapxInFkp and §2.9.114 GrpPrlAndIstd text (local lines
+18684-18688 and 12469-12471) requires whole Prl elements and does not specify
+this PAPX pad; the allowance is therefore compatibility evidence, not a new
+normative claim. No timing or performance result is claimed. [Record and
+limitations](../../0671-doc-admission-residues.md).
 
 [MS-DOC `FBKF`]: https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/4dfad7b0-37bb-443a-8933-3bb79d2c5994
 
@@ -40,10 +45,12 @@ indirection or cycle still reaches the existing typed error. The global SPRM
 parser remains strict, and the writer remains unchanged. The facade carries the
 existing `OpenOptions` and `Leniency` type through both path and byte entry
 points, while structural defects remain fatal under stylesheet tolerance. The
-current MS-DOC pages define the PAPX length forms and whole-Prl grammar but do
-not explicitly name this alignment byte; the record leaves that specification
-gap visible and relies on repeated fixture bytes plus compatible implementation
-evidence for this narrow admission. `performance_claim: none`.
+checked-in MS-DOC snapshot's §2.9.175 (local lines 18595 and 18684-18688)
+defines the PAPX length forms and §2.9.114 (local lines 12380 and 12469-12471)
+requires whole-Prl grammar, while neither names this alignment byte. The record
+leaves that specification gap visible and relies on repeated fixture bytes plus
+compatible implementation evidence for this narrow admission. `performance_claim:
+none`.
 
 ## For `REPORT.md`
 
@@ -64,7 +71,10 @@ existing duplicate-style fixture only when the caller opts into
 the DOC facade's 31 unit tests passed, and the combined `doc,docx` facade check
 passed. The repository's 57-file DOC inventory and 0640 corpus scan are retained
 as the corpus baseline; this follow-up does not claim a new full differential,
-timing, instruction, allocation or RSS number.
+timing, instruction, allocation or RSS number. The checked-in MS-DOC reference
+confirms FBKF uniqueness at §2.9.70 (local line 6648) and the PAPX length/whole-
+Prl constraints at §§2.9.175 and 2.9.114 (local lines 18684-18688 and
+12469-12471); it does not make the alignment-byte allowance normative.
 
 ## For `ADR_COMPLIANCE.md`
 
@@ -79,8 +89,10 @@ normalizes that byte, and `parse_sprms` retains its exact-sequence contract.
 The new facade methods expose an existing public option and preserve the strict
 default, with the path read using the existing bounded fallback helper. No CFB
 entry point, resource limit, error variant or archive state is changed. The
-primary MS-DOC pages make the uniqueness rule explicit and define the PAPX
-length arithmetic, while the observed alignment-byte behavior remains a
-documented compatibility inference rather than a new normative claim. The
-record therefore names the open specification question and the corpus boundary
-instead of treating the one witness as universal. `performance_claim: none`.
+primary local MS-DOC sections make the uniqueness rule explicit (§2.9.70, local
+line 6648) and define PAPX length arithmetic (§2.9.175, local lines
+18684-18688), while the whole-Prl requirement (§2.9.114, local lines
+12469-12471) means the observed alignment-byte behavior remains a documented
+compatibility inference rather than a new normative claim. The record therefore
+names the open specification question and the corpus boundary instead of treating
+the one witness as universal. `performance_claim: none`.
