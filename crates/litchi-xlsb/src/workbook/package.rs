@@ -255,12 +255,19 @@ impl Workbook {
     ) -> Result<sparkline::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         sparkline::workbook::validate_commit_context(&commit, &self.formula_context)?;
-        sparkline::workbook::apply_with_external_link_limits(
-            &mut self.package,
+        let applied = sparkline::workbook::apply_retaining_parse(
+            &self.package,
             &uri,
             commit,
             self.external_link_limits,
-        )
+        )?;
+        match applied {
+            sparkline::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
+            sparkline::workbook::Applied::Published { snapshot, workbook } => {
+                *self = *workbook;
+                Ok(snapshot)
+            },
+        }
     }
 
     /// Read optional sparkline groups selected by worksheet name.
@@ -288,12 +295,19 @@ impl Workbook {
         commit: &cell_watches::Commit,
     ) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::apply_with_external_link_limits(
-            &mut self.package,
+        let applied = cell_watches::workbook::apply_retaining_parse(
+            &self.package,
             &uri,
             commit,
             self.external_link_limits,
-        )
+        )?;
+        match applied {
+            cell_watches::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
+            cell_watches::workbook::Applied::Published { snapshot, workbook } => {
+                *self = *workbook;
+                Ok(snapshot)
+            },
+        }
     }
 
     /// Read the typed cell-watch and phonetic snapshot selected by worksheet

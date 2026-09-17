@@ -984,7 +984,7 @@ fn insert_candidate_cell(
     formula: Option<CellFormula>,
 ) -> Result<()> {
     let uri = workbook.worksheet_uri(sheet)?;
-    let mut package = workbook.package.clone();
+    let package = workbook.package.clone();
     let mut edit = super::workbook::read(&package, &uri)?.edit();
     if let Some(formula) = formula {
         edit.insert_formula(reference, style, value, formula)?;
@@ -992,16 +992,16 @@ fn insert_candidate_cell(
         edit.insert(reference, style, value)?;
     }
     let commit = edit.commit()?;
-    let _snapshot = super::workbook::apply_with_external_link_limits(
-        &mut package,
-        &uri,
-        &commit,
-        workbook.external_link_limits(),
-    )?;
-    *workbook = Workbook::from_opc_package_with_external_link_limits(
-        package,
-        workbook.external_link_limits(),
-    )?;
+    let external_link_limits = workbook.external_link_limits();
+    let applied =
+        super::workbook::apply_retaining_parse(&package, &uri, &commit, external_link_limits)?;
+    if let super::workbook::Applied::Published {
+        workbook: validated,
+        ..
+    } = applied
+    {
+        *workbook = *validated;
+    }
     Ok(())
 }
 
@@ -1329,16 +1329,16 @@ fn transfer_cell(
     }
     edit.set_show_phonetic(target_reference, source_cell.show_phonetic())?;
     let commit = edit.commit()?;
-    let _published_snapshot = super::workbook::apply_with_external_link_limits(
-        &mut package,
-        &uri,
-        &commit,
-        target.external_link_limits(),
-    )?;
-    *target = Workbook::from_opc_package_with_external_link_limits(
-        package,
-        target.external_link_limits(),
-    )?;
+    let external_link_limits = target.external_link_limits();
+    let applied =
+        super::workbook::apply_retaining_parse(&package, &uri, &commit, external_link_limits)?;
+    if let super::workbook::Applied::Published {
+        workbook: validated,
+        ..
+    } = applied
+    {
+        *target = *validated;
+    }
     Ok(())
 }
 

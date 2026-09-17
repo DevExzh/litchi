@@ -1,0 +1,20 @@
+change 0669 gate summary
+========================
+
+worktree: /home/zhuhe/code/litchi-worktrees/0669
+branch: perf/0669-xlsb-edit-residues
+base: 5fa92d7ce
+profile: CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+jobs: 2
+target cleanup: none
+
+[PASS] cargo fmt --all -- --check
+[PASS] cargo check -p litchi-xlsb -j2
+[PASS] cargo clippy -p litchi-xlsb --all-targets -j2 -- -D warnings
+[PASS] cargo test -p litchi-xlsb --lib -j2
+       575 passed; 0 failed
+[PASS] cargo test -p litchi-xlsb --tests -j2
+       575 library tests and 144 integration tests passed; 0 failed
+
+No release build, benchmark, callgrind, allocator, RSS, or timing result is
+included. The shared apply_workbook_structure selector is owned by 0674.

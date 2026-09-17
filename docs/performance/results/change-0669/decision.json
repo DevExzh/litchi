@@ -1,0 +1,39 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0669",
+  "title": "XLSB edit publication retains the validated workbook parse and repairs resource relationship guards",
+  "decision": "retained, implemented in litchi-xlsb",
+  "code_state": "cell-value workbook-structure callers, sparkline and cell-watch publication, and cell-value resource guards; focused tests and no harness changes",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "change 0651 queue row 13, decisions and correctness trade-off in change 0652, with the single-parse seam established by change 0599 and the resource-guard finding recorded by change 0647",
+  "reason_codes": [
+    "insert_candidate_cell and transfer_cell still called the 0599 retaining helper and then reparsed the same candidate workbook",
+    "sparkline and cell-watch package publication validated a candidate workbook but left the facade's derived fields on the pre-edit Workbook",
+    "styles and shared-string transfer returned early or skipped relationship creation when the resource part existed while its workbook relationship did not",
+    "correctness is preserved by staging, complete parse validation, and one final owner assignment; exact no-ops remain no-parse results"
+  ],
+  "accepted_evidence": {
+    "resource_guards": "two focused tests pass: existing styles.bin without the styles relationship, and existing sharedStrings.bin without the shared-strings relationship",
+    "derived_refresh": "sparkline and cell-watch facade publication tests pass and compare the post-publication Workbook debug projection with a fresh parse of its published OPC package",
+    "regression_suite": "cargo test -p litchi-xlsb --lib: 575 tests; cargo test -p litchi-xlsb --tests: the same 575 library tests plus 144 integration tests, all passing",
+    "static_gates": "cargo fmt --all -- --check, cargo check -p litchi-xlsb -j2, and cargo clippy -p litchi-xlsb --all-targets -j2 -- -D warnings all pass"
+  },
+  "accepted_costs": {
+    "retained_parse_api": "two crate-private Applied outcomes and one parse-retaining function are added in each worksheet owner; the public cell-watch package wrapper keeps its signature and sparkline remains an internal workbook adapter",
+    "relationship_probe": "resource transfer inspects the workbook relationship before independently creating a missing part or missing relationship; malformed staged candidates still fail before owner publication",
+    "measurement_deferred": "no speed, allocation, RSS, or release measurement is claimed until 0674 supplies the apply_workbook_structure selector and paired evidence"
+  },
+  "known_gaps": {
+    "harness_owner": "tools/perf-baseline selectors and gates are owned by 0674 and were intentionally left untouched",
+    "opc_migration": "0661 is concurrently migrating lazy OPC APIs; this change uses existing ownership methods and must pass the coordinator's post-cherry-pick compile gate",
+    "no_timing": "the packet proves correctness and removes the named duplicate parse statically, but does not quantify elapsed-time or allocation change"
+  },
+  "provenance": {
+    "base_commit": "5fa92d7ce",
+    "branch": "perf/0669-xlsb-edit-residues",
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0669",
+    "record": "docs/performance/0669-xlsb-edit-residues.md"
+  }
+}

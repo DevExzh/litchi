@@ -185,6 +185,8 @@ fn workbook_facade_publishes_only_a_valid_commit() {
         workbook.cell_watches(0).unwrap().watches(),
         snapshot.watches()
     );
+    let reparsed = crate::Workbook::from_opc_package(workbook.opc_package().clone()).unwrap();
+    assert_eq!(format!("{workbook:?}"), format!("{reparsed:?}"));
 
     let mut stale = workbook.edit_cell_watches(0).unwrap();
     stale.add(Watch::new(4, 4).unwrap()).unwrap();
