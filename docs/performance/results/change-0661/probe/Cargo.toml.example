@@ -1,0 +1,39 @@
+# Manifest template for the scratch differential probe retained in `src/bin/`.
+#
+# Build one copy per leg, each with its own `CARGO_TARGET_DIR`, pointing the
+# path dependencies at that leg's checkout:
+#
+#   litchi-opc  = { path = "<checkout>/crates/litchi-opc" }
+#   litchi-xlsx = { path = "<checkout>/crates/litchi-xlsx" }
+#
+# `publish` builds on both legs; `lazy` builds only on the after branch,
+# because it uses `try_iter_parts` and `deferred_decode_counters`. On the
+# before leg build only the one binary:
+#
+#   cargo build --release --bin publish
+#
+# `--locked` is not used: the probe is a fresh crate with no lockfile of its
+# own. It resolves the same dependency versions through the same path
+# dependencies, and the release profile below mirrors the workspace's.
+
+[package]
+name    = "opc-lazy-probe"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "publish"
+path = "src/bin/publish.rs"
+
+[[bin]]
+name = "lazy"
+path = "src/bin/lazy.rs"
+
+[dependencies]
+litchi-opc  = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+litchi-xlsx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-xlsx" }
+sha2        = "0.10"
+
+[profile.release]
+lto   = true
+panic = "abort"

@@ -3041,8 +3041,9 @@ fn physical_state(workbook: &Workbook) -> PhysicalState {
         .collect::<Vec<_>>();
     root_relationships.sort();
     let mut parts = package
-        .iter_parts()
+        .try_iter_parts()
         .map(|part| {
+            let part = part.expect("package part decodes");
             let mut relationships = part
                 .rels()
                 .iter()

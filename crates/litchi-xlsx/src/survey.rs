@@ -640,7 +640,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
                 part.partname()
             )));
         }
-        let survey = parse(part.blob())?;
+        let survey = parse(package.get_part(part.partname())?.blob())?;
         if !ids.insert(survey.id()) {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }

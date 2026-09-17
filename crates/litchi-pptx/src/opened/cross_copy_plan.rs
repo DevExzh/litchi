@@ -2024,10 +2024,13 @@ fn prove_package_dialect(package: &OpcPackage, presentation: &dyn Part) -> Resul
     };
 
     for part in package.iter_parts() {
-        if !is_xml_part(part) {
+        if !is_xml_part(part.partname(), part.content_type()) {
             continue;
         }
-        let (part_transitional, part_strict) = dialect_namespace_flags(part.blob());
+        // The dialect check reads every XML part's markup, so every XML part
+        // is decoded here (ADR 0030).
+        let part_blob = package.get_part(part.partname()).map_err(Error::from)?;
+        let (part_transitional, part_strict) = dialect_namespace_flags(part_blob.blob());
         if part_transitional && part_strict {
             return refusal(
                 SlideCopyRefusal::UnknownSemanticSurface,
@@ -2110,12 +2113,11 @@ fn dialect_namespace_flags(bytes: &[u8]) -> (bool, bool) {
     (transitional, strict)
 }
 
-fn is_xml_part(part: &dyn Part) -> bool {
-    let content_type = part.content_type();
+fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
     content_type == "application/xml"
         || content_type.ends_with("+xml")
-        || part.partname().membername().ends_with(".xml")
-        || part.partname().membername().ends_with(".rels")
+        || partname.membername().ends_with(".xml")
+        || partname.membername().ends_with(".rels")
 }
 
 /// Hash the exact serialized archive used for physical authorization.

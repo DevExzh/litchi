@@ -235,7 +235,7 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
             }
             continue;
         }
-        let root = parse_document(part.blob())?;
+        let root = parse_document(package.get_part(part.partname())?.blob())?;
         let (core, rel) = source_namespaces(&root, "worksheet")?;
         let refs = integration_refs(
             &root,

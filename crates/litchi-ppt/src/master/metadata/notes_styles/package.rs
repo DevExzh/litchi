@@ -79,7 +79,10 @@ pub(super) fn from_bytes(data: Vec<u8>) -> Result<Styles> {
             "{RECORD_NAME} contains an invalid OPC package: {error}"
         ))
     })?;
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part.map_err(|error| {
+            Error::Corrupted(format!("{RECORD_NAME} part payload is unreadable: {error}"))
+        })?;
         if part.blob().len() > MAX_XML_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "{RECORD_NAME} part {} exceeds {MAX_XML_BYTES} bytes",

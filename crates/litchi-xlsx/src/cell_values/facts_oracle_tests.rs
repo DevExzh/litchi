@@ -506,7 +506,10 @@ fn change_0622_oracle_over_test_data_worksheets() {
         let Ok(package) = litchi_opc::OpcPackage::from_bytes(&bytes) else {
             continue;
         };
-        for part in package.iter_parts() {
+        for part in package
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
+        {
             let name = part.partname().as_str().to_owned();
             if !name.starts_with("/xl/worksheets/") || !name.ends_with(".xml") {
                 continue;

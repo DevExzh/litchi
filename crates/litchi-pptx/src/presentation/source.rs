@@ -5231,7 +5231,10 @@ mod tests {
 
         let source = litchi_opc::OpcPackage::from_bytes(&archive).unwrap();
         let candidate = litchi_opc::OpcPackage::from_bytes(&output).unwrap();
-        for part in source.iter_parts() {
+        for part in source
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
+        {
             let counterpart = candidate.get_part(part.partname()).unwrap();
             if part.partname().as_str() != "/ppt/slides/slide1.xml" {
                 assert_eq!(counterpart.blob(), part.blob(), "{}", part.partname());

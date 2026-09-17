@@ -836,7 +836,7 @@ fn validate_slicer_views(
                 .1
                 .clone()
         } else {
-            super::views::parse_slicers(part.blob())?
+            super::views::parse_slicers(package.get_part(part.partname())?.blob())?
         };
         for slicer in value.slicers {
             if !names.insert(slicer.name.to_ascii_lowercase()) {
@@ -916,7 +916,9 @@ fn all_slicers(package: &OpcPackage) -> Result<Vec<Slicer>> {
         .iter_parts()
         .filter(|part| part.content_type() == SLICERS_CONTENT_TYPE)
     {
-        output.extend(super::views::parse_slicers(part.blob())?.slicers);
+        output.extend(
+            super::views::parse_slicers(package.get_part(part.partname())?.blob())?.slicers,
+        );
     }
     Ok(output)
 }
@@ -1155,8 +1157,10 @@ fn next_part_name(package: &OpcPackage, template: &str) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
         let candidate = PackURI::new(template.replace("%d", &suffix.to_string()))
             .map_err(|error| invalid(format!("invalid package part URI: {error}")))?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free package part name"))

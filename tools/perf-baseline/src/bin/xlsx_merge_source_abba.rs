@@ -1019,7 +1019,10 @@ type PartInventory = BTreeMap<String, PartDigest>;
 fn package_inventory(bytes: &[u8]) -> AnyResult<PartInventory> {
     let package = OpcPackage::from_bytes(bytes)?;
     let mut inventory = BTreeMap::new();
-    for part in package.iter_parts() {
+    for part in package
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         inventory.insert(
             part.partname().to_string(),
             PartDigest {
@@ -1084,7 +1087,8 @@ fn source_patch_checks(
 
 fn package_inventory_from_package(package: &OpcPackage) -> PartInventory {
     package
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .map(|part| {
             (
                 part.partname().to_string(),

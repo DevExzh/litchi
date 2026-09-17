@@ -755,11 +755,14 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
         return Err("DOCX story publication corpus has no ZIP members".into());
     }
     let package = OpcPackage::from_bytes(&archive)?;
-    let uncompressed_payload_bytes = package.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("DOCX story publication payload count overflow")
-    })?;
+    let uncompressed_payload_bytes = package
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("DOCX story publication payload count overflow")
+        })?;
     let target_payload = SHARED_TARGET.as_bytes();
     let main_bytes = source_members
         .get("word/document.xml")

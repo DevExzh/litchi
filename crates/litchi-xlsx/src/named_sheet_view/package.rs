@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Relationships};
 use std::collections::HashSet;
 
 use super::codec::{parse_named_sheet_views, write_named_sheet_views};
@@ -45,7 +45,10 @@ pub fn load_worksheet_named_sheet_views(
     package: &OpcPackage,
     worksheet_part: &PackURI,
 ) -> Result<Option<Views>> {
-    require_worksheet(package.get_part(worksheet_part)?)?;
+    require_worksheet(
+        worksheet_part,
+        package.get_part(worksheet_part)?.content_type(),
+    )?;
     validate_named_sheet_views_graph(package)?;
     let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
         return Ok(None);
@@ -65,7 +68,10 @@ pub fn store_worksheet_named_sheet_views(
     value: &Views,
 ) -> Result<()> {
     let xml = write_named_sheet_views(value)?;
-    require_worksheet(package.get_part(worksheet_part)?)?;
+    require_worksheet(
+        worksheet_part,
+        package.get_part(worksheet_part)?.content_type(),
+    )?;
     validate_named_sheet_views_graph(package)?;
 
     if let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? {
@@ -92,7 +98,10 @@ pub fn remove_worksheet_named_sheet_views(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
 ) -> Result<bool> {
-    require_worksheet(package.get_part(worksheet_part)?)?;
+    require_worksheet(
+        worksheet_part,
+        package.get_part(worksheet_part)?.content_type(),
+    )?;
     validate_named_sheet_views_graph(package)?;
     let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
         return Ok(false);
@@ -120,7 +129,7 @@ fn named_sheet_views_relationship(
     worksheet_part: &PackURI,
 ) -> Result<Option<Relationship>> {
     let worksheet = package.get_part(worksheet_part)?;
-    require_worksheet(worksheet)?;
+    require_worksheet(worksheet.partname(), worksheet.content_type())?;
     let mut matches = worksheet
         .rels()
         .iter()
@@ -164,7 +173,7 @@ fn validate_named_sheet_views_graph(package: &OpcPackage) -> Result<()> {
         let Some(relationship) = relationships.next() else {
             continue;
         };
-        require_worksheet(source)?;
+        require_worksheet(source.partname(), source.content_type())?;
         if relationships.next().is_some() {
             return Err(invalid(format!(
                 "worksheet '{}' has multiple Named Sheet Views relationships",
@@ -254,13 +263,10 @@ fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
     })
 }
 
-fn require_worksheet(part: &dyn Part) -> Result<()> {
-    if part.content_type() == ct::SML_WORKSHEET {
+fn require_worksheet(partname: &PackURI, content_type: &str) -> Result<()> {
+    if content_type == ct::SML_WORKSHEET {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "part '{}' is not a worksheet",
-            part.partname()
-        )))
+        Err(invalid(format!("part '{partname}' is not a worksheet")))
     }
 }

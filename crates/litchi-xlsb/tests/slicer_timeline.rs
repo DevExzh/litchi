@@ -57,8 +57,8 @@ fn package_snapshot(package: &litchi_opc::OpcPackage) -> Package {
 fn authored_package() -> litchi_opc::OpcPackage {
     let source = Package::create().unwrap().into_opc();
     let mut package = litchi_opc::OpcPackage::new();
-    for part in source.iter_parts() {
-        package.add_part(part.clone_part());
+    for part in source.try_iter_parts() {
+        package.add_part(part.unwrap().clone_part());
     }
     *package.rels_mut() = source.rels().clone();
     package
@@ -438,10 +438,16 @@ fn timeline_patch_preserves_noop_and_emits_compact_xml() {
         .unwrap();
     apply_timeline(&mut package, views.commit().unwrap().patch());
 
-    for part in package.iter_parts().filter(|part| {
-        part.partname().as_str().contains("/timelineCaches/")
-            || part.partname().as_str().contains("/timelines/")
-    }) {
+    let timeline_names = package
+        .iter_parts()
+        .filter(|part| {
+            part.partname().as_str().contains("/timelineCaches/")
+                || part.partname().as_str().contains("/timelines/")
+        })
+        .map(|part| part.partname().clone())
+        .collect::<Vec<_>>();
+    for name in &timeline_names {
+        let part = package.get_part(name).unwrap();
         let xml = part.blob();
         assert!(!xml.contains(&b'\n'));
         assert!(!xml.contains(&b'\r'));

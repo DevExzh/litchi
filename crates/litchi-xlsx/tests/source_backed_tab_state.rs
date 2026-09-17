@@ -325,7 +325,10 @@ fn visibility_operations_use_one_part_and_preserve_every_unrelated_member() {
         .unwrap();
     let before = OpcPackage::from_bytes(&source).unwrap();
     let after = OpcPackage::from_bytes(&output).unwrap();
-    for part in before.iter_parts() {
+    for part in before
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let actual = after.get_part(part.partname()).unwrap();
         assert_eq!(actual.content_type(), part.content_type());
         assert_eq!(

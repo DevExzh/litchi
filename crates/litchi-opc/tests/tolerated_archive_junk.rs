@@ -37,8 +37,11 @@ fn open(relative: &str) -> OpcPackage {
 /// Return the part with the given name, or fail the test.
 fn part<'package>(package: &'package OpcPackage, partname: &str) -> &'package dyn Part {
     package
-        .iter_parts()
-        .find(|part| part.partname().as_str() == partname)
+        .try_iter_parts()
+        .find_map(|part| {
+            let part = part.unwrap_or_else(|error| panic!("decode {partname}: {error}"));
+            (part.partname().as_str() == partname).then_some(part)
+        })
         .unwrap_or_else(|| panic!("package is missing {partname}"))
 }
 

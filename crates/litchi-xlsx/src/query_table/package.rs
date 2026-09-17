@@ -256,8 +256,10 @@ fn next_query_table_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
         let candidate =
             PackURI::new(format!("/xl/queryTables/queryTable{suffix}.xml")).map_err(invalid)?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free query-table part name"))

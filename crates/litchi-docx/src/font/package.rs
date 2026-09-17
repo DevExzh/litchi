@@ -5,7 +5,7 @@
 //! OPC relationship graph ownership for the `WordprocessingML` font table.
 
 use crate::{Error, Result};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, XmlPart};
 use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -261,28 +261,37 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
 
     for (part_name, (content_type, data)) in &resources {
         let uri = PackURI::new(part_name).map_err(Error::Uri)?;
-        if let Ok(part) = package.get_part(&uri) {
-            if part.content_type() != content_type {
-                return Err(invalid(format!("font part '{uri}' content type collision")));
-            }
-            if !part.rels().is_empty() {
-                return Err(invalid(format!(
-                    "font part '{uri}' has outbound relationships"
-                )));
-            }
-            if part.blob() != data.as_slice() && !old_part_names.contains(part_name) {
-                return Err(invalid(format!("font part '{uri}' data collision")));
-            }
-            if part.blob() != data.as_slice()
-                && old_table_name.as_ref().is_some_and(|table| {
-                    has_inbound_outside_relationships(package, &uri, table, &old_relationship_ids)
+        match package.get_part(&uri) {
+            Ok(part) => {
+                if part.content_type() != content_type {
+                    return Err(invalid(format!("font part '{uri}' content type collision")));
+                }
+                if !part.rels().is_empty() {
+                    return Err(invalid(format!(
+                        "font part '{uri}' has outbound relationships"
+                    )));
+                }
+                if part.blob() != data.as_slice() && !old_part_names.contains(part_name) {
+                    return Err(invalid(format!("font part '{uri}' data collision")));
+                }
+                if part.blob() != data.as_slice()
+                    && old_table_name.as_ref().is_some_and(|table| {
+                        has_inbound_outside_relationships(
+                            package,
+                            &uri,
+                            table,
+                            &old_relationship_ids,
+                        )
                         .unwrap_or(true)
-                })
-            {
-                return Err(invalid(format!(
-                    "shared font part '{uri}' cannot be overwritten"
-                )));
-            }
+                    })
+                {
+                    return Err(invalid(format!(
+                        "shared font part '{uri}' cannot be overwritten"
+                    )));
+                }
+            },
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
     }
     validate_all_internal_relationship_targets(package)?;
@@ -298,10 +307,12 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
     package.unsign();
 
     for (uri, content_type, data) in resource_parts {
-        if let Ok(part) = package.get_part_mut(&uri) {
-            part.set_blob_shared(data);
-        } else {
-            package.add_part(Box::new(BlobPart::new_shared(uri, content_type, data)));
+        match package.get_part_mut(&uri) {
+            Ok(part) => part.set_blob_shared(data),
+            Err(OpcError::PartNotFound(_)) => {
+                package.add_part(Box::new(BlobPart::new_shared(uri, content_type, data)));
+            },
+            Err(error) => return Err(error.into()),
         }
     }
     if let Some(existing) = &old_table_name {
@@ -818,13 +829,16 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
             && part.content_type().ends_with("+xml")
             && part.content_type() != FT_CT
     }) {
-        if part.blob().len() > MAX_XML {
+        // Only the WordprocessingML parts this pass parses are decoded
+        // (ADR 0030).
+        let blob = package.get_part(part.partname())?.blob();
+        if blob.len() > MAX_XML {
             return Err(invalid(format!(
                 "WordprocessingML part '{}' is too large for font-usage validation",
                 part.partname()
             )));
         }
-        let mut reader = Reader::from_reader(part.blob());
+        let mut reader = Reader::from_reader(blob);
         let mut nodes = 0usize;
         loop {
             match reader.read_event().map_err(xml_error)? {

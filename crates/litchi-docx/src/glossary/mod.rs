@@ -17,7 +17,7 @@ pub(super) use crate::{Error, Result};
 pub(super) use caseless::Caseless;
 pub(super) use litchi_opc::constants::content_type as ct;
 pub(super) use litchi_opc::part::{BlobPart, Part};
-pub(super) use litchi_opc::{ContentType, OpcPackage, PackURI};
+pub(super) use litchi_opc::{ContentType, OpcError, OpcPackage, PackURI};
 pub(super) use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,

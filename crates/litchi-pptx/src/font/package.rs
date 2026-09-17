@@ -15,7 +15,7 @@ use super::{
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -213,32 +213,36 @@ pub(super) fn put_raw(
 
     for (part_name, (content_type, data)) in &resources {
         let uri = PackURI::new(part_name).map_err(Error::Invalid)?;
-        if let Ok(part) = package.get_part(&uri) {
-            if part.content_type() != content_type {
-                return Err(invalid(format!("font part '{uri}' content type collision")));
-            }
-            if !part.rels().is_empty() {
-                return Err(invalid(format!(
-                    "font part '{uri}' has outbound relationships"
-                )));
-            }
-            let stored = part.blob_arc();
-            let same_data = Arc::ptr_eq(&stored, data) || stored.as_slice() == data.as_slice();
-            if !same_data && !old_part_names.contains(part_name) {
-                return Err(invalid(format!("font part '{uri}' data collision")));
-            }
-            if !same_data
-                && has_inbound_outside_relationships(
-                    package,
-                    &uri,
-                    &presentation_name,
-                    &old_relationship_ids,
-                )?
-            {
-                return Err(invalid(format!(
-                    "shared font part '{uri}' cannot be overwritten"
-                )));
-            }
+        match package.get_part(&uri) {
+            Ok(part) => {
+                if part.content_type() != content_type {
+                    return Err(invalid(format!("font part '{uri}' content type collision")));
+                }
+                if !part.rels().is_empty() {
+                    return Err(invalid(format!(
+                        "font part '{uri}' has outbound relationships"
+                    )));
+                }
+                let stored = part.blob_arc();
+                let same_data = Arc::ptr_eq(&stored, data) || stored.as_slice() == data.as_slice();
+                if !same_data && !old_part_names.contains(part_name) {
+                    return Err(invalid(format!("font part '{uri}' data collision")));
+                }
+                if !same_data
+                    && has_inbound_outside_relationships(
+                        package,
+                        &uri,
+                        &presentation_name,
+                        &old_relationship_ids,
+                    )?
+                {
+                    return Err(invalid(format!(
+                        "shared font part '{uri}' cannot be overwritten"
+                    )));
+                }
+            },
+            Err(OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
         }
     }
 
@@ -270,10 +274,12 @@ pub(super) fn put_raw(
     }
     for (part_name, (content_type, data)) in resources {
         let uri = PackURI::new(&part_name).map_err(Error::Invalid)?;
-        if let Ok(part) = candidate.get_part_mut(&uri) {
-            part.set_blob_shared(data);
-        } else {
-            candidate.add_part(Box::new(BlobPart::new_shared(uri, content_type, data)));
+        match candidate.get_part_mut(&uri) {
+            Ok(part) => part.set_blob_shared(data),
+            Err(OpcError::PartNotFound(_)) => {
+                candidate.add_part(Box::new(BlobPart::new_shared(uri, content_type, data)));
+            },
+            Err(error) => return Err(error.into()),
         }
     }
     candidate

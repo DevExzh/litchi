@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use litchi_core::sheet::Result;
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
 
 use super::model::{REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
 use super::{invalid, package};
@@ -145,34 +145,38 @@ impl Snapshot {
         }
 
         if let Some(part) = &self.source.part {
-            if let Ok(existing) = package.get_part(&part.part_uri) {
-                if existing.content_type() != part.content_type {
-                    return Err(invalid(format!(
-                        "custom XML maps part '{}' has an incompatible content type",
-                        part.part_uri
-                    )));
-                }
-                if existing.rels().iter().next().is_some() {
-                    return Err(invalid("custom XML maps part must not have relationships"));
-                }
-                package
-                    .get_part_mut(&part.part_uri)?
-                    .set_blob(part.bytes().to_vec());
-            } else {
-                let mut replacement = litchi_opc::part::BlobPart::new(
-                    part.part_uri.clone(),
-                    part.content_type.clone(),
-                    part.bytes().to_vec(),
-                );
-                for relationship in &part.relationships {
-                    replacement.rels_mut().add_relationship(
-                        relationship.relationship_type.clone(),
-                        relationship.target.clone(),
-                        relationship.id.clone(),
-                        relationship.mode == TargetMode::External,
+            match package.get_part(&part.part_uri) {
+                Ok(existing) => {
+                    if existing.content_type() != part.content_type {
+                        return Err(invalid(format!(
+                            "custom XML maps part '{}' has an incompatible content type",
+                            part.part_uri
+                        )));
+                    }
+                    if existing.rels().iter().next().is_some() {
+                        return Err(invalid("custom XML maps part must not have relationships"));
+                    }
+                    package
+                        .get_part_mut(&part.part_uri)?
+                        .set_blob(part.bytes().to_vec());
+                },
+                Err(OpcError::PartNotFound(_)) => {
+                    let mut replacement = litchi_opc::part::BlobPart::new(
+                        part.part_uri.clone(),
+                        part.content_type.clone(),
+                        part.bytes().to_vec(),
                     );
-                }
-                package.try_add_part(Box::new(replacement))?;
+                    for relationship in &part.relationships {
+                        replacement.rels_mut().add_relationship(
+                            relationship.relationship_type.clone(),
+                            relationship.target.clone(),
+                            relationship.id.clone(),
+                            relationship.mode == TargetMode::External,
+                        );
+                    }
+                    package.try_add_part(Box::new(replacement))?;
+                },
+                Err(error) => return Err(error.into()),
             }
 
             let owner = self

@@ -148,7 +148,9 @@ where
         .iter_parts()
         .filter(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
     {
-        let connection_id = query_table_connection_id(part.blob())?;
+        // Only a query-table part's payload is parsed, so only a query-table
+        // part's payload is decoded (ADR 0030).
+        let connection_id = query_table_connection_id(package.get_part(part.partname())?.blob())?;
         if !ids.contains(&connection_id) {
             return Err(invalid(format!(
                 "query-table part '{}' references missing connection ID {}",
@@ -211,8 +213,10 @@ fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
             format!("/xl/connections{suffix}.xml")
         };
         let candidate = PackURI::new(&name)?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free connections part name"))
@@ -495,11 +499,15 @@ impl SourceState {
             .as_ref()
             .map(|uri| package.get_part(uri).map(SourcePart::from_part))
             .transpose()?;
-        let mut query_tables = package
+        let query_table_names = package
             .iter_parts()
             .filter(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
-            .map(SourcePart::from_part)
+            .map(|part| part.partname().clone())
             .collect::<Vec<_>>();
+        let mut query_tables = Vec::new();
+        for name in &query_table_names {
+            query_tables.push(SourcePart::from_part(package.get_part(name)?));
+        }
         query_tables.sort_by(|left, right| left.part_uri.as_str().cmp(right.part_uri.as_str()));
         Ok(Self {
             workbook_part_name: workbook.partname().to_string(),

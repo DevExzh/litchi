@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use litchi_ooxml_common::custom_xml;
-use litchi_opc::{OpcPackage, PackURI, Relationship, Relationships};
+use litchi_opc::{OpcError, OpcPackage, PackURI, Relationship, Relationships};
 
 use crate::package::story::{self, StoryKind, StoryLimits, StoryTopology};
 use crate::{Error, Package, Result};
@@ -1431,7 +1431,7 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
     let mut part_names = Vec::<PackURI>::new();
     let mut seen = HashSet::<PackURI>::new();
     for relationship in package.rels().iter() {
-        if !root_signature_relationship(package, relationship) {
+        if !root_signature_relationship(package, relationship)? {
             continue;
         }
         relationship_count = relationship_count
@@ -1456,7 +1456,7 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
         }
     }
     for part in package.iter_parts() {
-        if is_signature_part(part) {
+        if is_signature_part(part.partname(), part.content_type()) {
             add_signature_part(
                 package,
                 part.partname().clone(),
@@ -1504,7 +1504,7 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
     // unsigned package is the common case and stays exactly as it was.
     if relationship_count != 0 {
         for relationship in sorted_relationships(package.rels())? {
-            if !root_signature_relationship(package, relationship) {
+            if !root_signature_relationship(package, relationship)? {
                 continue;
             }
             token.push(1);
@@ -1589,23 +1589,26 @@ fn add_signature_part(
     Ok(())
 }
 
-fn root_signature_relationship(package: &OpcPackage, relationship: &Relationship) -> bool {
+fn root_signature_relationship(package: &OpcPackage, relationship: &Relationship) -> Result<bool> {
     if is_signature_relationship(relationship.reltype(), relationship.target_ref()) {
-        return true;
+        return Ok(true);
     }
     if relationship.is_external() {
-        return false;
+        return Ok(false);
     }
-    relationship
-        .target_partname()
-        .ok()
-        .and_then(|part| package.get_part(&part).ok())
-        .is_some_and(is_signature_part)
+    let Ok(part) = relationship.target_partname() else {
+        return Ok(false);
+    };
+    match package.get_part(&part) {
+        Ok(part) => Ok(is_signature_part(part.partname(), part.content_type())),
+        Err(OpcError::PartNotFound(_)) => Ok(false),
+        Err(error) => Err(error.into()),
+    }
 }
 
-fn is_signature_part(part: &dyn litchi_opc::Part) -> bool {
-    starts_with_ascii_case_insensitive(part.partname().as_str(), "/_xmlsignatures/")
-        || contains_ascii_case_insensitive(part.content_type(), "digital-signature")
+fn is_signature_part(partname: &PackURI, content_type: &str) -> bool {
+    starts_with_ascii_case_insensitive(partname.as_str(), "/_xmlsignatures/")
+        || contains_ascii_case_insensitive(content_type, "digital-signature")
 }
 
 fn charge_signature_field(charged: &mut usize, length: usize, limit: usize) -> Result<()> {

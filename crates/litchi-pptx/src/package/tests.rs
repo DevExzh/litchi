@@ -197,7 +197,8 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
     );
     for part in package
         .opc
-        .iter_parts()
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
         .filter(|part| part.partname().as_str().starts_with("/ppt/webextensions/"))
     {
         assert!(!part.blob().contains(&b'\n'));

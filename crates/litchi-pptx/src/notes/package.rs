@@ -15,7 +15,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 #[cfg(test)]
 use litchi_opc::part::BlobPart;
 use litchi_opc::part::Part;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcError, OpcPackage, PackURI};
 #[cfg(test)]
 use std::collections::BTreeMap;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -777,8 +777,10 @@ fn validate_descendant_inbound(
     let Ok(target_reference) = relationship.target_partname() else {
         return Ok(());
     };
-    let Some(stored_target) = package.get_part(&target_reference).ok().map(Part::partname) else {
-        return Ok(());
+    let stored_target = match package.get_part(&target_reference) {
+        Ok(part) => part.partname(),
+        Err(OpcError::PartNotFound(_)) => return Ok(()),
+        Err(error) => return Err(error.into()),
     };
     if roots.contains(stored_target) || !closure.contains(stored_target) {
         return Ok(());
@@ -808,12 +810,15 @@ fn validate_notes_inbound(
     let Ok(target) = relationship.target_partname() else {
         return Ok(());
     };
-    let index = by_target.get(&target).copied().or_else(|| {
-        package
-            .get_part(&target)
-            .ok()
-            .and_then(|part| by_target.get(part.partname()).copied())
-    });
+    let index = if let Some(index) = by_target.get(&target).copied() {
+        Some(index)
+    } else {
+        match package.get_part(&target) {
+            Ok(part) => by_target.get(part.partname()).copied(),
+            Err(OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(error.into()),
+        }
+    };
     let Some(index) = index else {
         return Ok(());
     };

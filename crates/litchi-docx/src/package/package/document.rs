@@ -4,6 +4,7 @@ use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
 use super::transfer::{
     apply_transfer_graph, relationship_graph_digest, relationship_graph_digest_opc,
 };
+use litchi_opc::OpcError;
 
 /// How `apply_document_patch` obtained the snapshot it publishes.
 enum DocumentPatchSource {
@@ -420,13 +421,17 @@ impl Package {
                 .map_err(|error| Error::InvalidUri(format!("document URI: {error}")))?;
 
             // Try to get existing document content
-            if let Ok(part) = self.opc.get_part(&doc_uri) {
-                let xml = std::str::from_utf8(part.blob())
-                    .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8: {error}")))?;
-                self.mutable_doc = Some(MutableDocument::from_xml(xml)?);
-            } else {
-                // Create a new empty document
-                self.mutable_doc = Some(MutableDocument::new());
+            match self.opc.get_part(&doc_uri) {
+                Ok(part) => {
+                    let xml = std::str::from_utf8(part.blob())
+                        .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8: {error}")))?;
+                    self.mutable_doc = Some(MutableDocument::from_xml(xml)?);
+                },
+                Err(OpcError::PartNotFound(_)) => {
+                    // Create a new empty document
+                    self.mutable_doc = Some(MutableDocument::new());
+                },
+                Err(error) => return Err(error.into()),
             }
         }
 

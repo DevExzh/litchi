@@ -504,9 +504,13 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
             format!("/ppt/tableStyles{number}.xml")
         };
         let candidate = PackURI::new(&path).map_err(Error::Invalid)?;
-        if package.get_part(&candidate).is_err() {
-            package.validate_new_part_name(&candidate)?;
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => {
+                package.validate_new_part_name(&candidate)?;
+                return Ok(candidate);
+            },
+            Err(error) => return Err(error.into()),
         }
     }
     Err(limit(

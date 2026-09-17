@@ -1940,7 +1940,8 @@ impl Edit {
                 .package
                 .iter_parts()
                 .filter(|part| {
-                    part.partname() != &base.inner.workbook_uri && codec::reference_part(*part)
+                    part.partname() != &base.inner.workbook_uri
+                        && codec::reference_part_named(part.partname(), part.content_type())
                 })
                 .map(|part| {
                     (

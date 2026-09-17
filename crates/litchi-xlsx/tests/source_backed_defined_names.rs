@@ -277,7 +277,10 @@ fn changed_edit_reopens_and_changes_only_workbook_xml() {
         relationship_signatures(source.rels()),
         relationship_signatures(candidate.rels())
     );
-    for part in source.iter_parts() {
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = candidate.get_part(part.partname()).unwrap();
         assert_eq!(part.content_type(), output_part.content_type());
         assert_eq!(

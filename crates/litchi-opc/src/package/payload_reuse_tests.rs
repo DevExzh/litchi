@@ -62,11 +62,22 @@ fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
     archive
 }
 
+/// Assert what the reused package holds for one part.
+///
+/// `expect_donation` says whether the donor's allocation is adoptable. Since
+/// change 0661 a donor opened through an ordinary owned door holds its
+/// payloads in the retained source archive and materializes one through the
+/// positional reader on first access. That reader sizes a **stored** member's
+/// buffer one byte above its length, so the donation guard — which refuses a
+/// donor allocation larger than the freshly decoded one, so that reuse can
+/// never raise retention — correctly declines it. A deflated member is sized
+/// identically on both paths and is still donated.
 fn assert_payload_internals(
     donor: &OpcPackage,
     reused: &OpcPackage,
     ordinary: &OpcPackage,
     partname: &PackURI,
+    expect_donation: bool,
 ) {
     let donor_blob = donor.get_part(partname).expect("donor part").blob_arc();
     let reused_blob = reused.get_part(partname).expect("reused part").blob_arc();
@@ -75,7 +86,11 @@ fn assert_payload_internals(
         .expect("ordinary decoded part")
         .blob_arc();
 
-    assert!(Arc::ptr_eq(&donor_blob, &reused_blob));
+    assert_eq!(
+        Arc::ptr_eq(&donor_blob, &reused_blob),
+        expect_donation,
+        "donation for {partname}"
+    );
     assert_eq!(donor_blob.as_slice(), reused_blob.as_slice());
     assert!(reused_blob.capacity() <= decoded_blob.capacity());
 
@@ -86,14 +101,23 @@ fn assert_payload_internals(
         .parts
         .get(partname)
         .expect("preserved part payload");
-    assert!(Arc::ptr_eq(&reused_blob, &preserved.blob));
+    assert!(Arc::ptr_eq(
+        &reused_blob,
+        preserved
+            .blob
+            .decoded()
+            .expect("eager reuse keeps a payload")
+    ));
 
     if partname == &pack(XML_URI) {
         let source_xml = reused
             .source_xml_parts
             .get(partname)
             .expect("XML source payload");
-        assert!(Arc::ptr_eq(&reused_blob, source_xml));
+        assert!(Arc::ptr_eq(
+            &reused_blob,
+            source_xml.decoded().expect("eager reuse keeps a payload")
+        ));
     }
 }
 
@@ -134,8 +158,8 @@ fn matching_binary_and_xml_payloads_share_all_owned_views_and_target_output() {
         OpcPackage::from_vec_reusing_payloads(target_bytes.clone(), ReadLimits::default(), &donor)
             .expect("matching payloads should be reusable");
 
-    assert_payload_internals(&donor, &reused, &ordinary, &pack(XML_URI));
-    assert_payload_internals(&donor, &reused, &ordinary, &pack(BINARY_URI));
+    assert_payload_internals(&donor, &reused, &ordinary, &pack(XML_URI), true);
+    assert_payload_internals(&donor, &reused, &ordinary, &pack(BINARY_URI), false);
     assert_eq!(reused.get_part(&pack(XML_URI)).unwrap().blob(), XML_PAYLOAD);
     assert_eq!(
         reused.get_part(&pack(BINARY_URI)).unwrap().blob(),

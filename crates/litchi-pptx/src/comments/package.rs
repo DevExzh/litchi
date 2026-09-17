@@ -632,8 +632,10 @@ fn next_relationship_id(part: &dyn Part, prefix: &str) -> Result<String> {
 fn next_legacy_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=100_001u32 {
         let uri = PackURI::new(format!("/ppt/comments/comment{suffix}.xml")).map_err(invalid)?;
-        if package.get_part(&uri).is_err() {
-            return Ok(uri);
+        match package.get_part(&uri) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(uri),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free legacy comment part name"))
@@ -641,14 +643,18 @@ fn next_legacy_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
 
 fn next_legacy_author_part_name(package: &OpcPackage) -> Result<PackURI> {
     let canonical = PackURI::new("/ppt/commentAuthors.xml").map_err(invalid)?;
-    if package.get_part(&canonical).is_err() {
-        return Ok(canonical);
+    match package.get_part(&canonical) {
+        Ok(_) => {},
+        Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(canonical),
+        Err(error) => return Err(error.into()),
     }
     for suffix in 1..=65_537u32 {
         let candidate =
             PackURI::new(format!("/ppt/commentAuthors{suffix}.xml")).map_err(invalid)?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free legacy comment-author part name"))

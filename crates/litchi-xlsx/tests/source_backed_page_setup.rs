@@ -352,7 +352,10 @@ fn changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship()
         relationship_signatures(source.rels()),
         relationship_signatures(candidate.rels())
     );
-    for part in source.iter_parts() {
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let output_part = candidate.get_part(part.partname()).unwrap();
         assert_eq!(part.content_type(), output_part.content_type());
         assert_eq!(

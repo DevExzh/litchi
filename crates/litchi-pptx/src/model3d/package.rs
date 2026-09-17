@@ -333,15 +333,19 @@ fn stage_embedded(
     let Some(data) = desired else {
         return Ok(None);
     };
-    if previous == Some(data)
-        && previous_relation.is_some_and(|relation| {
-            package
-                .get_part(source_name)
-                .ok()
-                .and_then(|part| part.rels().get(&relation.id))
-                .is_some_and(|value| !value.is_external())
-        })
-    {
+    let can_reuse = if previous == Some(data) {
+        match (previous_relation, package.get_part(source_name)) {
+            (Some(relation), Ok(part)) => part
+                .rels()
+                .get(&relation.id)
+                .is_some_and(|value| !value.is_external()),
+            (Some(_), Err(litchi_opc::OpcError::PartNotFound(_))) | (None, _) => false,
+            (Some(_), Err(error)) => return Err(error.into()),
+        }
+    } else {
+        false
+    };
+    if can_reuse {
         return previous_relation
             .map(|relation| relationship_id(&relation.id))
             .transpose();
@@ -371,15 +375,19 @@ fn stage_linked(
     let Some(link) = desired else {
         return Ok(None);
     };
-    if previous == Some(link)
-        && previous_relation.is_some_and(|relation| {
-            package
-                .get_part(source_name)
-                .ok()
-                .and_then(|part| part.rels().get(&relation.id))
-                .is_some_and(litchi_opc::Relationship::is_external)
-        })
-    {
+    let can_reuse = if previous == Some(link) {
+        match (previous_relation, package.get_part(source_name)) {
+            (Some(relation), Ok(part)) => part
+                .rels()
+                .get(&relation.id)
+                .is_some_and(litchi_opc::Relationship::is_external),
+            (Some(_), Err(litchi_opc::OpcError::PartNotFound(_))) | (None, _) => false,
+            (Some(_), Err(error)) => return Err(error.into()),
+        }
+    } else {
+        false
+    };
+    if can_reuse {
         return previous_relation
             .map(|relation| relationship_id(&relation.id))
             .transpose();

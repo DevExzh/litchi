@@ -14280,7 +14280,11 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
             .iter_parts()
             .map(|part| part.rels().len())
             .sum::<usize>();
-    let parsed_part_payload_bytes: usize = parsed.iter_parts().map(|part| part.blob().len()).sum();
+    let parsed_part_payload_bytes: usize = parsed
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .map(|part| part.blob().len())
+        .sum();
     if parsed_part_count != part_members.len()
         || parsed_relationship_count != relationship_members.len()
         || parsed_part_payload_bytes != part_members.values().map(Vec::len).sum::<usize>()
@@ -16117,11 +16121,14 @@ fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
     {
         return Err("DOCX section-layout corpus lost its table-cell sentinel".into());
     }
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("DOCX section-layout logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("DOCX section-layout logical byte count overflows usize")
+        })?;
     Ok(Corpus {
         manifest: CorpusManifest {
             name: "docx-source-backed-existing-section-layout".to_owned(),
@@ -16264,11 +16271,14 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     verify_semantic_docx(&package, SemanticShape::Medium, &[])?;
     let opc = OpcPackage::from_bytes(&archive)?;
     let entry_count = opc.part_count();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("DOCX source-edit logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("DOCX source-edit logical byte count overflows usize")
+        })?;
     for index in 0..DOCX_SOURCE_MEDIA_ENTRY_COUNT {
         let uri = PackURI::new(format!("/word/media/image{}.png", index + 1))?;
         if opc.get_part(&uri)?.blob() != docx_source_media_payload(index) {
@@ -16311,11 +16321,14 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     verify_pptx_source_edit_semantics(&package, 0)?;
     let opc = OpcPackage::from_bytes(&archive)?;
     let entry_count = opc.part_count();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("PPTX source-edit logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("PPTX source-edit logical byte count overflows usize")
+        })?;
     for index in 0..PPTX_SOURCE_MEDIA_ENTRY_COUNT {
         let uri = PackURI::new(format!(
             "/ppt/media/litchi-perf-source-media-{index:02}.png"
@@ -16465,14 +16478,14 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
     )?;
 
     let destination_opc = destination.opc()?;
-    let uncompressed_payload_bytes =
-        destination_opc
-            .iter_parts()
-            .try_fold(0usize, |total, part| {
-                total
-                    .checked_add(part.blob().len())
-                    .ok_or("PPTX cross-copy destination payload bytes overflow")
-            })?;
+    let uncompressed_payload_bytes = destination_opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("PPTX cross-copy destination payload bytes overflow")
+        })?;
     let target_payload = source_text.into_bytes();
     let manifest = CorpusManifest {
         name: case.name().to_owned(),
@@ -16789,11 +16802,14 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         .find_map(|(name, range)| (selected_media_member == name).then_some(range.clone()))
         .ok_or("PPTX source image corpus selected media member is missing")?;
     let source_opc = OpcPackage::from_bytes(&archive)?;
-    let uncompressed_payload_bytes = source_opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("PPTX source image corpus logical payload bytes overflow")
-    })?;
+    let uncompressed_payload_bytes = source_opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("PPTX source image corpus logical payload bytes overflow")
+        })?;
     let expected_images_sha256 = pptx_source_image_metadata_sha256(&expected_images)?;
     let selected_image_sha256 =
         pptx_source_image_metadata_sha256(std::slice::from_ref(&selected_image))?;
@@ -18783,7 +18799,10 @@ fn verify_pptx_cross_copy_output(
         == relationship_signatures(candidate_opc.rels());
     let destination_presentation_member = destination_presentation.partname().membername();
     let mut destination_parts_untouched = true;
-    for destination_part in destination_opc.iter_parts() {
+    for destination_part in destination_opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate_opc.get_part(destination_part.partname())?;
         if candidate_part.content_type() != destination_part.content_type() {
             destination_parts_untouched = false;
@@ -19111,11 +19130,14 @@ fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error
     let target_uri = PackURI::new("/xl/workbook.xml")?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     let entry_count = opc.part_count();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("XLSX calculation corpus logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("XLSX calculation corpus logical byte count overflows usize")
+        })?;
     Ok(Corpus {
         manifest: CorpusManifest {
             name: "xlsx-calculation-metadata-media".to_owned(),
@@ -19174,11 +19196,14 @@ fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
     opc.get_part_mut(&target_uri)?.set_blob(replaced);
     let archive = PackageWriter::to_bytes(&opc)?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("XLSX page-break projection logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("XLSX page-break projection logical byte count overflows usize")
+        })?;
     corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
     corpus.manifest.entry_count = opc.part_count();
@@ -19267,8 +19292,10 @@ fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     corpus.archive = PackageWriter::to_bytes(&opc)?;
     corpus.manifest.archive_member_count =
         ArchiveReader::new(&corpus.archive)?.file_names().count();
-    corpus.manifest.uncompressed_payload_bytes =
-        opc.iter_parts().try_fold(0usize, |total, part| {
+    corpus.manifest.uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
             total
                 .checked_add(part.blob().len())
                 .ok_or("XLSX data-validation corpus logical byte count overflows usize")
@@ -19298,8 +19325,10 @@ fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     corpus.archive = PackageWriter::to_bytes(&opc)?;
     corpus.manifest.archive_member_count =
         ArchiveReader::new(&corpus.archive)?.file_names().count();
-    corpus.manifest.uncompressed_payload_bytes =
-        opc.iter_parts().try_fold(0usize, |total, part| {
+    corpus.manifest.uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
             total
                 .checked_add(part.blob().len())
                 .ok_or("XLSX auto-filter corpus logical byte count overflows usize")
@@ -19330,8 +19359,10 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     corpus.archive = PackageWriter::to_bytes(&opc)?;
     corpus.manifest.archive_member_count =
         ArchiveReader::new(&corpus.archive)?.file_names().count();
-    corpus.manifest.uncompressed_payload_bytes =
-        opc.iter_parts().try_fold(0usize, |total, part| {
+    corpus.manifest.uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
             total
                 .checked_add(part.blob().len())
                 .ok_or("XLSX conditional-formatting corpus logical byte count overflows usize")
@@ -19384,11 +19415,14 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     let target_payload = opc.get_part(&worksheet_uri)?.blob().to_vec();
     let entry_count = opc.part_count();
-    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part.blob().len())
-            .ok_or("XLSX merge fixture logical byte count overflows usize")
-    })?;
+    let uncompressed_payload_bytes = opc
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+        .try_fold(0usize, |total, part| {
+            total
+                .checked_add(part.blob().len())
+                .ok_or("XLSX merge fixture logical byte count overflows usize")
+        })?;
     Ok(Corpus {
         manifest: CorpusManifest {
             name: format!(
@@ -22410,7 +22444,10 @@ fn xlsx_row_visibility_variant_bytes(
         "signed" => {
             let source = package;
             package = OpcPackage::new();
-            for part in source.iter_parts() {
+            for part in source
+                .try_iter_parts()
+                .map(|part| part.expect("part payload decodes"))
+            {
                 package.try_add_part(part.clone_part())?;
             }
             for relationship in source.rels().iter() {
@@ -23074,7 +23111,10 @@ fn verify_xlsx_cell_crud_package_identity(
     if source_workbook_relationships != candidate_workbook_relationships {
         return Err("XLSX cell CRUD output changed workbook relationships".into());
     }
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         if Some(source_part.partname().membername()) == removed_member {
             continue;
         }
@@ -48576,7 +48616,10 @@ fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), 
         return Err("DOCX source-edit package topology differs from source".into());
     }
     let main_uri = PackURI::new("/word/document.xml")?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -48668,7 +48711,10 @@ fn verify_docx_section_layout_output(
         return Err("DOCX section-layout package topology differs from source".into());
     }
     let main_uri = PackURI::new("/word/document.xml")?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -49454,7 +49500,10 @@ fn verify_pptx_source_edit_output(
         return Err("PPTX source-edit package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -49506,7 +49555,10 @@ fn verify_pptx_multi_slide_edit_output(
         .map(|position| PackURI::new(format!("/ppt/slides/slide{}.xml", position + 1)))
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -51060,7 +51112,10 @@ fn verify_xlsx_defined_names_edit_output(
         return Err("XLSX defined-name package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -51242,7 +51297,10 @@ fn verify_xlsx_calculation_metadata_edit_output(
         return Err("XLSX calculation-edit package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -52420,7 +52478,10 @@ fn verify_xlsx_page_break_edit_output(
         return Err("XLSX page-break package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -52722,7 +52783,10 @@ fn verify_xlsx_page_margin_edit_output(
         return Err("XLSX page-margin package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -52931,7 +52995,10 @@ fn verify_xlsx_page_setup_edit_output(
     {
         return Err("XLSX page-setup output unexpectedly references printer settings".into());
     }
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -53131,7 +53198,10 @@ fn verify_xlsx_print_options_edit_output(
         return Err("XLSX print-options package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -53367,7 +53437,10 @@ fn verify_xlsx_sheet_protection_edit_output(
         return Err("XLSX sheet-protection package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -53660,7 +53733,10 @@ fn verify_xlsx_auto_filter_edit_output(
         return Err("XLSX auto-filter package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -54845,7 +54921,10 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
         return Err("XLSX conditional-formatting patch replay changed its target".into());
     }
     inverse.apply(&mut replay)?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let restored = replay.get_part(source_part.partname())?;
         if restored.content_type() != source_part.content_type()
             || relationship_signatures(restored.rels())
@@ -54891,7 +54970,10 @@ fn verify_xlsx_conditional_formatting_edit_output(
         return Err("XLSX conditional-formatting package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -55116,7 +55198,10 @@ fn verify_xlsx_data_validation_edit_output(
         return Err("XLSX data-validation package topology differs from source".into());
     }
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    for source_part in source.iter_parts() {
+    for source_part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
         let candidate_part = candidate.get_part(source_part.partname())?;
         if candidate_part.content_type() != source_part.content_type()
             || relationship_signatures(candidate_part.rels())
@@ -56118,7 +56203,8 @@ fn run_opc_relationship_open(
                 .map(|part| part.rels().len())
                 .sum::<usize>();
         let part_payload_bytes = package
-            .iter_parts()
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
             .map(|part| part.blob().len())
             .sum::<usize>();
 
@@ -63235,9 +63321,9 @@ mod tests {
 
         let source = OpcPackage::from_bytes(&corpus.archive).unwrap();
         let mut wrong_main_target = OpcPackage::new();
-        for part in source.iter_parts() {
+        for part in source.try_iter_parts() {
             wrong_main_target
-                .try_add_part(part.clone_part())
+                .try_add_part(part.expect("part payload decodes").clone_part())
                 .expect("copy synthetic Part into wrong-target fixture");
         }
         wrong_main_target.rels_mut().add_relationship(

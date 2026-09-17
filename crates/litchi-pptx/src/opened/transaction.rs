@@ -1338,8 +1338,13 @@ fn remove_unreferenced_dependencies(package: &mut OpcPackage, roots: Vec<PackURI
     let mut queue = VecDeque::from(roots);
     let mut checked = HashSet::new();
     while let Some(name) = queue.pop_front() {
-        if !checked.insert(name.clone()) || package.get_part(&name).is_err() {
+        if !checked.insert(name.clone()) {
             continue;
+        }
+        match package.get_part(&name) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => continue,
+            Err(error) => return Err(error.into()),
         }
         if package
             .rels()

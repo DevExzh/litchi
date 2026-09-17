@@ -24,7 +24,7 @@ use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
 use litchi_core::binary;
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI};
 
 const SST_URI: &str = "/xl/sharedStrings.bin";
 const STYLES_URI: &str = "/xl/styles.bin";
@@ -227,7 +227,12 @@ fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
     let relationship_type = workbook_resource_relationship_type(package, false)?;
     let relationship_present =
         has_workbook_resource_relationship(package, relationship_type, "styles.bin")?;
-    if package.get_part(&uri).is_err() {
+    let missing = match package.get_part(&uri) {
+        Ok(_) => false,
+        Err(OpcError::PartNotFound(_)) => true,
+        Err(error) => return Err(error.into()),
+    };
+    if missing {
         let mut bytes = Vec::new();
         crate::writer::StylesWriter::new().write(&mut Writer::new(&mut bytes))?;
         package.try_add_part(Box::new(BlobPart::new(
@@ -344,7 +349,11 @@ pub(super) fn intern_shared_string_for_new_cell(
 ) -> Result<u32> {
     let encoded = value.encode()?;
     let uri = PackURI::new(SST_URI)?;
-    let existing = package.get_part(&uri).ok().map(|part| part.blob().to_vec());
+    let existing = match package.get_part(&uri) {
+        Ok(part) => Some(part.blob().to_vec()),
+        Err(OpcError::PartNotFound(_)) => None,
+        Err(error) => return Err(error.into()),
+    };
     let workbook_uri = PackURI::new(WORKBOOK_URI)?;
     let relationship_type = workbook_resource_relationship_type(package, true)?;
     let relationship_present =
@@ -378,18 +387,18 @@ pub(super) fn transfer_style(
     source_index: StyleIndex,
 ) -> Result<StyleIndex> {
     let source_uri = PackURI::new(STYLES_URI)?;
-    let Some(source_blob) = source
-        .get_part(&source_uri)
-        .ok()
-        .map(|part| part.blob().to_vec())
-    else {
-        return if source_index.get() == 0 {
-            StyleIndex::new(0)
-        } else {
-            Err(Error::UnsupportedFeature(
-                "source workbook omits styles.bin for a nonzero style".to_string(),
-            ))
-        };
+    let source_blob = match source.get_part(&source_uri) {
+        Ok(part) => part.blob().to_vec(),
+        Err(OpcError::PartNotFound(_)) => {
+            return if source_index.get() == 0 {
+                StyleIndex::new(0)
+            } else {
+                Err(Error::UnsupportedFeature(
+                    "source workbook omits styles.bin for a nonzero style".to_string(),
+                ))
+            };
+        },
+        Err(error) => return Err(error.into()),
     };
     ensure_styles_part(target)?;
     let mut target_blob = target.get_part(&source_uri)?.blob().to_vec();

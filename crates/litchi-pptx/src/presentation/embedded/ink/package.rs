@@ -135,8 +135,10 @@ pub fn store_slide(
 fn allocate_part(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..1_000_000u32 {
         let name = PackURI::new(format!("/ppt/ink/ink{index}.xml")).map_err(Error::Uri)?;
-        if package.get_part(&name).is_err() {
-            return Ok(name);
+        match package.get_part(&name) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(name),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(limit("InkML part namespace", 1_000_000))

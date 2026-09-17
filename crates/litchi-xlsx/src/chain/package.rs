@@ -338,7 +338,7 @@ fn validate_part_set(package: &OpcPackage, relationship_target: Option<&PackURI>
     let mut parts = package
         .iter_parts()
         .filter(|part| part.content_type() == CONTENT_TYPE);
-    let part_name = parts.next().map(litchi_opc::Part::partname);
+    let part_name = parts.next().map(|part| part.partname());
     if parts.next().is_some() {
         return Err(invalid(
             "package contains more than one calculation-chain part",
@@ -384,8 +384,10 @@ fn next_part_name(package: &OpcPackage) -> Result<PackURI> {
             format!("/xl/calcChain{suffix}.xml")
         };
         let candidate = PackURI::new(&name).map_err(invalid)?;
-        if package.get_part(&candidate).is_err() {
-            return Ok(candidate);
+        match package.get_part(&candidate) {
+            Ok(_) => {},
+            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
+            Err(error) => return Err(error.into()),
         }
     }
     Err(invalid("no free calculation-chain part name"))

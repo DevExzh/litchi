@@ -69,7 +69,8 @@ fn package_model3d_round_trip_preserves_payloads_relationships_and_unknowns() {
         reopened
             .opc()
             .unwrap()
-            .iter_parts()
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
             .any(|part| part.content_type() == MODEL_CONTENT_TYPE && part.blob() == b"glb-v2")
     );
 
@@ -89,7 +90,8 @@ fn package_model3d_round_trip_preserves_payloads_relationships_and_unknowns() {
         !reopened
             .opc()
             .unwrap()
-            .iter_parts()
+            .try_iter_parts()
+            .map(|part| part.expect("part payload decodes"))
             .any(|part| part.content_type() == ct::PNG && part.blob() == b"png-v1")
     );
 }

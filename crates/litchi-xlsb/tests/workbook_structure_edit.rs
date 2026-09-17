@@ -155,9 +155,11 @@ fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
     let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
     package
         .opc_package()
-        .iter_parts()
-        .find(|part| {
-            part.content_type() == "application/vnd.openxmlformats-officedocument.drawing+xml"
+        .try_iter_parts()
+        .find_map(|part| {
+            let part = part.expect("drawing part decodes");
+            (part.content_type() == "application/vnd.openxmlformats-officedocument.drawing+xml")
+                .then_some(part)
         })
         .expect("standard drawing part")
         .blob()

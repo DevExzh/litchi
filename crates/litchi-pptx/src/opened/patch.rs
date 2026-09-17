@@ -240,16 +240,16 @@ impl Patch {
                 source,
             })?;
         for name in names {
-            let before = source
-                .get_part(&name)
-                .ok()
-                .map(ResourceState::capture_bounded)
-                .transpose()?;
-            let after = target
-                .get_part(&name)
-                .ok()
-                .map(ResourceState::capture_bounded)
-                .transpose()?;
+            let before = match source.get_part(&name) {
+                Ok(part) => Some(ResourceState::capture_bounded(part)?),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
+            let after = match target.get_part(&name) {
+                Ok(part) => Some(ResourceState::capture_bounded(part)?),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
             if before != after {
                 deltas.push(Delta {
                     name,
@@ -960,11 +960,11 @@ fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
         return Err(stale());
     }
     for delta in &patch.deltas {
-        let current = package
-            .get_part(&delta.name)
-            .ok()
-            .map(ResourceState::capture_bounded)
-            .transpose()?;
+        let current = match package.get_part(&delta.name) {
+            Ok(part) => Some(ResourceState::capture_bounded(part)?),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(error.into()),
+        };
         if current != delta.before {
             return Err(stale());
         }
@@ -981,11 +981,11 @@ fn validate_after(package: &OpcPackage, patch: &Patch) -> Result<()> {
         ));
     }
     for delta in &patch.deltas {
-        let current = package
-            .get_part(&delta.name)
-            .ok()
-            .map(ResourceState::capture_bounded)
-            .transpose()?;
+        let current = match package.get_part(&delta.name) {
+            Ok(part) => Some(ResourceState::capture_bounded(part)?),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(error.into()),
+        };
         if current != delta.after {
             return Err(invalid(
                 "opened-presentation published resource differs from its patch target",

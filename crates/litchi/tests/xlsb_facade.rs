@@ -366,8 +366,8 @@ fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
     let bytes = all_worksheet_bytes();
     let package = OpcPackage::from_bytes(&bytes).unwrap();
     let largest_part_bytes = package
-        .iter_parts()
-        .map(|part| part.blob().len())
+        .try_iter_parts()
+        .map(|part| part.expect("generated package parts decode").blob().len())
         .max()
         .expect("generated package must contain ordinary parts");
     let exact_limits = xlsb::ReadLimits::builder()

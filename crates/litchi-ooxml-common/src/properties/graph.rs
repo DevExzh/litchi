@@ -1,7 +1,9 @@
 use super::{Dialect, STRICT_CORE_PROPERTIES_RELATIONSHIP};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI, Part, PartView, Relationships, SourceBackedPackage};
+use litchi_opc::{
+    OpcPackage, PackURI, Part, PartMetadata, PartView, Relationships, SourceBackedPackage,
+};
 
 pub(super) struct Graph {
     pub(super) part: Option<PackURI>,
@@ -36,6 +38,20 @@ trait GraphPart {
 }
 
 impl GraphPart for &dyn Part {
+    fn graph_partname(&self) -> &PackURI {
+        self.partname()
+    }
+
+    fn graph_content_type(&self) -> &str {
+        self.content_type()
+    }
+
+    fn graph_rels(&self) -> &Relationships {
+        self.rels()
+    }
+}
+
+impl GraphPart for PartMetadata<'_> {
     fn graph_partname(&self) -> &PackURI {
         self.partname()
     }
