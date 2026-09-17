@@ -321,3 +321,29 @@ fn reused_v3_zero_length_stream_masks_high_size_word() {
     assert_eq!(&output[size_offset..size_offset + 8], &[0; 8]);
     OleFile::open(Cursor::new(output)).unwrap();
 }
+
+#[test]
+fn shrinking_a_mini_stream_clears_former_payload_from_root_padding() {
+    let original = vec![1u8; 100];
+    let source = build(&[(&["Small"], original.clone())]);
+    let mut expanded = original.clone();
+    expanded.extend_from_slice(&[9u8; 70]);
+    let render = |source: &[u8], payload: &[u8]| {
+        let mut writer = OleWriter::new();
+        assert!(writer.adopt_source_layout(source).unwrap());
+        writer.create_stream(&["Small"], payload).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        assert!(writer.last_sector_layout().unwrap().reused_source_layout());
+        output.into_inner()
+    };
+    let grown = render(&source, &expanded);
+    assert_eq!(
+        grown.len(),
+        source.len(),
+        "growth fits the root's last sector"
+    );
+    let restored = render(&grown, &original);
+    assert_eq!(read_all(&restored), read_all(&source));
+    assert_eq!(restored, source, "released root padding must be zero again");
+}
