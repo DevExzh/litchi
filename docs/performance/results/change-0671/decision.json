@@ -9,12 +9,12 @@
   "claim_registry_entry": false,
   "reason_codes": [
     "MS-DOC FBKF explicitly requires ibkl to be unique within a Plcfbkf/Plcfbkfd, so watermark.doc remains a typed refusal even though its duplicate and unused PlcfBkl slots carry the same CP",
-    "PapxInFkp's cb=0 form stores an even 2*cb' byte container; the POI witness repeats a complete odd SPRM sequence followed by one zero alignment byte in all 24 PAPX entries",
+    "PapxInFkp's cb=0 form stores an even 2*cb' byte container; the POI witness repeats an odd SPRM prefix followed by one zero byte in all 24 PAPX entries, while the checked-in MS-DOC GrpPrlAndIstd rule requires whole Prl elements",
     "the PAPX admission strips one byte only after strict SPRM parsing identifies an exact one-byte trailing opcode error; parse_sprms remains strict and malformed nonzero or incomplete operands remain errors",
     "the existing OpenOptions/Leniency contract is now reachable through litchi::Document without changing default strict behavior"
   ],
   "accepted_evidence": {
-    "specification": "Microsoft Learn MS-DOC FBKF, Plcfbkf, PapxInFkp and GrpPrlAndIstd pages linked by the change record",
+    "specification": "Checked-in 3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md §§2.9.70 (FBKF, local lines 6562/6648), 2.9.114 (GrpPrlAndIstd, local lines 12380/12469-12471), and 2.9.175 (PapxInFkp, local lines 18595/18684-18688); 2 Structures/2.8 PLCs.md §2.8.10 (Plcfbkf, local lines 887-893); and 3 Structure Examples/3.5 Example of a PlcBtePapx.md papxinfkp[1] (local lines 162-181), with the corresponding Microsoft Learn pages linked by the change record",
     "witnesses": "direct unified-facade tests over watermark.doc, poi/test-data/document/test.doc and duplicate-style-names.doc",
     "unit_tests": "PapBinTable alignment and malformed-tail tests plus the global SPRM trailing-zero refusal test",
     "corpus": "the 57-file inventory and 0640 retained corpus scan; no new full differential claimed",
@@ -22,11 +22,11 @@
   },
   "accepted_costs": {
     "FBKF": "the duplicate-bookmark fixture remains unavailable under strict reading, as required by the normative uniqueness rule",
-    "PAPX": "the current primary prose does not name a standalone pad byte; acceptance is limited to repeated witness evidence and compatible implementation behavior",
+    "PAPX": "the checked-in primary text defines the length forms and whole-Prl requirement but does not name a PapxInFkp alignment byte; acceptance is limited to repeated witness evidence and compatible implementation behavior, and remains a bounded compatibility exception",
     "facade": "the opt-in path eagerly reads a source into the existing bounded fallback before smart detection, while ordinary open behavior is unchanged"
   },
   "known_gaps": {
-    "PAPX_specification": "MS-DOC defines the length forms and whole-Prl requirement but does not explicitly specify the observed final alignment byte",
+    "PAPX_specification": "MS-DOC §2.9.175 defines the PapxInFkp length forms and §2.9.114 requires whole Prl elements, but neither explicitly specifies the observed final alignment byte; §2.9.337's zero padding rule is for UpxPapx/UpxChpx/UpxTapx and does not settle PapxInFkp",
     "corpus_differential": "the complete 0640 57-fixture differential was not rerun for this follow-up; the two residues and facade are covered directly",
     "performance": "no timing, instruction, allocation or memory claim was measured or registered"
   },

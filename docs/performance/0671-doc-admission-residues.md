@@ -1,10 +1,12 @@
 # 0671: DOC admission residues
 
 Change 0640 removed two field-table refusals and exposed two independent DOC
-admission residues. This record closes the row 16 follow-up assigned by change
-0651 and decision 1 of change 0652. It makes one narrow correctness change for
+admission residues. This record closes the DOC portion of row 16 in change
+0651. It follows change 0652's standing trade-offs: early-alpha breaking API
+changes are acceptable when kept small, and correctness and safety take
+priority over performance. It makes one narrow compatibility allowance for
 the `PapxInFkp` witness, keeps the `FBKF.ibkl` uniqueness check strict after
-reading the primary specification, and exposes the existing stylesheet
+reading the local primary specification, and exposes the existing stylesheet
 leniency option through the unified `litchi::Document` facade.
 
 Disposition: retained, correctness fix. `performance_claim: none`.
@@ -25,6 +27,8 @@ description gives the one-to-one FBKF/PlcfBkl relationship and permits equal
 bookmark CPs for overlapping bookmarks. Equal CPs explain why the witness is
 recoverable, but they do not satisfy the explicit `ibkl` MUST.
 
+The checked-in reference makes the same distinction locally: `3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md`, §2.9.70 `FBKF` (local lines 6562 and 6648), requires unique `ibkl` values; `3rdparty/specs/[MS-DOC]/2 Structures/2.8 PLCs.md`, §2.8.10 `Plcfbkf` (local lines 887-893), gives the one-to-one pairing and allows duplicate bookmark CPs unless a bookmark rule says otherwise. This is direct normative evidence for retaining the refusal.
+
 The `HashSet` guard in `crates/litchi-doc/src/parts/bookmarks.rs` is therefore
 unchanged. The facade regression test keeps the refusal typed and checks the
 existing message `bookmark ibkl values must be unique and in range`. This is a
@@ -40,10 +44,28 @@ encoding requires the `cb = 0` form to carry `2 * cb'` bytes, while a nonzero
 `cb` carries `2 * cb - 1` bytes. The companion
 [`GrpPrlAndIstd`](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/bd96f2aa-1318-4066-9723-4db035ef412b)
 grammar requires the grpprl portion to contain whole Prl elements. The
-published MS-DOC prose does not separately name this final alignment byte, so
-the admission is grounded in the repeated witness shape and the established
-Word-compatible writer behavior documented by [wv2's PAPX generator](https://fossies.org/linux/wv2/src/generator/generator_wword8.htm),
-which pads an odd grpprl with one zero byte to a word boundary.
+published MS-DOC prose does not separately name this final alignment byte.
+
+The checked-in local reference is more specific about the limit of that
+evidence: `3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md`, §2.9.175
+`PapxInFkp` (local lines 18595 and 18684-18688), defines the two length forms
+and says the bytes after `cb'` form a `GrpPrlAndIstd`; §2.9.114
+`GrpPrlAndIstd` (local lines 12380 and 12469-12471) requires its `grpprl` to
+contain a whole number of Prl elements. The local example
+`3rdparty/specs/[MS-DOC]/3 Structure Examples/3.5 Example of a PlcBtePapx.md`,
+the `papxinfkp[1]` expansion (local lines 162-181), uses the same `cb' = 3`
+size but fills the four bytes after `istd` with one complete four-byte Prl.
+Therefore the local normative text does not prove that the witness's final
+zero is padding: under that grammar, the three-byte SPRM plus zero is not a
+whole Prl. §2.9.337 `UPXPadding` (local lines 35375-35379) is also not a PAPX
+FKP rule; it applies to `UpxPapx`, `UpxChpx`, and `UpxTapx` structures.
+
+The compatibility allowance is consequently based on the repeated witness
+shape and the established Word-compatible writer behavior documented by
+[wv2's PAPX generator](https://fossies.org/linux/wv2/src/generator/generator_wword8.htm),
+which pads an odd grpprl with one zero byte to a word boundary. It remains a
+bounded producer compatibility exception, not a claim that the six-byte
+witness satisfies the local whole-Prl grammar.
 
 `PapBinTable::parse` now applies `trim_papx_word_alignment_pad` only to the
 `GrpPrlAndIstd` bytes obtained from a PAPX FKP. It removes one byte only when
@@ -91,10 +113,11 @@ Validation on this branch:
 * `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=2 cargo test -p litchi --features doc --lib` — 31 passed;
 * `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=2 cargo check -p litchi --features doc,docx` — passed.
 
-The remaining specification gap is explicit: the current primary MS-DOC pages
-define the two PAPX length forms and require whole Prl elements, but do not
-give a standalone normative sentence for an alignment pad. The narrow rule is
-kept because the witness is repeated across all PAPX entries and compatible
-implementations document the same pad shape; a future primary clarification
-could refine the comment without widening the parser. No `litchi-cfb` path or
-limit was changed.
+The remaining specification gap is explicit and supported by the checked-in
+reference: §2.9.175 defines the two PAPX length forms, §2.9.114 requires whole
+Prl elements, and neither section gives a standalone normative sentence for an
+alignment pad. The narrow rule is kept as a compatibility exception because
+the witness repeats across all PAPX entries and a compatible implementation
+documents the same pad shape; it must not be generalized to arbitrary
+non-whole Prl data. A future primary clarification could refine the comment
+without widening the parser. No `litchi-cfb` path or limit was changed.

@@ -158,11 +158,12 @@ impl PapBinTable {
                 let entry = fkp.entry(entry_index).ok_or_else(|| {
                     PackageError::Corrupted("PAP FKP entry is malformed".to_string())
                 })?;
-                // A `cb=0` PapxInFkp stores an even number of bytes after
-                // `cb'`, so producers that have an odd GrpPrl append one
-                // zero byte for the word boundary.  Keep the shared SPRM
-                // parser strict and remove exactly that one byte only when
-                // it is otherwise proven to be a final incomplete opcode.
+                // The checked-in MS-DOC grammar says these bytes form a
+                // GrpPrlAndIstd of whole Prl elements and does not name a
+                // PAPX pad. A repeated producer witness nevertheless has an
+                // odd SPRM prefix plus one zero byte. Keep the shared SPRM
+                // parser strict and remove exactly that byte only when it is
+                // otherwise proven to be a final incomplete opcode.
                 let grpprl = Self::trim_papx_word_alignment_pad(&entry.grpprl);
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
@@ -210,13 +211,14 @@ impl PapBinTable {
         Ok(Some(Self { runs }))
     }
 
-    /// Remove the single word-alignment byte occasionally written after an
-    /// odd PAPX SPRM sequence.  Nonzero `cb` encodings are odd-sized by
-    /// definition, so an even-sized `GrpPrlAndIstd` can only come from the
-    /// `cb=0`/`cb'` form.  The byte is accepted only when strict SPRM parsing
-    /// identifies every preceding byte as a complete sequence and the final
-    /// zero as exactly one incomplete opcode byte.  Any other malformed input
-    /// remains untouched and is rejected by the normal typed parser.
+    /// Remove the single producer-compatibility byte after an odd PAPX SPRM
+    /// sequence. The local MS-DOC grammar does not name this byte, and
+    /// nonzero `cb` encodings are odd-sized by definition, so an even-sized
+    /// `GrpPrlAndIstd` can only come from the `cb=0`/`cb'` form. The byte is
+    /// accepted only when strict SPRM parsing identifies every preceding byte
+    /// as a complete sequence and the final zero as exactly one incomplete
+    /// opcode byte. Any other malformed input remains untouched and is rejected
+    /// by the normal typed parser.
     fn trim_papx_word_alignment_pad(grpprl_and_istd: &[u8]) -> &[u8] {
         if grpprl_and_istd.len() < 3
             || !grpprl_and_istd.len().is_multiple_of(2)
