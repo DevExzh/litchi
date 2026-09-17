@@ -1,0 +1,32 @@
+# Gates for change 0667, worktree /home/zhuhe/code/litchi-worktrees/0667
+# Base 5fa92d7ce; branch perf/0667-xlsx-value-editor-shared-strings.
+# Commands are rerun after the final source and packet edits; tails are recorded below.
+
+$ cargo fmt --all -- --check
+exit=0 (no output)
+
+$ CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo clippy -p litchi-xlsx -p litchi-opc -p xml-minifier --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.40s
+clippy exit=0
+
+$ CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo test -p litchi-xlsx
+test result: ok; 1035 unit tests, all litchi-xlsx integration targets, and 2 doctests passed
+full package exit=0
+
+$ CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo test -p litchi-xlsx cell_values::admission_tests --lib -- --nocapture
+test result: ok; 28 passed; 0 failed; finished in 0.34s
+
+$ CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo test producer_shape::tests --manifest-path tools/perf-baseline/Cargo.toml --lib -- --nocapture
+test result: ok; 10 passed; 0 failed; finished in 0.85s
+
+$ CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo doc -p litchi-xlsx -p litchi-opc --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.12s
+doc exit=0
+
+$ /usr/bin/time -v env CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0667 cargo test -p litchi-xlsx cell_values::admission_tests::a_large_shared_string_table_stays_within_the_retained_part_bound --lib -- --nocapture
+test result: ok; 1 passed; 0 failed; finished in 0.34s
+Elapsed: 0.43s; maximum resident set size: 67728 KiB; exit=0
+
+$ /home/zhuhe/code/litchi-target-0667/release/litchi-perf-baseline --case xlsx_producer_medium_source_open,xlsx_producer_medium_source_selected_cell,xlsx_producer_medium_source_planning,xlsx_producer_medium_source_one_edit_save,xlsx_producer_medium_control_selected_cell,xlsx_producer_medium_control_planning,xlsx_producer_dense_source_open,xlsx_producer_dense_source_selected_cell,xlsx_producer_dense_source_planning,xlsx_producer_dense_source_one_edit_save,xlsx_producer_dense_control_selected_cell,xlsx_producer_dense_control_planning --warmup 3 --samples 15 --json docs/performance/results/change-0667/bench/producer.json --producer-evidence docs/performance/results/change-0667/bench/producer-evidence.json
+exit=0; binary sha256=444d4ff970cf5c59cf656f097e8035daa7b81e9f421656dcb2f2766985540ad2
+# The JSON artifacts retain all 15 samples and the complete evidence census.

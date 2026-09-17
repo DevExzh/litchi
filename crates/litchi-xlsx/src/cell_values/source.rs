@@ -752,6 +752,7 @@ impl SourceEdit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
+                    self.before.require_shared_string_free_target(address)?;
                     value.validate_for_write()?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
@@ -765,6 +766,7 @@ impl SourceEdit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
+                    self.before.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.require_formula_target(address)?;
                     self.before.require_unmerged_target(address)?;
@@ -776,6 +778,7 @@ impl SourceEdit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
+                    self.before.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
                     self.before.require_unmerged_target(address)?;
@@ -787,6 +790,7 @@ impl SourceEdit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
+                    self.before.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
@@ -799,6 +803,7 @@ impl SourceEdit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
+                    self.before.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
@@ -1025,6 +1030,7 @@ impl MultiSourceEdit {
                             address
                         ))
                     })?;
+                    snapshot.require_shared_string_free_target(address)?;
                     value.validate_for_write()?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
@@ -1040,6 +1046,7 @@ impl MultiSourceEdit {
                             address
                         ))
                     })?;
+                    snapshot.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.require_formula_target(address)?;
                     snapshot.require_unmerged_target(address)?;
@@ -1053,6 +1060,7 @@ impl MultiSourceEdit {
                             address
                         ))
                     })?;
+                    snapshot.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
                     snapshot.require_unmerged_target(address)?;
@@ -1066,6 +1074,7 @@ impl MultiSourceEdit {
                             address
                         ))
                     })?;
+                    snapshot.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
@@ -1080,6 +1089,7 @@ impl MultiSourceEdit {
                             address
                         ))
                     })?;
+                    snapshot.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }

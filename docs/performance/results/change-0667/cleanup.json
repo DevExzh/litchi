@@ -1,0 +1,26 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0667",
+  "retained_in_repository": [
+    "docs/performance/0667-xlsx-value-editor-shared-strings.md",
+    "docs/performance/results/change-0667/README.md",
+    "docs/performance/results/change-0667/decision.json",
+    "docs/performance/results/change-0667/cleanup.json",
+    "docs/performance/results/change-0667/gates.txt",
+    "docs/performance/results/change-0667/log-sections.md",
+    "docs/performance/results/change-0667/bench/producer.json",
+    "docs/performance/results/change-0667/bench/producer-evidence.json",
+    "docs/performance/results/change-0667/bench/large-table-run.txt"
+  ],
+  "removed_after_evidence_copy": [
+    "none; the release target directory is outside the worktree and remains session scratch",
+    "the large-table worksheet and package are generated inside the test and are not retained as a duplicate fixture"
+  ],
+  "kept_for_following_batch": [],
+  "notes": [
+    "No shared HOTSPOTS, GOAL_AUDIT, REPORT, or ADR_COMPLIANCE rollup file is modified by this branch; log-sections.md is the coordinator packet only.",
+    "The local ECMA-376 archive is referenced by path and section because the repository worktree does not carry a duplicate copy.",
+    "Producer timing is descriptive after-only evidence and has no claim-registry entry."
+  ]
+}

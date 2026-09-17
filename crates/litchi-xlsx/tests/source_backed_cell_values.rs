@@ -1818,7 +1818,7 @@ fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
 }
 
 #[test]
-fn mce_shared_strings_relationships_and_signed_changes_are_refused() {
+fn mce_relationships_and_signed_changes_are_refused() {
     for xml in [
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><mc:AlternateContent/></worksheet>"#
@@ -1862,7 +1862,20 @@ fn mce_shared_strings_relationships_and_signed_changes_are_refused() {
         PackageWriter::to_bytes(&shared).unwrap(),
     )))
     .unwrap();
-    assert!(editor.edit("Sheet1").is_err());
+    let mut edit = editor
+        .edit("Sheet1")
+        .expect("an unreferenced shared-string table is retained");
+    edit.set(address("A1"), 42u32).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .expect("shared-string relationship and part are published");
+    let archive = ArchiveReader::new(&output).unwrap();
+    assert_eq!(
+        archive.read("xl/sharedStrings.xml").unwrap(),
+        format!(r#"<sst xmlns="{SML}"><si><t>unused</t></si></sst>"#).into_bytes()
+    );
 
     let signed = fixture(
         format!(

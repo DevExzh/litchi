@@ -2683,26 +2683,27 @@ state — and the byte identity of every archive is recorded in
 | `producer-dense` | 3 | 128 × 128 | markup, markup+shared-strings, markup+worksheet-relationship |
 
 Each shape is built in three variants, because one archive cannot serve every
-scenario. The value-only editor refuses five separate parts of the producer
-signature before it reaches a cell, so the family is split and the refusals are
+scenario. The value-only editor now retains the shared-string part and resolves
+its selected cells, while worksheet relationships and markup-compatibility
+roots remain useful separate gates, so the family is split and each verdict is
 proven instead of assumed:
 
 | Variant | Carries | Used by |
 |---|---|---|
 | `read` | the complete producer signature | open, selected cell |
-| `edit` | the namespace declarations and `<cols>` — the largest subset the value-only editor admits | planning, one-cell edit/save |
+| `edit` | the namespace declarations, `<cols>` and shared-string part — the largest subset the value-only editor admits | planning, one-cell edit/save |
 | `control` | none of it: the marker-free counterpart | the control selectors |
 
-The `read` variant proves, once and untimed at construction, one typed refusal
-per producer fact, each on the smallest archive that carries only that fact
-(the gates fire in package-then-part order, so an archive carrying several can
-only witness the first):
+The `read` variant records, once and untimed at construction, one verdict per
+producer fact, each on the smallest archive that carries only that fact (the
+gates fire in package-then-part order, so an archive carrying several can only
+witness the first):
 
-| Producer fact | Typed refusal |
+| Producer fact | Verdict |
 |---|---|
 | `mc:Ignorable` / `x14ac:dyDescent` on the worksheet | `value-only edits refuse attribute 'mc:Ignorable' on 'worksheet'` |
 | `pageMargins` | `value-only edits refuse element 'pageMargins' in this XML context` |
-| the shared-string part | `value-only edits refuse workbook relationship '…/sharedStrings'` |
+| the shared-string part | `admitted by the value-only editor`; the table is retained and `t="s"` cells read back |
 | a worksheet relationship | `value-only edits refuse worksheet relationships` |
 | `mc:Ignorable` on the workbook | `value-only edits refuse attribute 'mc:Ignorable' on 'workbook'` |
 
@@ -2717,13 +2718,14 @@ Every generated worksheet carries:
 
 The *shared-strings* role stores 40% of its cells as `t="s"` references into
 `xl/sharedStrings.xml` (64 unique entries, `count`/`uniqueCount` as Excel
-writes them). The *worksheet-relationship* role carries
+writes them), and the value-only editor resolves those references while
+retaining the part byte-for-byte. The *worksheet-relationship* role carries
 `xl/worksheets/_rels/sheetN.xml.rels` pointing at a fixed 1,024-byte
 `xl/printerSettings/printerSettings1.bin`. The roles are deliberately on
 separate worksheets because the value-only editor refuses a
-relationship-bearing worksheet *before* it parses and a shared-string worksheet
-*while* it parses, so a worksheet carrying both can only witness the first
-refusal.
+relationship-bearing worksheet *before* it parses while admitting the
+shared-string worksheet; a worksheet carrying both can only witness the first
+gate.
 
 The DOCX shape rewrites `word/document.xml` to the Word 2013 root namespace set
 (17 declarations) with `mc:Ignorable="w14 w15 wp14"` and gives every `<w:p>` the

@@ -27,10 +27,11 @@
 //! its attributes with it, so an `r:id` there could orphan a relationship the
 //! rewrite is contracted to preserve. That is refused by name.
 //!
-//! Constructs whose *meaning* depends on the edited cell — shared strings,
-//! pivot caches, tables, cell metadata, shared and array formulas, merged
-//! ranges — are not decided here. The vocabulary cannot see them; they are
-//! decided by the relationship and edit gates in
+//! Constructs whose *meaning* depends on the edited cell — pivot caches,
+//! tables, cell metadata, shared and array formulas, merged ranges — are not
+//! decided here. Shared strings are retained by the snapshot and their target
+//! cells are guarded by the edit stage. The vocabulary cannot see the other
+//! constructs; they are decided by the relationship and edit gates in
 //! [`super::snapshot`](super::snapshot) and by the raw editor's own guards.
 //!
 //! [0602]: ../../../../docs/performance/0602-xlsx-real-producer-admission-design.md
@@ -268,16 +269,20 @@ impl Validator {
 /// complete source, parser materialization is carried as a `Complete` result;
 /// the caller finishes validation before forwarding that result through the
 /// raw facade. No speculative diagnostic escapes the established error order.
-pub(super) fn worksheet_xml_and_parse_source(
+pub(super) fn worksheet_xml_and_parse_source<'a, F>(
     content: &[u8],
     admission: raw::worksheet::SourceAdmission,
-) -> Result<(crate::cell::Store, Option<raw::worksheet::SourceFacts>)> {
+    strings: F,
+) -> Result<(crate::cell::Store, Option<raw::worksheet::SourceFacts>)>
+where
+    F: FnOnce() -> Result<Option<&'a [crate::cell::Text]>> + Copy,
+{
     let mut validator = Validator::new(XmlOwner::Worksheet);
     let mut builder = raw::worksheet::FactsBuilder::new(content);
     let attempt = raw::worksheet::parse_source_with_observer(
         content,
         admission,
-        || Ok(None),
+        strings,
         |namespace, event, span| {
             // The validator owns the first error and its precedence. The
             // fact builder only ever observes an event the validator has
@@ -302,13 +307,13 @@ pub(super) fn worksheet_xml_and_parse_source(
             drop(validator);
             drop(builder);
             worksheet_xml(content)?;
-            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
+            Ok((raw::worksheet::parse(content, strings)?, None))
         },
         raw::worksheet::SourceParseAttempt::ReaderFailed => {
             drop(validator);
             drop(builder);
             worksheet_xml(content)?;
-            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
+            Ok((raw::worksheet::parse(content, strings)?, None))
         },
     }
 }

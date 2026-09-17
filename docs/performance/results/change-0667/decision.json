@@ -1,0 +1,49 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0667",
+  "title": "the XLSX value-only editor retains and resolves shared strings with a stable-index dependency guard",
+  "decision": "retained, implemented in litchi-xlsx and the producer-shape harness",
+  "code_state": "internal litchi-xlsx source-closure and parser wiring; no public API item, litchi-opc API, unsafe code, or dependency changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0657 deliberately left 0602 D2 deferred; the 0667 assignment explicitly dispatches that remaining shared-string admission work",
+    "ECMA-376 Part 1 section 12.3.15 requires exactly one internal Shared String Table part, while sections 18.3.1.96, 18.4, 18.4.9 and 18.18.11 define the workbook-wide index and count semantics",
+    "the source closure retains the shared part and materializes its Text table once, only after a worksheet parser encounters t=\"s\"",
+    "the retained XML bytes are charged to the existing 64 MiB multi-worksheet bound before the selected snapshot is accepted, and parser allocation/text limits remain active",
+    "shared-string cells are readable and preserved, while every value-only mutation at such a target is refused before staging so no table index can be removed, added, or renumbered",
+    "producer evidence covers medium and dense 40-percent shared-string sheets; an independent 66935-entry witness exercises the large-table path"
+  ],
+  "accepted_evidence": {
+    "preservation": "admission_tests::a_shared_string_part_is_admitted_and_preserved plus the source-backed integration witness verify adjacent numeric edits, shared text readback, and exact shared-part transfer",
+    "dependency_safety": "set, formula, shared-formula, clear, and remove staging paths share the stable-index guard; duplicate, external, wrong-content-type, outbound, missing, malformed, and out-of-range relationship/table cases are refused",
+    "lazy_materialization": "a malformed unreferenced table succeeds for numeric-only worksheet cells; the parser closure is wired through source, owned, stream, fallback, rewritten, reduced-readback and multi-sheet paths",
+    "resource_witness": "a generated table with 66935 entries and 1863181 XML bytes resolves its final index after an adjacent edit within the 64 MiB retained-part bound",
+    "producer_evidence": "bench/producer-evidence.json records the shared-string role as admitted in medium and dense read variants, with 40 percent shared cells and 64 unique entries",
+    "timing": "bench/producer.json records 12 descriptive after-only cases with three warmups and 15 samples from clean commit 2009e7d9c; p95/p50 <= 1.05 is the declared per-case stability floor, with dense open at 1.153 excluded"
+  },
+  "accepted_costs": {
+    "read_only_shared_targets": "existing shared-string target cells remain readable but cannot be changed because the editor does not author or renumber the table",
+    "retained_part_budget": "the shared-string XML is retained and counted in the aggregate worksheet budget even when lazy parsing avoids table allocations",
+    "wider_admission": "workbooks with a valid shared-string relationship and valid indexed cells move from relationship refusal to readable admission",
+    "after_only_timing": "the timing artifact has no base binary or A/A floor and is not used as a speedup or regression claim"
+  },
+  "known_gaps": {
+    "large_table_throughput": "the 66935-entry witness is a bounded correctness/resource run, not a throughput study",
+    "real_fixture_census": "no 0602-style corpus census or paired publication comparison was added in this follow-on",
+    "remaining_value_dependencies": "pivot caches, tables, query tables, and other value-dependent relationships remain refused",
+    "shared_table_authoring": "adding, removing, renumbering, or rewriting shared-string entries remains outside the value-only editor"
+  },
+  "withheld": [
+    "any registered speedup, allocation, peak-RSS, cold-cache, concurrency, cross-platform, or real-fixture result"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "branch": "perf/0667-xlsx-value-editor-shared-strings",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "target_dir": "/home/zhuhe/code/litchi-target-0667",
+    "release_binary_sha256": "444d4ff970cf5c59cf656f097e8035daa7b81e9f421656dcb2f2766985540ad2",
+    "format_reference": "3rdparty/specs/ECMA-376/ECMA-376-1_5th_edition_december_2016.zip, Part 1 sections 12.3.15, 18.3.1.96, 18.4, 18.4.9 and 18.18.11"
+  }
+}
