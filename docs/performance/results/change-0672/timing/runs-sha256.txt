@@ -1,0 +1,8 @@
+d78b8c213b1fe2907277ac57b466d02c58724fd006319153ba56376945a32fb7  docs/performance/results/change-0672/timing/runs/abba-poi-a1.txt
+836d9b935d7ceadd3071c21ff23f41414933aceddf52991d4c0ad9ad89697126  docs/performance/results/change-0672/timing/runs/abba-poi-a2.txt
+0af79dd717fd1b9ed4ab4c12365bf7903413f9e6e97c0af888f04bbc4da12c19  docs/performance/results/change-0672/timing/runs/abba-poi-b1.txt
+ccab7e1439f059aca45d3b2dda2a6a32d684406a37d59b14dda64e9b10f8184d  docs/performance/results/change-0672/timing/runs/abba-poi-b2.txt
+6a4ca9ffbcdc96ece624d34ee5d9f03fecfe82b9233b831d12a003d527404159  docs/performance/results/change-0672/timing/runs/floor-poi-a1.txt
+27514ed8afbde4be57fb1b86306e8083541e178aa32e7fff7702db77457fd47c  docs/performance/results/change-0672/timing/runs/floor-poi-a2.txt
+681d5d95381359f27d5dec1f4650b9e5a7859b4dcbb1621a724c7ebbf2bb6fec  docs/performance/results/change-0672/timing/runs/floor-poi-b1.txt
+67a6aa50a8f0214c2810a9e2edfc6a40039945ea850d0756adfab18b75b004d6  docs/performance/results/change-0672/timing/runs/floor-poi-b2.txt

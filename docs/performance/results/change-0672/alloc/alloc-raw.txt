@@ -1,0 +1,22 @@
+# Change 0672 allocation counts.
+#
+# Counting allocator, one untimed warm-up before each measured operation.
+# The warm rows publish the worksheet store before the allocation window.
+# Whole-sheet area is A1:XFD1048576; the two legs are 5fa92d7ce and 0672.
+
+before  no_drawing_patriarch  cells-warm  visited=75770  allocations=16  allocated_bytes=10485760  peak_live_delta=10485760  retained_live_delta=10485760
+after   no_drawing_patriarch  cells-warm  visited=75770  allocations=1   allocated_bytes=6061600   peak_live_delta=6061600   retained_live_delta=6061600
+before  dense-wide-probe      cells-warm  visited=65536  allocations=65551  allocated_bytes=5608448   peak_live_delta=5608448   retained_live_delta=5608448
+after   dense-wide-probe      cells-warm  visited=65536  allocations=65537  allocated_bytes=5608448   peak_live_delta=5608448   retained_live_delta=5608448
+
+before  no_drawing_patriarch  cells        visited=75770  allocations=1734498  allocated_bytes=174657136  peak_live_delta=57025552  retained_live_delta=36519231
+after   no_drawing_patriarch  cells        visited=75770  allocations=1734483  allocated_bytes=170232976  peak_live_delta=57025552  retained_live_delta=32095071
+before  dense-wide-probe      cells        visited=65536  allocations=2234372  allocated_bytes=72345251   peak_live_delta=14615454  retained_live_delta=5618520
+after   dense-wide-probe      cells        visited=65536  allocations=2234372  allocated_bytes=72345251   peak_live_delta=14615454  retained_live_delta=5618520
+
+# Control: visit_cells is outside this change and remains allocation-free on
+# the warm route.
+before  no_drawing_patriarch  visit-warm   visited=75770  allocations=0  allocated_bytes=0  peak_live_delta=0  retained_live_delta=0
+after   no_drawing_patriarch  visit-warm   visited=75770  allocations=0  allocated_bytes=0  peak_live_delta=0  retained_live_delta=0
+before  dense-wide-probe      visit-warm   visited=65536  allocations=0  allocated_bytes=0  peak_live_delta=0  retained_live_delta=0
+after   dense-wide-probe      visit-warm   visited=65536  allocations=0  allocated_bytes=0  peak_live_delta=0  retained_live_delta=0
