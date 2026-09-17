@@ -625,8 +625,59 @@ impl CodeUnitSink for SurrogatePairing {
     }
 }
 
+enum SstSegments<'a> {
+    Slices(&'a [&'a [u8]]),
+    Records(&'a [RecordRef<'a>]),
+}
+
+impl<'a> SstSegments<'a> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Slices(segments) => segments.len(),
+            Self::Records(records) => records.len(),
+        }
+    }
+
+    fn get(&self, index: usize) -> Option<&'a [u8]> {
+        match self {
+            Self::Slices(segments) => segments.get(index).copied(),
+            Self::Records(records) => records.get(index).map(|record| record.payload()),
+        }
+    }
+
+    fn length_before(&self, index: usize) -> usize {
+        match self {
+            Self::Slices(segments) => segments
+                .iter()
+                .take(index)
+                .map(|segment| segment.len())
+                .sum(),
+            Self::Records(records) => records
+                .iter()
+                .take(index)
+                .map(|record| record.payload().len())
+                .sum(),
+        }
+    }
+
+    fn length_after(&self, index: usize) -> usize {
+        match self {
+            Self::Slices(segments) => segments
+                .iter()
+                .skip(index)
+                .map(|segment| segment.len())
+                .sum(),
+            Self::Records(records) => records
+                .iter()
+                .skip(index)
+                .map(|record| record.payload().len())
+                .sum(),
+        }
+    }
+}
+
 struct SstCursor<'a> {
-    segments: &'a [&'a [u8]],
+    segments: SstSegments<'a>,
     segment_index: usize,
     offset: usize,
     /// Summed length of every segment before `segment_index`.
@@ -651,7 +702,16 @@ struct SstPosition {
 impl<'a> SstCursor<'a> {
     fn new(segments: &'a [&'a [u8]]) -> Self {
         Self {
-            segments,
+            segments: SstSegments::Slices(segments),
+            segment_index: 0,
+            offset: 0,
+            logical_base: 0,
+        }
+    }
+
+    fn from_records(records: &'a [RecordRef<'a>]) -> Self {
+        Self {
+            segments: SstSegments::Records(records),
             segment_index: 0,
             offset: 0,
             logical_base: 0,
@@ -688,10 +748,7 @@ impl<'a> SstCursor<'a> {
     }
 
     fn current(&self) -> &'a [u8] {
-        self.segments
-            .get(self.segment_index)
-            .copied()
-            .unwrap_or_default()
+        self.segments.get(self.segment_index).unwrap_or_default()
     }
 
     fn remaining(&self) -> usize {
@@ -711,13 +768,7 @@ impl<'a> SstCursor<'a> {
     }
 
     fn remaining_total(&self) -> usize {
-        self.remaining()
-            + self
-                .segments
-                .iter()
-                .skip(self.segment_index + 1)
-                .map(|segment| segment.len())
-                .sum::<usize>()
+        self.remaining() + self.segments.length_after(self.segment_index + 1)
     }
 
     fn advance_segment(&mut self, context: &str) -> Result<()> {
@@ -1102,11 +1153,7 @@ impl<'a> SstCursor<'a> {
     fn logical_position(&self) -> usize {
         debug_assert_eq!(
             self.logical_base,
-            self.segments
-                .iter()
-                .take(self.segment_index)
-                .map(|segment| segment.len())
-                .sum::<usize>(),
+            self.segments.length_before(self.segment_index),
             "SST cursor logical base drifted from the segments behind it"
         );
         self.logical_base.saturating_add(self.offset)
@@ -1298,13 +1345,6 @@ fn scan_shared_string_records_as<T: SharedStringText>(
             resource: "SST segment locator",
             requested: records.len(),
         })?;
-    let mut payloads = Vec::new();
-    payloads
-        .try_reserve_exact(records.len())
-        .map_err(|_| SharedStringScanError::Allocation {
-            resource: "SST parser segments",
-            requested: records.len(),
-        })?;
     let mut logical_offset = 0usize;
     for record in records {
         let payload = record.payload();
@@ -1316,11 +1356,10 @@ fn scan_shared_string_records_as<T: SharedStringText>(
             logical_offset,
             len: payload.len(),
         });
-        payloads.push(payload);
         logical_offset = next;
     }
 
-    let mut cursor = SstCursor::new(&payloads);
+    let mut cursor = SstCursor::from_records(records);
     cursor
         .ensure_current(8, "SST header")
         .map_err(SharedStringScanError::Biff)?;
@@ -2556,10 +2595,56 @@ impl CellRecord {
         Ok(())
     }
 
+    /// Visits the validated cells in a `MulRk` record without constructing a
+    /// [`CellRecord`] for cells the caller will discard.
+    ///
+    /// The packed record has the same `(row, column, XF)` identity as the
+    /// expanded `Rk` records, and its RK payload is infallibly decoded after
+    /// [`Self::packed_cell_range`] has checked the complete record.  A query
+    /// can therefore validate the whole packed record through
+    /// [`MeasuredCell`] and materialize only a selected cell.
+    pub(crate) fn visit_mul_rk_measured(
+        data: &[u8],
+        mut visitor: impl FnMut(MeasuredCell, u32),
+    ) -> Result<()> {
+        let (row, first_col, count) = Self::packed_cell_range(data, 6, "MulRk")?;
+        for index in 0..count {
+            let offset = 4 + index * 6;
+            let xf_index = binary::read_u16_le_at(data, offset)?;
+            let value = binary::read_u32_le_at(data, offset + 2)?;
+            visitor(
+                MeasuredCell {
+                    row,
+                    col: first_col + utils::truncate_usize_to_u16(index),
+                    xf_index,
+                },
+                value,
+            );
+        }
+        Ok(())
+    }
+
     pub(crate) fn visit_mul_blank(data: &[u8], mut visitor: impl FnMut(Self)) -> Result<()> {
         let (row, first_col, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
         for index in 0..count {
             visitor(Self::Blank {
+                row,
+                col: first_col + utils::truncate_usize_to_u16(index),
+                xf_index: binary::read_u16_le_at(data, 4 + index * 2)?,
+            });
+        }
+        Ok(())
+    }
+
+    /// Visits the validated identities in a `MulBlank` record without
+    /// constructing a [`CellRecord`] for cells the caller will discard.
+    pub(crate) fn visit_mul_blank_measured(
+        data: &[u8],
+        mut visitor: impl FnMut(MeasuredCell),
+    ) -> Result<()> {
+        let (row, first_col, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
+        for index in 0..count {
+            visitor(MeasuredCell {
                 row,
                 col: first_col + utils::truncate_usize_to_u16(index),
                 xf_index: binary::read_u16_le_at(data, 4 + index * 2)?,
@@ -2812,6 +2897,70 @@ mod packed_cell_tests {
         let last_column_offset = data.len() - 2;
         data[last_column_offset..].copy_from_slice(&7u16.to_le_bytes());
         assert!(CellRecord::parse_mul_blank(&data).is_err());
+    }
+
+    #[test]
+    fn measured_packed_cells_match_the_expanded_cells() {
+        let mut rk = Vec::new();
+        rk.extend_from_slice(&7u16.to_le_bytes());
+        rk.extend_from_slice(&3u16.to_le_bytes());
+        rk.extend_from_slice(&1u16.to_le_bytes());
+        rk.extend_from_slice(&((42u32 << 2) | 0x02).to_le_bytes());
+        rk.extend_from_slice(&2u16.to_le_bytes());
+        rk.extend_from_slice(&((1234u32 << 2) | 0x03).to_le_bytes());
+        rk.extend_from_slice(&4u16.to_le_bytes());
+
+        let mut measured = Vec::new();
+        CellRecord::visit_mul_rk_measured(&rk, |cell, value| {
+            measured.push((cell, value));
+        })
+        .unwrap();
+        assert_eq!(
+            measured,
+            vec![
+                (
+                    MeasuredCell {
+                        row: 7,
+                        col: 3,
+                        xf_index: 1,
+                    },
+                    (42u32 << 2) | 0x02,
+                ),
+                (
+                    MeasuredCell {
+                        row: 7,
+                        col: 4,
+                        xf_index: 2,
+                    },
+                    (1234u32 << 2) | 0x03,
+                ),
+            ]
+        );
+
+        let mut blank = Vec::new();
+        blank.extend_from_slice(&9u16.to_le_bytes());
+        blank.extend_from_slice(&5u16.to_le_bytes());
+        blank.extend_from_slice(&11u16.to_le_bytes());
+        blank.extend_from_slice(&12u16.to_le_bytes());
+        blank.extend_from_slice(&6u16.to_le_bytes());
+
+        let mut measured = Vec::new();
+        CellRecord::visit_mul_blank_measured(&blank, |cell| measured.push(cell)).unwrap();
+        assert_eq!(
+            measured,
+            vec![
+                MeasuredCell {
+                    row: 9,
+                    col: 5,
+                    xf_index: 11,
+                },
+                MeasuredCell {
+                    row: 9,
+                    col: 6,
+                    xf_index: 12,
+                },
+            ]
+        );
     }
 
     #[test]

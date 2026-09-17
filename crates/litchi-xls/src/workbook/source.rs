@@ -3203,9 +3203,19 @@ fn scan_worksheet<S: CellSink>(
             0x00BD => {
                 let payload = scan.read_payload(&frame)?;
                 let mut processing = Ok(());
-                CellRecord::visit_mul_rk(payload, |cell| {
+                CellRecord::visit_mul_rk_measured(payload, |measured, value| {
                     if processing.is_ok() {
-                        processing = sink.accept(&cell, &context, &mut strings);
+                        if sink.wants(measured.row, measured.col) {
+                            let cell = CellRecord::Rk {
+                                row: measured.row,
+                                col: measured.col,
+                                xf_index: measured.xf_index,
+                                value: crate::utils::rk_to_f64(value),
+                            };
+                            processing = sink.accept(&cell, &context, &mut strings);
+                        } else {
+                            processing = sink.accept_measured(&measured, &context);
+                        }
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
@@ -3214,9 +3224,18 @@ fn scan_worksheet<S: CellSink>(
             0x00BE => {
                 let payload = scan.read_payload(&frame)?;
                 let mut processing = Ok(());
-                CellRecord::visit_mul_blank(payload, |cell| {
+                CellRecord::visit_mul_blank_measured(payload, |measured| {
                     if processing.is_ok() {
-                        processing = sink.accept(&cell, &context, &mut strings);
+                        if sink.wants(measured.row, measured.col) {
+                            let cell = CellRecord::Blank {
+                                row: measured.row,
+                                col: measured.col,
+                                xf_index: measured.xf_index,
+                            };
+                            processing = sink.accept(&cell, &context, &mut strings);
+                        } else {
+                            processing = sink.accept_measured(&measured, &context);
+                        }
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
