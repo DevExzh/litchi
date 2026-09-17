@@ -416,7 +416,6 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root = false;
@@ -425,7 +424,7 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
     let mut anchors = Vec::new();
 
     loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 depth += 1;
                 nodes += 1;
@@ -502,7 +501,6 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
             Event::Eof => break,
             Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
     if !root || depth != 0 || !frames.is_empty() {
         return Err(invalid("missing or unterminated document root"));

@@ -903,14 +903,13 @@ struct StackEntry {
 fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut document = XmlDocument { root: None };
     let mut stack: Vec<StackEntry> = Vec::new();
     let mut version = XmlVersion::Implicit1_0;
     let mut string_bytes = 0usize;
     let mut node_count = 0usize;
     loop {
-        match reader.read_event_into(&mut buffer)? {
+        match reader.read_event()? {
             Event::Decl(declaration) => version = declaration.xml_version()?,
             Event::Start(element) => push_node(
                 &reader,
@@ -949,7 +948,6 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                     if non_whitespace {
                         return invalid("text outside the XML root".into());
                     }
-                    buffer.clear();
                     continue;
                 };
                 entry.node.has_non_whitespace_text |= non_whitespace;
@@ -963,7 +961,6 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                     if non_whitespace {
                         return invalid("CDATA outside the XML root".into());
                     }
-                    buffer.clear();
                     continue;
                 };
                 entry.node.has_non_whitespace_text |= non_whitespace;
@@ -996,7 +993,6 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
             },
             Event::Eof => break,
         }
-        buffer.clear();
     }
     if !stack.is_empty() {
         return invalid("unclosed modern comment XML element".into());

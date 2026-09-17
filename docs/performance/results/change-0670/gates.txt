@@ -1,0 +1,47 @@
+Gates for change 0670. Worktree: /home/zhuhe/code/litchi-worktrees/0670;
+base: 5fa92d7ce; branch: perf/0670-docx-parser-residues.
+Build environment: CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0,
+CARGO_BUILD_JOBS=2. Existing Cargo targets were reused and not cleaned.
+
+=== cargo fmt --all --check ===
+pending final run after the evidence packet is added
+
+=== cargo clippy -p litchi-docx --all-targets -- -D warnings ===
+pass; no warnings emitted
+
+=== cargo test -p litchi-docx --lib ===
+964 passed; 0 failed; 0 ignored; 0 measured
+
+=== focused managed BOM integration ===
+`cargo test -p litchi-docx --test source_backed_managed_document_edit
+managed_document_bom_offsets_are_preserved_through_snapshot_and_edit`
+pass; 1 passed; 0 failed
+
+=== cargo test -p litchi-docx --tests ===
+one failure:
+`source_backed_tail_append::supported_settings_mce_fallback_is_admitted_and_output_limited`
+returns `None` where the test expects an output-limit refusal
+
+=== untouched-base reproduction ===
+The same test was run in an isolated checkout at exactly 5fa92d7ce and returns
+the same `None`; this failure predates 0670.
+
+=== cargo test -p litchi-docx --tests -- --skip supported_settings_mce_fallback_is_admitted_and_output_limited ===
+pass; all remaining litchi-docx integration suites passed (the skipped test is
+the one documented pre-existing failure above)
+
+=== cargo doc -p litchi-docx --no-deps ===
+pass; rustdoc emitted no warnings
+
+=== allocation evidence ===
+Release-built retained change-0643 counting probe, before/after, reps 4 to 20:
+eager write sink at 10,000 paragraphs: 10045/503555 -> 46/3605 allocations/bytes;
+source write sink: 10046/503651 -> 47/3701; eager/source text controls are
+identical. Full table: measurements/allocations.txt. Counts are evidence only;
+no performance claim is registered.
+
+=== correctness witnesses ===
+The unit and integration BOM witnesses pass; strict reader/writer universal
+measure tests pass; the committed source preserves EF BB BF. Root 0677 commit
+029b17b22 remains a prerequisite for the independent xml-minifier publication
+audit path.

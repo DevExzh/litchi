@@ -26,6 +26,14 @@
     clippy::struct_excessive_bools,
     reason = "the public model preserves independent OOXML flags"
 )]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "universal measurements are range-checked before twip conversion"
+)]
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "universal measurement conversion intentionally uses bounded floating-point units"
+)]
 //! Bounded and lossless `w:sectPr` `WordprocessingML` codec.
 
 use super::model::{
@@ -35,6 +43,7 @@ use super::model::{
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_drawingml::coordinate::{Coordinate, Unit};
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -1202,9 +1211,17 @@ fn parse_attr_measurement(
 }
 
 fn parse_measurement(value: &str, description: &str, signed: bool, page_size: bool) -> Result<Emu> {
-    let twips = value.parse::<i64>().map_err(|_source_error| {
-        Error::InvalidFormat(format!("invalid {description} twip value '{value}'"))
-    })?;
+    let twips = match value.parse::<i64>() {
+        Ok(twips) => twips,
+        Err(_source_error) if value.bytes().any(|byte| byte.is_ascii_alphabetic()) => {
+            parse_universal_twips(value, description)?
+        },
+        Err(_source_error) => {
+            return Err(Error::InvalidFormat(format!(
+                "invalid {description} twip value '{value}'"
+            )));
+        },
+    };
     let valid = if signed {
         (-MAX_TWIPS..=MAX_TWIPS).contains(&twips)
     } else if page_size {
@@ -1218,6 +1235,43 @@ fn parse_measurement(value: &str, description: &str, signed: bool, page_size: bo
         )));
     }
     Emu::try_from_twips(twips)
+}
+
+/// Decode the universal-measure member of `ST_TwipsMeasure` into the integer
+/// twip representation used by the section model. The lexical grammar and
+/// unit set are shared with DrawingML's bounded `ST_UniversalMeasure`; the
+/// section domain check remains at the caller so signed/page-size context is
+/// preserved.
+pub(crate) fn parse_universal_twips(value: &str, description: &str) -> Result<i64> {
+    let measure = Coordinate::parse(value).map_err(|_source_error| {
+        Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))
+    })?;
+    let number = measure.number().ok_or_else(|| {
+        Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))
+    })?;
+    let unit = measure.unit().ok_or_else(|| {
+        Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))
+    })?;
+    let twips_per_unit = match unit {
+        Unit::Mm => 7_200.0 / 127.0,
+        Unit::Cm => 72_000.0 / 127.0,
+        Unit::Inch => 1_440.0,
+        Unit::Pt => 20.0,
+        Unit::Pc | Unit::Pi => 240.0,
+    };
+    let twips = number
+        .parse::<f64>()
+        .map_err(|_source_error| {
+            Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))
+        })?
+        .mul_add(twips_per_unit, 0.0)
+        .round();
+    if !twips.is_finite() || twips < i64::MIN as f64 || twips > i64::MAX as f64 {
+        return Err(Error::InvalidFormat(format!(
+            "invalid {description} universal measure '{value}'"
+        )));
+    }
+    Ok(twips as i64)
 }
 
 fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {

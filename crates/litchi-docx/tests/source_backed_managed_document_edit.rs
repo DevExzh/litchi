@@ -68,6 +68,12 @@ fn fixture(first: &str, second: &str) -> Vec<u8> {
     fixture_with_document(document_xml(first, second), 37, 13)
 }
 
+fn byte_order_marked_document(first: &str, second: &str) -> Vec<u8> {
+    let mut document = b"\xEF\xBB\xBF".to_vec();
+    document.extend_from_slice(&document_xml(first, second));
+    document
+}
+
 fn managed_collapsed_hyperlink_fixture() -> Vec<u8> {
     fixture_with_document(
         format!(
@@ -588,6 +594,60 @@ fn managed_document_snapshot_and_edit_retain_source_and_candidate_reservations()
     drop(retained_runs);
     assert!(budget.used(Resource::Memory) > 0);
     drop(paragraph);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_document_bom_offsets_are_preserved_through_snapshot_and_edit() {
+    let (budget, _cancellation_source, package) = managed(
+        fixture_with_document(byte_order_marked_document("before", "kept"), 37, 13),
+        1 << 20,
+    );
+    let snapshot = package.document_snapshot().unwrap();
+    assert_eq!(
+        snapshot
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "before tail"
+    );
+    assert_eq!(
+        snapshot
+            .paragraph(Position::new(1))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "kept"
+    );
+    assert!(snapshot.xml_bytes().starts_with(b"\xEF\xBB\xBF"));
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit
+            .snapshot()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "after"
+    );
+    assert_eq!(
+        commit
+            .snapshot()
+            .paragraph(Position::new(1))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "kept"
+    );
+    assert!(commit.snapshot().xml_bytes().starts_with(b"\xEF\xBB\xBF"));
+    drop(commit);
+    drop(snapshot);
+    drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 

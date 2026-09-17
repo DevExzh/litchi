@@ -406,10 +406,10 @@ impl SectionProperties {
                 "pgSz" => {
                     let attrs = attributes(&metadata, &raw)?;
                     if let Some(value) = attr(&attrs, "w") {
-                        properties.page_width = parse_u32(value, "page width")?;
+                        properties.page_width = parse_twips_u32(value, "page width")?;
                     }
                     if let Some(value) = attr(&attrs, "h") {
-                        properties.page_height = parse_u32(value, "page height")?;
+                        properties.page_height = parse_twips_u32(value, "page height")?;
                     }
                     if let Some(value) = attr(&attrs, "orient") {
                         properties.orientation = PageOrientation::parse(value)?;
@@ -417,13 +417,13 @@ impl SectionProperties {
                 },
                 "pgMar" => {
                     let attrs = attributes(&metadata, &raw)?;
-                    assign_u32(&attrs, "top", &mut properties.margin_top)?;
-                    assign_u32(&attrs, "bottom", &mut properties.margin_bottom)?;
-                    assign_u32(&attrs, "left", &mut properties.margin_left)?;
-                    assign_u32(&attrs, "right", &mut properties.margin_right)?;
-                    assign_u32(&attrs, "header", &mut properties.header_distance)?;
-                    assign_u32(&attrs, "footer", &mut properties.footer_distance)?;
-                    assign_u32(&attrs, "gutter", &mut properties.gutter)?;
+                    assign_twips_u32(&attrs, "top", &mut properties.margin_top)?;
+                    assign_twips_u32(&attrs, "bottom", &mut properties.margin_bottom)?;
+                    assign_twips_u32(&attrs, "left", &mut properties.margin_left)?;
+                    assign_twips_u32(&attrs, "right", &mut properties.margin_right)?;
+                    assign_twips_u32(&attrs, "header", &mut properties.header_distance)?;
+                    assign_twips_u32(&attrs, "footer", &mut properties.footer_distance)?;
+                    assign_twips_u32(&attrs, "gutter", &mut properties.gutter)?;
                 },
                 "pgNumType" => {
                     properties.page_numbering = Some(parse_page_numbering(&metadata, &raw)?)
@@ -2289,9 +2289,24 @@ fn parse_u32(value: &str, description: &str) -> Result<u32> {
     })
 }
 
-fn assign_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<()> {
+fn parse_twips_u32(value: &str, description: &str) -> Result<u32> {
+    match value.parse::<u32>() {
+        Ok(value) => Ok(value),
+        Err(_source_error) if value.bytes().any(|byte| byte.is_ascii_alphabetic()) => {
+            let twips = crate::section::parse_universal_twips(value, description)?;
+            u32::try_from(twips).map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid {description} value '{value}'"))
+            })
+        },
+        Err(_source_error) => Err(Error::InvalidFormat(format!(
+            "invalid {description} value '{value}'"
+        ))),
+    }
+}
+
+fn assign_twips_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<()> {
     if let Some(value) = attr(attrs, name) {
-        *slot = parse_u32(value, name)?;
+        *slot = parse_twips_u32(value, name)?;
     }
     Ok(())
 }
@@ -2350,7 +2365,7 @@ fn parse_columns(metadata: &RootMetadata, xml: &str) -> Result<SectionColumns> {
             .transpose()?
             .unwrap_or(1),
         space: attr(&attrs, "space")
-            .map(|value| parse_u32(value, "column space"))
+            .map(|value| parse_twips_u32(value, "column space"))
             .transpose()?,
         separator: parse_on_off_attr(&attrs, "sep", false)?,
         columns: Vec::new(),
@@ -2368,13 +2383,13 @@ fn parse_columns(metadata: &RootMetadata, xml: &str) -> Result<SectionColumns> {
         reject_unmodeled_attributes(metadata, &raw, "col")?;
         let attrs = attributes(metadata, &raw)?;
         columns.columns.push(SectionColumn {
-            width: parse_u32(
+            width: parse_twips_u32(
                 attr(&attrs, "w")
                     .ok_or_else(|| Error::InvalidFormat("section column omits width".into()))?,
                 "column width",
             )?,
             space: attr(&attrs, "space")
-                .map(|value| parse_u32(value, "column space"))
+                .map(|value| parse_twips_u32(value, "column space"))
                 .transpose()?,
         });
     }
@@ -2611,7 +2626,7 @@ fn parse_grid(metadata: &RootMetadata, xml: &str) -> Result<SectionDocumentGrid>
             .transpose()?
             .unwrap_or(GridType::Default),
         line_pitch: attr(&attrs, "linePitch")
-            .map(|value| parse_u32(value, "grid line pitch"))
+            .map(|value| parse_twips_u32(value, "grid line pitch"))
             .transpose()?,
         char_space: attr(&attrs, "charSpace")
             .map(|value| {

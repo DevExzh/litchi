@@ -1,0 +1,21 @@
+Local primary schema witness
+
+The local ECMA-376 Strict schema archive is
+`3rdparty/specs/ECMA-376/ECMA-376-1_5th_edition_december_2016.zip`.
+
+After extracting its strict schema bundle:
+
+  wml.xsd:3233-3238 defines CT_Body as EG_BlockLevelElts* followed by an
+  optional, single sectPr. A body-final sectPr is therefore schema-valid only
+  as the final body child; a sectPr followed by another body child remains
+  outside that content model.
+
+  shared-commonSimpleTypes.xsd:57-59 defines ST_TwipsMeasure as the union of
+  ST_UnsignedDecimalNumber and ST_PositiveUniversalMeasure.
+
+  shared-commonSimpleTypes.xsd:95-103 defines ST_UniversalMeasure and its
+  positive restriction with the lexical suffixes mm, cm, in, pt, pc, and pi.
+
+The reader and writer section tests use 612pt/792pt page dimensions and pt
+margins, columns, and grid pitch. The original section XML remains byte-exact
+on the reader source-preserving round trip.

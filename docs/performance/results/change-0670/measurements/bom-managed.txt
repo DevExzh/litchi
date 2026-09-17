@@ -1,0 +1,21 @@
+Managed DOCX BOM witness
+
+Input: a source-backed DOCX whose word/document.xml begins with EF BB BF and
+contains two direct body paragraphs. The managed snapshot read both semantic
+texts, replaced paragraph 0, and committed the projection.
+
+Observed:
+
+  paragraph 0 before: before tail
+  paragraph 1 before: kept
+  paragraph 0 after:  after
+  paragraph 1 after:  kept
+  source XML starts with EF BB BF: yes
+  committed XML starts with EF BB BF: yes
+  managed memory returns to zero after package/snapshot/commit drops: yes
+
+The witness is
+`crates/litchi-docx/tests/source_backed_managed_document_edit.rs::managed_document_bom_offsets_are_preserved_through_snapshot_and_edit`.
+It validates the transaction scanner's source-buffer ranges and the projected
+edit. End-to-end publication of a regenerated marked part also requires the
+separate xml-minifier slice-audit fix from root commit 029b17b22 (change 0677).

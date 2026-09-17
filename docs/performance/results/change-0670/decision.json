@@ -1,0 +1,55 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0670",
+  "title": "DOCX parser residues, strict universal section measures, and managed BOM ranges",
+  "decision": "retained, implemented as a bounded parser and correctness follow-on",
+  "code_state": "slice-backed litchi-docx readers borrow quick-xml events; semantic text reuses one bounded paragraph String; managed document ranges and whole-document compaction carry a leading UTF-8 BOM; section readers and writers admit ST_TwipsMeasure universal units; guarded source-backed readers and body-final sectPr policy remain unchanged; no public API, error type, limit, or refusal contract was widened",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0651 row 14 identified seven DOCX read_event_into sites with the same slice-backed shape fixed by 0643, one bounded paragraph String per sink paragraph, and a paragraph-index memo requiring a priced design",
+    "slice-backed quick-xml readers return borrowed events that are consumed in the same loop, so retaining an event buffer and clearing it adds allocation work without changing the token stream or limit checks",
+    "0651 row 16 and 0650 witnessed the managed transaction's three-byte BOM range skew; source-backed ranges must address the retained source bytes, and the compaction fallback must preserve the producer's BOM",
+    "ISO Strict ST_TwipsMeasure admits positive universal measures, so rejecting valid pt section dimensions is an editor feature gap; the local primary schema authorizes a bounded parser extension",
+    "the local CT_Body schema requires an optional final sectPr, so changing the body-final refusal would change document insertion semantics without an accepted model decision"
+  ],
+  "accepted_evidence": {
+    "borrowed_reader_scope": "chart, font, header_footer, modern_comments, smartart, validation, and semantic text slice-backed loops changed to borrowed quick-xml events; source-backed tail and paragraph-copy loops remain guarded",
+    "allocation_probe": "retained change-0643 counting allocator, release-built before/after legs from 5fa92d7ce and perf/0670-docx-parser-residues, reps 4 to 20, 24/200/10000 paragraph fixtures; sink controls and text controls are recorded in measurements/allocations.txt",
+    "managed_bom_witness": "unit and integration witnesses parse two BOM-marked paragraphs, preserve source ranges, replace the first paragraph, retain EF BB BF in committed XML, and release managed memory",
+    "strict_measure_witness": "reader and writer tests cover 612pt/792pt dimensions, pt margins and distances, columns, and grid pitch; the reader's source-preserving output remains byte-exact",
+    "schema_witness": "3rdparty/specs/ECMA-376/ECMA-376-1_5th_edition_december_2016.zip, nested OfficeOpenXML-XMLSchema-Strict.zip, wml.xsd:3233-3238 and shared-commonSimpleTypes.xsd:57-59,95-103",
+    "test_suites": "964 litchi-docx library tests, focused managed BOM integration test, clippy, fmt, rustdoc, and the broad integration suite with its exact pre-existing failure are recorded in gates.txt"
+  },
+  "accepted_costs": {
+    "paragraph_buffer": "one String capacity is retained for the current text-write operation and its allocation errors remain on the existing try_reserve path; no package or source lifetime is extended",
+    "universal_rounding": "fractional universal measurements are rounded to integer twips before the existing section bounds; malformed, non-finite, negative-for-unsigned, and out-of-range values remain typed refusals",
+    "transaction_bom": "marked source ranges carry a checked three-byte offset and whole-document compaction performs one prefix comparison plus a prefix restoration",
+    "no_registered_claim": "allocation counts are deterministic evidence only; no timing, RSS, instruction, throughput, or registry claim was earned"
+  },
+  "known_gaps": {
+    "publication_audit": "the independent xml-minifier slice-audit BOM offset fix is root change 0677 commit 029b17b22; end-to-end marked managed publication requires that prerequisite",
+    "body_final_sectpr": "a body-final sectPr followed by another body child remains refused because local CT_Body requires sectPr to be final; insertion semantics are frozen",
+    "paragraph_index": "the package-level paragraph index is a design-only follow-up with DocumentIndexAdmission pricing and generation lifetime recorded in follow-ups.md",
+    "guarded_readers": "source-backed tail_append.rs and paragraph_copy.rs retain read_event_into pending a separate proof of bounded token windows, cancellation, freshness, and refusal order",
+    "broad_test": "supported_settings_mce_fallback_is_admitted_and_output_limited fails with None on both this branch and untouched 5fa92d7ce; the remaining broad suites pass"
+  },
+  "withheld": [
+    "any timing, throughput, RSS, instruction-count, cross-platform, or claim-registry performance result",
+    "any claim that a marked DOCX can be edited and published end to end without root 0677",
+    "any implementation of the paragraph-index memo or body-final sectPr insertion policy"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ce",
+    "branch": "perf/0670-docx-parser-residues",
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0670",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, quick-xml 0.41.0",
+    "build_policy": "CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=2; release profile retained measurement fidelity; pre-existing targets were reused and not cleaned",
+    "probe_targets": {
+      "before": "/home/zhuhe/code/litchi-worktrees/targets/0670-probe-before",
+      "after": "/home/zhuhe/code/litchi-worktrees/targets/0670-probe-after"
+    },
+    "root_prerequisite": "0677 xml-minifier BOM audit fix, 029b17b22, is separate from this commit"
+  }
+}

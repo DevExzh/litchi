@@ -97,6 +97,33 @@ fn page_layout_properties_round_trip() {
 }
 
 #[test]
+fn strict_universal_measurements_decode_to_writer_twips() {
+    let xml = r#"<s:sectPr xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:pgSz s:w="612pt" s:h="792pt"/><s:pgMar s:top="72pt" s:right="72pt" s:bottom="72pt" s:left="72pt" s:header="36pt" s:footer="36pt" s:gutter="0pt"/><s:cols s:space="36pt"/><s:docGrid s:linePitch="18pt"/></s:sectPr>"#;
+    let section = SectionProperties::from_xml(xml).unwrap();
+
+    assert_eq!(section.page_width, 12_240);
+    assert_eq!(section.page_height, 15_840);
+    assert_eq!(section.margin_top, 1_440);
+    assert_eq!(section.margin_right, 1_440);
+    assert_eq!(section.margin_bottom, 1_440);
+    assert_eq!(section.margin_left, 1_440);
+    assert_eq!(section.header_distance, 720);
+    assert_eq!(section.footer_distance, 720);
+    assert_eq!(section.gutter, 0);
+    assert_eq!(
+        section.columns.as_ref().and_then(|columns| columns.space),
+        Some(720)
+    );
+    assert_eq!(
+        section
+            .document_grid
+            .as_ref()
+            .and_then(|grid| grid.line_pitch),
+        Some(360)
+    );
+}
+
+#[test]
 fn page_layout_defaults_and_empty_edges() {
     let xml = r#"<w:sectPr><w:pgBorders/><w:lnNumType w:countBy="2"/></w:sectPr>"#;
     let section = SectionProperties::from_xml(xml).unwrap();

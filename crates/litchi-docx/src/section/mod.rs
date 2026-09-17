@@ -12,6 +12,8 @@ mod inventory;
 pub mod layout;
 mod model;
 
+pub(crate) use codec::parse_universal_twips;
+
 #[cfg(test)]
 mod tests;
 
