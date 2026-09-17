@@ -26,32 +26,53 @@ pub(crate) fn read_with_limits(
     worksheet::read_with_limits(part.blob(), limits).map_err(map_error)
 }
 
-/// Apply an exact-source commit atomically to one worksheet part.
-pub(crate) fn apply_with_external_link_limits(
-    package: &mut OpcPackage,
+/// The outcome of one validated sparkline publication.
+///
+/// Returning the parsed workbook lets a typed workbook owner publish the
+/// derived state that already validated the candidate bytes.
+pub(crate) enum Applied {
+    /// The patch reproduced the stored worksheet bytes exactly.
+    Unchanged(Snapshot),
+    /// The changed candidate passed complete workbook validation.
+    Published {
+        /// Snapshot read from the validated worksheet bytes.
+        snapshot: Snapshot,
+        /// Workbook parse that validated the candidate package.
+        workbook: Box<crate::Workbook>,
+    },
+}
+
+/// Apply a sparkline commit and retain the complete workbook parse used for
+/// candidate validation.
+pub(crate) fn apply_retaining_parse(
+    package: &OpcPackage,
     worksheet: &PackURI,
     commit: Commit,
     external_link_limits: ExternalLinkLimits,
-) -> Result<Snapshot> {
+) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let current = part.blob();
     let (_, limits, patch) = commit.into_publication();
     let (changed, updated) = patch.apply_owned(current).map_err(map_error)?;
     if !changed {
-        return worksheet::read_owned(updated, limits).map_err(map_error);
+        return Ok(Applied::Unchanged(
+            worksheet::read_owned(updated, limits).map_err(map_error)?,
+        ));
     }
 
     let snapshot = worksheet::read_with_limits(&updated, limits).map_err(map_error)?;
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    crate::Workbook::from_opc_package_with_external_link_limits(
-        candidate.clone(),
+    let workbook = crate::Workbook::from_opc_package_with_external_link_limits(
+        candidate,
         external_link_limits,
     )?;
-    *package = candidate;
-    Ok(snapshot)
+    Ok(Applied::Published {
+        snapshot,
+        workbook: Box::new(workbook),
+    })
 }
 
 /// Prove every structurally valid formula against its workbook-owned name and

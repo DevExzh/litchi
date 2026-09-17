@@ -60,22 +60,59 @@ pub fn apply_with_external_link_limits(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
+    let applied = apply_retaining_parse(package, worksheet, commit, external_link_limits)?;
+    match applied {
+        Applied::Unchanged(snapshot) => Ok(snapshot),
+        Applied::Published { snapshot, workbook } => {
+            *package = workbook.into_opc_package();
+            Ok(snapshot)
+        },
+    }
+}
+
+/// The outcome of one validated cell-watch publication.
+///
+/// The parsed workbook is returned to callers that already own a typed
+/// workbook, so publishing does not parse the same candidate twice.
+pub(crate) enum Applied {
+    /// The patch reproduced the stored worksheet bytes exactly.
+    Unchanged(Snapshot),
+    /// The changed candidate passed complete workbook validation.
+    Published {
+        /// Snapshot read from the validated worksheet bytes.
+        snapshot: Snapshot,
+        /// Workbook parse that validated the candidate package.
+        workbook: Box<crate::Workbook>,
+    },
+}
+
+/// Apply a cell-watch commit and retain the complete workbook parse used for
+/// candidate validation.
+pub(crate) fn apply_retaining_parse(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
     if updated.as_slice() == part.blob() {
-        return Ok(commit.snapshot().clone());
+        return Ok(Applied::Unchanged(commit.snapshot().clone()));
     }
 
+    let snapshot = worksheet::read(&updated)?;
     let mut candidate = package.clone();
-    candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
+    candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    crate::Workbook::from_opc_package_with_external_link_limits(
-        candidate.clone(),
+    let workbook = crate::Workbook::from_opc_package_with_external_link_limits(
+        candidate,
         external_link_limits,
     )?;
-    *package = candidate;
-    worksheet::read(&updated)
+    Ok(Applied::Published {
+        snapshot,
+        workbook: Box::new(workbook),
+    })
 }
 
 fn require_worksheet(part: &dyn Part) -> Result<()> {

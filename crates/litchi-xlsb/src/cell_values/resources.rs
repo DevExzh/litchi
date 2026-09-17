@@ -223,31 +223,71 @@ pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> R
 
 fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
     let uri = PackURI::new(STYLES_URI)?;
-    if package.get_part(&uri).is_ok() {
-        return Ok(());
+    let workbook_uri = PackURI::new(WORKBOOK_URI)?;
+    let relationship_type = workbook_resource_relationship_type(package, false)?;
+    let relationship_present =
+        has_workbook_resource_relationship(package, relationship_type, "styles.bin")?;
+    if package.get_part(&uri).is_err() {
+        let mut bytes = Vec::new();
+        crate::writer::StylesWriter::new().write(&mut Writer::new(&mut bytes))?;
+        package.try_add_part(Box::new(BlobPart::new(
+            uri,
+            "application/vnd.ms-excel.styles".to_string(),
+            bytes,
+        )))?;
     }
-    let mut bytes = Vec::new();
-    crate::writer::StylesWriter::new().write(&mut Writer::new(&mut bytes))?;
-    package.try_add_part(Box::new(BlobPart::new(
-        uri,
-        "application/vnd.ms-excel.styles".to_string(),
-        bytes,
-    )))?;
-    let workbook = package.get_part_mut(&PackURI::new(WORKBOOK_URI)?)?;
-    let strict = workbook.rels().iter().any(|relationship| {
-        relationship
-            .reltype()
-            .starts_with("http://purl.oclc.org/ooxml/")
-    });
-    workbook.rels_mut().get_or_add(
-        if strict {
-            litchi_opc::constants::relationship_type::STRICT_STYLES
-        } else {
-            litchi_opc::constants::relationship_type::STYLES
-        },
-        "styles.bin",
-    );
+    if !relationship_present {
+        package
+            .get_part_mut(&workbook_uri)?
+            .rels_mut()
+            .get_or_add(relationship_type, "styles.bin");
+    }
     Ok(())
+}
+
+fn workbook_resource_relationship_type(
+    package: &OpcPackage,
+    shared_strings: bool,
+) -> Result<&'static str> {
+    let workbook_uri = PackURI::new(WORKBOOK_URI)?;
+    let strict = package
+        .get_part(&workbook_uri)?
+        .rels()
+        .iter()
+        .any(|relationship| {
+            relationship.reltype() == litchi_opc::constants::relationship_type::STRICT_STYLES
+                || relationship
+                    .reltype()
+                    .starts_with("http://purl.oclc.org/ooxml/")
+        });
+    Ok(if shared_strings {
+        if strict {
+            litchi_opc::constants::relationship_type::STRICT_SHARED_STRINGS
+        } else {
+            litchi_opc::constants::relationship_type::SHARED_STRINGS
+        }
+    } else if strict {
+        litchi_opc::constants::relationship_type::STRICT_STYLES
+    } else {
+        litchi_opc::constants::relationship_type::STYLES
+    })
+}
+
+fn has_workbook_resource_relationship(
+    package: &OpcPackage,
+    relationship_type: &str,
+    target: &str,
+) -> Result<bool> {
+    let workbook_uri = PackURI::new(WORKBOOK_URI)?;
+    Ok(package
+        .get_part(&workbook_uri)?
+        .rels()
+        .iter()
+        .any(|relationship| {
+            !relationship.is_external()
+                && relationship.reltype() == relationship_type
+                && relationship.target_ref() == target
+        }))
 }
 
 fn intern_payload(
@@ -305,34 +345,27 @@ pub(super) fn intern_shared_string_for_new_cell(
     let encoded = value.encode()?;
     let uri = PackURI::new(SST_URI)?;
     let existing = package.get_part(&uri).ok().map(|part| part.blob().to_vec());
+    let workbook_uri = PackURI::new(WORKBOOK_URI)?;
+    let relationship_type = workbook_resource_relationship_type(package, true)?;
+    let relationship_present =
+        has_workbook_resource_relationship(package, relationship_type, "sharedStrings.bin")?;
+    let has_part = existing.is_some();
     let (bytes, index) = match existing {
         Some(source) => append_or_reuse_sst(&source, value, &encoded)?,
         None => (new_sst(&encoded)?, 0),
     };
-    if package.get_part(&uri).is_ok() {
+    if has_part {
         package.get_part_mut(&uri)?.set_blob(bytes);
     } else {
-        let relationship_type = if package
-            .get_part(&PackURI::new(WORKBOOK_URI)?)?
-            .rels()
-            .iter()
-            .any(|relationship| {
-                relationship.reltype() == litchi_opc::constants::relationship_type::STRICT_STYLES
-                    || relationship
-                        .reltype()
-                        .starts_with("http://purl.oclc.org/ooxml/")
-            }) {
-            litchi_opc::constants::relationship_type::STRICT_SHARED_STRINGS
-        } else {
-            litchi_opc::constants::relationship_type::SHARED_STRINGS
-        };
         package.try_add_part(Box::new(BlobPart::new(
             uri,
             SST_CONTENT_TYPE.to_string(),
             bytes,
         )))?;
+    }
+    if !relationship_present {
         package
-            .get_part_mut(&PackURI::new(WORKBOOK_URI)?)?
+            .get_part_mut(&workbook_uri)?
             .rels_mut()
             .get_or_add(relationship_type, "sharedStrings.bin");
     }
@@ -819,4 +852,85 @@ fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<
 
 fn map_style_error(error: crate::styles::Error) -> Error {
     Error::InvalidFormat(format!("style resource transfer: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn package_without_resource_relationship(
+        package: &mut OpcPackage,
+        relationship_type: &str,
+        target: &str,
+    ) {
+        let workbook_uri = PackURI::new(WORKBOOK_URI).unwrap();
+        let ids = package
+            .get_part(&workbook_uri)
+            .unwrap()
+            .rels()
+            .iter()
+            .filter(|relationship| {
+                !relationship.is_external()
+                    && relationship.reltype() == relationship_type
+                    && relationship.target_ref() == target
+            })
+            .map(|relationship| relationship.r_id().to_string())
+            .collect::<Vec<_>>();
+        let workbook = package.get_part_mut(&workbook_uri).unwrap();
+        for id in ids {
+            workbook.rels_mut().remove(&id);
+        }
+    }
+
+    #[test]
+    fn existing_styles_part_without_relationship_is_relinked() {
+        let mut package = crate::Package::create().unwrap().into_opc();
+        let relationship_type = litchi_opc::constants::relationship_type::STYLES;
+        package_without_resource_relationship(&mut package, relationship_type, "styles.bin");
+
+        assert!(
+            !has_workbook_resource_relationship(&package, relationship_type, "styles.bin").unwrap()
+        );
+        assert!(package.get_part(&PackURI::new(STYLES_URI).unwrap()).is_ok());
+
+        ensure_styles_part(&mut package).unwrap();
+
+        assert!(
+            has_workbook_resource_relationship(&package, relationship_type, "styles.bin").unwrap()
+        );
+    }
+
+    #[test]
+    fn existing_shared_strings_part_without_relationship_is_relinked() {
+        let mut package = crate::Package::create().unwrap().into_opc();
+        let value = SharedString {
+            text: "existing".to_string(),
+            runs: Vec::new(),
+            phonetic: None,
+        };
+        let shared_strings_uri = PackURI::new(SST_URI).unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                shared_strings_uri,
+                SST_CONTENT_TYPE.to_string(),
+                new_sst(&value.encode().unwrap()).unwrap(),
+            )))
+            .unwrap();
+        let relationship_type = litchi_opc::constants::relationship_type::SHARED_STRINGS;
+        package_without_resource_relationship(&mut package, relationship_type, "sharedStrings.bin");
+        assert!(
+            !has_workbook_resource_relationship(&package, relationship_type, "sharedStrings.bin")
+                .unwrap()
+        );
+
+        assert_eq!(
+            intern_shared_string_for_new_cell(&mut package, &value).unwrap(),
+            0
+        );
+
+        assert!(
+            has_workbook_resource_relationship(&package, relationship_type, "sharedStrings.bin")
+                .unwrap()
+        );
+    }
 }

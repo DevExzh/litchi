@@ -362,6 +362,8 @@ fn workbook_api_applies_atomically_and_refuses_stale_commits() {
             .blob(),
         workbook_before
     );
+    let reparsed = crate::Workbook::from_opc_package(workbook.opc_package().clone()).unwrap();
+    assert_eq!(format!("{workbook:?}"), format!("{reparsed:?}"));
 
     let mut stale = workbook.edit_sparklines(0).unwrap();
     stale.remove();
