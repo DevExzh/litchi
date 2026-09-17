@@ -1522,6 +1522,7 @@ enum Case {
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
+    PptxSemanticOpenedTransactionPhases,
     PptxNamedOneEditSave,
     PptxNamedRepeatedEditSave,
     PptxNumericRepeatedEditSave,
@@ -2242,6 +2243,7 @@ impl Case {
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
+            Self::PptxSemanticOpenedTransactionPhases => "pptx_semantic_opened_transaction_phases",
             Self::PptxNamedOneEditSave => "pptx_named_one_edit_save",
             Self::PptxNamedRepeatedEditSave => "pptx_named_repeated_edit_save",
             Self::PptxNumericRepeatedEditSave => "pptx_numeric_repeated_edit_save",
@@ -2788,6 +2790,7 @@ impl Case {
                 | Self::PptxSemanticNoopEditSave
                 | Self::PptxSemanticOneEditSave
                 | Self::PptxSemanticOnePercentEditSave
+                | Self::PptxSemanticOpenedTransactionPhases
         )
     }
 
@@ -4986,6 +4989,30 @@ struct PptxCrossCopySummary {
     lifecycle_ns: Option<Vec<u64>>,
 }
 
+/// Per-sample phase evidence for the opened-presentation transaction edit.
+/// Package construction, semantic verification and digesting stay outside the
+/// phase clocks. The vectors are reordered to the enclosing elapsed statistics
+/// so each phase value remains aligned with its total sample.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct PptxOpenedTransactionPhaseSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_archive_sha256: String,
+    selected_edit_count: usize,
+    opened_presentation_ns: Vec<u64>,
+    snapshot_edit_ns: Vec<u64>,
+    set_shape_text_ns: Vec<u64>,
+    transaction_commit_ns: Vec<u64>,
+    apply_commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    total_ns: Vec<u64>,
+    output_sha256: Vec<String>,
+    phase_sum_verified: bool,
+    semantic_reopen_verified: bool,
+    deterministic_output_verified: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct OdsScalarRowsSummary {
     role: &'static str,
@@ -5080,6 +5107,8 @@ struct SourceSummary {
     pptx_source_backed_cross_copy_lifecycle: Option<PptxSourceBackedCrossCopyLifecycleSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_image_query: Option<PptxSourceImageQuerySummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_opened_transaction_phases: Option<PptxOpenedTransactionPhaseSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_casefold_lookup: Option<OpcCasefoldLookupSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -13076,6 +13105,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
+        "pptx_semantic_opened_transaction_phases" => {
+            Some(Case::PptxSemanticOpenedTransactionPhases)
+        },
         "pptx_named_one_edit_save" => Some(Case::PptxNamedOneEditSave),
         "pptx_named_repeated_edit_save" => Some(Case::PptxNamedRepeatedEditSave),
         "pptx_numeric_repeated_edit_save" => Some(Case::PptxNumericRepeatedEditSave),
@@ -13630,6 +13662,7 @@ fn usage_text() -> String {
                                        pptx_semantic_create_small,pptx_streaming_create,\n\
                                        pptx_semantic_noop_edit_save,\n\
                                        pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,\n\
+                                       pptx_semantic_opened_transaction_phases,\n\
                                        pptx_named_one_edit_save,pptx_named_repeated_edit_save,\n\
                                        pptx_numeric_repeated_edit_save,\n\
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
@@ -24787,6 +24820,9 @@ fn run_case_with_config(
         | Case::PptxSemanticOnePercentEditSave => {
             run_semantic_pptx(case, corpus, warmup_iterations, samples)
         },
+        Case::PptxSemanticOpenedTransactionPhases => {
+            run_pptx_opened_transaction_phases(corpus, warmup_iterations, samples)
+        },
         Case::PptxNamedOneEditSave
         | Case::PptxNamedRepeatedEditSave
         | Case::PptxNumericRepeatedEditSave => {
@@ -33514,6 +33550,150 @@ fn run_semantic_pptx(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+/// Decompose the same one-shape opened-transaction edit used by the semantic
+/// PPTX selector. Each clock is an explicit public API boundary: package
+/// construction and all semantic/digest checks remain outside the clocks, and
+/// the enclosing total covers only the six measured stages.
+fn run_pptx_opened_transaction_phases(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let total = shape.pptx_slides() * shape.pptx_text_boxes_per_slide();
+    let updates = semantic_update_indices(total)?;
+    let selected = vec![
+        *updates
+            .first()
+            .ok_or("semantic PPTX phase corpus has no editable shape")?,
+    ];
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = PptxOpenedTransactionPhaseSummary {
+        implementation: "litchi-pptx::Package opened presentation transaction",
+        timing_scope: "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Transaction::commit, apply_opened_presentation_commit, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        selected_edit_count: selected.len(),
+        opened_presentation_ns: Vec::with_capacity(samples),
+        snapshot_edit_ns: Vec::with_capacity(samples),
+        set_shape_text_ns: Vec::with_capacity(samples),
+        transaction_commit_ns: Vec::with_capacity(samples),
+        apply_commit_ns: Vec::with_capacity(samples),
+        publication_ns: Vec::with_capacity(samples),
+        total_ns: Vec::with_capacity(samples),
+        output_sha256: Vec::with_capacity(samples),
+        ..PptxOpenedTransactionPhaseSummary::default()
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+        let total_started = Instant::now();
+
+        let started = Instant::now();
+        let snapshot = package.opened_presentation()?;
+        let opened_presentation_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        let mut edit = snapshot.edit();
+        let snapshot_edit_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        for linear in &selected {
+            let slide = *linear / shape.pptx_text_boxes_per_slide();
+            let object = *linear % shape.pptx_text_boxes_per_slide();
+            if !edit.set_shape_text(slide, object, semantic_pptx_text(slide, object, true))? {
+                return Err("PPTX phase edit unexpectedly reported no change".into());
+            }
+        }
+        let set_shape_text_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        let commit = edit.commit()?;
+        let transaction_commit_ns = elapsed_ns(started.elapsed())?;
+        if !commit.is_changed() {
+            return Err("PPTX phase edit did not produce a changed commit".into());
+        }
+
+        let started = Instant::now();
+        package.apply_opened_presentation_commit(commit)?;
+        let apply_commit_ns = elapsed_ns(started.elapsed())?;
+
+        let started = Instant::now();
+        let bytes = package.to_bytes()?;
+        let publication_ns = elapsed_ns(started.elapsed())?;
+        let total_ns = elapsed_ns(total_started.elapsed())?;
+
+        let phase_sum = opened_presentation_ns
+            .checked_add(snapshot_edit_ns)
+            .and_then(|value| value.checked_add(set_shape_text_ns))
+            .and_then(|value| value.checked_add(transaction_commit_ns))
+            .and_then(|value| value.checked_add(apply_commit_ns))
+            .and_then(|value| value.checked_add(publication_ns))
+            .ok_or("PPTX phase duration sum overflows u64")?;
+        if phase_sum > total_ns {
+            return Err("PPTX phase durations exceed their enclosing total".into());
+        }
+
+        let reopened = litchi_pptx::Package::from_bytes(&bytes)?;
+        verify_semantic_pptx(&reopened, shape, &selected)?;
+        let output_sha256 = sha256_hex(&bytes);
+        std::hint::black_box(bytes);
+        if iteration >= warmup_iterations {
+            elapsed.push(total_ns);
+            summary.opened_presentation_ns.push(opened_presentation_ns);
+            summary.snapshot_edit_ns.push(snapshot_edit_ns);
+            summary.set_shape_text_ns.push(set_shape_text_ns);
+            summary.transaction_commit_ns.push(transaction_commit_ns);
+            summary.apply_commit_ns.push(apply_commit_ns);
+            summary.publication_ns.push(publication_ns);
+            summary.total_ns.push(total_ns);
+            summary.output_sha256.push(output_sha256);
+        }
+    }
+
+    let expected_output_sha256 = summary
+        .output_sha256
+        .first()
+        .cloned()
+        .ok_or("PPTX phase selector retained no output samples")?;
+    summary.deterministic_output_verified = summary
+        .output_sha256
+        .iter()
+        .all(|digest| digest == &expected_output_sha256);
+    if !summary.deterministic_output_verified {
+        return Err("PPTX phase selector output digest changed across samples".into());
+    }
+    summary.semantic_reopen_verified = true;
+    summary.phase_sum_verified = true;
+
+    let elapsed_ns = statistics(elapsed);
+    let sample_order = elapsed_ns.sample_order.clone();
+    reorder_sample_vector(&mut summary.opened_presentation_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.snapshot_edit_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.set_shape_text_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.transaction_commit_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.apply_commit_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.publication_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.total_ns, &sample_order)?;
+    reorder_sample_vector(&mut summary.output_sha256, &sample_order)?;
+
+    let source = SourceSummary {
+        pptx_opened_transaction_phases: Some(summary),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: Case::PptxSemanticOpenedTransactionPhases.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns,
+        sink: None,
+        source: boxed_source(source),
+        execution: None,
+        output_sha256: Some(expected_output_sha256),
+        operation_metrics: None,
+    })
 }
 
 fn run_pptx_slide_name_index(
@@ -60607,7 +60787,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 527);
+        assert_eq!(selectable_count, 528);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 
@@ -64409,6 +64589,32 @@ mod tests {
         assert_eq!(pptx.manifest.entry_count, 12);
         let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
         assert!(pptx_result.sink.is_none());
+
+        let phase_result =
+            run_case(Case::PptxSemanticOpenedTransactionPhases, &pptx, 0, 1).unwrap();
+        assert_eq!(phase_result.case, "pptx_semantic_opened_transaction_phases");
+        let phase_output = phase_result.output_sha256.clone();
+        let phases = phase_result
+            .source
+            .unwrap()
+            .pptx_opened_transaction_phases
+            .expect("PPTX opened-transaction phase evidence");
+        assert_eq!(phases.selected_edit_count, 1);
+        assert_eq!(phases.opened_presentation_ns.len(), 1);
+        assert_eq!(phases.snapshot_edit_ns.len(), 1);
+        assert_eq!(phases.set_shape_text_ns.len(), 1);
+        assert_eq!(phases.transaction_commit_ns.len(), 1);
+        assert_eq!(phases.apply_commit_ns.len(), 1);
+        assert_eq!(phases.publication_ns.len(), 1);
+        assert_eq!(phases.total_ns.len(), 1);
+        assert_eq!(phases.output_sha256.len(), 1);
+        assert_eq!(
+            phase_output.as_deref(),
+            Some(phases.output_sha256[0].as_str())
+        );
+        assert!(phases.phase_sum_verified);
+        assert!(phases.semantic_reopen_verified);
+        assert!(phases.deterministic_output_verified);
     }
 
     #[test]

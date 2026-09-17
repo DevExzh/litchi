@@ -1,0 +1,29 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0674",
+  "retained_in_repository": [
+    "docs/performance/0674-performance-gate-hygiene.md",
+    "docs/performance/results/change-0674/README.md, decision.json, cleanup.json, gates.log and log-sections.md",
+    "the seven implementation and test files listed by git status on perf/0674-performance-gate-hygiene"
+  ],
+  "removed_after_the_evidence_was_copied": [],
+  "retained_outside_repository": [
+    "/home/zhuhe/code/litchi-targets/0674-harness — about 7.3 GiB of isolated Cargo output; removable after the coordinator cherry-picks this branch",
+    "/tmp/0674-facade-polyglot.json — gate report retained only as summarized in gates.log",
+    "/tmp/0674-native-metadata.json and /tmp/0674-native-metadata.err — locked metadata probe outputs",
+    "/tmp/0674-pptx-phases.json — phase-selector smoke report retained only as summarized in gates.log",
+    "/tmp/0674-strict.out and /tmp/0674-structural.out — claims probe outputs retained only as summarized in gates.log",
+    "/home/zhuhe/code/litchi-worktrees/0674 — the clean worktree and branch, removable after cherry-pick and review"
+  ],
+  "not_created": [
+    "no release or workspace-wide Cargo target; no staged timing binary; no profiler output; no fixture copy",
+    "no historical result log was unignored; the only tracked .log is this packet's gates.log",
+    "no claim-registry, evidence-schema or structural-checker change for claim-0251"
+  ],
+  "notes": [
+    "The parent owns the root target and unrelated worktrees; only the 0674 target, scratch files and worktree above belong to this change.",
+    "The packet log is tracked by the final scoped .gitignore negation !docs/performance/results/change-0674/*.log; broad *.log rules continue to ignore other paths.",
+    "The target was kept through verification to avoid repeating the focused harness build; it is safe to remove after the commit is cherry-picked."
+  ]
+}

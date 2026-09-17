@@ -21,12 +21,15 @@ combined explicit ``--no-default-features`` closure.
 
 Two suites sit outside every per-package selection and are covered by their
 own cheap modes.  ``facade-format-tests`` compiles the facade with the four
-Office format leaves, because ``litchi``'s default feature set is empty and a
+Office format leaves, while ``facade-polyglot-tests`` covers the separate
+``docx,odt`` feature closure.  ``litchi``'s default feature set is empty and a
 bare ``cargo test --package litchi`` therefore compiles almost none of its
 library tests.  ``harness-tests`` runs the performance harness in
 ``tools/perf-baseline``, which is a separate Cargo project that no workspace
-selection reaches.  Both are single-command modes placed before the
-long-running package sweeps so a stale expectation fails fast.
+selection reaches; its allocator-instrumented binary is run by a second,
+explicitly serial command because it owns a process-global test allocator.
+These modes are placed before the long-running package sweeps so a stale
+expectation fails fast.
 """
 
 from __future__ import annotations
@@ -288,6 +291,7 @@ MODES = (
     "clippy",
     "doc",
     "facade-format-tests",
+    "facade-polyglot-tests",
     "harness-tests",
     "lib-tests",
     "doc-tests",
@@ -302,6 +306,12 @@ MODES = (
 # none of them reaches an iWork package.  Change 0629 found one test behind
 # `#[cfg(feature = "docx")]` red for 94 commits for exactly this reason.
 FACADE_FORMAT_TEST_FEATURES = ("docx", "pptx", "xls", "xlsx")
+
+# The facade's ODF/DOCX polyglot detector tests live behind a feature pair that
+# is intentionally separate from the four-format Office closure above.  Keep
+# this as a named gate so a default-feature test cannot silently omit those
+# tests again.
+FACADE_POLYGLOT_TEST_FEATURES = ("docx", "odt")
 
 # The performance harness is its own Cargo project with its own workspace
 # table, so no `--workspace`, `--package` or exclusion selection in this gate
@@ -1585,6 +1595,28 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
                 ),
             ),
         )
+    if mode == "facade-polyglot-tests":
+        # The DOCX/ODT polyglot tests are feature-gated and are not compiled by
+        # either the empty facade default or the four-leaf Office gate.
+        return (
+            CommandSpec(
+                "facade-polyglot-tests",
+                (
+                    cargo,
+                    "test",
+                    "--package",
+                    FACADE_PACKAGE,
+                    "--no-default-features",
+                    "--features",
+                    ",".join(FACADE_POLYGLOT_TEST_FEATURES),
+                    "--lib",
+                    "--tests",
+                    "--no-fail-fast",
+                    "--",
+                    "--test-threads=1",
+                ),
+            ),
+        )
     if mode == "harness-tests":
         manifest = ROOT / HARNESS_MANIFEST_RELATIVE_PATH
         if not manifest.is_file():
@@ -1594,15 +1626,15 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
         # Commands run with ROOT as the working directory, so the manifest
         # path stays relative and never encodes this checkout's location.
         #
-        # Unlike the workspace modes this one does not serialize its test
-        # threads.  The bulk modes serialize because a single invocation over
-        # 45 roots keeps every test binary alive until the final link; one
-        # standalone project has no such fan-out, its own workflow
-        # (perf-baseline.yml) has always run this suite with Cargo's default
-        # parallelism, and serializing it here measured 1,870 s of test
-        # execution against 581 s for the same 531 passing tests.  Build
-        # parallelism stays bounded by the gate's CARGO_BUILD_JOBS invariant
-        # either way.
+        # Unlike the workspace modes this main command does not serialize its
+        # test threads.  The bulk modes serialize because a single invocation
+        # over 45 roots keeps every test binary alive until the final link; one
+        # standalone project has no such fan-out, and serializing its 531-test
+        # default suite measured 1,870 s against 581 s at Cargo's default
+        # parallelism.  The allocator binary is a separate command below: its
+        # tests touch a process-global allocator counter and must run with one
+        # test thread.  Build parallelism stays bounded by the gate's
+        # CARGO_BUILD_JOBS invariant either way.
         return (
             CommandSpec(
                 "harness-tests",
@@ -1614,6 +1646,21 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
                     "--lib",
                     "--tests",
                     "--no-fail-fast",
+                ),
+            ),
+            CommandSpec(
+                "harness-allocator-tests",
+                (
+                    cargo,
+                    "test",
+                    "--manifest-path",
+                    HARNESS_MANIFEST_RELATIVE_PATH,
+                    "--features",
+                    "allocator-metrics",
+                    "--bin",
+                    "docx_bounded_tail_append_compare",
+                    "--",
+                    "--test-threads=1",
                 ),
             ),
         )

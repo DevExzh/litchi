@@ -1,0 +1,83 @@
+Change 0674 gate transcript
+Base: 5fa92d7ce
+Branch: perf/0674-performance-gate-hygiene
+Toolchain: rustc 1.95.0, cargo 1.95.0
+
+=== formatting and diff hygiene ===
+$ cargo +1.95.0 fmt --manifest-path tools/perf-baseline/Cargo.toml --all
+exit 0
+$ git diff --check
+exit 0
+
+=== harness clippy ===
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo clippy --manifest-path tools/perf-baseline/Cargo.toml --lib --tests -- -D warnings
+Finished dev profile; exit 0
+The marker census basis-point calculation uses checked division after its
+nonzero guard. No lint is suppressed.
+
+=== semantic PPTX phase selector ===
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib semantic_docx_and_pptx_tiny_corpora_are_deterministic_and_editable -- --test-threads=1
+test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
+$ cargo run --manifest-path tools/perf-baseline/Cargo.toml --quiet -- --semantic-shape tiny --case pptx_semantic_opened_transaction_phases --json /tmp/0674-pptx-phases.json
+exit 0; JSON contains six phase vectors, total_ns, phase_sum_verified=true,
+semantic_reopen_verified=true and deterministic_output_verified=true.
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-harness CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib selectable_case_count_matches_current_enumeration -- --test-threads=1
+test result: ok. 1 passed; 0 failed; 527 filtered out; exit 0
+
+=== allocator isolation ===
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --features allocator-metrics --bin docx_bounded_tail_append_compare -- --test-threads=1
+test result: ok. 5 passed; 0 failed; exit 0
+
+=== facade docx/odt feature gate ===
+$ CARGO_TARGET_DIR=/home/zhuhe/code/litchi-targets/0674-polyglot CARGO_BUILD_JOBS=2 CARGO_PROFILE_TEST_DEBUG=0 python3 tools/non_iwork_gate.py --record-file /tmp/0674-facade-polyglot.json facade-polyglot-tests
+95 facade library tests and integration targets passed; exit 0
+The command is --no-default-features --features docx,odt --lib --tests
+--no-fail-fast -- --test-threads=1.
+
+=== native-resave lock hygiene ===
+$ CARGO_NET_OFFLINE=true cargo metadata --manifest-path tools/native-resave/Cargo.toml --locked --format-version 1
+exit 0
+$ CARGO_NET_OFFLINE=true cargo check --manifest-path tools/native-resave/Cargo.toml --locked --offline
+exit 0; four existing warnings remain in the stub binary (unused import,
+two unused parameters and dead fixture helper).
+
+=== Python gate and policy tests ===
+$ python3 -m unittest tools.test_non_iwork_gate
+Ran 59 tests; OK; exit 0
+$ python3 -m unittest tools.test_perf_baseline_source_policy
+Ran 26 tests; OK; exit 0
+$ python3 -m unittest tools.test_corpus_manifest_v2
+Ran 12 tests; OK; exit 0
+$ python3 -m unittest tools.test_crud_coverage_index
+Ran 41 tests; OK; exit 0
+$ python3 -m unittest tools.test_perf_corpus_binding
+Ran 9 tests; OK; exit 0
+
+=== claims structural diagnostic (preexisting, intentionally deferred) ===
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+STRUCTURAL_STATUS=2
+This is the landed claim/checker policy recorded by 0651 and earlier packets;
+0674 does not alter the schema or suppress the diagnostic.
+
+=== claims strict gate ===
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit 0
+
+=== full harness sweep before the count assertion update ===
+The existing 527-selector sweep completed in about 568 seconds: 526 tests
+passed, 1 failed only at selectable_case_count_matches_current_enumeration
+(actual 528 versus stale expected 527), and 1 was ignored. All integration
+targets passed. Updating the expected count to 528 was followed by the
+affected count test above, which passed. The complete 528-test sweep was not
+repeated to avoid another heavyweight run; no library code changed in the
+count fix.
+
+=== packet ignore proof ===
+$ git check-ignore --no-index -v docs/performance/results/change-0674/gates.log
+.gitignore:317:!docs/performance/results/change-0674/*.log docs/performance/results/change-0674/gates.log
+$ git check-ignore --no-index -v docs/performance/results/change-0651/integration-gate.log
+.gitignore:150:*.log docs/performance/results/change-0651/integration-gate.log
+The packet-local negative rule tracks this log and does not unignore
+historical change-0651 logs.

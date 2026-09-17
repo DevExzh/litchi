@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0674",
+  "title": "remaining harness gates, allocator isolation and reproducibility hygiene are closed",
+  "decision": "retained, harness and gate hygiene work in tools and documentation",
+  "code_state": "no file under crates/ changed; the harness remains under tools/; native-resave lock metadata was refreshed; no production dependency or public API changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0651 row 17 left one missing PPTX opened-transaction phase selector after 0664 landed the marker-bearing corpora, ordinary-save allocation regions and DOCX text-sink selectors; the new selector records six public stages with explicit enclosing-total and semantic-reopen gates",
+    "0651 row 19 left the docx,odt facade feature pair outside the standing gate and left process-global allocator tests exposed to default parallelism; named modes now compile the feature pair and serialize the allocator binary",
+    "0651 row 19 also identified a stale native-resave lockfile and a broad repository log ignore rule; the lockfile is regenerated and only this packet's logs receive a scoped tracked exception",
+    "0651 row 20's release reproducibility finding is documented at the harness boundary: binary_identity names the executable timed under lto=true, while byte-for-byte rebuilds require separately audited toolchain, linker and profile settings",
+    "the existing structural claim diagnostic is reproduced exactly and deferred because changing claim-0251's evidence policy or schema is unrelated to this gate work; strict evidence verification passes all ten claims"
+  ],
+  "accepted_evidence": {
+    "pptx_phase_selector": "pptx_semantic_opened_transaction_phases is registered, parsed, dispatched and exercised by the tiny semantic test and a JSON smoke run; six phase vectors, total_ns, output digests and semantic reopen gates are retained",
+    "facade_polyglot_gate": "non_iwork_gate.py facade-polyglot-tests runs cargo test for litchi with --no-default-features --features docx,odt --lib --tests --no-fail-fast and one test thread; all 95 facade library tests and integration targets pass",
+    "allocator_gate": "non_iwork_gate.py harness-tests keeps its default suite and adds the allocator-metrics docx_bounded_tail_append_compare binary with --test-threads=1; all five allocator tests pass",
+    "native_resave_lock": "cargo metadata --locked and cargo check --locked --offline pass for tools/native-resave after offline lockfile regeneration",
+    "source_and_registry_tests": "Python test modules for the gate planner, perf-baseline source policy, corpus manifest, CRUD coverage and corpus binding pass with 59, 26, 12, 41 and 9 tests",
+    "harness_quality": "cargo fmt, cargo clippy --lib --tests -- -D warnings, the semantic tiny test and the updated selectable-case count test pass; the prior full sweep's only failure was the stale 527 count",
+    "claims_diagnostic": "structural mode returns status 2 with claim-0251-xlsx-xml-borrowed requiring strict evidence verification; strict mode with --evidence-root . returns status 0 and validates 10 claims",
+    "tracked_packet_log": "gates.log is tracked through the final scoped negation !docs/performance/results/change-0674/*.log, while a historical change-0651 .log remains ignored"
+  },
+  "accepted_costs": {
+    "allocator_serialization": "the allocator subcommand is intentionally serial and separate from the fast default harness suite because its process-global counter is not thread-safe",
+    "native_lock_refresh": "the lockfile refresh updates transitive registry versions to the current offline index; cargo check is run locked and offline",
+    "structural_mode": "the repository's structural claims mode remains red on a preexisting landed claim; strict evidence mode is the passing gate and the exact red diagnostic is retained",
+    "full_harness_sweep": "the already completed broad sweep took about 568 seconds; after the count assertion changed, only the affected count test was rerun to avoid another heavyweight sweep"
+  },
+  "known_gaps": {
+    "claim_0251": "claim-0251-xlsx-xml-borrowed still requires strict verification in structural mode; resolving its schema/evidence policy needs a separate claims change",
+    "native_resave_warnings": "the native-resave stub binary still emits four existing unused/dead-code warnings under cargo check",
+    "full_after_count_sweep": "the entire 528-test harness library was not rerun after changing the expected selector count; the preceding sweep passed every test except that exact stale assertion, all integration targets passed, and the affected count test passes after the update"
+  },
+  "withheld": [
+    "any speedup, latency, allocation, RSS, physical-I/O, cold-cache, producer or cross-platform claim",
+    "any claim that changing the log ignore rule covers historical packet logs",
+    "any resolution of the preexisting claim-0251 structural registry policy"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ce",
+    "branch": "perf/0674-performance-gate-hygiene",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws",
+    "toolchain": "rustc 1.95.0, cargo 1.95.0",
+    "target_directories": [
+      "/home/zhuhe/code/litchi-targets/0674-harness"
+    ],
+    "cpu_pin": "none; focused gates use CARGO_BUILD_JOBS=2 and no timing claim",
+    "commit": "the tip of perf/0674-performance-gate-hygiene; a commit cannot record its own hash"
+  }
+}
