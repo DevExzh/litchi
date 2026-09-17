@@ -1041,9 +1041,9 @@ fn bounded_settings_mce_limits(
     let max_choices_per_alternate = MceLimits::default()
         .max_choices_per_alternate
         .min(source_bytes.max(1));
-    // MCE writes inherited namespace declarations onto emitted elements, so
-    // valid processed XML can exceed its source length. Apply the explicit
-    // settings-byte ceiling to that output and reserve it before processing.
+    // MCE may restore namespace bindings at emitted scope boundaries. Apply
+    // the explicit settings-byte ceiling to its output and reserve it before
+    // processing, even when a particular fallback shrinks the source.
     let max_output_bytes =
         usize::try_from(limits.max_settings_xml_bytes).map_err(|_| Error::Limit {
             resource: "settings XML bytes",
