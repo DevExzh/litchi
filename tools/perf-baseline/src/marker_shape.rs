@@ -956,7 +956,8 @@ pub(crate) fn build(family: Family, variant: Variant) -> Result<MarkerCorpus, Bo
             marked_bytes
                 .checked_mul(10_000)
                 .ok_or("marked byte share overflows usize")?
-                / uncompressed_bytes
+                .checked_div(uncompressed_bytes)
+                .ok_or("marked byte share division failed")?
         },
         marked_part_kinds,
         skeleton_member_count: skeleton_census.len(),

@@ -201,6 +201,18 @@ fails report generation rather than publishing unverifiable provenance.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
+### Release binary identity and reproducibility
+
+The root release profile sets `lto = true`. Whole-program optimization and the
+linker/toolchain can make two release builds differ byte for byte even when
+they use the same committed source and lockfile. The report's
+`binary_identity.binary_sha256` therefore names the executable that actually
+ran; it must not be replaced with a digest from a later rebuild. A byte-for-
+byte reproduction requires a separately pinned toolchain/linker and a profile
+whose reproducibility settings have been checked (for example, an explicitly
+audited `lto = false` profile); the normal release profile makes no such
+rebuild identity promise.
+
 ## Change 0402 OPC overlay publication evidence
 
 The opt-in `opc_source_overlay_multi_part_noop` selector retains a fixed
@@ -2298,12 +2310,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --xlsx-shape tiny --json -
 ```
 
-Run the complete tiny semantic DOCX/PPTX smoke matrix (17 records):
+Run the complete tiny semantic DOCX/PPTX smoke matrix (18 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+  --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,pptx_semantic_opened_transaction_phases \
   --json target/perf/semantic-office-smoke.json
 ```
 
@@ -3123,7 +3135,8 @@ docx_semantic_text_to_sink     docx_source_text_to_sink
 ```
 
 None of the twenty-six is in `Case::DEFAULT`; the checked default catalog
-SHA-256 does not move for them. The registry goes from 501 to 527 names.
+SHA-256 does not move for them. The registry goes from 501 to 527 names; the
+phase selector above adds one more opt-in name, for 528 selectable cases.
 
 **A refusal the pair found.** The documented eager DOCX sink entry point
 `Document::write_text_to` **refuses the marker corpus** with the typed
@@ -3449,6 +3462,16 @@ legacy controls intentionally leave `sink` as `null`. The cross-presentation
 slide-copy evidence selectors use the public `OpcPackage::to_stream` writer
 through a bounded sequential sink and report its counters explicitly, without
 extending the claim to the other PPTX save paths.
+
+`pptx_semantic_opened_transaction_phases` is the phase decomposition of the
+one-edit control on the same semantic corpus. It records separate clocks for
+`opened_presentation`, `Snapshot::edit`, `set_shape_text`,
+`Transaction::commit`, `apply_opened_presentation_commit`, and `to_bytes`, plus
+the enclosing total. Package construction, reopen/oracle checks, and output
+digests stay outside the clocks. Every phase vector is aligned to the sorted
+total samples and every retained output must reproduce the same semantic
+reopen and digest gates; this selector is attribution evidence and makes no
+latency or allocation claim.
 
 ## Opt-in RTF semantic corpus matrix
 
@@ -4367,6 +4390,9 @@ native-Office claim is made.
   time opened-presentation transaction capture, no-op/one/~1% text-box edits,
   commit, publication, and `to_bytes`, then reopen and verify all slides,
   shapes, and text. The public API has no save-to-sink method.
+- `pptx_semantic_opened_transaction_phases`: decompose the one-edit control
+  into the six public stages named above, retaining aligned phase vectors and
+  the same semantic reopen/output-digest gates.
 - `pptx_named_one_edit_save`: on the named-slide corpus, time one named
   selector/edit/save (use `--semantic-shape tiny` for the small-deck overhead
   guard).

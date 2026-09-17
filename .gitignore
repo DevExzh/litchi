@@ -310,3 +310,8 @@ __marimo__/
 .streamlit/secrets.toml
 # Transient git worktrees created for isolated agent runs.
 .claude/worktrees/
+
+# Change 0674's packet logs are retained evidence. Keep the exception after
+# every broad log rule and scoped to this packet so historical or ad-hoc result
+# logs remain ignored.
+!docs/performance/results/change-0674/*.log
