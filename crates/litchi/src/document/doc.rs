@@ -852,6 +852,34 @@ impl Document {
         }
     }
 
+    /// Open a legacy `.doc` through the format-specific options exposed by
+    /// [`crate::doc`].  The option is consulted only when detection selects
+    /// the DOC reader; other recognized document formats use their normal
+    /// facade path.
+    #[cfg(feature = "doc")]
+    pub fn open_with_doc_options<P: AsRef<Path>>(
+        path: P,
+        options: doc::OpenOptions,
+    ) -> Result<Self> {
+        let bytes = crate::detection_smart::detected::read_document_path_bytes_with_limits(
+            path.as_ref(),
+            crate::detection_smart::detected::UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES,
+            crate::detection_smart::detected::UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES,
+        )?;
+        Self::from_bytes_with_doc_options(bytes, options)
+    }
+
+    /// Create a document from bytes while passing explicit options to the
+    /// legacy `.doc` reader.  In particular, this makes the existing
+    /// [`doc::Leniency::TolerateStylesheetDefects`] escape hatch available
+    /// through the unified facade.
+    #[cfg(feature = "doc")]
+    pub fn from_bytes_with_doc_options(bytes: Vec<u8>, options: doc::OpenOptions) -> Result<Self> {
+        let detected =
+            crate::detection_smart::detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
+        Self::from_detected_with_doc_options(detected, options)
+    }
+
     /// Create a document from bytes with an explicit DOCX/OPC resource policy.
     ///
     /// The policy is consulted only while probing an OOXML ZIP candidate.
@@ -1016,6 +1044,37 @@ impl Document {
             detected => Err(Error::UnexpectedFormat {
                 detected: detected.format(),
             }),
+        }
+    }
+
+    #[cfg(feature = "doc")]
+    #[allow(
+        unreachable_patterns,
+        reason = "the wildcard is required when the facade is built with additional format features"
+    )]
+    fn from_detected_with_doc_options(
+        detected: crate::detection_smart::DetectedFormat,
+        options: doc::OpenOptions,
+    ) -> Result<Self> {
+        match detected {
+            DetectedFormat::Doc(ole_file) => {
+                // OLE file already parsed - reuse it while allowing the DOC
+                // package to apply the caller's leniency policy.
+                let mut package = doc::Package::from_ole_file(ole_file).map_err(Error::from)?;
+                let document = package
+                    .document_with_options(options)
+                    .map_err(Error::from)?;
+                let metadata = package
+                    .ole_file()
+                    .get_metadata()
+                    .map(|metadata| metadata.into())
+                    .unwrap_or_default();
+
+                Ok(Self {
+                    inner: DocumentImpl::Doc(document, metadata),
+                })
+            },
+            detected => Self::from_detected(detected),
         }
     }
 
@@ -3733,6 +3792,50 @@ mod tests {
             "Failed to load DOC from bytes: {:?}",
             doc.err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "doc")]
+    fn doc_leniency_is_available_through_the_unified_facade() {
+        let path = test_data_path().join("ole/doc/duplicate-style-names.doc");
+        assert!(Document::open(&path).is_err());
+
+        let options =
+            doc::OpenOptions::default().with_leniency(doc::Leniency::TolerateStylesheetDefects);
+        let from_path = Document::open_with_doc_options(&path, options)
+            .expect("lenient DOC options should reach the facade");
+        let from_path_text = from_path.text().expect("read lenient DOC text");
+        assert!(!from_path_text.is_empty());
+
+        let bytes = std::fs::read(&path).expect("read duplicate-style fixture");
+        let options =
+            doc::OpenOptions::default().with_leniency(doc::Leniency::TolerateStylesheetDefects);
+        let from_bytes = Document::from_bytes_with_doc_options(bytes, options)
+            .expect("lenient DOC options should reach the byte facade");
+        assert_eq!(
+            from_bytes.text().expect("read lenient DOC bytes"),
+            from_path_text
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "doc")]
+    fn doc_admission_residues_keep_typed_fbkf_refusal_and_accept_papx_padding() {
+        let watermark = test_data_path().join("ole/doc/watermark.doc");
+        let watermark_error = match Document::open(&watermark) {
+            Ok(_) => panic!("duplicate FBKF ibkl should remain a strict refusal"),
+            Err(error) => error,
+        };
+        assert!(
+            watermark_error
+                .to_string()
+                .contains("bookmark ibkl values must be unique and in range")
+        );
+
+        let poi_test = test_data_path().join("poi/test-data/document/test.doc");
+        let document = Document::open(&poi_test)
+            .expect("an odd PAPX SPRM followed by one zero alignment byte should be accepted");
+        assert!(!document.text().expect("read PAPX witness text").is_empty());
     }
 
     #[test]

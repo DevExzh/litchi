@@ -1,0 +1,31 @@
+change 0671 gates
+==================
+
+Worktree: /home/zhuhe/code/litchi-worktrees/0671
+Base: 5fa92d7ce
+Branch: perf/0671-doc-admission-residues
+Build settings: CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=2
+
+PASS  cargo fmt --all --check
+PASS  cargo test -p litchi-doc --lib
+      1007 passed, 0 failed, 2 ignored
+PASS  cargo test -p litchi-doc --test doc_leniency
+      4 passed, 0 failed
+PASS  cargo test -p litchi --features doc --lib
+      31 passed, 0 failed
+PASS  cargo check -p litchi --features doc,docx
+
+PASS  cargo test -p litchi --features doc,docx,xlsx,pptx,xls
+      232 library tests, 31 feature-gated DOC facade tests through the
+      combined target, all integration tests, and 35 doctests passed; 7
+      doctests ignored
+
+Targeted witness tests included in the litchi facade library run:
+
+  doc_admission_residues_keep_typed_fbkf_refusal_and_accept_papx_padding
+  doc_leniency_is_available_through_the_unified_facade
+
+The `litchi-doc` unit suite also covers the PAPX alignment predicate,
+non-padding trailing bytes, and strict global trailing-zero SPRM rejection.
+The combined feature check reports one pre-existing dead-code warning in the
+DOCX detection module; it is outside this change.
