@@ -1,0 +1,27 @@
+Change 0673 open differential — 533 ZIP containers under test-data
+
+Both legs record the open verdict, request/byte/source-observation cost, package
+relationships, admitted parts, non-part members, and every decoded part's
+length and CRC. The reports contain 18,494 lines each.
+
+No report lines differ.
+No verdict, error identity, package relationship, part, non-part member, decoded
+payload, or source-observation count differs. The locator's missed-probe path
+therefore retains the prior read grammar while the exact terminal-EOCD path
+avoids the heap scratch.
+
+                                      before       after        delta
+open requests, 533 containers        2036        2036       0
+open bytes, 533 containers        2366873     2366873       0
+version() observations                 2132        2132          0
+containers costing more requests           0          0
+containers costing fewer requests         0        0
+containers reading more bytes              0          0
+containers reading fewer bytes            0        0
+
+Every common exact-EOCD container keeps the same open request count and bytes;
+this corpus does not contain a missed-probe container. The per-fixture tests
+exercise the comment-bearing and ZIP64 fallback paths separately.
+uniform_request_delta=0
+uniform_byte_delta=0
+versions_unchanged=True

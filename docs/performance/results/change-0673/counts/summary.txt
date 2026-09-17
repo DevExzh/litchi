@@ -1,0 +1,16 @@
+Change 0673 managed indexed-open allocation counts
+
+Probe: change 0632's deterministic allocation/request probe, rebuilt against
+the before checkout and this worktree, release profile, taskset -c 8. The
+request grammar and source-version observations stay identical on all three
+fixtures; the common exact-EOCD path removes one heap allocation for the
+locator's 64 KiB scratch.
+
+fixture                 open allocs       open allocated bytes       open requests/bytes  versions
+xlsx-132                5338 -> 5337      2,256,370 -> 2,190,833      9/26,020 -> 9/26,020  4 -> 4
+pptx-shapes             1995 -> 1994        541,256 ->   475,719      5/11,145 -> 5/11,145  4 -> 4
+docx-comment             403 ->  402        365,976 ->   300,439      5/1,644  -> 5/1,644   4 -> 4
+
+Measured open allocation delta: -1 allocation and -65,537 allocated bytes per
+fixture. This is deterministic evidence for the bounded scratch removal; it
+is not registered as a speed or latency claim.

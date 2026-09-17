@@ -1,0 +1,3 @@
+before_tree=/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce
+after_tree=/home/zhuhe/code/litchi-worktrees/0673
+work_dir=/tmp/litchi-0673-probe.Lymrwu

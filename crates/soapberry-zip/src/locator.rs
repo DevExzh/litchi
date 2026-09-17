@@ -2,9 +2,9 @@ use crate::errors::{Error, ErrorKind};
 use crate::reader_at::{FileReader, ReaderAtExt};
 use crate::utils::{le_u16, le_u32, le_u64};
 use crate::{
-    END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE, END_OF_CENTRAL_DIR_SIGNATURE64, ReaderAt,
-    Zip64EndOfCentralDirectory, Zip64EndOfCentralDirectoryRecord, ZipArchive, ZipFileHeaderFixed,
-    ZipSliceArchive,
+    END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE, END_OF_CENTRAL_DIR_SIGNATURE64, RECOMMENDED_BUFFER_SIZE,
+    ReaderAt, Zip64EndOfCentralDirectory, Zip64EndOfCentralDirectoryRecord, ZipArchive,
+    ZipFileHeaderFixed, ZipSliceArchive,
 };
 use std::cell::RefCell;
 use std::fs::File;
@@ -728,8 +728,40 @@ impl ZipLocator {
             }
         }
 
-        let location_result =
-            find_end_of_central_dir(&mut reader, buffer, self.max_search_space, end_offset);
+        // The managed index path only needs the caller buffer for the exact
+        // terminal EOCD probe on the common, zero-comment shape.  If that
+        // probe misses, retain the historical 64 KiB search window before
+        // scanning backwards.  This keeps the uncommon search path's read
+        // sizes and parse/refusal handling unchanged while allowing the
+        // common path to keep its locator scratch on the stack.
+        let mut fallback_buffer =
+            if self.directory_prefill_bytes > 0 && buffer.len() < RECOMMENDED_BUFFER_SIZE {
+                let mut allocated = Vec::new();
+                if let Err(source) = allocated.try_reserve_exact(RECOMMENDED_BUFFER_SIZE) {
+                    return Err((
+                        reader,
+                        Error::from(ErrorKind::Allocation {
+                            resource: "indexed archive locator scratch",
+                            source,
+                        }),
+                    ));
+                }
+                allocated.resize(RECOMMENDED_BUFFER_SIZE, 0);
+                Some(allocated)
+            } else {
+                None
+            };
+        let search_buffer: &mut [u8] = match fallback_buffer.as_mut() {
+            Some(allocated) => allocated.as_mut_slice(),
+            None => &mut *buffer,
+        };
+
+        let location_result = find_end_of_central_dir(
+            &mut reader,
+            search_buffer,
+            self.max_search_space,
+            end_offset,
+        );
 
         let (eocd_offset, buffer_pos, buffer_valid_len) = match location_result {
             Ok(Some(location_tuple)) => location_tuple,
@@ -742,10 +774,16 @@ impl ZipLocator {
         };
 
         let (reader, eocd) = self
-            .locate_in_reader_impl(reader, buffer, eocd_offset, buffer_pos, buffer_valid_len)
+            .locate_in_reader_impl(
+                reader,
+                search_buffer,
+                eocd_offset,
+                buffer_pos,
+                buffer_valid_len,
+            )
             .map_err(|(reader, e)| (reader, e.with_eocd_offset(eocd_offset)))?;
 
-        Ok(self.finish_locate_in_reader(reader, buffer, eocd))
+        Ok(self.finish_locate_in_reader(reader, search_buffer, eocd))
     }
 
     fn finish_locate_in_reader<R>(

@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0673",
+  "title": "The managed ZIP index defers its 64 KiB locator scratch until a fixed EOCD probe misses",
+  "decision": "retained, implemented in soapberry-zip",
+  "code_state": "crates/soapberry-zip only: locator.rs, office.rs and directory_prefill.rs; no public API, error kind, archive limit, ZIP record or output member changed; no unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "change 0651 row 18, change 0632's locator-scratch limitation, and change 0652's correctness-first standing decisions",
+  "reason_codes": [
+    "the managed IndexedArchive::from_reader* path allocated a 64 KiB locator scratch before its mandatory fixed terminal-EOCD probe, even though the common zero-comment shape can decide the locate from a 22-byte read",
+    "a 46-byte stack buffer is sufficient for the fixed EOCD and the existing first-central-record probe; a missed probe allocates the historical 64 KiB buffer with try_reserve_exact before the unchanged backwards search",
+    "the public ZipLocator defaults keep directory prefill disabled, so callers that supply their own locator scratch retain their existing request and buffer behavior",
+    "the common path's allocation removal is measured directly, while the missed path is covered by focused comment, ZIP64, prefix, short-read and malformed-directory tests and the full open oracle"
+  ],
+  "accepted_evidence": {
+    "allocation_probe": "change 0632's probe, release builds on CPU 8, three fixtures: open allocations 5338->5337, 1995->1994 and 403->402; allocated bytes 2256370->2190833, 541256->475719 and 365976->300439; open requests, bytes and version observations identical",
+    "open_oracle": "533 containers from change 0632's list, 18494 report lines per leg, byte-identical reports, zero changed open-cost lines, and identical per-container request/byte/version costs",
+    "focused_tests": "the directory_prefill integration suite covers the exact stack probe, missed comment search window, false EOCD comment signature, prefixed archive, ZIP64, capped short reads, undersized directory, oversized-variable-field BufferTooSmall refusal and empty archive",
+    "crate_suites": "cargo test -p soapberry-zip --all-targets and cargo test -p litchi-opc --all-targets both pass with the requested two-job low-debug configuration"
+  },
+  "accepted_costs": {
+    "missed_probe": "comment-bearing, ZIP64, trailing-byte, malformed or otherwise rejected fixed probes still allocate the bounded 64 KiB fallback and use the established backwards search; no new request is added",
+    "allocation_error_timing": "a fallback scratch reservation failure still returns ErrorKind::Allocation with the existing indexed archive locator scratch resource, but it occurs after the small fixed probe because the reservation is deferred",
+    "remaining_prefill": "the central-directory prefill and the index's directory-sized scan buffer remain unchanged; this change removes only the locator's independent search scratch"
+  },
+  "known_gaps": {
+    "latency": "no latency, remote transport, physical-device, cold-cache or peak-RSS measurement was taken because the measured request grammar is unchanged",
+    "allocation_failure_injection": "the deferred reservation failure path is typed and bounded but was not forced with an allocator-failure harness",
+    "corpus_missed_probe": "the 533-container oracle exercises the corpus open grammar but contains no open-cost delta for the deferred scratch; the focused comment fixture supplies the missed-probe read-shape witness"
+  },
+  "withheld": [
+    "any registered speedup, throughput, latency, cold-cache, physical-I/O, peak-RSS, instruction-count, concurrency-scaling, remote-source or cross-platform result",
+    "any claim that the deferred allocation changes malformed-input acceptance or refusal ordering beyond the focused tests and oracle evidence"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "branch": "perf/0673-zip-locator-scratch",
+    "commit": "the tip of perf/0673-zip-locator-scratch; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu_pin": "taskset -c 8",
+    "binaries": {
+      "counts": "see counts/binaries.sha256",
+      "oracle": "see oracle/binaries.sha256"
+    },
+    "before_tree": "/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce",
+    "after_tree": "/home/zhuhe/code/litchi-worktrees/0673"
+  }
+}
