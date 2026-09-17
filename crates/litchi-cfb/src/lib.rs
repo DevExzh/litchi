@@ -41,8 +41,9 @@ pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
 pub use stream_move::{ExistingStreamMove, StreamMoveLimits, ValidatedStreamMovePlan};
 pub use validation::{CfbValidationError, validate_source, validate_source_with_limits};
 pub use writer::{
-    OleWriter, SequentialOleWriter, SequentialWriteError, SequentialWriteProgress,
-    SequentialWriteReport, SequentialWriterLimits, SequentialWriterOptions,
+    OleWriter, SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport, SequentialOleWriter,
+    SequentialWriteError, SequentialWriteProgress, SequentialWriteReport, SequentialWriterLimits,
+    SequentialWriterOptions,
 };
 
 #[cfg(test)]

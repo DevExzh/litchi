@@ -64,14 +64,19 @@ use super::difat::DifatBuilder;
 use super::directory::DirectoryBuilder;
 use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
+use super::layout::{
+    ModelInputs, Outcome, SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport,
+    SourceLayout, StreamInput, plan_reuse,
+};
 use super::minifat::MiniFatBuilder;
 use smallvec::SmallVec;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::hash::Hash;
 use std::io::{self, BufWriter, ErrorKind, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const V3_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -87,6 +92,42 @@ const MOVEFILE_WRITE_THROUGH: u32 = 0x0000_0008;
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn MoveFileExW(existing_file_name: *const u16, new_file_name: *const u16, flags: u32) -> i32;
+}
+
+/// A registered stream's bytes, owned outright or shared with its producer.
+///
+/// Sharing lets a caller that already holds a stream's bytes behind an
+/// [`Arc`] register them without a copy, which is what
+/// [`OleWriter::create_stream_shared`] exists for.
+#[derive(Debug, Clone)]
+enum StreamPayload {
+    Owned(Vec<u8>),
+    Shared(Arc<[u8]>),
+}
+
+impl StreamPayload {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(bytes) => bytes,
+        }
+    }
+}
+
+impl PartialEq for StreamPayload {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes() == other.bytes()
+    }
+}
+
+impl Eq for StreamPayload {}
+
+impl std::ops::Deref for StreamPayload {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        self.bytes()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -258,11 +299,17 @@ pub struct OleWriter {
     entries: Vec<WriteDirectoryEntry>,
     /// Stream data in insertion order (path, data)
     /// Using Vec instead of `HashMap` to preserve insertion order for directory entries
-    streams: Vec<(Vec<String>, Vec<u8>)>,
+    streams: Vec<(Vec<String>, StreamPayload)>,
     /// Storages indexed by path
     storages: HashSet<Vec<String>>,
     /// Non-zero CLSIDs assigned to individual storages.
     storage_clsids: HashMap<Vec<String>, [u8; 16]>,
+    /// Where the next serialization places its sectors.
+    sector_layout_policy: SectorLayoutPolicy,
+    /// Bounded metadata of the artifact this writer republishes, if adopted.
+    source_layout: Option<Box<SourceLayout>>,
+    /// What the most recent serialization did with that layout.
+    last_sector_layout: Option<SectorLayoutReport>,
 }
 
 impl OleWriter {
@@ -307,6 +354,9 @@ impl OleWriter {
             streams: Vec::new(),
             storages: HashSet::new(),
             storage_clsids: HashMap::new(),
+            sector_layout_policy: SectorLayoutPolicy::default(),
+            source_layout: None,
+            last_sector_layout: None,
         };
 
         // Initialize with root entry
@@ -325,6 +375,130 @@ impl OleWriter {
         });
 
         writer
+    }
+
+    /// Selects where the next serialization places its sectors.
+    ///
+    /// The default is [`SectorLayoutPolicy::Reuse`]. It has an effect only
+    /// once a source artifact has been adopted with
+    /// [`Self::adopt_source_layout`]; without one there is no layout to reuse
+    /// and both policies serialize from scratch.
+    pub const fn set_sector_layout_policy(&mut self, policy: SectorLayoutPolicy) {
+        self.sector_layout_policy = policy;
+    }
+
+    /// The policy the next serialization will apply.
+    #[must_use]
+    pub const fn sector_layout_policy(&self) -> SectorLayoutPolicy {
+        self.sector_layout_policy
+    }
+
+    /// Adopts the artifact this writer republishes, so that
+    /// [`SectorLayoutPolicy::Reuse`] can keep its sector assignment.
+    ///
+    /// `source` is parsed through the ordinary validating CFB parser and only
+    /// its container metadata is retained — the header sector, the FAT, the
+    /// MiniFAT, the directory image, the packed mini stream, and one record
+    /// per directory entry. The packed mini stream is retained because it
+    /// contains the source's mini-sector image; regular stream payloads and a
+    /// second full copy of `source` are not retained by the layout object.
+    /// The retained bytes are bounded by the artifact's sector count.
+    ///
+    /// Adopting a source never changes what the writer publishes logically.
+    /// It changes only where the bytes land, and only while the writer's
+    /// stream and storage set still matches the adopted artifact's.
+    ///
+    /// Returns `true` when the artifact was adopted. A source that the parser
+    /// rejects, or whose layout cannot be represented, is simply not adopted
+    /// and the writer serializes from scratch: `false` is returned rather than
+    /// an error, because the from-scratch path is always available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::Allocation`] when the bounded metadata cannot be
+    /// reserved.
+    pub fn adopt_source_layout(&mut self, source: &[u8]) -> Result<bool, OleError> {
+        self.source_layout = None;
+        match SourceLayout::parse(source) {
+            Ok(layout) => {
+                self.source_layout = Some(Box::new(layout));
+                Ok(true)
+            },
+            Err(error @ OleError::Allocation { .. }) => Err(error),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Whether an artifact has been adopted for layout reuse.
+    #[must_use]
+    pub const fn has_adopted_source_layout(&self) -> bool {
+        self.source_layout.is_some()
+    }
+
+    /// What the most recent [`Self::write_to`] or [`Self::save`] did with the
+    /// adopted source's sectors, or `None` before the first serialization.
+    #[must_use]
+    pub const fn last_sector_layout(&self) -> Option<SectorLayoutReport> {
+        self.last_sector_layout
+    }
+
+    fn stream_inputs(&self) -> Result<Vec<StreamInput<'_>>, OleError> {
+        let mut inputs = Vec::new();
+        inputs
+            .try_reserve_exact(self.streams.len())
+            .map_err(|source| OleError::allocation("stream layout inputs", source))?;
+        for (path, data) in &self.streams {
+            inputs.push(StreamInput {
+                path,
+                bytes: data.bytes(),
+            });
+        }
+        Ok(inputs)
+    }
+
+    /// Every storage the serialized directory will contain: the ones the
+    /// caller declared and the ancestors every path implies.
+    fn effective_storages(&self) -> BTreeSet<Vec<String>> {
+        let mut storages: BTreeSet<Vec<String>> = BTreeSet::new();
+        for path in &self.storages {
+            for length in 1..=path.len() {
+                storages.insert(path[..length].to_vec());
+            }
+        }
+        for (path, _) in &self.streams {
+            for length in 1..path.len() {
+                storages.insert(path[..length].to_vec());
+            }
+        }
+        storages
+    }
+
+    fn plan_sector_layout(&self) -> Result<Outcome, OleError> {
+        if self.sector_layout_policy == SectorLayoutPolicy::Rewrite {
+            return Ok(Outcome::Declined(SectorLayoutFallback::PolicySelected));
+        }
+        let Some(source) = self.source_layout.as_deref() else {
+            return Ok(Outcome::Declined(SectorLayoutFallback::NoAdoptedSource));
+        };
+        let streams = self.stream_inputs()?;
+        let storages = self.effective_storages();
+        let mut storage_class_ids: BTreeMap<Vec<String>, [u8; 16]> = BTreeMap::new();
+        for (path, class_id) in &self.storage_clsids {
+            storage_class_ids.insert(path.clone(), *class_id);
+        }
+        let root_class_id = self.entries.first().map_or([0u8; 16], |entry| entry.clsid);
+        plan_reuse(
+            source,
+            &ModelInputs {
+                sector_size: self.sector_size,
+                mini_sector_size: self.mini_sector_size,
+                mini_stream_cutoff: self.mini_stream_cutoff,
+                streams: &streams,
+                storages: &storages,
+                storage_class_ids: &storage_class_ids,
+                root_class_id,
+            },
+        )
     }
 
     /// Set the CLSID (Class ID) for the root entry
@@ -409,6 +583,30 @@ impl OleWriter {
             return Err(OleError::InvalidData("Empty path".to_string()));
         }
 
+        self.put_payload(path, StreamPayload::Owned(data))
+    }
+
+    /// Create or replace a stream from a payload shared with its producer.
+    ///
+    /// Unlike [`Self::create_stream`], this method never copies `data`: the
+    /// writer retains the same allocation the caller holds and writes through
+    /// it at serialization time. It is the entry point for a caller that
+    /// already owns the bytes behind an [`Arc`], such as a package editor
+    /// republishing streams it captured.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the stream table cannot
+    /// grow.
+    pub fn create_stream_shared(&mut self, path: &[&str], data: Arc<[u8]>) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        self.put_payload(path, StreamPayload::Shared(data))
+    }
+
+    fn put_payload(&mut self, path: &[&str], data: StreamPayload) -> Result<(), OleError> {
         if let Some(position) = self.stream_position(path) {
             self.streams[position].1 = data;
             return Ok(());
@@ -899,6 +1097,21 @@ impl OleWriter {
             validate_stream_size(self.sector_size, data.len(), "user stream")?;
         }
 
+        // The reused layout is planned in full before a byte is emitted, so a
+        // gate that declines costs nothing and leaves no partial output.
+        let declined = match self.plan_sector_layout()? {
+            Outcome::Planned(plan) => {
+                let report = plan.report();
+                writer.seek(SeekFrom::Start(0))?;
+                let inputs = self.stream_inputs()?;
+                plan.emit(&inputs, writer)?;
+                drop(inputs);
+                self.last_sector_layout = Some(report);
+                return Ok(());
+            },
+            Outcome::Declined(fallback) => fallback,
+        };
+
         // Initialize builders
         let mut fat = FatBuilder::new_with_size(self.sector_size)?;
         let mut minifat = MiniFatBuilder::new(self.mini_sector_size);
@@ -1185,6 +1398,9 @@ impl OleWriter {
         }
 
         writer.flush()?;
+
+        self.last_sector_layout =
+            Some(SectorLayoutReport::declined(declined).with_output_sectors(fat.total_sectors()));
 
         Ok(())
     }
@@ -1556,7 +1772,7 @@ fn validate_stream_size(
     Ok(())
 }
 
-fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
+pub(super) fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
     let sector_size_u64 = checked_sector_size(sector_size)?;
     if sector_count > MAXREGSECT {
         return Err(OleError::InvalidData(
@@ -1813,7 +2029,9 @@ mod tests {
         let mut writer = OleWriter::new();
         // Bypass the public path validation to exercise a serialization error
         // after save has already created its sibling temporary file.
-        writer.streams.push((Vec::new(), Vec::new()));
+        writer
+            .streams
+            .push((Vec::new(), StreamPayload::Owned(Vec::new())));
 
         let error = writer.save(&destination).unwrap_err();
         assert!(error.to_string().contains("stream path must not be empty"));
@@ -1949,7 +2167,8 @@ mod tests {
                 .all(|(path, _)| !path.starts_with(root.as_slice()))
         );
         assert!(writer.streams.iter().any(|(path, data)| {
-            path == &["RootSibling".to_string(), "Preserved".to_string()] && data == b"preserved"
+            path == &["RootSibling".to_string(), "Preserved".to_string()]
+                && data.bytes() == b"preserved"
         }));
     }
 

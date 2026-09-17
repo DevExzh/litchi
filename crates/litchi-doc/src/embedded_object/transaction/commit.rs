@@ -12,6 +12,8 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Target};
 
 impl Editor {
+    /// Publishes the source-backed DOC/ObjectPool edit with the default OLE2
+    /// sector-layout reuse policy carried by the common object editor.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(PackageError::from)
     }

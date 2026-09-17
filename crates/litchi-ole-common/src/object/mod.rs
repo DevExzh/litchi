@@ -24,6 +24,7 @@ pub use discovery::discover;
 pub use editor::{CfbParseEvent, CfbParseOutcome};
 pub use editor::{Editor, MAX_STREAM_REMOVALS};
 pub use link::Link;
+pub use litchi_cfb::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport};
 pub use model::{Limits, Object, Objects, Storage, Stream};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;

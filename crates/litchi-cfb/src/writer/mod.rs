@@ -25,6 +25,10 @@ pub(crate) use directory::DirectoryBuilder;
 /// OLE2 header generation
 mod header;
 
+/// Source-anchored sector layout policy for the core writer.
+mod layout;
+pub use layout::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport};
+
 /// Core OLE writer implementation
 mod core;
 pub(crate) use core::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};

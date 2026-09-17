@@ -1,0 +1,47 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0663",
+  "title": "source-backed OLE2 saves reuse validated sector layout with deterministic append and fallback",
+  "decision": "retained, implemented in litchi-cfb, litchi-ole-common, litchi-doc and litchi-ppt",
+  "code_state": "public OLE2 sector-layout policy and source adoption; source-backed DOC and PPT embedded-object save routes use Reuse by default; newly-authored DOC remains from scratch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "0652 decision 10 authorizes the OLE2 side of 0617: reuse the source layout by default, reclaim cheap released space, and append when growth no longer fits",
+    "the implementation retains source directory and allocation metadata behind explicit adoption, with typed fallbacks for unsupported geometry, topology, class identifiers, DIFAT and rejected plans",
+    "the source-backed DOC route reaches the policy through litchi-ole-common::object::Editor::finish; a changed snapshot now carries the same policy instead of silently re-rendering from scratch",
+    "the preservation corpus compares every stream and every reused directory CLSID with the source, exercises both MiniFAT cutoff directions, and checks deterministic output across fresh processes",
+    "the measurement shows layout retention and append/reclaim behavior but not a separable 0617 payload-copy saving, so no speed claim is registered"
+  ],
+  "accepted_evidence": {
+    "corpus": "211 of 211 parsed OLE2 fixtures pass stream-by-stream differential, normalized raw source directory records (all fields except stream start/size, including CLSIDs), reopen and validation checks; 209 no-op/same-length/length-changing saves reuse and 195 length-changing saves append",
+    "fallback_sweep": "37 tampered DOC source layouts decline safely and 5 parser-admitted mutations retain all stream bytes",
+    "cutoff": "smoke tests cover 4095-byte MiniFAT to 5000-byte regular and the reverse migration, plus shrink/reclaim and append",
+    "determinism": "same-process repetitions and three child-process layout digests agree",
+    "ordinary_route": "the doc_tracked_revision_editor integration test edits test-data/ole/doc/picture.doc through RevisionEditor::finish and observes the untouched table allocation start sector is retained; embedded-object source-backed finish paths call the common ObjectEditor and litchi-ppt explicitly adopts original bytes",
+    "timing": "24 release ABBA samples on picture.doc in three windows with paired A/A floors"
+  },
+  "accepted_costs": {
+    "metadata_retention": "adoption reparses the source and retains bounded layout state including the packed mini-stream image; it does not retain a second full source artifact or regular-stream payload copy",
+    "source_shape": "directory creation, deletion, renaming and unsupported source geometry fall back to the existing deterministic rewrite path",
+    "timing_floor": "reuse p50 was 255796–265081 ns against rewrite 241471–252786 ns while same-window A/A floors were 2.58–7.47%; the difference is not claimed",
+    "sink_work": "the generic emitter still writes every output sector; kept_sectors measures placement retention rather than avoided payload copies"
+  },
+  "known_gaps": {
+    "copy_through": "0617's true copy-through spans and its 13–30% estimate are not implemented by this record",
+    "new_documents": "the public litchi-doc Writer creates a new CFB and has no source layout to adopt",
+    "performance_scope": "no registered latency, allocation, RSS, cold-cache, physical-I/O, concurrency or cross-platform result",
+    "difat": "DIFAT source and output layouts intentionally decline until a bounded corpus witness exists"
+  },
+  "withheld": [
+    "any 0617 speedup or avoided-payload-copy claim",
+    "any cross-platform, cold-cache, physical-device, RSS or concurrency result"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "branch": "perf/0663-cfb-sector-layout-policy",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "parent_head_note": "parent integration includes 0659's CFB snapshot fence"
+  }
+}

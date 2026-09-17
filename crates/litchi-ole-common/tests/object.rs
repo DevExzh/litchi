@@ -10,7 +10,7 @@
     reason = "integration tests use concise assertions and checked fixture-sized literals"
 )]
 
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleFile, OleWriter, SectorLayoutPolicy};
 use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -482,4 +482,77 @@ fn snapshots_share_streams_and_edit_independently() {
     assert!(!snapshot.is_changed());
     assert_eq!(snapshot.finish().expect("source should finish"), original);
     assert_eq!(editor.stream(&path), Some(&b"edited from snapshot"[..]));
+}
+
+#[test]
+fn changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors() {
+    let base = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], &vec![0x11u8; 20_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source stream should write");
+    });
+
+    // Move B into A's released sectors and leave A with a shorter allocation.
+    // This makes the adopted source physically different from the deterministic
+    // from-scratch order while preserving the same logical directory shape.
+    let source = {
+        let mut writer = OleWriter::new();
+        assert!(
+            writer
+                .adopt_source_layout(&base)
+                .expect("source should adopt")
+        );
+        writer
+            .create_stream(&["A"], &vec![0x33u8; 5_000])
+            .expect("source edit should write");
+        writer
+            .create_stream(&["B"], &vec![0x44u8; 20_000])
+            .expect("source edit should write");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("source should write");
+        assert!(
+            writer
+                .last_sector_layout()
+                .expect("source report")
+                .reused_source_layout()
+        );
+        output.into_inner()
+    };
+
+    let mut editor = Editor::open(source.clone(), Targets::default(), Limits::default())
+        .expect("source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x55u8; 5_000])
+        .expect("DOC stream edit should commit");
+    let commit = editor.commit().expect("DOC edit should commit");
+    assert_eq!(
+        commit.snapshot().sector_layout_policy(),
+        SectorLayoutPolicy::Reuse
+    );
+    assert_eq!(
+        commit.snapshot().finish().expect("snapshot should finish"),
+        commit.patch().after(),
+        "a changed source-backed snapshot must use the same layout policy as the DOC save"
+    );
+
+    let mut rewrite = OleWriter::new();
+    rewrite
+        .create_stream(&["A"], &vec![0x55u8; 5_000])
+        .expect("rewrite stream should write");
+    rewrite
+        .create_stream(&["B"], &vec![0x44u8; 20_000])
+        .expect("rewrite stream should write");
+    let mut rewritten = Cursor::new(Vec::new());
+    rewrite
+        .write_to(&mut rewritten)
+        .expect("rewrite should write");
+    let rewritten = rewritten.into_inner();
+    assert_ne!(
+        commit.patch().after(),
+        rewritten.as_slice(),
+        "the source-backed route should retain its adopted physical layout"
+    );
 }

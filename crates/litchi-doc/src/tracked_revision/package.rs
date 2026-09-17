@@ -2294,6 +2294,12 @@ impl RevisionEditor {
         Ok(revision)
     }
 
+    /// Finishes the source-backed DOC edit.
+    ///
+    /// The embedded [`ObjectEditor`] retains the exact opened CFB bytes and
+    /// renders changed saves with its default
+    /// [`litchi_cfb::SectorLayoutPolicy::Reuse`] policy. This is the ordinary tracked
+    /// revision save route; callers do not need to opt into the CFB policy.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(PackageError::from)
     }

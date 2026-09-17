@@ -8,7 +8,7 @@ use super::model::{Limits, Objects};
 use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, SectorLayoutPolicy};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
@@ -66,6 +66,7 @@ pub struct Editor {
     package: Package,
     objects: Objects,
     changed: bool,
+    layout: SectorLayoutPolicy,
 }
 
 impl Editor {
@@ -178,6 +179,7 @@ impl Editor {
             package,
             objects,
             changed: false,
+            layout: SectorLayoutPolicy::default(),
         })
     }
 
@@ -194,6 +196,7 @@ impl Editor {
             self.package.clone(),
             self.objects.clone(),
             self.changed,
+            self.layout,
         )
     }
 
@@ -205,6 +208,7 @@ impl Editor {
             package: snapshot.package(),
             objects: snapshot.objects_clone(),
             changed: snapshot.changed(),
+            layout: snapshot.layout(),
         }
     }
 
@@ -578,6 +582,26 @@ impl Editor {
         Ok(removed)
     }
 
+    /// Selects where a rendered package places its sectors.
+    ///
+    /// The default is [`SectorLayoutPolicy::Reuse`]: a render keeps the opened
+    /// artifact's sector assignment wherever the package's stream and storage
+    /// set still matches it, appends what no longer fits, and reclaims what a
+    /// shrinking stream released. [`SectorLayoutPolicy::Rewrite`] re-lays out
+    /// the whole container, producing the smallest output.
+    ///
+    /// Both policies publish the same logical package: identical stream bytes,
+    /// hierarchy, names and class identifiers.
+    pub const fn set_sector_layout_policy(&mut self, policy: SectorLayoutPolicy) {
+        self.layout = policy;
+    }
+
+    /// The sector-layout policy a render will apply.
+    #[must_use]
+    pub const fn sector_layout_policy(&self) -> SectorLayoutPolicy {
+        self.layout
+    }
+
     /// Finishes the edit, returning the original bytes for a true no-op.
     ///
     /// # Errors
@@ -585,7 +609,8 @@ impl Editor {
     /// Returns an error if the edited CFB cannot be rendered.
     pub fn finish(self) -> Result<Vec<u8>, OleError> {
         if self.changed {
-            self.package.render()
+            self.package
+                .render_with_layout(Some(self.original.as_slice()), self.layout)
         } else {
             Ok(match Arc::try_unwrap(self.original) {
                 Ok(bytes) => bytes,
@@ -618,7 +643,9 @@ impl Editor {
 
     fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), OleError> {
         self.package.check(self.limits)?;
-        let rendered = self.package.render()?;
+        let rendered = self
+            .package
+            .render_with_layout(Some(self.original.as_slice()), self.layout)?;
         let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
         codec::open(&check)?;
         let mut parsed = Package::capture(&mut check, self.limits)?;

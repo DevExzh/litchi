@@ -10,7 +10,7 @@ use super::editor::Editor;
 use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
-use litchi_cfb::OleError;
+use litchi_cfb::{OleError, SectorLayoutPolicy};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -21,6 +21,7 @@ struct State {
     package: Package,
     objects: Objects,
     changed: bool,
+    layout: SectorLayoutPolicy,
 }
 
 /// Immutable, cheap-to-clone view of a captured OLE object package.
@@ -43,6 +44,7 @@ impl Snapshot {
         package: Package,
         objects: Objects,
         changed: bool,
+        layout: SectorLayoutPolicy,
     ) -> Self {
         Self {
             state: Arc::new(State {
@@ -52,6 +54,7 @@ impl Snapshot {
                 package,
                 objects,
                 changed,
+                layout,
             }),
         }
     }
@@ -86,6 +89,13 @@ impl Snapshot {
     #[must_use]
     pub fn is_changed(&self) -> bool {
         self.state.changed
+    }
+
+    /// The sector-layout policy captured from the editor that produced this
+    /// snapshot.
+    #[must_use]
+    pub fn sector_layout_policy(&self) -> SectorLayoutPolicy {
+        self.state.layout
     }
 
     /// Borrows an opaque package stream without copying it.
@@ -132,7 +142,9 @@ impl Snapshot {
     /// Returns an error when the captured package cannot be rendered.
     pub fn finish(&self) -> Result<Vec<u8>, OleError> {
         if self.state.changed {
-            self.state.package.render()
+            self.state
+                .package
+                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)
         } else {
             Ok(self.state.original.as_ref().clone())
         }
@@ -156,5 +168,9 @@ impl Snapshot {
 
     pub(crate) fn changed(&self) -> bool {
         self.state.changed
+    }
+
+    pub(crate) fn layout(&self) -> SectorLayoutPolicy {
+        self.state.layout
     }
 }

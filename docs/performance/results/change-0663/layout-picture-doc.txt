@@ -1,0 +1,13 @@
+Fixture: test-data/ole/doc/picture.doc
+Source bytes: 1448448
+Sector size: 512
+Streams: 7
+
+shape             reuse_bytes  rewrite_bytes  output_sectors  kept  rewritten  appended  reclaimed  free
+noop                 1448448        1447936            2828  2795         32         0          0     1
+same-length          1448448        1447936            2828  2795         32         0          0     1
+length-changing      1449984        1449984            2831  2795         36         3          1     0
+
+`kept` is source placement retention. The emitter still writes the output
+sectors through the generic sink; these numbers do not measure avoided payload
+copies.
