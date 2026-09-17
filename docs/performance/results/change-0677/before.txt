@@ -1,0 +1,26 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.09s
+     Running unittests src/lib.rs (target/debug/deps/xml_minifier-7f9dbac370afd9b3)
+
+running 1 test
+test audit::stream_tests::reader_matches_slice_bom_admission ... FAILED
+
+failures:
+
+---- audit::stream_tests::reader_matches_slice_bom_admission stdout ----
+
+thread 'audit::stream_tests::reader_matches_slice_bom_admission' (1471360) panicked at crates/xml-minifier/src/audit.rs:2167:49:
+a UTF-8 BOM is valid XML: Malformed { offset: 0, detail: "invalid XML declaration boundary" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit::stream_tests::reader_matches_slice_bom_admission
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xml-minifier --lib`

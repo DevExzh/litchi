@@ -1,0 +1,21 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running tests/source_xml_publication.rs (target/debug/deps/source_xml_publication-29d882c2dca42fd9)
+
+running 13 tests
+test managed_source_xml_refuses_retained_fragment_capacity_over_budget ... ok
+test an_exact_no_op_still_precedes_both_audits ... ok
+test source_provenance_rejects_foreign_lineage_and_stale_ranges_without_output ... ok
+test managed_source_xml_honors_cancellation_and_releases_memory_gauge ... ok
+test identical_source_splice_retains_original_authority_and_exact_output ... ok
+test destination_depth_and_event_limits_refuse_source_xml_additions ... ok
+test eager_replacement_preserves_a_utf8_bom_and_still_refuses_a_doctype_before_output ... ok
+test the_authored_classifier_still_separates_compact_from_formatted_xml ... ok
+test source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment ... ok
+test source_splice_rejects_reedit_and_overlapping_ranges_without_second_output ... ok
+test original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal ... ok
+test noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact ... ok
+test marked_xml_members_in_real_packages_pass_the_source_audit_unchanged ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

@@ -1,0 +1,4 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+ Documenting xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.12s
+   Generated /home/zhuhe/code/litchi/target/doc/xml_minifier/index.html

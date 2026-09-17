@@ -672,3 +672,61 @@ fn an_exact_no_op_still_precedes_both_audits() {
         .expect("an exact no-op must publish the source artifact byte for byte");
     assert_eq!(output, source, "an exact no-op copies the source artifact");
 }
+
+#[test]
+fn eager_replacement_preserves_a_utf8_bom_and_still_refuses_a_doctype_before_output() {
+    use litchi_opc::{OpcPackage, PackageWriter};
+
+    let original = b"<?xml version=\"1.0\"?><document><before/></document>";
+    let marked = b"\xef\xbb\xbf<?xml version=\"1.0\"?><document><after/></document>";
+    let mut package = OpcPackage::from_vec(archive_bytes(original)).unwrap();
+    package
+        .get_part_mut(&document_uri())
+        .unwrap()
+        .set_blob(marked.to_vec());
+    let published = PackageWriter::to_bytes(&package).unwrap();
+    let reopened = OpcPackage::from_vec(published).unwrap();
+    assert_eq!(reopened.get_part(&document_uri()).unwrap().blob(), marked);
+
+    package
+        .get_part_mut(&document_uri())
+        .unwrap()
+        .set_blob(b"\xef\xbb\xbf<!DOCTYPE document><document/>".to_vec());
+    let mut output = Vec::new();
+    assert!(PackageWriter::write_to_stream(&mut output, &package).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn marked_xml_members_in_real_packages_pass_the_source_audit_unchanged() {
+    use litchi_opc::phys_pkg::PhysPkgReader;
+
+    let fixtures = [
+        "libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx",
+        "libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+        "poi/test-data/slideshow/bug65551.pptx",
+    ];
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+    let mut marked = 0;
+    for fixture in fixtures {
+        let bytes = std::fs::read(root.join(fixture)).unwrap();
+        let archive = PhysPkgReader::new(&bytes).unwrap();
+        for name in archive.member_names().unwrap() {
+            if !name.ends_with(".xml") && !name.ends_with(".rels") {
+                continue;
+            }
+            let payload = archive.read_member(&name).unwrap();
+            if !payload.starts_with(b"\xef\xbb\xbf") {
+                continue;
+            }
+            let report = xml_minifier::audit::verify_source(
+                &payload,
+                xml_minifier::audit::Limits::default(),
+            )
+            .unwrap_or_else(|error| panic!("{fixture}:{name}: {error}"));
+            assert_eq!(report.bytes(), payload.len());
+            marked += 1;
+        }
+    }
+    assert_eq!(marked, 16);
+}

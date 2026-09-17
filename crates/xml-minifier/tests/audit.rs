@@ -372,13 +372,12 @@ fn source_policy_keeps_every_structural_encoding_doctype_and_limit_refusal() {
         Err(audit::Error::Encoding { valid_up_to: 3 })
     ));
 
-    // A leading byte order mark stays refused exactly as the authored contract
-    // refuses it. Change 0650's frozen question 3 is not decided here.
+    // A UTF-8 marker is encoding framing, not malformed lexical XML.
     let marked = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><root/>";
-    let authored = audit::verify_authored(marked, limits_for(marked)).unwrap_err();
-    let source = audit::verify_source(marked, limits_for(marked)).unwrap_err();
-    assert!(matches!(source, audit::Error::Malformed { offset: 0, .. }));
-    assert_eq!(source.to_string(), authored.to_string());
+    let authored = audit::verify_authored(marked, limits_for(marked)).unwrap();
+    let source = audit::verify_source(marked, limits_for(marked)).unwrap();
+    assert_eq!(source, authored);
+    assert_eq!(source.bytes(), marked.len());
 
     // Every finite budget, each narrowed to one below what the input needs.
     let nested = b"<?xml version=\"1.0\"?>\n<a>\n  <b c=\"1\">text</b>\n</a>";
@@ -429,4 +428,56 @@ fn the_authored_and_default_contracts_are_unchanged_by_the_source_policy() {
     let report_authored = audit::verify_authored(compact, limits_for(compact)).unwrap();
     let report_source = audit::verify_source(compact, limits_for(compact)).unwrap();
     assert_eq!(report_authored, report_source);
+}
+
+#[test]
+fn source_bom_preserves_structural_refusals_and_byte_accounting() {
+    let marked = b"\xef\xbb\xbf<a/>";
+    let report = audit::verify_source(marked, limits_for(marked)).unwrap();
+    assert_eq!(report.bytes(), marked.len());
+    assert!(matches!(
+        audit::verify_source(
+            marked,
+            limits_for(marked).narrow(Resource::Bytes, marked.len() - 1)
+        ),
+        Err(audit::Error::Limit {
+            resource: Resource::Bytes,
+            actual: 7,
+            limit: 6,
+            ..
+        })
+    ));
+    assert!(matches!(
+        audit::verify_source(marked, limits_for(marked).narrow(Resource::TokenBytes, 3)),
+        Err(audit::Error::Limit {
+            resource: Resource::TokenBytes,
+            actual: 4,
+            limit: 3,
+            offset: 3
+        })
+    ));
+    let doctype = b"\xef\xbb\xbf<!DOCTYPE a><a/>";
+    assert!(matches!(
+        audit::verify_source(doctype, limits_for(doctype)),
+        Err(audit::Error::Doctype { offset: 3 })
+    ));
+    let invalid = b"\xef\xbb\xbf<a>\xff</a>";
+    assert!(matches!(
+        audit::verify_source(invalid, limits_for(invalid)),
+        Err(audit::Error::Encoding { valid_up_to: 6 })
+    ));
+    for malformed in [
+        b"\xef\xbb\xbf\xef\xbb\xbf<a/>".as_slice(),
+        b"\xef\xbb\xbf<a/><b/>",
+        b"\xef\xbb\xbf<a></b>",
+        b"\xef\xbb\xbf",
+    ] {
+        assert!(
+            matches!(
+                audit::verify_source(malformed, limits_for(malformed)),
+                Err(audit::Error::Malformed { .. })
+            ),
+            "{malformed:?}"
+        );
+    }
 }

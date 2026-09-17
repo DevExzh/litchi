@@ -1,0 +1,4 @@
+Independent read-only review by /root/xlsx_read_residue_0672: no blocker.
+Verified tiny chunks, marker-inclusive totals and offsets, marker-exclusive token budgets, repeated/truncated markers, invalid UTF-8, DTDs and unmarked behavior.
+Re-ran xml-minifier lib/audit/stream suites and OPC publication tests successfully.
+Low max_bytes < 3 cannot classify full BOM; pre-existing streaming limit precedence remains documented.
