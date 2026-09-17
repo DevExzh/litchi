@@ -1107,11 +1107,21 @@ enum Selection<'a> {
 
 /// Copy every stored cell of a checked range out of a materialized store.
 fn collect_stored_cells(store: &Store, range: Rect) -> Result<Vec<SourceCell>> {
+    // Count the sparse records that will actually be copied before reserving.
+    // The old one-slot growth loop doubled a 75,770-cell whole-sheet result to
+    // 131,072 slots.  A count pass keeps narrow ranges sparse while making the
+    // owning result's capacity exact; the store is immutable for this read, so
+    // the second traversal cannot observe a different set of records.
+    let count = if range == Rect::ALL {
+        store.stored_cell_count()
+    } else {
+        store.cells(range).count()
+    };
     let mut values = Vec::new();
+    values
+        .try_reserve_exact(count)
+        .map_err(|source| allocation("source-backed selected cells", source))?;
     for (address, cell) in store.cells(range) {
-        values
-            .try_reserve(1)
-            .map_err(|source| allocation("source-backed selected cells", source))?;
         values.push(SourceCell {
             address,
             cell: cell.clone(),
@@ -4063,6 +4073,24 @@ mod tests {
                 error.contains("streaming_0642 callback: stop"),
                 "unexpected refusal: {error}"
             );
+        }
+
+        #[test]
+        fn cells_0672_reserve_exactly_the_stored_selection() {
+            let fixture = worksheet_xml(
+                r#"<sheetData><row r="1">
+                    <c r="A1"><v>1</v></c><c r="B1"><v>2</v></c>
+                    <c r="C1"><v>3</v></c><c r="D1"><v>4</v></c>
+                    <c r="E1"><v>5</v></c>
+                </row></sheetData>"#,
+            );
+            let (_source, workbook) = source_workbook(&fixture, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            sheet.stored_extent().unwrap();
+
+            let cells = sheet.cells("A1:E1").unwrap();
+            assert_eq!(cells.len(), 5);
+            assert_eq!(cells.capacity(), cells.len());
         }
     }
 }

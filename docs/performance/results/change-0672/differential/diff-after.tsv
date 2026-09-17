@@ -1,0 +1,5 @@
+file	sheet	cold_visit	cold_cells	warm_visit	eager_cells	agree
+test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	ok:75770:4eab1afa78b0f687	ok:75770:4eab1afa78b0f687	ok:75770:4eab1afa78b0f687	ok:75770:4eab1afa78b0f687	yes
+docs/performance/results/change-0672/corpus/dense-wide-probe.xlsx	Sheet1	ok:65536:f27c33cfdd24bec5	ok:65536:f27c33cfdd24bec5	ok:65536:f27c33cfdd24bec5	ok:65536:f27c33cfdd24bec5	yes
+docs/performance/results/change-0672/corpus/dense-wide-probe.xlsx	Sheet2	ok:65536:173df8de561b2365	ok:65536:173df8de561b2365	ok:65536:173df8de561b2365	ok:65536:173df8de561b2365	yes
+# worksheets=3 disagreements=0

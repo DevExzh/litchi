@@ -1,0 +1,20 @@
+[package]
+name = "xlsx0672-before"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "xlsx0672"
+path = "src/probe.rs"
+
+[[bin]]
+name = "xlsx0672_alloc"
+path = "src/alloc.rs"
+
+[dependencies]
+litchi-sheet = { path = "/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce/crates/litchi-sheet" }
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce/crates/litchi-xlsx" }
+
+[profile.release]
+debug = 2

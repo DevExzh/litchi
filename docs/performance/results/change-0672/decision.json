@@ -1,0 +1,55 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0672",
+  "title": "Reserve stored-route XLSX cell results exactly",
+  "decision": "retained, implemented in litchi-xlsx",
+  "code_state": "crates/litchi-xlsx/src/workbook/source.rs; no public API, error, refusal, source fence, or selected-scanner behavior changed; one focused capacity test added; no unsafe or dependency change",
+  "authority": [
+    "change 0651 queue row 15 names the stored-route cells over-allocation as a follow-on from 0642",
+    "change 0652 keeps correctness, bounded resources and refusal-before-result ahead of performance",
+    "change 0642 explicitly leaves the selected scanner's retained Vec<SelectedRecord> in place until an ADR 0006 refusal-order design"
+  ],
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "collect_stored_cells grew one slot at a time and retained a 131072-slot vector for 75770 cells",
+    "Rect::ALL uses the parsed Store's exact stored_cell_count; narrower ranges count the same immutable sparse iterator before try_reserve_exact",
+    "allocation failure remains fallible before any owning result is returned, and value order is unchanged",
+    "the selected scanner and visit_cells refusal-before-result contract are untouched"
+  ],
+  "accepted_evidence": {
+    "allocations": "counting global allocator before/after on a 75770-cell POI worksheet and a generated 2x256x256 workbook, for cells, cells-warm and the visit-warm control",
+    "timing": "one pinned A1 B1 B2 A2 warm pair with 30 samples and 20 warmups, plus a same-binary before A/A floor",
+    "differential": "three worksheets across the POI fixture and generated workbook; cold visit, cold cells, warm visit and eager cells agree with identical counts and FNV digests on both legs",
+    "tests": "focused 0642 refusal/order tests plus the exact-capacity test; full litchi-xlsx library suite 1031/1031"
+  },
+  "observations": {
+    "poi_warm": "cells allocations 16 -> 1; allocated and peak bytes 10485760 -> 6061600",
+    "dense_warm": "cells allocations 65551 -> 65537; allocated bytes remain 5608448 because the old capacity was already exact",
+    "poi_cold": "allocated bytes 174657136 -> 170232976; peak live bytes remain 57025552",
+    "timing": "same-binary p50 A/A floor <= 1.770%; before/after p50 +3.751% and +4.134% in the two directions; tail floor is noisy and withheld"
+  },
+  "known_gaps": {
+    "scanner": "the cold selected Vec<SelectedRecord> still sets peak live bytes and needs its own refusal-order design",
+    "scope": "two worksheet shapes, one host, warm timing only; no RSS, cold-cache timing, range-source or cross-platform claim"
+  },
+  "withheld": [
+    "any registered speedup, throughput, RSS, cold-cache, peak-memory, concurrency or cross-platform result",
+    "any claim that the scanner's own retained record vector was removed"
+  ],
+  "provenance": {
+    "base_commit": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "branch": "perf/0672-xlsx-read-allocation",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws",
+    "cpu_pin": "17",
+    "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "binaries": {
+      "before/xlsx0672": "fb116d75f5e2b80db0bada1867f87a192a2544bb27beaade35b830a6c528a113",
+      "after/xlsx0672": "f92e4bd912b7353e052907d83921c76de3e07dad8456c66d4b80799f4b3be2ad",
+      "before/xlsx0672_alloc": "167e48c927e1326cedadb8254c8babfbff20218e7beaf76716bdfdef78fe4231",
+      "after/xlsx0672_alloc": "28a80ab29ef603fec9bd0e09adf3d63f58f671b06ccad9c79a62343b4d281dc8",
+      "dense-wide-probe.xlsx": "8591744a8f5365d183c0cef283964e97402c920d5e50af749729b84666fadf55"
+    }
+  }
+}

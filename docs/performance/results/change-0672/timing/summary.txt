@@ -1,0 +1,25 @@
+# Change 0672 paired timing, cells-warm on the stored-route POI worksheet.
+# 30 samples per leg, 20 warmups, taskset -c 17, A1 B1 B2 A2 order.
+# The floor uses the unchanged before binary in all four legs.
+
+== floor-poi
+leg     n           p50          mean           p95          p99
+a1     30     1,500,692   1,502,775.7     1,532,688    1,546,987
+b1     30     1,494,622   1,497,041.0     1,515,867    1,537,048
+b2     30     1,517,842   1,520,021.8     1,547,427    1,548,617
+a2     30     1,545,187   1,568,465.0     1,713,068    1,714,448
+A1->B1: p50 +0.404%  mean +0.382%  p95 +1.097%  p99 +0.642%
+B2<-A2: p50 +1.770%  mean +3.089%  p95 +9.669%  p99 +9.673%
+
+== abba-poi
+leg     n           p50          mean           p95          p99
+a1     30     1,510,162   1,555,945.6     1,753,039    2,327,280
+b1     30     1,453,512   1,453,999.2     1,464,497    1,471,567
+b2     30     1,452,216   1,455,056.8     1,487,977    1,491,217
+a2     30     1,514,837   1,517,895.1     1,552,617    1,554,017
+A1->B1: p50 +3.751%  mean +6.552%  p95 +16.460%  p99 +36.769%
+B2<-A2: p50 +4.134%  mean +4.140%  p95 +4.163%  p99 +4.041%
+
+# The p50 A/A floor is +1.770%; the before/after p50 improvement is +3.751%
+# and +4.134% in the two paired directions. The p95/p99 floor is noisy in the
+# first direction and is reported without a tail claim.

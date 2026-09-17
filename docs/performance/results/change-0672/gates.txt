@@ -1,0 +1,17 @@
+Change 0672 scoped gates (worktree perf/0672-xlsx-read-allocation)
+
+PASS  cargo fmt --all -- --check
+PASS  CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test -j2 -p litchi-xlsx workbook::source::tests::streaming_0642_tests --lib
+      4 passed; 0 failed
+PASS  CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test -j2 -p litchi-xlsx --lib
+      1031 passed; 0 failed
+PASS  before/after four-way differential probe
+      3 worksheets, 0 disagreements on each leg
+PASS  before/after counting allocator probe
+      warm and cold cells, plus unchanged visit-warm control, completed
+PASS  before/after pinned timing pair and same-binary A/A floor
+      30 samples per leg, 20 warmups, CPU 17
+
+The selected scanner's cold-vector design was not changed or re-measured as a
+candidate; its refusal-before-result contract remains covered by the existing
+0642 tests and the before/after differential.
