@@ -1,0 +1,22 @@
+change 0666 gates (debug profile, CARGO_BUILD_JOBS=2)
+
+$ cargo fmt --all --check
+PASS
+
+$ CARGO_BUILD_JOBS=2 cargo check -p litchi-xlsx --lib
+Finished `dev` profile [unoptimized + debuginfo]
+PASS
+
+$ CARGO_BUILD_JOBS=2 cargo clippy -p litchi-xlsx --lib --all-features -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo]
+PASS
+
+$ CARGO_BUILD_JOBS=2 cargo test -p litchi-xlsx --lib
+test result: ok. 1032 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.26s
+
+$ CARGO_BUILD_JOBS=2 cargo test -p litchi-xlsx --lib cell_values::validation::shared_traversal_tests -- --nocapture
+worksheet MCE admission census: parts=205 borrowed=71 rewritten=30 rewritten_shared_complete=25 fallback=104
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1020 filtered out; focused run completed in about 4.8s
+
+The focused run also exercises the independent marker census recorded in
+measurements.tsv. No release benchmark, profiler or allocation gate was run.

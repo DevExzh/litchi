@@ -1,0 +1,36 @@
+change 0666 worksheet MCE rewrite residue
+
+Base: 5fa92d7ce
+Branch: perf/0666-mce-rewrite-residue
+Authority: change 0652 decision 1; change 0651 MCE rows
+Performance claim: none
+
+Implementation
+- MceRewriteEquivalence counts namespace declarations per source start tag.
+- The equivalence observer receives NamespaceResolver state.
+- Bound non-MCE prefixed attributes are admitted because the worksheet parser ignores them; value-only validation still rejects relationship references inside sheetData.
+- mc:Ignorable is admitted only after NCName, duplicate, binding, MCE-recursion and 4096-token checks.
+- ProcessContent, PreserveElements, PreserveAttributes, MustUnderstand, unknown MCE directives, prefixed elements, unbound prefixes, dyDescent and AlternateContent retain fallback.
+
+Focused real-worksheet measurement
+- 205 worksheet parts
+- 71 borrowed
+- 30 rewritten candidates
+- 25 validator-backed shared completions
+- 104 admission fallbacks
+- 130 mc:Ignorable markers, 104 dyDescent markers, 3 other MCE-directive markers and 0 AlternateContent markers
+- preservation floor: 0 value or exact-error differences against authoritative parsing
+
+Adversarial coverage
+- valid mc:Ignorable with a bound prefixed attribute and source-backed no-op
+- unbound, duplicate and MCE-recursive Ignorable prefixes
+- ProcessContent and PreserveAttributes fallback
+- 288 declarations distributed over 96 tags, proving the bound is per tag
+
+Adjacent consumer disposition
+query_table extension lists own a typed XML tree; auto_filter and data_validation
+detach selected processed fragments into bounded writers; named_sheet_view adapts
+filter roots into a generated auto-filter document and publishes typed payloads.
+No borrowed slice is claimed for those contracts.
+
+No release benchmark, allocation trace, RSS, cold-cache or cross-platform run was taken.

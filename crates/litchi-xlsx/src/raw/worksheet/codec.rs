@@ -1160,13 +1160,13 @@ where
             None => true,
         };
         let (namespace, event) = reader.resolver().resolve_event(event);
+        let resolver = reader.resolver();
         if let Some(equivalence) = equivalence.as_mut()
-            && !equivalence.observe(&event)
+            && !equivalence.observe(&event, resolver)
         {
             return super::SourceParseAttempt::ProvisionalFailed;
         }
         let decoder = reader.decoder();
-        let resolver = reader.resolver();
         let parser_allowed = observer(
             &namespace,
             &event,

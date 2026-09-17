@@ -1,0 +1,12 @@
+measurement	value	unit	source	floor_or_interpretation
+worksheet_parts	205	parts	shared_traversal_tests	all selected real worksheet parts
+borrowed	71	parts	shared_traversal_tests	unchanged marker-free path
+rewritten_candidates	30	parts	shared_traversal_tests	MCE namespace marker and no dyDescent or AlternateContent marker
+rewritten_shared_complete	25	parts	shared_traversal_tests	validator-backed source traversal reached EOF
+admission_fallback	104	parts	shared_traversal_tests	source admission rejected before shared rewrite proof
+mc_ignorable_markers	130	parts	independent ZIP census	producer marker count
+dy_descent_markers	104	parts	independent ZIP census	separate x14ac capture remains required
+other_mce_directive_parts	3	parts	independent ZIP census	ProcessContent, PreserveAttributes, PreserveElements or MustUnderstand marker
+alternate_content_markers	0	parts	independent ZIP census	no worksheet AlternateContent marker in this fixture set
+preservation_differences	0	parts	authoritative differential	correctness floor: no value or exact-error mismatch
+cumulative_declaration_witness	288	declarations	focused adversarial test	spread over 96 tags; exceeds old cumulative 256 budget
