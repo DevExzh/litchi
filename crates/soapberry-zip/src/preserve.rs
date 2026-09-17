@@ -3163,7 +3163,7 @@ mod tests {
     }
 
     impl crate::office::ScopedWorkers for CountingScopedWorkers {
-        fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+        fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
             self.waves
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.tasks

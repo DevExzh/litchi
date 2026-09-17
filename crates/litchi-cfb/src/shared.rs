@@ -3529,7 +3529,7 @@ mod tests {
     use crate::{OleWriter, SharedOleBulkError};
     use litchi_core::{
         Budget, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,
-        ExecutionLimits, Limits, Resource,
+        ExecutionLimits, Limits, Resource, ScopedWorkers,
     };
     use std::{
         io::Cursor,
@@ -3942,6 +3942,23 @@ mod tests {
             cancellation,
             limits,
         )
+    }
+
+    #[derive(Debug, Default)]
+    struct CountingWorkers {
+        tasks: AtomicUsize,
+        max_wave: AtomicUsize,
+    }
+
+    impl ScopedWorkers for CountingWorkers {
+        fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
+            self.tasks.fetch_add(tasks.len(), AtomicOrdering::Relaxed);
+            self.max_wave
+                .fetch_max(tasks.len(), AtomicOrdering::Relaxed);
+            for task in tasks.iter_mut() {
+                task();
+            }
+        }
     }
 
     fn bulk_bytes() -> Vec<u8> {
@@ -7983,6 +8000,127 @@ mod tests {
         assert_eq!(bulk, serial);
         assert_eq!(bulk[0][0], 0x22);
         assert_eq!(bulk[2][0], 0x11);
+    }
+
+    #[test]
+    fn bulk_reads_use_caller_facility_and_release_operation_worker_width() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(Arc::clone(&source));
+        let paths: &[&[&str]] = &[&["Second"], &["Small"], &["First"]];
+        let (_cancel, token) = CancellationSource::pair();
+        let budget = Budget::root(
+            "shared-cfb-caller-workers",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(2, 2, u64::MAX),
+        );
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroU64::new(16_384).unwrap(),
+            1,
+        )
+        .unwrap();
+        let workers = Arc::new(CountingWorkers::default());
+        let context = ExecutionContext::new(budget.clone(), token, limits)
+            .with_scoped_workers(workers.clone());
+        let session = file.bulk_read(context);
+        let result = session.read_streams(paths).unwrap();
+
+        assert_eq!(result[0][0], 0x22);
+        assert_eq!(result[2][0], 0x11);
+        assert!(workers.tasks.load(AtomicOrdering::Relaxed) >= 2);
+        assert!(workers.max_wave.load(AtomicOrdering::Relaxed) <= 2);
+        assert_eq!(session.pool_build_count(), 0);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+        drop(session);
+        assert_eq!(budget.used(Resource::Workers), 0);
+    }
+
+    #[test]
+    fn bulk_reads_refuse_zero_io_before_the_first_payload_read() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(Arc::clone(&source));
+        let baseline = source.reads.load(AtomicOrdering::SeqCst);
+        let paths: &[&[&str]] = &[&["Second"], &["First"]];
+        let (_cancel, token) = CancellationSource::pair();
+        let budget = Budget::root(
+            "shared-cfb-zero-io",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(2, 0, u64::MAX),
+        );
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroU64::new(16_384).unwrap(),
+            1,
+        )
+        .unwrap();
+        let session = file.bulk_read(ExecutionContext::new(budget.clone(), token, limits));
+        assert!(matches!(
+            session.read_streams(paths),
+            Err(SharedOleBulkError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::IoConcurrency
+        ));
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), baseline);
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+    }
+
+    #[test]
+    fn serial_bulk_failure_releases_worker_and_io_admissions() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(Arc::clone(&source));
+        source.fail_all_reads();
+        let paths: &[&[&str]] = &[&["Second"]];
+        let (_cancel, token) = CancellationSource::pair();
+        let budget = Budget::root(
+            "shared-cfb-serial-failure",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(1, 1, u64::MAX),
+        );
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(16_384).unwrap(),
+            0,
+        )
+        .unwrap();
+        let session = file.bulk_read(ExecutionContext::new(budget.clone(), token, limits));
+        assert!(matches!(
+            session.read_streams(paths),
+            Err(SharedOleBulkError::Ole(_))
+        ));
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
+    }
+
+    #[test]
+    fn cancelled_bulk_read_releases_worker_and_io_admissions() {
+        let source = Arc::new(TestSource::new(bulk_bytes()));
+        let file = shared(Arc::clone(&source));
+        let (cancel, token) = CancellationSource::pair();
+        source.cancel_on_next_read(cancel);
+        let budget = Budget::root(
+            "shared-cfb-cancelled-read",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+                .with_execution_io(1, 1, u64::MAX),
+        );
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(16_384).unwrap(),
+            0,
+        )
+        .unwrap();
+        let session = file.bulk_read(ExecutionContext::new(budget.clone(), token, limits));
+
+        assert!(matches!(
+            session.read_streams(&[&["Second"]]),
+            Err(SharedOleBulkError::Execution(ExecutionError::Cancelled))
+        ));
+        assert_eq!(budget.used(Resource::Workers), 0);
+        assert_eq!(budget.used(Resource::IoConcurrency), 0);
     }
 
     #[test]

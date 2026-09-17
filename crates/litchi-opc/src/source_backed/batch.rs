@@ -8,7 +8,7 @@ use super::{PartData, SourceBackedPackage};
 use crate::error::{OpcError, Result};
 use crate::limits::ReadResource;
 use crate::packuri::PackURI;
-use litchi_core::{ExecutionContext, Reservation, Resource};
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use soapberry_zip::office::EntryId;
 use std::mem::size_of;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -121,6 +121,8 @@ struct SchedulerAdmission {
     command_vec_bytes: usize,
     reply_vec_bytes: usize,
     ordinal_vec_bytes: usize,
+    _workers: Reservation,
+    _io: Reservation,
     _memory: Reservation,
     _objects: Reservation,
 }
@@ -155,6 +157,13 @@ pub(super) fn read_parts_ordered(
         Err(error) => return finish(package, Err(error)),
     };
 
+    if let Some(context) = context.as_ref()
+        && let Err(error) = context.consume(Resource::CpuTasks, prepared.requests.len() as u64)
+    {
+        drop(prepared);
+        return finish(package, Err(super::map_execution_error(error)));
+    }
+
     let output = match OutputAdmission::reserve(context.as_ref(), prepared.requests.len()) {
         Ok(output) => output,
         Err(error) => {
@@ -184,6 +193,12 @@ pub(super) fn read_parts_ordered(
         workers > 1
             && prepared.requests.len() > 1
             && prepared.declared_total >= limits.min_parallel_bytes()
+            && (limits.min_task_bytes() == 0
+                || prepared.requests.iter().all(|request| {
+                    request
+                        .declared_bytes
+                        .is_some_and(|bytes| bytes >= limits.min_task_bytes())
+                }))
             && prepared.all_fit_inflight
     });
 
@@ -191,35 +206,96 @@ pub(super) fn read_parts_ordered(
         let context = context
             .as_ref()
             .ok_or_else(|| batch_refusal("parallel scheduling requires an execution context"))?;
-        let reuse_workers = wave_end(
-            &prepared.requests,
-            0,
-            workers,
-            context.limits().max_in_flight_bytes().get(),
-        )
-        .map(|end| end < prepared.requests.len())
-        .unwrap_or(false);
-        let scheduler = match SchedulerAdmission::reserve(context, workers, reuse_workers) {
-            Ok(scheduler) => scheduler,
-            Err(error) => {
-                drop(parts);
-                drop(output);
-                drop(prepared);
-                return finish(package, Err(error));
-            },
-        };
-        let result = read_parallel(
-            package,
-            context,
-            &prepared.requests,
-            workers,
-            &scheduler,
-            &mut parts,
-        );
-        drop(scheduler);
-        result
+        let caller_workers = context.scoped_workers().is_some();
+        let mut selected = None;
+        for width in (2..=workers).rev() {
+            let reuse_workers = wave_end(
+                &prepared.requests,
+                0,
+                width,
+                context.limits().max_in_flight_bytes().get(),
+            )
+            .map(|end| end < prepared.requests.len())
+            .unwrap_or(false);
+            match SchedulerAdmission::reserve(context, width, reuse_workers, caller_workers) {
+                Ok(scheduler) => {
+                    selected = Some((width, scheduler));
+                    break;
+                },
+                Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                    if matches!(
+                        limit.resource,
+                        Resource::Workers
+                            | Resource::IoConcurrency
+                            | Resource::Memory
+                            | Resource::Objects
+                    ) => {},
+                Err(error) => {
+                    drop(parts);
+                    drop(output);
+                    drop(prepared);
+                    return finish(package, Err(error));
+                },
+            }
+        }
+        if let Some((width, scheduler)) = selected {
+            let result = read_parallel(
+                package,
+                context,
+                &prepared.requests,
+                width,
+                &scheduler,
+                &mut parts,
+            );
+            drop(scheduler);
+            result
+        } else {
+            let workers = context
+                .reserve(Resource::Workers, 1)
+                .map_err(super::map_execution_error);
+            let io = match workers {
+                Ok(workers) => match context.reserve(Resource::IoConcurrency, 1) {
+                    Ok(io) => Some((workers, io)),
+                    Err(error) => {
+                        drop(workers);
+                        return finish(package, Err(super::map_execution_error(error)));
+                    },
+                },
+                Err(error) => return finish(package, Err(error)),
+            };
+            let result = read_serial(package, &prepared.requests, &mut parts);
+            drop(io);
+            result
+        }
     } else {
-        read_serial(package, &prepared.requests, &mut parts)
+        let admission = if let Some(context) = context.as_ref() {
+            let workers = context
+                .reserve(Resource::Workers, 1)
+                .map_err(super::map_execution_error);
+            match workers {
+                Ok(workers) => match context.reserve(Resource::IoConcurrency, 1) {
+                    Ok(io) => Some((workers, io)),
+                    Err(error) => {
+                        drop(workers);
+                        drop(parts);
+                        drop(output);
+                        drop(prepared);
+                        return finish(package, Err(super::map_execution_error(error)));
+                    },
+                },
+                Err(error) => {
+                    drop(parts);
+                    drop(output);
+                    drop(prepared);
+                    return finish(package, Err(error));
+                },
+            }
+        } else {
+            None
+        };
+        let result = read_serial(package, &prepared.requests, &mut parts);
+        drop(admission);
+        result
     };
 
     drop(prepared);
@@ -359,17 +435,28 @@ impl OutputAdmission {
 }
 
 impl SchedulerAdmission {
-    fn reserve(context: &ExecutionContext, workers: usize, reuse_workers: bool) -> Result<Self> {
-        let handle_bytes = checked_collection_bytes(
-            workers,
-            if reuse_workers {
-                size_of::<(usize, thread::ScopedJoinHandle<'static, ()>)>()
-            } else {
-                size_of::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>()
-            },
-            "source-backed batch worker handles",
-        )?;
-        let (wave_bytes, command_vec_bytes, reply_vec_bytes, ordinal_vec_bytes) = if reuse_workers {
+    fn reserve(
+        context: &ExecutionContext,
+        workers: usize,
+        reuse_workers: bool,
+        caller_workers: bool,
+    ) -> Result<Self> {
+        let handle_bytes = if caller_workers {
+            0
+        } else {
+            checked_collection_bytes(
+                workers,
+                if reuse_workers {
+                    size_of::<(usize, thread::ScopedJoinHandle<'static, ()>)>()
+                } else {
+                    size_of::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>()
+                },
+                "source-backed batch worker handles",
+            )?
+        };
+        let (wave_bytes, command_vec_bytes, reply_vec_bytes, ordinal_vec_bytes) = if reuse_workers
+            && !caller_workers
+        {
             let command_message_bytes = checked_collection_bytes(
                 workers,
                 size_of::<WorkerCommand>(),
@@ -425,22 +512,41 @@ impl SchedulerAdmission {
         } else {
             (0, 0, 0, 0)
         };
-        let stack_bytes = workers
-            .checked_mul(THREAD_STACK_BYTES)
-            .ok_or_else(|| batch_refusal("source-backed batch worker stacks overflow"))?;
+        let stack_bytes = if caller_workers {
+            0
+        } else {
+            workers
+                .checked_mul(THREAD_STACK_BYTES)
+                .ok_or_else(|| batch_refusal("source-backed batch worker stacks overflow"))?
+        };
         let control_bytes = SCHEDULER_CONTROL_BYTES
             .checked_add(handle_bytes)
             .and_then(|bytes| bytes.checked_add(wave_bytes))
             .and_then(|bytes| bytes.checked_add(stack_bytes))
             .ok_or_else(|| batch_refusal("source-backed batch scheduler overflows"))?;
-        let memory = context
-            .reserve(
-                Resource::Memory,
-                u64::try_from(control_bytes)
-                    .map_err(|_| batch_refusal("batch scheduler exceeds u64"))?,
-            )
+        let worker_permits = context
+            .reserve(Resource::Workers, workers as u64)
             .map_err(super::map_execution_error)?;
-        let channel_objects = if reuse_workers {
+        let io = match context.reserve(Resource::IoConcurrency, workers as u64) {
+            Ok(io) => io,
+            Err(error) => {
+                drop(worker_permits);
+                return Err(super::map_execution_error(error));
+            },
+        };
+        let memory = match context.reserve(
+            Resource::Memory,
+            u64::try_from(control_bytes)
+                .map_err(|_| batch_refusal("batch scheduler exceeds u64"))?,
+        ) {
+            Ok(memory) => memory,
+            Err(error) => {
+                drop(io);
+                drop(worker_permits);
+                return Err(super::map_execution_error(error));
+            },
+        };
+        let channel_objects = if reuse_workers && !caller_workers {
             workers
                 .checked_mul(4)
                 .ok_or_else(|| batch_refusal("source-backed batch channel objects overflow"))?
@@ -458,6 +564,8 @@ impl SchedulerAdmission {
             Ok(objects) => objects,
             Err(error) => {
                 drop(memory);
+                drop(io);
+                drop(worker_permits);
                 return Err(super::map_execution_error(error));
             },
         };
@@ -466,6 +574,8 @@ impl SchedulerAdmission {
             command_vec_bytes,
             reply_vec_bytes,
             ordinal_vec_bytes,
+            _workers: worker_permits,
+            _io: io,
             _memory: memory,
             _objects: objects,
         })
@@ -512,11 +622,82 @@ fn read_parallel(
 ) -> Result<()> {
     let max_bytes = context.limits().max_in_flight_bytes().get();
     fence(package)?;
+    if context.scoped_workers().is_some() {
+        return read_with_scoped_workers(package, context, requests, workers, max_bytes, output);
+    }
     let first_end = wave_end(requests, 0, workers, max_bytes)?;
     if first_end == requests.len() {
         return read_one_wave(package, requests, 0, first_end, scheduler, output);
     }
     read_reused_workers(package, requests, workers, max_bytes, scheduler, output)
+}
+
+fn read_with_scoped_workers(
+    package: &SourceBackedPackage,
+    context: &ExecutionContext,
+    requests: &[PreparedRequest],
+    workers: usize,
+    max_bytes: u64,
+    output: &mut Vec<PartData>,
+) -> Result<()> {
+    let facility = context
+        .scoped_workers()
+        .ok_or_else(|| batch_refusal("caller worker facility disappeared"))?;
+    let mut start = 0;
+    while start < requests.len() {
+        fence(package)?;
+        let end = wave_end(requests, start, workers, max_bytes)?;
+        let mut slots: Vec<Option<Result<PartData>>> = Vec::new();
+        slots
+            .try_reserve_exact(end - start)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed batch caller worker slots",
+                source,
+            })?;
+        slots.resize_with(end - start, || None);
+        {
+            let mut tasks: Vec<Box<dyn FnMut() + Send + '_>> = requests[start..end]
+                .iter()
+                .zip(slots.iter_mut())
+                .enumerate()
+                .map(|(offset, (request, slot))| {
+                    let ordinal = start + offset;
+                    let task: Box<dyn FnMut() + Send + '_> = Box::new(move || {
+                        let result = catch_unwind(AssertUnwindSafe(|| {
+                            let declared = request.declared_bytes.ok_or_else(|| {
+                                batch_refusal("parallel batch request lacks prepared metadata")
+                            })?;
+                            package.read_part_prepared(request.index, request.entry_id, declared)
+                        }))
+                        .unwrap_or_else(|_| {
+                            Err(OpcError::SourceBackedBatchWorkerPanic { ordinal })
+                        });
+                        *slot = Some(result);
+                    });
+                    task
+                })
+                .collect();
+            let mut task_refs: Vec<&mut (dyn FnMut() + Send + '_)> =
+                tasks.iter_mut().map(|task| &mut **task).collect();
+            facility.run_all(&mut task_refs);
+        }
+        let mut selected = None;
+        for (offset, result) in slots.into_iter().enumerate() {
+            match result.unwrap_or_else(|| {
+                Err(OpcError::SourceBackedBatchWorkerPanic {
+                    ordinal: start + offset,
+                })
+            }) {
+                Ok(data) => output.push(data),
+                Err(error) => select_error(&mut selected, start + offset, error),
+            }
+        }
+        if let Some((_, error)) = selected {
+            return Err(error);
+        }
+        start = end;
+    }
+    Ok(())
 }
 
 fn read_one_wave(

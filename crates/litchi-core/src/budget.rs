@@ -10,7 +10,7 @@ use thiserror::Error;
 
 type ChargedNodes = SmallVec<[Arc<Node>; 4]>;
 
-const RESOURCE_COUNT: usize = 8;
+const RESOURCE_COUNT: usize = 9;
 
 /// Resource dimensions charged by parsing, editing, and serialization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,6 +29,12 @@ pub enum Resource {
     /// joined, so a parent budget bounds the sum of every child session's
     /// width rather than each session's own policy value.
     Workers,
+    /// Peak permits for concurrent positional reads.
+    ///
+    /// A read session reserves these permits before the first source read and
+    /// releases them when its batch or operation completes. A shared parent
+    /// therefore bounds read concurrency across ZIP, CFB and OPC sessions.
+    IoConcurrency,
     /// Cumulative count of scheduled CPU work units.
     ///
     /// Counted in tasks, not bytes: one deflate, decompression, parse or
@@ -47,7 +53,8 @@ impl Resource {
             Self::Depth => 4,
             Self::Work => 5,
             Self::Workers => 6,
-            Self::CpuTasks => 7,
+            Self::IoConcurrency => 7,
+            Self::CpuTasks => 8,
         }
     }
 }
@@ -69,9 +76,10 @@ pub struct Limits {
 impl Limits {
     /// Creates a fully explicit finite limit set.
     ///
-    /// [`Resource::Workers`] and [`Resource::CpuTasks`] are left unbounded;
-    /// [`Limits::with_execution`] sets them. Every caller that predates those
-    /// two dimensions therefore keeps exactly its current meaning.
+    /// [`Resource::Workers`], [`Resource::IoConcurrency`] and
+    /// [`Resource::CpuTasks`] are left unbounded; the execution builders set
+    /// them. Every caller that predates those dimensions therefore keeps
+    /// exactly its current meaning.
     #[must_use]
     pub const fn new(
         memory: u64,
@@ -91,11 +99,13 @@ impl Limits {
                 work,
                 u64::MAX,
                 u64::MAX,
+                u64::MAX,
             ],
         }
     }
 
-    /// Bounds the two execution dimensions of this limit set.
+    /// Bounds worker and CPU-task execution dimensions while retaining an
+    /// unbounded positional-read budget.
     ///
     /// `workers` is the peak number of worker threads or executor slots every
     /// operation charged against this budget may hold at once; `cpu_tasks` is
@@ -103,6 +113,24 @@ impl Limits {
     #[must_use]
     pub const fn with_execution(mut self, workers: u64, cpu_tasks: u64) -> Self {
         self.values[Resource::Workers.index()] = workers;
+        self.values[Resource::CpuTasks.index()] = cpu_tasks;
+        self
+    }
+
+    /// Bounds workers, positional-read concurrency and cumulative CPU tasks.
+    ///
+    /// This additive builder keeps the two-argument [`Self::with_execution`]
+    /// constructor source-compatible for callers that do not opt into a
+    /// shared read budget.
+    #[must_use]
+    pub const fn with_execution_io(
+        mut self,
+        workers: u64,
+        io_concurrency: u64,
+        cpu_tasks: u64,
+    ) -> Self {
+        self.values[Resource::Workers.index()] = workers;
+        self.values[Resource::IoConcurrency.index()] = io_concurrency;
         self.values[Resource::CpuTasks.index()] = cpu_tasks;
         self
     }
@@ -115,10 +143,10 @@ impl Limits {
         match profile {
             Profile::Server => {
                 Self::new(256 * MIB, 2 * GIB, 4 * GIB, 10_000_000, 256, 1_000_000_000)
-                    .with_execution(64, 1_000_000)
+                    .with_execution_io(64, 64, 1_000_000)
             },
             Profile::Desktop => Self::new(GIB, 8 * GIB, 16 * GIB, 50_000_000, 512, 5_000_000_000)
-                .with_execution(256, 5_000_000),
+                .with_execution_io(256, 256, 5_000_000),
             Profile::TrustedBatch => Self::new(
                 4 * GIB,
                 64 * GIB,
@@ -127,7 +155,7 @@ impl Limits {
                 1024,
                 50_000_000_000,
             )
-            .with_execution(1024, 50_000_000),
+            .with_execution_io(1024, 1024, 50_000_000),
         }
     }
 
@@ -527,5 +555,18 @@ mod tests {
             assert_eq!(successes, 1);
         });
         assert_eq!(budget.used(Resource::Memory), 1);
+    }
+
+    #[test]
+    fn execution_io_builder_composes_all_runtime_dimensions() {
+        let limits = Limits::new(1, 2, 3, 4, 5, 6).with_execution_io(7, 8, 9);
+        assert_eq!(limits.get(Resource::Workers), 7);
+        assert_eq!(limits.get(Resource::IoConcurrency), 8);
+        assert_eq!(limits.get(Resource::CpuTasks), 9);
+
+        let legacy = Limits::new(1, 2, 3, 4, 5, 6).with_execution(7, 9);
+        assert_eq!(legacy.get(Resource::Workers), 7);
+        assert_eq!(legacy.get(Resource::IoConcurrency), u64::MAX);
+        assert_eq!(legacy.get(Resource::CpuTasks), 9);
     }
 }
