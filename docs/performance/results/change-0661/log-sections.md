@@ -25,6 +25,9 @@ records its first typed error, and the consumer audit now treats only
 first-access refusal is stable and cannot become an empty generated payload.
 Exact source no-op copying remains an intentional preservation contract, and
 changed members are forced and validated before publication.
+The follow-up malformed-deferred witnesses extend this to graph publication:
+PPTX master/layout authoring rolls back after late decode failure, and XLSB
+threaded graph operations stay bound to the resolved root workbook.
 
 ## For `REPORT.md`
 
@@ -38,6 +41,8 @@ opens. The exact-no-op route decoded 0 parts/0 bytes; one-part reblob decoded
 decoded 216/550 parts and 6,044,263/8,274,037 bytes among those publications.
 These are deterministic access counters and differential results, not timing,
 RSS, allocation, or claim-registry measurements.
+The follow-up tests add correctness evidence only and do not alter these
+read-set totals.
 
 ## For `ADR_COMPLIANCE.md`
 
@@ -51,3 +56,6 @@ tests, the 437-test OPC suite, workspace check, and 1,342-row differential
 support the record. The packet explicitly withholds the old 0610 one-part XLSX
 claim and all timing/RSS/allocation claims; broad release measurement remains
 outside this change.
+The audit follow-up additionally verifies staged PPTX graph authoring, forced
+theme fallback, root-relationship XLSB resolution, and propagation of root
+workbook decode failures.

@@ -21,6 +21,168 @@ fn uri(value: &str) -> PackURI {
     PackURI::new(value).unwrap()
 }
 
+fn corrupt_zip_member(mut bytes: Vec<u8>, member: &str) -> Vec<u8> {
+    let member = member.as_bytes();
+    let mut local_found = false;
+    let mut cursor = 0_usize;
+    while let Some(relative) = bytes[cursor..]
+        .windows(4)
+        .position(|window| window == b"PK\x03\x04")
+    {
+        let header = cursor + relative;
+        let name_length = u16::from_le_bytes([bytes[header + 26], bytes[header + 27]]) as usize;
+        let extra_length = u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]) as usize;
+        let name_start = header + 30;
+        let data_start = name_start + name_length + extra_length;
+        if &bytes[name_start..name_start + name_length] == member {
+            assert!(data_start < bytes.len(), "ZIP member has no payload");
+            local_found = true;
+            break;
+        }
+        cursor = header + 4;
+    }
+    assert!(local_found, "ZIP member {member:?} was not found");
+
+    // Keep the archive structurally admissible while making the deferred read
+    // fail deterministically at CRC verification time. Mutating a compressed
+    // bit can still produce an equivalent stream, so a central-directory CRC
+    // mismatch is the stable malformed-source fixture.
+    let mut cursor = 0_usize;
+    while let Some(relative) = bytes[cursor..]
+        .windows(4)
+        .position(|window| window == b"PK\x01\x02")
+    {
+        let header = cursor + relative;
+        if header + 46 > bytes.len() {
+            break;
+        }
+        let name_length = u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]) as usize;
+        let extra_length = u16::from_le_bytes([bytes[header + 30], bytes[header + 31]]) as usize;
+        let comment_length = u16::from_le_bytes([bytes[header + 32], bytes[header + 33]]) as usize;
+        let name_start = header + 46;
+        let name_end = name_start + name_length;
+        let record_end = name_end + extra_length + comment_length;
+        if record_end > bytes.len() {
+            break;
+        }
+        if &bytes[name_start..name_end] == member {
+            bytes[header + 16] ^= 1;
+            return bytes;
+        }
+        cursor = header + 4;
+    }
+    panic!("central record for ZIP member {member:?} was not found");
+}
+
+fn malformed_layout_source() -> Vec<u8> {
+    let mut package = Package::new().unwrap();
+    let master = uri("/ppt/slideMasters/slideMaster1.xml");
+    let original_layout = uri("/ppt/slideLayouts/slideLayout1.xml");
+    let corrupt_layout = uri("/ppt/slideLayouts/corrupt.xml");
+    package
+        .edit_opc(|opc| {
+            let relationship_id = opc
+                .get_part(&master)
+                .unwrap()
+                .rels()
+                .iter()
+                .find(|relationship| relationship.reltype() == rt::SLIDE_LAYOUT)
+                .unwrap()
+                .r_id()
+                .to_owned();
+            opc.get_part_mut(&master)
+                .unwrap()
+                .rels_mut()
+                .retarget(&relationship_id, "../slideLayouts/corrupt.xml".to_owned())
+                .unwrap();
+            assert!(opc.remove_part(&original_layout));
+            opc.add_part(Box::new(BlobPart::new(
+                corrupt_layout,
+                ct::PML_SLIDE_LAYOUT.to_owned(),
+                b"<corrupt/>".to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
+    let bytes = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
+    corrupt_zip_member(bytes, "ppt/slideLayouts/corrupt.xml")
+}
+
+fn malformed_orphan_theme_source() -> Vec<u8> {
+    let mut package = Package::new().unwrap();
+    let master = uri("/ppt/slideMasters/slideMaster1.xml");
+    let notes_master = uri("/ppt/notesMasters/notesMaster1.xml");
+    let theme = uri("/ppt/theme/theme1.xml");
+    let notes_theme = uri("/ppt/theme/theme2.xml");
+    let orphan_theme = uri("/ppt/theme/orphan.xml");
+    package
+        .edit_opc(|opc| {
+            for part_name in [&master, &notes_master] {
+                let relationship_ids: Vec<String> = opc
+                    .get_part(part_name)
+                    .unwrap()
+                    .rels()
+                    .iter()
+                    .filter(|relationship| relationship.reltype() == rt::THEME)
+                    .map(|relationship| relationship.r_id().to_owned())
+                    .collect();
+                let part = opc.get_part_mut(part_name).unwrap();
+                for relationship_id in relationship_ids {
+                    part.rels_mut().remove(&relationship_id);
+                }
+            }
+            assert!(opc.remove_part(&theme));
+            assert!(opc.remove_part(&notes_theme));
+            opc.add_part(Box::new(BlobPart::new(
+                orphan_theme,
+                ct::OFC_THEME.to_owned(),
+                b"<orphan-theme/>".to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
+    let bytes = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
+    corrupt_zip_member(bytes, "ppt/theme/orphan.xml")
+}
+
+#[test]
+fn deferred_theme_fallback_is_forced_before_master_authoring() {
+    let source = malformed_orphan_theme_source();
+    let mut package = Package::from_vec(source.clone()).unwrap();
+    assert!(package.add_slide_master().is_err());
+    assert_eq!(
+        PackageWriter::to_bytes(package.opc().unwrap()).unwrap(),
+        source
+    );
+}
+
+#[test]
+fn deferred_graph_failure_rolls_back_master_and_layout_authoring() {
+    let source = malformed_layout_source();
+    let mut master_package = Package::from_vec(source.clone()).unwrap();
+    assert!(master_package.add_slide_master().is_err());
+    assert_eq!(
+        PackageWriter::to_bytes(master_package.opc().unwrap()).unwrap(),
+        source
+    );
+
+    let mut layout_package = Package::from_vec(source.clone()).unwrap();
+    assert!(
+        layout_package
+            .add_slide_layout(
+                &uri("/ppt/slideMasters/slideMaster1.xml"),
+                SlideLayoutKind::Blank,
+                "Deferred failure",
+                &[],
+            )
+            .is_err()
+    );
+    assert_eq!(
+        PackageWriter::to_bytes(layout_package.opc().unwrap()).unwrap(),
+        source
+    );
+}
+
 #[test]
 fn authored_master_and_layouts_roundtrip_through_read_side() {
     let mut package = Package::new().unwrap();

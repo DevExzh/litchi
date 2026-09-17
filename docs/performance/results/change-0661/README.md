@@ -93,3 +93,9 @@ The packet does not claim that the old 0610 one-part XLSX route has been
 reproduced, that lazy decoding improves wall-clock time, or that all refused
 operations could be admitted. Those questions require separate measurements
 or format-specific policy decisions.
+
+The follow-up audit also has focused malformed-deferred coverage: PPTX
+master/layout authoring leaves the source graph unchanged after a late decode
+refusal and forces an orphan theme before linking it; XLSB threaded graph
+validation propagates a corrupt root workbook and graph removal follows the
+resolved root workbook when multiple XLSB parts exist.

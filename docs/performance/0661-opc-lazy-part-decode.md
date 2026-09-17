@@ -46,6 +46,14 @@ source-match helpers remain deliberately conservative where their API is
 infallible: any payload error returns `false`, which rejects the exact-source
 proof and cannot publish an empty replacement.
 
+The follow-up audit closes three graph-publication routes. PPTX master and
+layout authoring now stages the candidate graph and forces an orphan theme
+before linking it. XLSB threaded-comment validation and removal resolve the
+workbook through the root office-document relationship, using the canonical
+`/xl/workbook.bin` name only when that relationship is absent; errors from an
+existing root target remain visible. Focused malformed-deferred tests cover
+these refusal and rollback paths.
+
 ## Budget and failure behavior
 
 The central-directory declared-size preflight remains at open. Actual
@@ -116,6 +124,10 @@ and at most two Cargo jobs:
 * `cargo test -p litchi-opc --test lazy_part_decode -j2` (3 passed)
 * `cargo test -p litchi-opc -j2` (437 unit tests, all integration tests, and
   5 doctests passed)
+* `cargo test -p litchi-pptx --lib master_layout::tests -j2` (9 passed,
+  including deferred-theme and staged-graph regressions)
+* `cargo test -p litchi-xlsb --lib comments::threaded::tests -j2` (11 passed,
+  including root-workbook fallback and graph-removal regressions)
 
 The source audit also ran `git diff --check` clean. The coordinator should
 rerun the shared integration gate after cherry-picking 0661 and 0665 together,
