@@ -4401,8 +4401,9 @@ fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
 fn assert_memo_names_only_its_own_package(stage: &str, snapshot: &super::Snapshot) {
     let live: std::collections::HashSet<(usize, usize)> = snapshot
         .package
-        .iter_parts()
+        .try_iter_parts()
         .filter_map(|part| {
+            let part = part.expect("validated memo package payload");
             let blob = part.blob_arc();
             std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
         })
@@ -4789,8 +4790,9 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
 fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package) {
     let live: std::collections::HashSet<(usize, usize)> = package
         .opc
-        .iter_parts()
+        .try_iter_parts()
         .filter_map(|part| {
+            let part = part.expect("validated memo package payload");
             let blob = part.blob_arc();
             std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
         })

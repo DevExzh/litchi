@@ -388,7 +388,8 @@ impl PartDigests {
             return Ok(Self::default());
         }
         let mut projected = Self::with_capacity(package.part_count())?;
-        for part in package.iter_parts() {
+        for metadata in package.iter_parts() {
+            let part = package.get_part(metadata.partname())?;
             let Some((key, blob)) = memo_key(part) else {
                 continue;
             };
@@ -785,7 +786,8 @@ pub(crate) fn package_fingerprint_with_memo(
     feed(&mut digest, b"parts");
     digest.update(part_count.to_le_bytes());
     let mut memo = PartDigests::with_capacity(parts.len())?;
-    for part in parts {
+    for metadata in parts {
+        let part = package.get_part(metadata.partname())?;
         let payload = match memo_key(part) {
             Some((key, blob)) => {
                 let payload = match parent.and_then(|parent| parent.get(key)) {
