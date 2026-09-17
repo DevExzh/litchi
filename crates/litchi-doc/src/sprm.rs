@@ -468,6 +468,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_zero_truncated_opcode_without_call_site_context() {
+        assert_eq!(
+            parse_sprms(&[0x35, 0x08, 0x01, 0x00]),
+            Err(Error::Opcode {
+                at: 3,
+                remaining: 1,
+            })
+        );
+    }
+
+    #[test]
     fn rejects_truncated_fixed_and_variable_operands() {
         assert_eq!(
             parse_sprms(&[0x43, 0x4A, 0x18]),

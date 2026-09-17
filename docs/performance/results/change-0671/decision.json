@@ -1,0 +1,39 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0671",
+  "title": "Resolve the two DOC admission residues exposed by change 0640 and expose stylesheet leniency through the facade",
+  "decision": "retained, correctness fix",
+  "code_state": "PapBinTable trims one proven PAPX word-alignment byte at its consumer; FBKF.ibkl uniqueness remains strict; litchi::Document adds bounded path and byte entry points carrying litchi_doc::OpenOptions; no CFB path, parser limit, writer encoding or default route changes",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "MS-DOC FBKF explicitly requires ibkl to be unique within a Plcfbkf/Plcfbkfd, so watermark.doc remains a typed refusal even though its duplicate and unused PlcfBkl slots carry the same CP",
+    "PapxInFkp's cb=0 form stores an even 2*cb' byte container; the POI witness repeats a complete odd SPRM sequence followed by one zero alignment byte in all 24 PAPX entries",
+    "the PAPX admission strips one byte only after strict SPRM parsing identifies an exact one-byte trailing opcode error; parse_sprms remains strict and malformed nonzero or incomplete operands remain errors",
+    "the existing OpenOptions/Leniency contract is now reachable through litchi::Document without changing default strict behavior"
+  ],
+  "accepted_evidence": {
+    "specification": "Microsoft Learn MS-DOC FBKF, Plcfbkf, PapxInFkp and GrpPrlAndIstd pages linked by the change record",
+    "witnesses": "direct unified-facade tests over watermark.doc, poi/test-data/document/test.doc and duplicate-style-names.doc",
+    "unit_tests": "PapBinTable alignment and malformed-tail tests plus the global SPRM trailing-zero refusal test",
+    "corpus": "the 57-file inventory and 0640 retained corpus scan; no new full differential claimed",
+    "facade": "both bounded path and owned-byte leniency routes produce the same text on duplicate-style-names.doc"
+  },
+  "accepted_costs": {
+    "FBKF": "the duplicate-bookmark fixture remains unavailable under strict reading, as required by the normative uniqueness rule",
+    "PAPX": "the current primary prose does not name a standalone pad byte; acceptance is limited to repeated witness evidence and compatible implementation behavior",
+    "facade": "the opt-in path eagerly reads a source into the existing bounded fallback before smart detection, while ordinary open behavior is unchanged"
+  },
+  "known_gaps": {
+    "PAPX_specification": "MS-DOC defines the length forms and whole-Prl requirement but does not explicitly specify the observed final alignment byte",
+    "corpus_differential": "the complete 0640 57-fixture differential was not rerun for this follow-up; the two residues and facade are covered directly",
+    "performance": "no timing, instruction, allocation or memory claim was measured or registered"
+  },
+  "provenance": {
+    "base_commit": "5fa92d7ce",
+    "branch": "perf/0671-doc-admission-residues",
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0671",
+    "build_settings": "CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=2"
+  }
+}

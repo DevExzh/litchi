@@ -158,6 +158,12 @@ impl PapBinTable {
                 let entry = fkp.entry(entry_index).ok_or_else(|| {
                     PackageError::Corrupted("PAP FKP entry is malformed".to_string())
                 })?;
+                // A `cb=0` PapxInFkp stores an even number of bytes after
+                // `cb'`, so producers that have an odd GrpPrl append one
+                // zero byte for the word boundary.  Keep the shared SPRM
+                // parser strict and remove exactly that one byte only when
+                // it is otherwise proven to be a final incomplete opcode.
+                let grpprl = Self::trim_papx_word_alignment_pad(&entry.grpprl);
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
                     let piece_modifier = piece_table
@@ -166,7 +172,7 @@ impl PapBinTable {
                         .unwrap_or_default();
                     let (properties, direct_grpprl, initial_style_index) =
                         Self::parse_properties_with_direct_cached(
-                            &entry.grpprl,
+                            grpprl,
                             piece_modifier,
                             data_stream,
                             stylesheet,
@@ -202,6 +208,32 @@ impl PapBinTable {
         });
 
         Ok(Some(Self { runs }))
+    }
+
+    /// Remove the single word-alignment byte occasionally written after an
+    /// odd PAPX SPRM sequence.  Nonzero `cb` encodings are odd-sized by
+    /// definition, so an even-sized `GrpPrlAndIstd` can only come from the
+    /// `cb=0`/`cb'` form.  The byte is accepted only when strict SPRM parsing
+    /// identifies every preceding byte as a complete sequence and the final
+    /// zero as exactly one incomplete opcode byte.  Any other malformed input
+    /// remains untouched and is rejected by the normal typed parser.
+    fn trim_papx_word_alignment_pad(grpprl_and_istd: &[u8]) -> &[u8] {
+        if grpprl_and_istd.len() < 3
+            || !grpprl_and_istd.len().is_multiple_of(2)
+            || grpprl_and_istd.last() != Some(&0)
+        {
+            return grpprl_and_istd;
+        }
+
+        let direct_sprms = &grpprl_and_istd[2..];
+        match parse_sprms(direct_sprms) {
+            Err(crate::sprm::Error::Opcode { at, remaining: 1 })
+                if at.saturating_add(1) == direct_sprms.len() =>
+            {
+                &grpprl_and_istd[..grpprl_and_istd.len() - 1]
+            },
+            _ => grpprl_and_istd,
+        }
     }
 
     #[cfg(test)]
@@ -544,6 +576,21 @@ mod tests {
             properties.justification,
             super::super::pap::Justification::Right
         );
+    }
+
+    #[test]
+    fn trims_one_zero_byte_after_a_complete_odd_papx_sprm_sequence() {
+        let grpprl = [0x00, 0x00, 0x31, 0x24, 0x00, 0x00];
+        assert_eq!(
+            PapBinTable::trim_papx_word_alignment_pad(&grpprl),
+            &grpprl[..5]
+        );
+    }
+
+    #[test]
+    fn keeps_non_padding_trailing_bytes_for_typed_rejection() {
+        let grpprl = [0x00, 0x00, 0x31, 0x24, 0x00, 0x01];
+        assert_eq!(PapBinTable::trim_papx_word_alignment_pad(&grpprl), &grpprl);
     }
 
     #[test]
