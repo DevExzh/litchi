@@ -1,0 +1,13 @@
+[package]
+name = "litchi-probe-0665"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+xml-minifier = { path = "REPLACE_WITH_CHECKOUT/crates/xml-minifier" }
+litchi-xlsx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-xlsx" }
+sha2 = "0.11"
+
+[workspace]

@@ -498,15 +498,37 @@ impl OpcPackage {
         Ok(package)
     }
 
-    pub(crate) fn is_exact_source_xml(&self, part: &dyn Part) -> bool {
+    /// Whether this XML part still holds the very allocation it was decoded
+    /// from, and is therefore the source's own bytes rather than a caller's.
+    ///
+    /// This is a provenance proof, not a byte comparison. Ingress retains the
+    /// `Arc` each XML part was loaded with
+    /// ([`Self::unmarshal`] and [`Self::try_add_source_part`]); every
+    /// documented route that changes a payload installs a different
+    /// allocation, because [`Part::set_blob`] and [`Part::set_blob_shared`]
+    /// replace the part's `Arc` rather than mutating through it, and
+    /// [`Self::add_part`] and [`Self::remove_part`] drop the retained entry
+    /// outright. So the entry survives exactly while the part is untouched:
+    /// change 0647's "the map changed iff the capture was dropped" invariant,
+    /// applied to payloads instead of relationship captures, and the same
+    /// proof shape change 0593 gave part relationships.
+    ///
+    /// A caller that writes the source's own bytes back through `set_blob`
+    /// stops being an original here, deliberately. The writer must audit the
+    /// bytes a caller supplied, and bytes that merely *equal* the source's are
+    /// indistinguishable from authored ones by inspection, so an equality test
+    /// would let a mutation escape the audit. Change 0665 replaced that
+    /// equality test with this proof; the preservation planner's own
+    /// `source_blob_retained` keeps its byte comparison, because there an
+    /// equal payload publishes equal bytes either way.
+    ///
+    /// Publication does not decide compactness from this signal — no member is
+    /// refused for spelling any more (change 0665) — only whether the member
+    /// is parsed again before it is republished.
+    pub(crate) fn holds_original_source_xml(&self, part: &dyn Part) -> bool {
         self.source_xml_parts
             .get(part.partname())
-            .is_some_and(|source| {
-                // The retained payload is normally the same allocation the part
-                // still holds, so settle the identical case on the pointer before
-                // charging a whole-part comparison.
-                std::ptr::eq(source.as_slice(), part.blob()) || source.as_slice() == part.blob()
-            })
+            .is_some_and(|source| Arc::ptr_eq(source, &part.blob_arc()))
     }
 
     /// Get a reference to the main document part.
@@ -1958,5 +1980,28 @@ mod tests {
             &edited.get_part(&uri).unwrap().blob_arc(),
             &replacement
         ));
+    }
+
+    #[test]
+    fn source_xml_provenance_requires_the_ingress_allocation() {
+        let uri = PackURI::new("/custom/source.xml").unwrap();
+        let source_xml = b"<root>\n  <child/>\n</root>".to_vec();
+        let mut authored = OpcPackage::new();
+        authored.add_part(Box::new(BlobPart::new(
+            uri.clone(),
+            "application/xml".to_owned(),
+            source_xml,
+        )));
+
+        let bytes = crate::pkgwriter::PackageWriter::to_bytes(&authored).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        assert!(reopened.holds_original_source_xml(reopened.get_part(&uri).unwrap()));
+
+        // Equal bytes in a newly allocated payload are still authored from the
+        // writer's point of view. A byte comparison would incorrectly retain
+        // the source proof here; allocation identity must revoke it.
+        let equal_copy = reopened.get_part(&uri).unwrap().blob().to_vec();
+        reopened.get_part_mut(&uri).unwrap().set_blob(equal_copy);
+        assert!(!reopened.holds_original_source_xml(reopened.get_part(&uri).unwrap()));
     }
 }

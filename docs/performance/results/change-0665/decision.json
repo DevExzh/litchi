@@ -1,0 +1,56 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0665",
+  "title": "The eager package writer stops refusing a member because its XML is not compact, and 58 of 180 real .xlsx fixtures plus 53 of 55 DOCX fixtures publish work they could not publish before",
+  "decision": "retained, implemented in litchi-opc and litchi-docx",
+  "code_state": "crates/litchi-opc (pkgwriter.rs, package.rs, error.rs) and crates/litchi-docx (document/transaction.rs), plus ADR 0006; no public item added, removed or re-signed; the behaviour of PackageWriter::{write,write_to_stream,to_bytes} and of litchi_docx::document::Edit::commit under the default policy changes; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0652 decision 2 speaks about original part bytes; this record applies the same verify_source profile to eager planned payloads, including source-spliced replacements, as an explicit implementation interpretation informed by 0654 and the source-backed replacement precedent in 0657, not as an additional owner decision",
+    "the premise change 0654 left had to be corrected first: its witness measured a freshly opened package, and on the route itself all 59 xlsx-hide refusals are on SPLICED parts, 51 of them 16 bytes shorter than the bytes they were decoded from, not on untouched ones, so a provenance signal alone could not have moved one of them",
+    "change 0660 named publication_accepts_preserved_xml as the single function that had to change when this landed, and flipping it takes its default policy from 1 of 55 fixtures preserved to 54 of 55",
+    "every non-compactness check is kept and is now asserted by a new test that drives eleven refusal families through the public streaming door and proves the sink received zero bytes",
+    "compactness is kept where it is a contract: a debug assertion at the three sites that author XML in the writer, plus a retained test that the manifest and every relationships member is byte-minimal",
+    "the provenance signal becomes a proof rather than an inspection (Arc::ptr_eq against the payload retained at ingress), so a caller that mutates a part and writes the source's bytes back can no longer escape the audit; the audited-part call counts are identical on both legs on all three selectors, so nothing on the corpus moved"
+  ],
+  "accepted_evidence": {
+    "route_differentials": "321 fixtures x three eager routes x two legs and 180 fixtures x the xlsx-hide route x two legs: 319 identical no-op digests, 310 identical compact-edit digests, 33 identical xlsx-hide digests, 0 residual NotCompact refusals, 58 newly published",
+    "member_identity": "every XML part of each of the 91 packages the xlsx-hide route publishes on the after leg compared by digest with the same part of the source: 1,022 identical, 0 added, 0 removed; the parts that differ are exactly the ones the route edits",
+    "docx_census": "change 0660's probe over 63 DOCX fixtures, eleven aspects, both legs: open, source, gate, gate_source, noop_save, exact_noop, one_edit_optin and one_edit_reopen unchanged on all 63; managed_edit moved on 53 and one_edit on 25; the gate's verdict moves from 1 compact / 54 non-compact to 54 accepts / 1 refuses",
+    "preserved_spans": "on the 26 fixtures that admit the one-edit route the source bytes the commit rewrites fall from 203,203 to 1,007 (-99.5%) and the median rewritten span from 981.5 bytes to 0",
+    "shadowed_refusal_witness": "the two fixtures whose refusal text moves are measured at the base: both are refused with the identical PreservationUnavailable message by the before leg on the eager edit-save route with a compact payload, where no compactness verdict can apply",
+    "instructions": "callgrind isolation pairs at N=1 and N=3, differenced and halved, three selectors, both legs; the audit's inclusive Ir and its share of publication, and the audit call counts per iteration",
+    "timing": "80 samples per pooled leg, order A1 B1 B2 A2 A3 A4 on CPU 20 in one window, three selectors over six scenarios, with the A/A and B/B floors of the same window beside every paired delta, and one output SHA-256 per scenario across all six legs"
+  },
+  "accepted_costs": {
+    "published_docx_bytes_change": "53 of 63 fixtures on the insert route and 25 of 26 on the one-edit route publish different main-document bytes than the base; every one reopens with identical paragraph, table and block-control counts, and CompactionPolicy::WholeDocument still reproduces the base's bytes",
+    "docx_published_size": "preservation keeps the producer's whitespace, so the published main part grows in total across those 25 fixtures, 351,114 to 351,634 bytes against a source of 351,815",
+    "pptx_regression": "pptx_eager_batch_edit_save is +1.22% at p50 against a 0.04% A/A floor in that window, with a +0.01% instruction count; reported, not explained and not chased",
+    "provenance_tightening": "a payload replaced with bytes equal to the source's is now audited rather than skipped; on the corpus the audited-part call counts are identical on both legs, but an off-corpus caller that round-trips a structurally defective payload through set_blob would now be refused",
+    "two_shadowed_refusals": "poi/.../49609.xlsx and poi/.../bug62513.pptx now report PreservationUnavailable where the compactness verdict fired first",
+    "instruction_counts": "instructions rank work, not latency; the 38.30% and 60.16% are instruction shares of publication, not time shares of a save"
+  },
+  "known_gaps": {
+    "untouched_parts_unaudited": "an untouched XML part is still not audited on the eager route, where the source-backed route audits the same bytes with verify_source after change 0654; closing that costs a whole-part parse per member per publication and would newly refuse 4 of the 321 fixtures, three of them only through the byte-order-mark defect change 0650 froze, so it is frozen and reported with its price",
+    "bom_fallback": "1 of the 55 openable DOCX fixtures still takes the whole-document fallback, because verify_source refuses a byte-order-marked document with 'invalid XML declaration boundary' (change 0650's defect)",
+    "source_backed_replacement": "this branch changes none of the source-backed replacement call sites; the 0657 landing on the target branch already applies the source profile there, and this record carries that profile through the eager route so source-spliced payloads do not regress to the authored compactness refusal",
+    "docx_selector_blind": "docx_semantic_one_edit_save cannot show the census's movement, because the harness's DOCX semantic corpus is generated by this repository and is therefore already compact",
+    "pptx_audit_symbol": "the PPTX selector's audit isolation pair is negative and is not separable, so only its whole-iteration figure is quoted",
+    "corpus": "this repository's fixtures only: 321 OOXML packages, 180 of them .xlsx, and 63 DOCX-family fixtures"
+  },
+  "withheld": [
+    "any registered speedup, throughput, RSS, cold-cache, physical-I/O or concurrency result",
+    "any claim about packages outside this repository's fixture corpus",
+    "any explanation of the PPTX paired-timing regression"
+  ],
+  "provenance": {
+    "base_commit": "5af158123",
+    "branch": "perf/0665-opc-eager-writer-source-provenance",
+    "before_leg": "/home/zhuhe/code/litchi-worktrees/before-5af158123, a read-only detached checkout at the base commit",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws x86_64, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 20",
+    "binaries": "binaries.sha256"
+  }
+}

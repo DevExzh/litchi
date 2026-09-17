@@ -5301,86 +5301,32 @@ fn shifted_offset(offset: u32, delta: i64) -> Option<u32> {
 /// Report whether the package writer would accept preserved main-document
 /// bytes without re-serializing them.
 ///
-/// The OPC writer audits every authored XML part against the repository's
-/// compact-output contract before it plans a publication
-/// (`PackageWriter::validate_authored_xml`). Preservation republishes the
-/// producer's own bytes for every paragraph an edit did not change, and a
-/// producer that indents its markup — or writes a line break after the XML
-/// declaration, the witness change 0602 named — does not satisfy that
-/// contract. Publishing those bytes would turn an edit that succeeds today
-/// into a typed publication refusal, so
-/// [`CompactionPolicy::PreserveUnmodified`] declines to preserve such a
-/// document and takes the whole-document route, which publishes byte for byte
-/// what the same edit published before this policy existed.
+/// The OPC writer audits every XML member it publishes for encoding,
+/// well-formedness, exactly one document element, character data only inside
+/// it, the absence of a DTD or DOCTYPE and its finite budgets
+/// (`PackageWriter::audit_published_xml`). It no longer asserts the
+/// repository's compact output contract against any member: change 0665 made
+/// that movement on the eager route as an implementation interpretation of
+/// change 0652's decision 2 (*"Original byte contract: loose the audit, accept
+/// non-compact XMLs"*), after changes 0654 and 0657 established the same
+/// source profile on the source-backed route. Change 0660 named this function
+/// as the one place that had to change when it landed, and this is that change.
+///
+/// So a producer that indents its markup, or writes a line break after the XML
+/// declaration — the witness change 0602 named, and the shape 53 of this
+/// repository's 55 openable DOCX fixtures have — now publishes preserved. What
+/// still sends a document down the whole-document route is a *structural*
+/// refusal the writer would raise on the preserved bytes: the byte-order-marked
+/// main document change 0650 froze is the one this repository's corpus carries.
 ///
 /// The gate runs the auditor the writer runs, under the writer's limits, so it
 /// cannot reach a different verdict than the writer. It is asked of the
 /// *source* snapshot rather than the candidate because the compactor's own
-/// output always satisfies the contract — one ASCII space between attributes,
-/// no whitespace before a tag close, no whitespace-only text run outside
-/// `xml:space="preserve"`, no document type declaration — so a compact source
-/// spliced with compacted paragraphs is compact, and a source the writer would
-/// refuse is refused whichever paragraphs the edit touched.
-///
-/// Change 0652's decision 2 loosens that audit for original part bytes (queue
-/// row 2 of change 0651, implemented separately in this wave). When it lands
-/// this function is the one place that has to change.
+/// output always satisfies the contract, so a source the writer accepts stays
+/// acceptable once compacted paragraphs are spliced into it, and a source the
+/// writer would refuse is refused whichever paragraphs the edit touched.
 fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
-    !carries_character_data_outside_the_root(xml)
-        && xml_minifier::audit::verify_authored(xml, xml_minifier::audit::Limits::default()).is_ok()
-}
-
-/// Report whether the document carries character data outside its root
-/// element.
-///
-/// The publication audit refuses that unconditionally, whatever the rest of the
-/// document looks like: whitespace at depth zero is `FormattingWhitespace` and
-/// anything else outside the document element is malformed. Answering the case
-/// from the first bytes keeps the cost of the audit off the documents that
-/// cannot use its answer. A line break between the XML declaration and the
-/// root element — the shape 53 of this repository's 55 openable DOCX fixtures
-/// have, and the witness change 0602 named — is then decided in about sixty
-/// bytes instead of a whole-document parse.
-///
-/// This is a necessary condition, never a sufficient one: `false` only sends
-/// the document to the real auditor, which remains the verdict.
-fn carries_character_data_outside_the_root(xml: &[u8]) -> bool {
-    // A document whose last byte is not a tag close has trailing character
-    // data after its root element closed.
-    if xml.last() != Some(&b'>') {
-        return true;
-    }
-    let mut cursor = 0usize;
-    loop {
-        let Some(rest) = xml.get(cursor..) else {
-            return true;
-        };
-        match rest.first() {
-            // Anything but markup here is character data at depth zero.
-            Some(b'<') => {},
-            _ => return true,
-        }
-        let (terminator, opening) = match (rest.get(1), rest.get(2..4)) {
-            (Some(b'?'), _) => (b"?>".as_slice(), 2usize),
-            (Some(b'!'), Some(b"--")) => (b"-->".as_slice(), 4),
-            // A document type declaration with an internal subset can close
-            // early here; `scan_document` has already refused one, and the
-            // auditor refuses it again, so an early stop only costs a parse.
-            (Some(b'!'), _) => (b">".as_slice(), 2),
-            // The root element's start tag: nothing preceded it but markup.
-            _ => return false,
-        };
-        let Some(tail) = rest.get(opening..) else {
-            return true;
-        };
-        let Some(end) = tail
-            .windows(terminator.len())
-            .position(|window| window == terminator)
-        else {
-            return true;
-        };
-        cursor += opening + end + terminator.len();
-    }
+    xml_minifier::audit::verify_source(xml, xml_minifier::audit::Limits::default()).is_ok()
 }
 
 /// The `xml:space` attribute name, whose inherited value is the only state
@@ -8214,12 +8160,16 @@ mod tests {
 
     #[test]
     fn a_source_the_publication_audit_refuses_takes_the_whole_document_route() {
-        // A line break between the XML declaration and the root element is
-        // character data outside the document element, which the publication
-        // audit always refuses. The preserving policy must not hand those
-        // bytes to the writer.
-        let mut xml = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".to_vec();
-        xml.extend_from_slice(&apostrophe_corpus());
+        // Change 0665 leaves every structural and finite-budget refusal in
+        // place, so the preserving policy still has a fallback. One token
+        // larger than the auditor's `TokenBytes` budget is such a refusal and
+        // the snapshot admits it, because the snapshot's own budgets are
+        // counted differently.
+        let oversized = "a".repeat(4 * 1024 * 1024 + 1);
+        let xml = document(&format!(
+            "<w:p><w:pPr><w:pStyle w:val=\"{oversized}\"/></w:pPr><w:r><w:t>first</w:t></w:r></w:p>\
+             <w:p><w:r><w:t>second</w:t></w:r></w:p>"
+        ));
         assert!(!publication_accepts_preserved_xml(&xml));
         let base = Snapshot::from_xml(xml).unwrap();
 
@@ -8242,9 +8192,6 @@ mod tests {
             compacted.snapshot().xml_bytes(),
             "the fallback must publish exactly what the whole-document route publishes"
         );
-        assert!(publication_accepts_preserved_xml(
-            preserved.snapshot().xml_bytes()
-        ));
     }
 
     #[test]
@@ -8290,47 +8237,49 @@ mod tests {
     }
 
     #[test]
-    fn the_cheap_gate_only_refuses_what_the_auditor_refuses() {
+    fn the_gate_accepts_every_noncompact_spelling_and_still_refuses_structure() {
         let compact = apostrophe_corpus();
-        assert!(!carries_character_data_outside_the_root(&compact));
         assert!(publication_accepts_preserved_xml(&compact));
 
-        let cases: [&[u8]; 6] = [
-            // A line break after the XML declaration.
+        // Change 0665: every one of these is a compactness verdict the writer
+        // no longer raises, so the preserving policy must publish them.
+        let accepted: [&[u8]; 4] = [
             b"<?xml version=\"1.0\"?>\n<w:p/>",
-            // A space before the root element.
             b" <w:p/>",
-            // Trailing whitespace after the root element.
             b"<w:p/>\n",
-            // Text before the root element.
+            b"<w:p a=\"1\"\n     b=\"2\"/>",
+        ];
+        for case in accepted {
+            assert!(
+                publication_accepts_preserved_xml(case),
+                "the gate should accept {:?}",
+                String::from_utf8_lossy(case)
+            );
+        }
+
+        // Structural refusals stay, and the gate still keeps them off the
+        // preserving route.
+        let refused: [&[u8]; 4] = [
+            // Character data outside the document element.
             b"x<w:p/>",
             // An unterminated processing instruction.
             b"<?xml version=\"1.0\"",
             // Nothing at all.
             b"",
+            // A document type declaration.
+            b"<!DOCTYPE w:document><w:p/>",
         ];
-        for case in cases {
+        for case in refused {
             assert!(
-                carries_character_data_outside_the_root(case),
-                "the cheap gate should refuse {:?}",
-                String::from_utf8_lossy(case)
-            );
-            assert!(
-                xml_minifier::audit::verify_authored(case, xml_minifier::audit::Limits::default())
-                    .is_err(),
-                "the auditor should refuse {:?} too",
+                !publication_accepts_preserved_xml(case),
+                "the gate should refuse {:?}",
                 String::from_utf8_lossy(case)
             );
         }
 
-        // A comment or processing instruction around the root is markup, not
-        // character data, so the cheap gate defers to the auditor.
-        let framed = b"<?xml version=\"1.0\"?><!--note--><w:p/><!--after-->".as_slice();
-        assert!(!carries_character_data_outside_the_root(framed));
-
-        // Every fixture the auditor accepts must pass the cheap gate first,
-        // or the gate would send a publishable document down the fallback.
+        // The gate is the auditor the writer runs, over the whole corpus.
         let mut audited = 0usize;
+        let mut accepted_fixtures = 0usize;
         for path in docx_fixture_paths() {
             let Ok(archive) = std::fs::read(&path) else {
                 continue;
@@ -8343,19 +8292,25 @@ mod tests {
             };
             audited += 1;
             let xml = base.xml_bytes();
-            if xml_minifier::audit::verify_authored(xml, xml_minifier::audit::Limits::default())
-                .is_ok()
-            {
-                assert!(
-                    !carries_character_data_outside_the_root(xml),
-                    "the cheap gate contradicted the auditor on {}",
-                    path.display()
-                );
+            assert_eq!(
+                publication_accepts_preserved_xml(xml),
+                xml_minifier::audit::verify_source(xml, xml_minifier::audit::Limits::default())
+                    .is_ok(),
+                "the gate contradicted the auditor on {}",
+                path.display()
+            );
+            if publication_accepts_preserved_xml(xml) {
+                accepted_fixtures += 1;
             }
         }
         assert!(
             audited >= 50,
             "the corpus should reach this test: {audited}"
+        );
+        assert!(
+            accepted_fixtures + 1 >= audited,
+            "at most one corpus fixture may still take the whole-document route: \
+             {accepted_fixtures} of {audited} accepted"
         );
     }
 
@@ -8457,13 +8412,16 @@ mod tests {
             fixtures >= 50 && edited >= 80,
             "the corpus should reach this test: {fixtures} fixtures, {edited} edits"
         );
-        assert!(
-            identical >= 70,
-            "the audit fallback should carry most of this corpus today: {identical}/{edited}"
+        // Change 0665 removed the compactness refusal from the eager
+        // publication audit, so the gate no longer sends this corpus down the
+        // whole-document fallback: every fixture preserves.
+        assert_eq!(
+            identical, 0,
+            "no fixture should still need the audit fallback: {identical}/{edited}"
         );
-        assert!(
-            preserving >= 1,
-            "at least one fixture should take the preserving route: {preserving}/{fixtures}"
+        assert_eq!(
+            preserving, fixtures,
+            "every fixture should take the preserving route: {preserving}/{fixtures}"
         );
     }
 
@@ -9033,7 +8991,7 @@ mod tests {
     }
 
     #[test]
-    fn rich_owner_edits_are_compact_durable_and_exactly_reversible() {
+    fn rich_owner_edits_preserve_the_source_spelling_and_stay_durable_and_reversible() {
         let source = Snapshot::from_xml(
             format!(
                 "<w:document xmlns:w=\"{WORD}\">\n  <w:body>\n    <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>direct</w:t><x:keep xmlns:x=\"urn:test\"/></w:r><w:fldSimple w:instr=\" AUTHOR \"><w:r><w:rPr><w:i/></w:rPr><w:t>field</w:t></w:r></w:fldSimple><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> DATE </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:color w:val=\"FF0000\"/></w:rPr><w:t>complex result</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:ins w:id=\"7\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins><w:del w:id=\"8\" w:author=\"A\"><w:r><w:delText>gone &amp; old</w:delText></w:r></w:del><w:sdt><w:sdtPr><w:tag w:val=\"kept\"/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:smallCaps/></w:rPr><w:t>control</w:t></w:r></w:sdtContent></w:sdt></w:p>\n    <w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill=\"00FF00\"/></w:tcPr><w:p><w:r><w:t>first</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>nested kept</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:rPr><w:u/></w:rPr><w:t>second</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\n    <w:sectPr/>\n  </w:body>\n</w:document>"
@@ -9078,7 +9036,10 @@ mod tests {
             .unwrap();
         let commit = edit.commit().unwrap();
         let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
-        assert!(!xml.contains("\n  "));
+        // Change 0665: publication no longer refuses a non-compact member, so
+        // the default policy preserves this source's indentation instead of
+        // re-serializing the whole document to remove it.
+        assert!(xml.contains("\n  "));
         for retained in [
             "<w:rPr><w:b/></w:rPr>",
             "<x:keep xmlns:x=\"urn:test\"/>",
@@ -9484,7 +9445,9 @@ mod tests {
         ] {
             assert!(xml.contains(retained), "missing retained XML: {retained}");
         }
-        assert!(!xml.contains("\n"));
+        // Change 0665: the default policy preserves the source's line breaks
+        // rather than re-serializing the whole document to remove them.
+        assert!(xml.contains("\n"));
 
         let durable = commit.patch().to_durable(durable_limits()).unwrap();
         let applied = source.apply_durable(&durable).unwrap();
