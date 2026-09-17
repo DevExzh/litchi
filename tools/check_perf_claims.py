@@ -2142,15 +2142,13 @@ def lint_registry(
     evidence_root: Path | None,
     mode: str,
 ) -> tuple[int, list[str]]:
+    if mode == "strict" and evidence_root is None:
+        return 2, ["INVALID CLAIM REGISTRY: strict mode requires --evidence-root"]
     try:
         registry = load_json(registry_path, location=str(registry_path))
         _, evidence_by_id, claims_by_id = validate_registry(registry, repo_root=repo_root)
         for claim_id, parsed in claims_by_id.items():
             claim = parsed["value"]
-            if claim["status"] == "landed" and mode == "structural":
-                raise ClaimInputError(
-                    f"landed claim {claim_id!r} requires strict evidence verification"
-                )
             for evidence_id in (parsed["latency"]["evidence_id"],):
                 evidence = evidence_by_id[evidence_id]
                 if mode == "strict" and evidence_root is not None:

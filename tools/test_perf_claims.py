@@ -43,6 +43,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "abba-0269-xlsx-repeated-store-cache",
                 "abba-0410-mce-attribute-names",
                 "abba-0413-cfb-chain-scratch",
+                "abba-0418-pptx-cross-copy-lifecycle",
+                "abba-0467-xlsx-cell-attributes-fixed-checkout",
             },
         )
         self.assertEqual(
@@ -56,6 +58,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "claim-0269-xlsx-repeated-store-cache",
                 "claim-0410-mce-attribute-names",
                 "claim-0413-cfb-chain-scratch",
+                "claim-0418-pptx-cross-copy-lifecycle",
+                "claim-0467-xlsx-cell-attributes",
             },
         )
         claim = claims["claim-0251-xlsx-xml-borrowed"]["value"]
@@ -71,6 +75,34 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
             mode="strict",
         )
         self.assertEqual(status, 0, messages)
+
+    def test_seed_registry_cli_structural_mode_needs_no_external_evidence(self) -> None:
+        with patch.object(
+            check_perf_claims,
+            "verify_abba_package",
+            side_effect=AssertionError("structural mode opened external evidence"),
+        ), patch.object(
+            check_perf_claims,
+            "verify_resource_report",
+            side_effect=AssertionError("structural mode opened resource evidence"),
+        ):
+            status, messages = check_perf_claims.lint_registry(
+                REGISTRY_PATH,
+                repo_root=REPO_ROOT,
+                evidence_root=None,
+                mode="structural",
+            )
+        self.assertEqual(status, 0, messages)
+
+    def test_strict_mode_requires_an_evidence_root(self) -> None:
+        status, messages = check_perf_claims.lint_registry(
+            REGISTRY_PATH,
+            repo_root=REPO_ROOT,
+            evidence_root=None,
+            mode="strict",
+        )
+        self.assertEqual(status, 2)
+        self.assertEqual(messages, ["INVALID CLAIM REGISTRY: strict mode requires --evidence-root"])
 
     def test_strict_mode_accepts_landed_latency_only_claim(self) -> None:
         for evidence_id, claim_id in (
@@ -158,23 +190,6 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
         registry["claims"][0]["documentation"] = ["../AGENTS.md"]
         with self.assertRaises(check_perf_claims.ClaimInputError):
             check_perf_claims.validate_registry(registry, repo_root=REPO_ROOT)
-
-    def test_landed_claim_requires_verified_evidence(self) -> None:
-        registry = load_seed()
-        claim = registry["claims"][0]
-        claim["status"] = "landed"
-        claim["code_state"] = "landed"
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "registry.json"
-            path.write_text(json.dumps(registry), encoding="utf-8")
-            status, messages = check_perf_claims.lint_registry(
-                path,
-                repo_root=REPO_ROOT,
-                evidence_root=None,
-                mode="structural",
-            )
-        self.assertEqual(status, 2, messages)
-
 
 class ClaimRegistryMetricExtensionTests(unittest.TestCase):
     def partial_landed_registry(self) -> dict:

@@ -776,13 +776,16 @@ and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
 text and error guards remain outside the timed interval. This brings the
 selectable matrix to 342 names while leaving the default 36 cases / 198 records
 unchanged.
-Four additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
-`xlsb_semantic_list_worksheets`, `xlsb_semantic_one_cell`, and
-`xlsb_semantic_full_cell_scan`) use deterministic tiny, medium, large, and
-sparse BIFF12 corpora. Archive cloning, workbook/worksheet preparation, and
-verification stay outside the timer; the full scan times only boxed
-`worksheet.cells()` consumption and verifies an exact canonical cell digest.
-These selectors bring the matrix to 348 names while leaving the default 36
+Five additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
+`xlsb_semantic_list_worksheets`, `xlsb_semantic_one_cell`,
+`xlsb_semantic_full_cell_scan`, and
+`xlsb_semantic_workbook_structure_edit_save`) use deterministic tiny, medium,
+large, and sparse BIFF12 corpora. Archive cloning, workbook/worksheet
+preparation, and verification stay outside the timer; the full scan times only
+boxed `worksheet.cells()` consumption and verifies an exact canonical cell
+digest. The structure-edit selector separately attributes detached planning,
+atomic publication and save, then reopens the renamed sheet and checks a typed
+cell. These selectors bring the matrix to 349 names while leaving the default 36
 cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) run each measured sample in a fresh child process
@@ -3138,7 +3141,7 @@ docx_semantic_text_to_sink     docx_source_text_to_sink
 
 None of the twenty-six is in `Case::DEFAULT`; the checked default catalog
 SHA-256 does not move for them. The registry goes from 501 to 527 names; the
-phase selector above adds one more opt-in name, for 528 selectable cases.
+phase selectors above add two more opt-in names, for 529 selectable cases.
 
 **A refusal the pair found.** The documented eager DOCX sink entry point
 `Document::write_text_to` **refuses the marker corpus** with the typed
