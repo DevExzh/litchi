@@ -1568,7 +1568,7 @@ fn settings_protection_flags_honor_explicit_on_and_off_values() {
 }
 
 #[test]
-fn supported_settings_mce_fallback_is_admitted_and_output_limited() {
+fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
     for strict in [false, true] {
         let source_xml = simple_document(strict);
         let namespace = if strict { STRICT_WORD } else { WORD };
@@ -1599,27 +1599,45 @@ fn supported_settings_mce_fallback_is_admitted_and_output_limited() {
             "MCE validation must leave the source settings member byte-identical"
         );
 
-        let mut output_limited = Vec::new();
-        let mut output_limits = limits(source_xml.len());
-        output_limits.max_settings_xml_bytes =
+        // The scoped namespace codec no longer redeclares every inherited
+        // binding on every element, so this fallback fits the source ceiling.
+        let mut exact_output = Vec::new();
+        let mut exact_limits = limits(source_xml.len());
+        exact_limits.max_settings_xml_bytes =
             u64::try_from(settings.len()).expect("settings fixture length fits u64");
+        bounded_package(source_archive.clone())
+            .tail_append_plain_paragraph("tail")
+            .with_limits(exact_limits)
+            .prepare()
+            .and_then(|plan| plan.write_to_stream(&mut exact_output))
+            .expect("scoped namespace output fits the exact source-size ceiling");
+        assert_eq!(semantic_texts(&exact_output), ["seed", "tail"]);
+        assert_eq!(
+            settings_bytes(&source_archive),
+            settings_bytes(&exact_output)
+        );
+
+        let mut output_limited = Vec::new();
+        exact_limits.max_settings_xml_bytes -= 1;
         let result = bounded_package(source_archive)
             .tail_append_plain_paragraph("tail")
-            .with_limits(output_limits)
+            .with_limits(exact_limits)
             .prepare()
             .and_then(|plan| plan.write_to_stream(&mut output_limited));
         assert!(
             matches!(
                 &result,
-                Err(TailAppendError::Document(DocumentError::Mce(MceError::LimitExceeded(resource))))
-                    if resource == "output bytes"
+                Err(TailAppendError::Limit {
+                    resource: "settings XML bytes",
+                    ..
+                })
             ),
-            "exact source-size settings ceiling must reject reinjected MCE output: {:?}",
+            "source-size ceiling must still reject before publication: {:?}",
             result.as_ref().err()
         );
         assert!(
             output_limited.is_empty(),
-            "settings MCE output-limit refusal must precede output"
+            "settings refusal must precede output"
         );
     }
 }
