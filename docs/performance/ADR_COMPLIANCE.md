@@ -1,5 +1,256 @@
 # Performance optimization ADR-compliance matrix
 
+## 0675 — accepted ADR 0030 and ADR 0031 are integrated with the preservation policies
+
+Record: [0675](0675-third-wave-integration.md). The wave implements the
+0652 decisions while preserving ADR 0003 typed failure, ADR 0005 bounded state
+and explicit scheduling, and ADR 0006 publication and compatibility boundaries.
+Lazy payload access is fallible at semantic consumers; allocation provenance
+continues to distinguish source XML from replacements. Source reuse and
+parallel work retain validation and resource admission. The remaining clean-
+value cache and refusal-order designs stay explicit prerequisites.
+
+## 0663 — explicit source adoption keeps ADR 0005 and ADR 0006's preservation boundary
+
+Record: [0663](0663-cfb-sector-layout-policy.md).
+
+ADR 0006's preservation-by-default rule is applied only after explicit source
+adoption and a validated directory/geometry match. The planner retains names,
+hierarchy, directory entry metadata and class IDs from the source, patches only
+the stream allocation fields it owns, and keeps output ordering deterministic.
+ADR 0005's retained-state boundary remains explicit: `OleWriter` stores bounded
+layout metadata, not an ambient file handle or executor, and the common editor
+passes the exact original bytes it captured. A changed directory shape,
+geometry, class ID, DIFAT requirement or planner invariant produces a typed
+fallback and the existing from-scratch writer; explicit zero class IDs are
+applied as clears. The default policy is a public
+breaking 0.0.x API movement accepted by 0652; the `Rewrite` policy remains
+available for callers that need canonical compaction. The generic source-layout
+emitter still writes payload sectors, so `kept_sectors` is not presented as
+zero-copy or I/O elision. The common editor has a separate validated
+same-length overlay path; it reads unchanged source spans through a composed
+view and materializes the final result only after readback. No 0617
+performance claim is registered. No unsafe code, raw lock, executor, ambient
+I/O or weakened resource bound was added.
+
+## 0676 — ADR 0031 read-side composition is implemented at all three named sessions
+
+Record: [0676](0676-execution-budget-composition.md), authority accepted ADR
+0031 and [0652](0652-owner-decisions-for-the-third-wave.md) decision 6.
+`litchi-core` owns the runtime-neutral `IoConcurrency` resource and scoped
+facility; `soapberry-zip` keeps its standalone mirrored trait; `litchi-opc`
+bridges caller facilities privately. ZIP and CFB pools are lazy, source-backed
+ordered reads keep their existing scoped-thread path when no facility is
+attached, and all three paths reserve before payload reads, preserve typed
+refusals and release operation permits. Cached private pools and caller
+facilities submit only the admitted operation width. The additive execution
+builder leaves old constructors unbounded, and no ordinary CRUD signature
+exposes a scheduler. Focused tests prove caller-facility determinism,
+shared-root narrowing, active CFB read bounds, zero-I/O admission and serial
+release. No performance claim is made; process-wide thread probes and latency
+measurements are outside this prerequisite record.
+[Record](0676-execution-budget-composition.md);
+[retained evidence](results/change-0676/README.md).
+
+## 0661 — ADR 0030's accessor, migration, and source-retention gates are covered
+
+Record: [0661](0661-opc-lazy-part-decode.md). The accepted ADR 0030
+contract is implemented: owned-source deferred payloads, fallible forcing
+accessors, metadata-only `iter_parts`, fallible `try_iter_parts`, stable
+first-access failures, and retained exact-source publication. The focused lazy
+tests, the 437-test OPC suite, workspace check, and 1,342-row differential
+support the record. The packet explicitly withholds the old 0610 one-part XLSX
+claim and all timing/RSS/allocation claims; broad release measurement remains
+outside this change.
+The audit follow-up additionally verifies staged PPTX graph authoring, forced
+theme fallback, root-relationship XLSB resolution, and propagation of root
+workbook decode failures.
+
+## 0667 — D2 applies preservation-by-default and bounded retained state
+
+Record: [0667](0667-xlsx-value-editor-shared-strings.md). The record
+implements 0602 D2 under 0652 decision 7's dependency rule and the 0651 queue:
+shared-string bytes and relationship identity are captured as source state,
+the table is lazy and charged to the existing aggregate bound, and reduced
+readback keeps the original index identity. ECMA-376 Part 1 §12.3.15's single
+internal part rule and §§18.3.1.96, 18.4, 18.4.9 and 18.18.11's index/type/count
+rules are cited in the record. Mutation paths refuse before staging whenever a
+shared target could change the table; no public API, OPC contract, or accepted
+ADR wording changes.
+
+## 0674 — no production boundary or safety defense moved
+
+Record: [0674](0674-performance-gate-hygiene.md). Nothing under `crates/`
+changed, so no public API, error identity, malformed-input defense, output
+contract or ADR boundary moved. The harness remains in `tools/` and retains
+`#![forbid(unsafe_code)]`; allocator isolation changes test scheduling rather
+than library behavior. The checked PPTX phase selector preserves semantic
+reopen and deterministic-output gates, and its checked basis-point division
+keeps the existing overflow defense while satisfying clippy. The native-resave
+lock refresh is metadata hygiene. The result-log negation is scoped after the
+broad rules, so result-packet logs are visible while callers still select what
+to add. Structural claims validation now succeeds without retained evidence;
+strict evidence verification remains the named workflow gate.
+
+## 0670 — compliant; preserve source bytes and keep the refusal fences
+
+Record: [0670](0670-docx-parser-residues.md).
+
+ADR 0003 is preserved because borrowed events are consumed within the parse,
+all existing limit and execution checks remain in order, and the managed
+transaction publishes only after source ranges and edits validate. ADR 0005 is
+preserved because the sink drops its per-event buffer and retains only one
+bounded paragraph capacity; the proposed paragraph index is withheld until a
+typed `DocumentIndexAdmission` budget exists. ADR 0006 is preserved because a
+producer-written BOM is retained through range correction and compaction, and
+unmodified source bytes remain the source of truth. The Strict universal-unit
+extension follows the local ECMA-376 schema and preserves integer section
+domains. No unsafe code, public executor or archive type, weakened malformed
+input defense, or body-final insertion policy was added. The independent
+xml-minifier audit fix remains root 0677's separate prerequisite.
+
+[Record and limitations](0670-docx-parser-residues.md); [retained
+evidence](README.md).
+
+## 0666 — no ADR amendment, limit movement or publication-byte movement
+
+Record: [0666-mce-rewrite-residue](0666-mce-rewrite-residue.md).
+Authority is decision 1 of change 0652; no accepted ADR is amended. ADR 0005's
+mandatory validation and bounded-resource rules remain in force: the resolver
+lookup and directive-token scan are bounded, `quick_xml`'s per-start
+declaration limit is unchanged, and every proof refusal repeats the
+authoritative validation and preprocessing path. ADR 0006's preservation
+default remains the source editor's contract: the shared path only reads source
+bytes, and the valid `mc:Ignorable` plus bound prefixed-attribute witness opens
+and commits a source-backed no-op without changing source bytes. No public API,
+error type, limit, dependency, unsafe block, global pool or publication writer
+changes. The adjacent fragment consumers remain owned or namespace-adapted
+because a borrowed slice would drop the standalone namespace context or typed
+unknown-node payload they publish. `performance_claim: none`.
+
+## 0665 — compliant; ADR 0006 records the eager-route interpretation of decision 2
+
+Record: [0665](0665-opc-eager-writer-publication-audit.md).
+
+ADR 0006 is amended by this record under 0652 decision 2. The owner quote
+names original bytes; 0654 established the source profile for source-backed
+originals and 0657 established it for source-backed replacements. 0665 records
+the eager route's use of that same profile for planned payloads, including
+source-spliced replacements, as an implementation interpretation rather than a
+new owner decision. Compactness remains checked by debug assertion and tests
+where this repository authors manifest and relationship XML; it is not a
+publication refusal for package payloads. UTF-8, well-formedness, one root,
+character-data placement, DTD/DOCTYPE rejection, attribute grammar,
+`xml:space`, finite budgets, deterministic error identity and zero-output
+failure ordering remain intact. ADR 0003's atomic, typed and source-checked
+publication boundary is unchanged; ADR 0005's limits, explicit providers,
+absence of ambient execution and no public archive implementation leakage are
+unchanged. `Arc::ptr_eq` tightens provenance without changing the preservation
+planner's byte comparison. The BOM publication-audit and managed transaction
+offset residues, plus the body-final-section and Strict measure questions,
+remain the exact change-0650 witnesses and are not resolved here. The
+xml-minifier BOM/offset implementation follow-up is 0677; the managed DOCX
+transaction witness is assigned to 0670.
+`performance_claim: none`; OLE2/OOXML remain active, ODF is deferred and iWork
+excluded. [Record](0665-opc-eager-writer-publication-audit.md);
+[retained evidence](results/change-0665/README.md).
+
+**ADR 0005 and ADR 0006 — bounded scratch and fail-closed validation remain
+intact.** The new stack storage is a fixed 46 bytes in the managed caller, and
+the only deferred heap reservation is the existing `RECOMMENDED_BUFFER_SIZE`
+window guarded by `try_reserve_exact`. A missed fixed probe still enters the
+old bounded backwards search; EOCD, ZIP64, central-record, short-read, limit,
+and typed malformed-directory checks are unchanged. The public locator's
+default scratch contract remains unchanged, and the 533-container oracle plus
+focused refusal tests show no acceptance or output movement.
+
+## 0677 — physical offsets corrected without changing validation boundaries
+
+[0677](0677-xml-publication-bom-offsets.md) preserves ADR 0006's typed
+structural, encoding, DOCTYPE and budget checks, and the OPC audit-before-output
+boundary. Exactly the leading marker is encoding framing; a second marker
+remains character data. No signature changes, unsafe code, dependency or
+ambient I/O is introduced. The streaming memory envelope remains conservative.
+
+## 0671 — ADR 0003 and ADR 0006 applied at the format boundary
+
+Record: [0671](0671-doc-admission-residues.md). The implementation follows
+ADR 0003's typed refusal rule and ADR 0006's reader/writer division. The reader
+keeps the normative `FBKF.ibkl` uniqueness refusal and does not convert it into
+leniency. For PAPX, the reader accepts one producer alignment byte only after a
+strict parser proves the preceding sequence complete and only under the explicit
+`OpenOptions::with_papx_alignment_padding()` profile; the default remains a
+typed refusal. No writer emits or normalizes that byte, and `parse_sprms` retains
+its exact-sequence contract. The new facade methods expose the public DOC
+options and preserve the strict default, with the path read using the existing
+bounded fallback helper. No CFB entry point, resource limit, error variant or
+archive state is changed. The
+primary local MS-DOC sections make the uniqueness rule explicit (§2.9.70, local
+line 6648) and define PAPX length arithmetic (§2.9.175, local lines
+18684-18688), while the whole-Prl requirement (§2.9.114, local lines
+12469-12471) means the observed alignment-byte behavior remains a documented
+compatibility inference rather than a new normative claim. The record therefore
+names the open specification question and the corpus boundary instead of treating
+the one witness as universal. `performance_claim: none`.
+
+## 0669 — retained parse publication preserves ADR 0003, 0005, and 0006
+
+Record: [0669](0669-xlsb-edit-residues.md). ADR 0003's source-checked,
+atomic publication is preserved by borrowing the published package, staging the
+candidate, and assigning the validated workbook only at the end. ADR 0005's
+typed validation and finite resource limits remain in place; no check is
+removed, and relationship repair is limited to an already staged candidate.
+ADR 0006's preservation default remains exact for no-ops and validated for
+changes. The accepted lazy OPC ADR 0030 is not amended and no proposed ADR is
+cited by production code. No unsafe code, dependency, global cache, ambient I/O,
+executor, or archive ownership leaks into the public API.
+
+## 0668 — the XLS residue follows the existing lazy and bounded-state rules
+
+The packed visitor validates the complete BIFF record before invoking the sink,
+keeps XF validation for every cell, and materializes a value only after a
+selected coordinate matches. The SST cursor consumes the same already-read
+`RecordRef` payloads and keeps the existing segment, entry, and framing
+boundaries. The change adds no cache, lock, reader-free retained position, or
+global pool. Row 11 remains deferred because ADR 0005 requires a bounded,
+weighted, evictable clean-value cache with accounting; row 12's framing fusion
+remains deferred because 0633's refusal order and coverage proof have priority.
+No public API, limit, error, fence, output byte, dependency, or unsafe code
+changed. [Decision record](0668-xls-query-residues.md);
+[packet](README.md).
+
+## 0672 — no refusal, ownership or public API boundary moved
+
+Record: [0672](0672-xlsx-stored-cell-allocation.md). ADR 0003's explicit
+owned conversion remains `cells` and returns the same sparse values in the same
+order. ADR 0005's resource boundary remains fallible through `try_reserve_exact`;
+the change introduces no cache, lock, executor or ambient resource. ADR 0006's
+preservation and refusal rules are unchanged. In particular, the selected
+scanner still reaches EOF and validates retained records before a callback, so
+no typed refusal is traded for a partial result. The 0652 decision record and
+0642's accepted refusal-order design are cited as authority; no ADR amendment
+is proposed.
+
+## 0662 — the write boundary satisfies decision 6; accepted ADR 0031's read rows are named as unfinished work
+
+Record: [0662](0662-parallel-changed-member-deflate.md), authority [0652](0652-owner-decisions-for-the-third-wave.md)
+decision 6. The production change preserves crate direction: `soapberry-zip`
+defines its own scoped-worker trait, `litchi-core` defines the runtime-neutral
+trait and budgets, and `litchi-opc` bridges them privately on the managed
+source-backed publication path. The write wave reserves before compression,
+never emits before every regenerated member is prepared, returns errors in
+serial plan order, keeps cancellation cooperative and typed, and uses no global
+pool or `unsafe`. Ordinary CRUD signatures remain free of archive, executor and
+lock types. This record does not claim full implementation of every paragraph
+of ADR 0031: `Resource::IoConcurrency` has not been added, the existing ZIP
+read session still creates its pool eagerly, and the CFB and source-backed read
+sessions do not yet share `Workers`/`CpuTasks`/caller-facility admission. The
+remaining read-session requirements and their three ADR verification tests are
+therefore explicitly outside 0662's decision-6 write scope, rather than being
+described as closed by the new deflate tests. `performance_claim: none`.
+[Record](0662-parallel-changed-member-deflate.md);
+[retained evidence](results/change-0662/README.md).
+
 ## 0657 — preservation proved by construction instead of by refusal
 
 Record: [0657](0657-xlsx-value-editor-d4-admission.md).

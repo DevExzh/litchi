@@ -1,0 +1,17 @@
+HEAD 02e1945753a654287f6142a629ce7043ad62597b
+$ python3 tools/check_crate_boundaries.py
+crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+  [002] litchi-iwa -> litchi-iwa-archive
+  [004] litchi-iwa -> litchi-iwa-common
+  [008] litchi-iwa -> litchi-iwa-index
+  [010] litchi-iwa -> litchi-iwa-protos
+  [012] litchi-iwa -> litchi-iwa-text
+  [013] litchi-iwa -> litchi-iwa-text-wire
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+
+exit 0

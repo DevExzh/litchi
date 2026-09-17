@@ -1,0 +1,135 @@
+[
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0662",
+    "commit": "15e5fc0fec08ce113644323981b3dc2752d9c77e",
+    "exit_code": 0,
+    "seconds": 4.82,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0665",
+    "commit": "25e0b2c75336cc6c11f5320c58d10b441721cedf",
+    "exit_code": 0,
+    "seconds": 7.13,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0668",
+    "commit": "ebe52e4a5500c56785c42cfe07b0f1630a684913",
+    "exit_code": 0,
+    "seconds": 1.47,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0669",
+    "commit": "c3bf9dfeb3d208065f0c86e125584fed12b878be",
+    "exit_code": 0,
+    "seconds": 1.24,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0672",
+    "commit": "4b8336dfbb4b9c06728adf897cf51658f920d347",
+    "exit_code": 0,
+    "seconds": 1.2,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0673",
+    "commit": "69ddbfc18353304bea09feabae075b5edc66ef5e",
+    "exit_code": 0,
+    "seconds": 1.11,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0666",
+    "commit": "578df2db5f19998a78daf1e4e22d39ae9b2e9c15",
+    "exit_code": 0,
+    "seconds": 1.05,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0670",
+    "commit": "435a2b674004259d9a7a4902306953a1473e6794",
+    "exit_code": 0,
+    "seconds": 1.28,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0671",
+    "commit": "fa9ad01a8723e5c83846653de47ff0e5faf65d24",
+    "exit_code": 0,
+    "seconds": 1.48,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0667",
+    "commit": "ee43ea1c1ac98ba937b3fa4d6b9dc3e72904af07",
+    "exit_code": 0,
+    "seconds": 0.91,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0661",
+    "commit": "7bc6ebc9709908fb2ef58278a8f82b1d2079ee5f",
+    "exit_code": 0,
+    "seconds": 0.97,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0674",
+    "commit": "3c9e978f87ba18cbdc813ffdf385a49dd6498a5e",
+    "exit_code": 0,
+    "seconds": 1.08,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/before-ab07e2a47",
+    "commit": "ab07e2a47e87bc4364c976e8f6a8fa9270e6637e",
+    "exit_code": 255,
+    "seconds": 0.1,
+    "output": "error: failed to delete '/home/zhuhe/code/litchi-worktrees/before-ab07e2a47': Permission denied\n"
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/before-ab07e2a47",
+    "commit": "ab07e2a47",
+    "exit_code": 0,
+    "seconds": 0.8,
+    "output": "Clean baseline removal retried after restoring directory write permission; git had already removed its registration."
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/before-5af158123",
+    "commit": "5af158123f370aa06b127aa15395ae094daa11c0",
+    "exit_code": 0,
+    "seconds": 0.81,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0676",
+    "commit": "b915e8b673b64a50ee3a37231854a172dab42904",
+    "exit_code": 0,
+    "seconds": 1.12,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/0663",
+    "commit": "b8b85c136d48c5a1af4a9a6d6f629613877e730e",
+    "exit_code": 0,
+    "seconds": 3.74,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/before-5fa92d7ce",
+    "commit": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "exit_code": 0,
+    "seconds": 1.05,
+    "output": ""
+  },
+  {
+    "worktree": "/home/zhuhe/code/litchi-worktrees/before-70d7768cc",
+    "commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "exit_code": 0,
+    "seconds": 1.15,
+    "output": ""
+  }
+]

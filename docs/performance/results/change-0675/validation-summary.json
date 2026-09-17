@@ -1,0 +1,34 @@
+{
+  "tests": {
+    "groups": 422,
+    "passed": 10801,
+    "failed": 0,
+    "ignored": 74
+  },
+  "facade": {
+    "groups": 29,
+    "passed": 382,
+    "failed": 0,
+    "ignored": 7
+  },
+  "harness": {
+    "groups": 19,
+    "passed": 545,
+    "failed": 0,
+    "ignored": 1
+  },
+  "allocator": {
+    "groups": 1,
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0
+  },
+  "facade-polyglot": {
+    "groups": 28,
+    "passed": 104,
+    "failed": 0,
+    "ignored": 0
+  },
+  "all_gate_exit_codes_zero": true,
+  "removed_worktrees": 18
+}

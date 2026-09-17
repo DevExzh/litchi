@@ -1,0 +1,75 @@
+[
+  {
+    "name": "claims",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "head": "02e1945753a654287f6142a629ce7043ad62597b",
+    "exit_code": 0,
+    "seconds": 70.35
+  },
+  {
+    "name": "report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "head": "02e1945753a654287f6142a629ce7043ad62597b",
+    "exit_code": 0,
+    "seconds": 0.07
+  },
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "head": "02e1945753a654287f6142a629ce7043ad62597b",
+    "exit_code": 0,
+    "seconds": 0.05
+  },
+  {
+    "name": "non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "head": "02e1945753a654287f6142a629ce7043ad62597b",
+    "exit_code": 0,
+    "seconds": 4.12
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "head": "02e1945753a654287f6142a629ce7043ad62597b",
+    "exit_code": 0,
+    "seconds": 264.53
+  }
+]

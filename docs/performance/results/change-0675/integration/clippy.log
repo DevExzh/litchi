@@ -1,0 +1,14 @@
+HEAD f14e3c85aa387630744a5ca1aaffdff356d4ba33
+$ cargo clippy -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-ole-common -p litchi-opc -p litchi-ooxml-common -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx -p litchi-xls -p litchi-xlsx -p litchi-xlsb -p xml-minifier --lib --no-deps --locked -- -D warnings
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.39s
+
+exit 0

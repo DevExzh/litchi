@@ -1,0 +1,38 @@
+HEAD 2fb80e36f609002756aa5cb2d1be75d519b1ac48
+$ cargo clippy -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-ole-common -p litchi-opc -p litchi-ooxml-common -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx -p litchi-xls -p litchi-xlsx -p litchi-xlsb -p xml-minifier --lib --no-deps --locked -- -D warnings
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+error: returning the result of a `let` binding from a block
+   --> crates/litchi-opc/src/package.rs:838:13
+    |
+834 | /             let counters = handle
+835 | |                 .payload()
+836 | |                 .deferred_source()
+837 | |                 .map(|source| source.counters());
+    | |_________________________________________________- unnecessary `let` binding
+838 |               counters
+    |               ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+834 ~
+835 ~             handle
+836 +                 .payload()
+837 +                 .deferred_source()
+838 +                 .map(|source| source.counters())
+    |
+
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+error: could not compile `litchi-opc` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+
+exit 101

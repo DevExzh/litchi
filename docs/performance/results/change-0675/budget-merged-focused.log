@@ -1,0 +1,57 @@
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.23s
+     Running unittests src/lib.rs (target/debug/deps/litchi_opc-e2d0d8ed5a364cd6)
+
+running 13 tests
+test execution::tests::explicit_owned_open_rejects_malformed_zip_before_input_charge ... ok
+test execution::tests::explicit_owned_open_rejects_input_limit_before_zip_and_input_charge ... ok
+test execution::tests::explicit_open_keeps_ordinary_payloads_out_of_lazy_cache ... ok
+test execution::tests::explicit_open_observes_pre_cancellation ... ok
+test execution::tests::read_limits_reject_before_execution_input_is_charged ... ok
+test execution::tests::explicit_zip_read_preflights_oversized_members_before_cpu_admission ... ok
+test execution::tests::zero_cpu_budget_refuses_before_retaining_a_zip_pool ... ok
+test execution::tests::explicit_zip_read_refuses_zero_io_before_member_payload_read ... ok
+test execution::tests::zip_byte_cap_that_splits_every_batch_does_not_retain_a_pool ... ok
+test execution::tests::explicit_zip_sessions_share_root_worker_admission_and_release_on_drop ... ok
+test execution::tests::explicit_open_refuses_insufficient_in_flight_memory ... ok
+test execution::tests::explicit_owned_open_retains_exact_source_authorization ... ok
+test execution::tests::explicit_opens_match_serial_parts_deterministically ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 441 filtered out; finished in 0.00s
+
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.50s
+     Running unittests src/lib.rs (target/debug/deps/litchi_cfb-95ababb0001066f2)
+
+running 18 tests
+test shared::tests::bulk_reads_charge_work_before_starting_payload_reads ... ok
+test shared::tests::bulk_reads_observe_mid_read_cancellation_atomically ... ok
+test shared::tests::bulk_preflight_failures_do_not_consume_minifat_direct_state ... ok
+test shared::tests::bulk_reads_enforce_byte_and_context_budget_caps ... ok
+test shared::tests::bulk_reads_reject_source_change_without_returning_partial_results ... ok
+test shared::tests::bulk_preload_materializes_once_and_repeated_eligible_open_is_cached ... ok
+test shared::tests::cancelled_bulk_read_releases_worker_and_io_admissions ... ok
+test shared::tests::bulk_reads_observe_preexisting_cancellation_atomically ... ok
+test shared::tests::serial_bulk_failure_releases_worker_and_io_admissions ... ok
+test shared::tests::zero_cpu_budget_refuses_before_building_a_bulk_pool ... ok
+test shared::tests::bulk_session_skips_pool_when_only_bounded_batches_are_ineligible ... ok
+test shared::tests::bulk_reads_refuse_zero_io_before_the_first_payload_read ... ok
+test shared::tests::bulk_reads_honor_task_cap_and_use_a_local_pool_when_eligible ... ok
+test shared::tests::bulk_reads_use_caller_facility_and_release_operation_worker_width ... ok
+test shared::tests::bulk_single_minifat_keeps_direct_width_one_and_two ... ok
+test shared::tests::bulk_multi_minifat_batch_converges_on_one_root_cache ... ok
+test shared::tests::bulk_reads_preserve_input_order_and_match_serial_reads ... ok
+test shared::tests::cached_bulk_pool_caps_later_io_narrowing ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 330 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (target/debug/deps/litchi_cfb-95ababb0001066f2)
+
+running 1 test
+test shared::tests::zero_cpu_budget_refuses_before_building_a_bulk_pool ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 347 filtered out; finished in 0.00s

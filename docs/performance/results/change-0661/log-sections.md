@@ -2,7 +2,7 @@
 
 ## For `HOTSPOTS.md`
 
-### 0661 — the accepted C2′ lazy OPC seam is implemented and retained
+## 0661 — the accepted C2′ lazy OPC seam is implemented and retained
 
 Record: [0661](../../0661-opc-lazy-part-decode.md). Authority: accepted ADR
 0030, change 0652 decision 3, and queue row 3 of change 0651. Owned OPC
@@ -15,7 +15,7 @@ registered performance claim is made.
 
 ## For `GOAL_AUDIT.md`
 
-### 0661 — correctness and bounded failures remain ahead of the deferred work
+## 0661 — correctness and bounded failures remain ahead of the deferred work
 
 Record: [0661](../../0661-opc-lazy-part-decode.md). The package invariant
 forces a deferred payload before a `&dyn Part` leaves `litchi-opc`; the
@@ -31,7 +31,7 @@ threaded graph operations stay bound to the resolved root workbook.
 
 ## For `REPORT.md`
 
-### 0661 — deterministic read-set evidence, no performance claim
+## 0661 — deterministic read-set evidence, no performance claim
 
 Record: [0661](../../0661-opc-lazy-part-decode.md), evidence packet
 [`results/change-0661`](README.md). Across 336 fixture rows, the admitted
@@ -46,7 +46,7 @@ read-set totals.
 
 ## For `ADR_COMPLIANCE.md`
 
-### 0661 — ADR 0030's accessor, migration, and source-retention gates are covered
+## 0661 — ADR 0030's accessor, migration, and source-retention gates are covered
 
 Record: [0661](../../0661-opc-lazy-part-decode.md). The accepted ADR 0030
 contract is implemented: owned-source deferred payloads, fallible forcing

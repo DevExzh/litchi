@@ -1,0 +1,90 @@
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.47s
+     Running unittests src/lib.rs (target/debug/deps/litchi_pptx-d0893799da2b7610)
+
+running 79 tests
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_allows_empty_write_after_reaching_the_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_allows_empty_write_at_zero_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_allows_an_empty_archive ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_digests_exactly_the_accepted_bytes ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_copies_when_spare_capacity_exists ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_rejects_before_reserving_and_keeps_prefix ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_rejects_an_oversized_first_write_without_allocation ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_keeps_successful_storage_within_the_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_reuses_an_exact_buffer ... ok
+test opened::cross_copy_plan::retention_tests::the_retention_path_never_spills ... ok
+test opened::tests::a_mismatched_blob_arc_part_is_never_memoized ... ok
+test opened::tests::commit_revision_binds_the_staged_package_without_a_signature_graph ... ok
+test opened::tests::a_superseded_slide_removal_patch_is_refused_by_name ... ok
+test opened::tests::commit_publication_captures_a_package_that_drifted_outside_the_write_set ... ok
+test opened::tests::atomic_shape_text_batch_composes_in_one_opened_transaction ... ok
+test opened::tests::composes_order_shape_and_notes_in_one_durable_inverse_commit ... ok
+test opened::tests::disjoint_new_shape_and_modern_comment_changes_merge_automatically ... ok
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_is_keyed_by_the_archive_bound ... ok
+test opened::tests::commit_rehashes_a_package_whose_unsign_strips_signature_bytes ... ok
+test opened::cross_copy_plan::revision_cache_tests::candidate_physical_revision_without_a_known_value_recomputes ... ok
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_caches_the_freshly_computed_value ... ok
+test opened::cross_copy_plan::revision_cache_tests::rebound_snapshot_starts_an_empty_physical_revision_cache ... ok
+test opened::tests::durable_decoder_and_history_enforce_finite_bounds ... ok
+test opened::tests::disjoint_patches_join_and_same_part_edits_conflict ... ok
+test opened::tests::memoized_recapture_equals_a_cold_recapture ... ok
+test opened::tests::a_superseded_cross_slide_copy_patch_is_refused_by_name ... ok
+test opened::tests::opened_slide_name_index_preserves_ambiguity ... ok
+test opened::cross_copy_plan::retention_tests::debug_does_not_print_the_retained_archive ... ok
+test opened::tests::packages_equal_tracks_every_fingerprint_input ... ok
+test opened::tests::opened_transaction_does_not_upgrade_borrowed_physical_provenance ... ok
+test opened::tests::opened_slide_name_index_preserves_identity_after_reorder ... ok
+test opened::tests::real_complex_chart_deck_survives_transaction_and_full_reopen ... ok
+test opened::tests::published_commit_snapshot_equals_a_fresh_capture ... ok
+test opened::tests::general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible ... ok
+test opened::tests::slide_copy_application_refuses_stale_complete_graph ... ok
+test opened::tests::one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen ... ok
+test opened::tests::cross_slide_copy_authorizes_known_noncanonical_source_archives ... ok
+test opened::tests::cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions ... ok
+test opened::cross_copy_plan::revision_cache_tests::planned_and_published_revisions_equal_fresh_serializations ... ok
+test opened::tests::slide_copy_plan_is_bounded_deterministic_and_non_publishing ... ok
+test opened::tests::cross_slide_copy_preserves_private_closure_and_inert_external_targets ... ok
+test opened::tests::cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication ... ok
+test opened::cross_copy_plan::retention_tests::a_plan_retains_the_archive_its_application_publishes ... ok
+test opened::cross_copy_plan::retention_tests::a_substituted_retained_archive_trips_the_debug_assertion - should panic ... ok
+test opened::tests::real_powerpoint_fixture_round_trips_an_exact_no_op ... ok
+test opened::tests::slide_copy_plan_accepts_the_strict_shared_layout_boundary ... ok
+test opened::tests::revision_v2_preserves_every_pairwise_verdict_of_v1 ... ok
+test opened::tests::picture_shape_transfer_copies_relationship_closure_and_remaps_identity ... ok
+test opened::tests::slide_copy_application_refuses_result_limit_and_nonempty_slide_id ... ok
+test opened::tests::slide_copy_plan_reuses_only_a_registered_layout ... ok
+test opened::tests::the_memo_retains_every_allocation_it_keys ... ok
+test opened::tests::cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directions ... ok
+test opened::tests::slide_copy_plan_refuses_cycles_and_unknown_internal_relationships ... ok
+test opened::tests::stale_write_set_still_refuses_a_committed_publication ... ok
+test opened::tests::slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens ... ok
+test opened::tests::the_superseded_refusal_does_not_displace_the_durable_byte_limit ... ok
+test opened::tests::grouped_connector_transfer_remaps_identity_closure_and_is_durable ... ok
+test opened::cross_copy_plan::retention_tests::the_durable_patch_is_untouched_by_retention ... ok
+test opened::cross_copy_plan::retention_tests::releasing_and_dropping_return_the_retained_bytes ... ok
+test opened::tests::the_facade_memo_never_outlives_the_graph_it_describes ... ok
+test opened::cross_copy_plan::retention_tests::a_dirty_planning_destination_and_a_clean_applying_one_agree ... ok
+test opened::cross_copy_plan::revision_cache_tests::warm_snapshot_caches_do_not_hide_a_stale_source_or_destination ... ok
+test opened::tests::three_way_plan_is_immutable_and_history_supports_redo ... ok
+test opened::tests::slide_copy_plan_refuses_global_tables_and_enforces_closure_limits ... ok
+test opened::cross_copy_plan::retention_tests::the_tighter_retained_candidate_budget_binds ... ok
+test opened::tests::cross_slide_copy_is_source_exact_reversible_and_reopens ... ok
+test opened::tests::slide_removal_and_dependency_transfer_are_durable_and_reversible ... ok
+test opened::tests::stale_and_unsupported_raw_xml_fail_before_publication ... ok
+test opened::tests::slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures ... ok
+test opened::cross_copy_plan::retention_tests::a_candidate_above_the_budget_falls_back_to_the_rebuild ... ok
+test opened::tests::part_digest_memo_resident_bytes ... ok
+test opened::tests::cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse ... ok
+test opened::cross_copy_plan::retention_tests::retention_changes_no_apply_verdict ... ok
+test opened::tests::cross_slide_copy_refuses_policy_surfaces_before_destination_mutation ... ok
+test opened::tests::slide_copy_plan_validates_owned_xml_and_external_topology ... ok
+test opened::tests::slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts ... ok
+test opened::tests::slide_removal_plan_handles_first_middle_and_last_durably ... ok
+test opened::tests::slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs ... ok
+test opened::tests::revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus ... ok
+
+test result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 508 filtered out; finished in 5.51s

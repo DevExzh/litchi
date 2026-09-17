@@ -59,12 +59,13 @@ declare them before the scan ran. The 23 witnesses in
 `cell_values/admission_tests.rs` are the first tests to reach them. The
 remaining gaps are named rather than closed: shared strings (0602's D2, **66 of
 95**), pivot caches, tables and query tables are refused because their meaning
-depends on the value being replaced, and the publication audit (0602's D0)
-still refuses every real package, so this change makes producer files
-**editable, not saveable**. The gate that decides whether this work has any
-user-visible effect is therefore change 0654's, not this one's; re-running
-`results/change-0657/probe` over the corpus after 0654 merges is the check that
-should be recorded.
+depends on the value being replaced. The final 0657 publication measurement
+also closes the source-spliced replacement half of 0602's D0: **9 of the 10
+admitted packages publish and reopen**, changing only the workbook and selected
+worksheet members; the tenth retains a non-canonical-relationship refusal.
+This corrects an earlier paragraph that described only the intermediate
+admission leg, before the replacement-audit correction recorded in 0657's
+REPORT section.
 
 ## For `REPORT.md`
 

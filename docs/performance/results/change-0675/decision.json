@@ -1,0 +1,81 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0675",
+  "title": "Third-wave integration and queue disposition",
+  "decision": "Integrate authorized implementations and retain explicit design prerequisites",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": [
+    "0652 owner decisions",
+    "0651 ranked queue",
+    "User requested resumed worktrees, commits, cherry-picks and cleanup"
+  ],
+  "known_gaps": [
+    "Weighted evictable XLS clean-value cache",
+    "XLS coverage-preserving framing fusion and full SST locator scan",
+    "XLSX scanner refusal-before-result streaming",
+    "Priced DOCX paragraph-index memo and guarded-reader buffer proof"
+  ],
+  "withheld": [
+    "Aggregate speedup",
+    "Physical cold-cache, RSS, cross-platform or general concurrency scaling claims"
+  ],
+  "code_state": "All implementing commits are integrated on feat/office-format-completeness; coordinator record and evidence only, with separately committed BOM, memo migration and stale-test fixes.",
+  "accepted_costs": {
+    "cfb_control": "Generic picture.doc Reuse versus Rewrite p50 is +39.64\u201341.01%; no latency claim.",
+    "doc_route": "FloatingPictures.doc before/after p50 is about +2.3% without a paired floor; descriptive only.",
+    "xlsx_reservation": "Exact stored-cell allocation removes growth allocations but 0672 retains a small measured warm timing regression."
+  },
+  "cleanup": {
+    "completed_worktrees": 14,
+    "temporary_baselines": 4,
+    "unrelated_worktrees": "preserved",
+    "historical_logs": "Newly visible logs from older packets are preserved, neither staged nor deleted."
+  },
+  "provenance": {
+    "starting_revision": "5fa92d7ced5a78f3c2c84a6afe9d0ba404253717",
+    "final_implementation_revision": "f14e3c85aa387630744a5ca1aaffdff356d4ba33",
+    "merge_ledger": "merge-log.txt"
+  },
+  "integration_corrections": [
+    "0677 BOM audit physical offsets",
+    "PPTX memo fallible payload access",
+    "DOCX scoped-MCE ceiling expectation",
+    "CFB cleared root mini-stream padding restores byte-identical XLS inverse"
+  ],
+  "validation": {
+    "tests": {
+      "groups": 422,
+      "passed": 10801,
+      "failed": 0,
+      "ignored": 74
+    },
+    "facade": {
+      "groups": 29,
+      "passed": 382,
+      "failed": 0,
+      "ignored": 7
+    },
+    "harness": {
+      "groups": 19,
+      "passed": 545,
+      "failed": 0,
+      "ignored": 1
+    },
+    "allocator": {
+      "groups": 1,
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    "facade-polyglot": {
+      "groups": 28,
+      "passed": 104,
+      "failed": 0,
+      "ignored": 0
+    },
+    "all_gate_exit_codes_zero": true,
+    "removed_worktrees": 18
+  }
+}

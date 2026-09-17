@@ -1,0 +1,33 @@
+HEAD f14e3c85aa387630744a5ca1aaffdff356d4ba33
+$ cargo doc -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-ole-common -p litchi-opc -p litchi-ooxml-common -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx -p litchi-xls -p litchi-xlsx -p litchi-xlsb -p xml-minifier --no-deps --locked
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+ Documenting litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+ Documenting litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+ Documenting xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+ Documenting litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 56.06s
+   Generated /home/zhuhe/code/litchi/target/doc/litchi_cfb/index.html and 13 other files
+
+exit 0
