@@ -21,7 +21,8 @@
     "workspace_check": "cargo check --workspace -j2 passed after the consumer error audit.",
     "differential": "differ-eager-vs-lazy.txt has 1,342 MATCH rows and zero MISMATCH rows across 336 fixtures.",
     "cross_checkout": "before/after cross-checkout artifacts compare equal for member observations, exact no-op, one-part reblob, and XLSX hide; cmp exits 0 for all four pairs.",
-    "read_sets": "The 336-row corpus has 5,077 admitted parts and 45,562,463 inflated bytes across 334 successful opens. Exact no-op decodes 0 parts/0 bytes; one-part reblob decodes 334 parts/389,581 bytes; the current XLSX hide route publishes 33 fixtures and decodes 216/550 parts and 6,044,263/8,274,037 bytes among those published fixtures."
+    "read_sets": "The 336-row corpus has 5,077 admitted parts and 45,562,463 inflated bytes across 334 successful opens. Exact no-op decodes 0 parts/0 bytes; one-part reblob decodes 334 parts/389,581 bytes; the current XLSX hide route publishes 33 fixtures and decodes 216/550 parts and 6,044,263/8,274,037 bytes among those published fixtures.",
+    "audit_followup": "Focused malformed-deferred regressions pass for PPTX orphan-theme forcing and staged master/layout rollback, plus XLSB root-workbook error propagation and graph removal bound to the resolved office-document target."
   },
   "accepted_costs": {
     "metadata": "Owned packages retain one deferred member handle and the source archive; a package that reads every member pays the bookkeeping and still performs the same payload work.",

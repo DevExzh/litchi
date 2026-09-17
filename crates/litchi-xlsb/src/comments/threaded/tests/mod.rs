@@ -8,7 +8,7 @@ use super::{
     validate_comments, validate_graph as validate_model_graph, write_comments, write_persons,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
 
 const NS: &str = "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments";
 const ALICE: &str = "{11111111-1111-1111-1111-111111111111}";
@@ -410,4 +410,123 @@ fn fixture() -> (OpcPackage, PackURI, PackURI) {
         .rels_mut()
         .get_or_add(rt::OFFICE_DOCUMENT, "xl/workbook.bin");
     (package, workbook, worksheet)
+}
+
+fn corrupt_zip_member(mut bytes: Vec<u8>, member: &str) -> Vec<u8> {
+    let member = member.as_bytes();
+    let mut local_found = false;
+    let mut cursor = 0_usize;
+    while let Some(relative) = bytes[cursor..]
+        .windows(4)
+        .position(|window| window == b"PK\x03\x04")
+    {
+        let header = cursor + relative;
+        let name_length = u16::from_le_bytes([bytes[header + 26], bytes[header + 27]]) as usize;
+        let extra_length = u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]) as usize;
+        let name_start = header + 30;
+        let data_start = name_start + name_length + extra_length;
+        if &bytes[name_start..name_start + name_length] == member {
+            assert!(data_start < bytes.len(), "ZIP member has no payload");
+            local_found = true;
+            break;
+        }
+        cursor = header + 4;
+    }
+    assert!(local_found, "ZIP member {member:?} was not found");
+
+    // Preserve structural ZIP admission and make the deferred read fail at
+    // verification. A compressed-byte flip can preserve an equivalent stream
+    // (for example by changing only a DEFLATE block-final marker), whereas a
+    // central-directory CRC mismatch is deterministic.
+    let mut cursor = 0_usize;
+    while let Some(relative) = bytes[cursor..]
+        .windows(4)
+        .position(|window| window == b"PK\x01\x02")
+    {
+        let header = cursor + relative;
+        if header + 46 > bytes.len() {
+            break;
+        }
+        let name_length = u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]) as usize;
+        let extra_length = u16::from_le_bytes([bytes[header + 30], bytes[header + 31]]) as usize;
+        let comment_length = u16::from_le_bytes([bytes[header + 32], bytes[header + 33]]) as usize;
+        let name_start = header + 46;
+        let name_end = name_start + name_length;
+        let record_end = name_end + extra_length + comment_length;
+        if record_end > bytes.len() {
+            break;
+        }
+        if &bytes[name_start..name_end] == member {
+            bytes[header + 16] ^= 1;
+            return bytes;
+        }
+        cursor = header + 4;
+    }
+    panic!("central record for ZIP member {member:?} was not found");
+}
+
+fn dual_workbook_package() -> (OpcPackage, PackURI, PackURI) {
+    let mut package = OpcPackage::new();
+    let canonical = PackURI::new("/xl/workbook.bin").unwrap();
+    let alternate = PackURI::new("/xl/workbook-alt.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        canonical,
+        ct::XLSB_BIN.into(),
+        b"canonical workbook".to_vec(),
+    )));
+    package.add_part(Box::new(BlobPart::new(
+        alternate.clone(),
+        ct::XLSB_BIN.into(),
+        b"alternate workbook".to_vec(),
+    )));
+    package
+        .rels_mut()
+        .get_or_add(rt::OFFICE_DOCUMENT, "xl/workbook-alt.bin");
+    (
+        package,
+        PackURI::new("/xl/workbook.bin").unwrap(),
+        alternate,
+    )
+}
+
+#[test]
+fn deferred_root_workbook_failure_is_not_replaced_by_canonical_fallback() {
+    let (package, _canonical, _alternate) = dual_workbook_package();
+    let mut bytes = PackageWriter::to_bytes(&package).unwrap();
+    bytes = corrupt_zip_member(bytes, "xl/workbook-alt.bin");
+    let package = OpcPackage::from_vec(bytes).unwrap();
+
+    let error = super::package::validate_graph(&package).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::Opc(OpcError::ZipError(_))
+    ));
+}
+
+#[test]
+fn threaded_graph_removal_uses_the_resolved_root_workbook() {
+    let (mut package, _canonical, alternate) = dual_workbook_package();
+    let persons = PackURI::new("/xl/persons/person1.xml").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        persons.clone(),
+        PERSONS_CONTENT_TYPE.into(),
+        format!(r#"<tc:personList xmlns:tc="{NS}"/>"#).into_bytes(),
+    )));
+    package
+        .get_part_mut(&alternate)
+        .unwrap()
+        .rels_mut()
+        .get_or_add(PERSONS_RELATIONSHIP_TYPE, "persons/person1.xml");
+
+    super::package::validate_graph(&package).unwrap();
+    assert!(remove_graph(&mut package).unwrap());
+    assert!(package.get_part(&persons).is_err());
+    assert!(
+        package
+            .get_part(&alternate)
+            .unwrap()
+            .rels()
+            .iter()
+            .all(|relationship| relationship.reltype() != PERSONS_RELATIONSHIP_TYPE)
+    );
 }

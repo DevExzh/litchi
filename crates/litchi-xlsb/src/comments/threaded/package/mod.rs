@@ -338,10 +338,12 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
         ));
     }
 
-    let workbook = package
-        .iter_parts()
-        .find(|part| part.content_type() == ct::XLSB_BIN);
-    let workbook_name = workbook.map(|part| part.partname().clone());
+    // Resolve the workbook through the package's office-document relationship
+    // once. Falling back to a content-type scan here could validate or remove
+    // threaded resources against an unrelated XLSB part when the root points
+    // at a different workbook, and it would hide a deferred decode failure on
+    // the actual relationship target.
+    let workbook_name = workbook_uri(package)?;
     let mut people_target = None;
     let mut comment_targets = HashSet::new();
     let mut comment_sources = HashSet::new();
@@ -382,7 +384,7 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             )));
         }
         if relationship_type == PERSONS_RELATIONSHIP_TYPE {
-            if source_type != ct::XLSB_BIN || workbook_name.as_ref() != Some(&source_name) {
+            if source_type != ct::XLSB_BIN || workbook_name != source_name {
                 return Err(invalid(
                     "persons relationship must originate at the XLSB workbook",
                 ));
@@ -457,16 +459,15 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
 fn remove_graph_inner(package: &mut OpcPackage) -> Result<bool> {
     let mut changed = false;
     let mut removals = Vec::new();
-    let workbook = package
-        .iter_parts()
-        .find(|part| part.content_type() == ct::XLSB_BIN)
-        .map(|part| part.partname().clone());
+    // Keep removal bound to the same resolved workbook URI used by graph
+    // validation; a content-type scan can select an unrelated binary part.
+    let workbook = workbook_uri(package)?;
     let sources: Vec<PackURI> = package
         .iter_parts()
         .map(|part| part.partname().clone())
         .collect();
     for source in sources {
-        let is_workbook = workbook.as_ref() == Some(&source);
+        let is_workbook = workbook == source;
         let part = package.get_part(&source)?;
         let ids: Vec<(String, PackURI)> = part
             .rels()
@@ -641,10 +642,18 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
 }
 
 fn workbook_uri(package: &OpcPackage) -> Result<PackURI> {
-    if let Ok(main) = package.main_document_part()
-        && main.content_type() == ct::XLSB_BIN
-    {
-        return Ok(main.partname().clone());
+    match package.main_document_part() {
+        Ok(main) => {
+            require_workbook(main)?;
+            return Ok(main.partname().clone());
+        },
+        // A package without a root office-document relationship is the one
+        // compatibility case where the canonical XLSB name is acceptable.
+        // Every other relationship or payload refusal belongs to the actual
+        // root target and must remain visible to the caller.
+        Err(OpcError::InvalidRelationship(message))
+            if message == "main-document relationship is missing" => {},
+        Err(error) => return Err(error.into()),
     }
     let candidate = PackURI::new("/xl/workbook.bin")?;
     require_workbook(package.get_part(&candidate)?)?;

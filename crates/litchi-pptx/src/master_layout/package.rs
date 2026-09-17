@@ -39,6 +39,13 @@ use super::model::{
 ///
 /// Returns an error if the operation fails.
 pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
+    let mut candidate = package.clone();
+    let result = add_slide_master_inner(&mut candidate)?;
+    *package = candidate;
+    Ok(result)
+}
+
+fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
     let presentation_name = package.main_document_part()?.partname().clone();
     require_presentation_part(package.get_part(&presentation_name)?.content_type())?;
     let presentation_xml = package.get_part(&presentation_name)?.blob().to_vec();
@@ -111,6 +118,20 @@ pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster>
 ///
 /// Returns an error if the operation fails.
 pub fn add_slide_layout(
+    package: &mut OpcPackage,
+    master_part_name: &PackURI,
+    kind: SlideLayoutKind,
+    name: &str,
+    placeholders: &[PlaceholderSpec],
+) -> Result<AuthoredSlideLayout> {
+    let mut candidate = package.clone();
+    let result =
+        add_slide_layout_inner(&mut candidate, master_part_name, kind, name, placeholders)?;
+    *package = candidate;
+    Ok(result)
+}
+
+fn add_slide_layout_inner(
     package: &mut OpcPackage,
     master_part_name: &PackURI,
     kind: SlideLayoutKind,
@@ -795,7 +816,13 @@ fn theme_target_for_new_master(
     // Otherwise reuse any existing theme part.
     for part in package.iter_parts() {
         if part.content_type() == ct::OFC_THEME {
-            return Ok((relative_target(master_dir, part.partname().as_str())?, None));
+            // Metadata iteration deliberately has no payload route. Force an
+            // orphan theme before linking a new master to it; otherwise a
+            // deferred ZIP/CRC refusal would be discovered only after the
+            // presentation graph had been mutated.
+            let theme_uri = part.partname().clone();
+            package.get_part(&theme_uri)?;
+            return Ok((relative_target(master_dir, theme_uri.as_str())?, None));
         }
     }
     // Otherwise author a fresh theme part from the default template.
