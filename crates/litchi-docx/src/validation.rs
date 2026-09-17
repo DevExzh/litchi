@@ -984,9 +984,8 @@ fn preflight_xml_structure(
     reader.config_mut().check_end_names = false;
     let mut events = 0usize;
     let mut depth = 0usize;
-    let mut buffer = Vec::new();
     loop {
-        match reader.read_event_into(&mut buffer) {
+        match reader.read_event() {
             Ok(event) => {
                 events = events.saturating_add(1);
                 if events > maximum_events {
@@ -1022,7 +1021,6 @@ fn preflight_xml_structure(
             // input-byte ceiling and does not justify another issue here.
             Err(_) => return Ok(()),
         }
-        buffer.clear();
     }
 }
 
@@ -1165,10 +1163,8 @@ fn inspect_visible_xml(
     let mut unsupported_body_children = 0_u64;
     let mut paragraphs = 0_u64;
     let mut tables = 0_u64;
-    let mut buffer = Vec::new();
-
     loop {
-        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(|_| {
+        let (namespace, event) = reader.read_resolved_event().map_err(|_| {
             simple_issue(
                 SEMANTICS,
                 "docx.main_document.malformed_xml",
@@ -1357,7 +1353,6 @@ fn inspect_visible_xml(
                 }
             },
         }
-        buffer.clear();
     }
     if !root_seen || !root_closed || depth != 0 {
         return Err(InspectionFailure::Issue(Box::new(

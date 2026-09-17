@@ -26,6 +26,8 @@ pub use litchi_core::patch::{
 };
 
 pub(crate) const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
+const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
+const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
 const MAX_DOCUMENT_DEPTH: usize = 256;
 const MAX_DOCUMENT_NODES: usize = 1_000_000;
 const MAX_OPERATIONS: usize = 4_096;
@@ -4716,7 +4718,7 @@ impl Edit {
                                 "changed main-document XML is not UTF-8: {error}"
                             ))
                         })?;
-                    let compact = crate::writer::doc::compact_changed_document_xml(source)?;
+                    let compact = compact_changed_document_preserving_bom(source)?;
                     self.projected.with_rewritten_xml(compact.into_bytes())?
                 },
             }
@@ -5329,6 +5331,24 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
     xml_minifier::audit::verify_source(xml, xml_minifier::audit::Limits::default()).is_ok()
 }
 
+/// Compact a whole-document edit while carrying a leading UTF-8 byte order
+/// mark through the quick-xml based compactor.
+///
+/// `quick-xml` consumes the mark before its first event. The transaction keeps
+/// the original XML bytes as its source of truth, so the fallback publication
+/// route must add the mark back after compaction just as the mutable writer
+/// does. Paragraph-fragment compaction does not call this helper.
+fn compact_changed_document_preserving_bom(source: &str) -> TransactionResult<String> {
+    let Some(rest) = source.strip_prefix(UTF8_BYTE_ORDER_MARK_TEXT) else {
+        return Ok(crate::writer::doc::compact_changed_document_xml(source)?);
+    };
+    let compact = crate::writer::doc::compact_changed_document_xml(rest)?;
+    let mut output = String::with_capacity(UTF8_BYTE_ORDER_MARK_TEXT.len() + compact.len());
+    output.push_str(UTF8_BYTE_ORDER_MARK_TEXT);
+    output.push_str(&compact);
+    Ok(output)
+}
+
 /// The `xml:space` attribute name, whose inherited value is the only state
 /// [`crate::writer::doc::compact_changed_document_xml`] carries into a body
 /// child from its ancestors.
@@ -5727,22 +5747,34 @@ fn scan_document_with_context(
     // prior allocation and parsing behavior.
     let mut namespace_bindings = context.map(|_| 2usize);
     let mut namespace_scopes = context.map(|_| Vec::<usize>::new());
+    // quick-xml consumes a leading UTF-8 BOM before its first event and does
+    // not include those bytes in `buffer_position()`. Layout ranges address
+    // the retained source buffer, so carry the prefix into every event span
+    // used below. This keeps managed and unmanaged scans on the same source
+    // coordinates and preserves exact paragraph/table slices.
+    let bom_offset =
+        usize::from(xml.starts_with(UTF8_BYTE_ORDER_MARK)) * UTF8_BYTE_ORDER_MARK.len();
 
     loop {
         if let Some(context) = context {
             context.check().map_err(managed_execution)?;
         }
-        let event_start =
-            usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_conversion_error| {
                 crate::Error::InvalidFormat("document offset does not fit usize".into())
-            })?;
+            })?
+            .checked_add(bom_offset)
+            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
         let raw_event = reader
             .read_event()
             .map_err(|error| crate::Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
-            crate::Error::InvalidFormat("document offset does not fit usize".into())
-        })?;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_conversion_error| {
+                crate::Error::InvalidFormat("document offset does not fit usize".into())
+            })?
+            .checked_add(bom_offset)
+            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
         let event_bytes = event_end.saturating_sub(event_start).max(1);
         let (event_namespace_bindings, active_namespace_bindings) = if namespace_bindings.is_some()
         {
@@ -8696,6 +8728,55 @@ mod tests {
 
         assert_eq!(snapshot.xml_bytes().as_ptr(), allocation);
         assert!(matches!(&snapshot.xml, XmlStorage::Owned(value) if Arc::ptr_eq(value, &xml)));
+    }
+
+    #[test]
+    fn byte_order_marked_snapshot_keeps_layout_ranges_and_edit_output() {
+        let mut marked = UTF8_BYTE_ORDER_MARK.to_vec();
+        marked.extend_from_slice(&document(
+            "<w:p><w:r><w:t>before</w:t></w:r></w:p><w:p><w:r><w:t>kept</w:t></w:r></w:p>",
+        ));
+        let source = Snapshot::from_xml(marked).unwrap();
+        assert_eq!(source.paragraph_count(), 2);
+        assert_eq!(
+            source.paragraph(Position::new(0)).unwrap().text().unwrap(),
+            "before"
+        );
+        assert_eq!(
+            source.paragraph(Position::new(1)).unwrap().text().unwrap(),
+            "kept"
+        );
+        assert!(layout_matches_rescan(&source));
+
+        let mut edit = source.edit();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        assert_eq!(
+            committed
+                .snapshot()
+                .paragraph(Position::new(0))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "after"
+        );
+        assert_eq!(
+            committed
+                .snapshot()
+                .paragraph(Position::new(1))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "kept"
+        );
+        assert!(
+            committed
+                .snapshot()
+                .xml_bytes()
+                .starts_with(UTF8_BYTE_ORDER_MARK)
+        );
+        assert!(layout_matches_rescan(committed.snapshot()));
     }
 
     #[test]

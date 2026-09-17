@@ -18,7 +18,6 @@ pub(crate) fn validate(xml: &[u8]) -> Result<Role> {
 
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut role = None;
@@ -26,7 +25,7 @@ pub(crate) fn validate(xml: &[u8]) -> Result<Role> {
 
     loop {
         let event = reader
-            .read_event_into(&mut buffer)
+            .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
@@ -105,7 +104,6 @@ pub(crate) fn validate(xml: &[u8]) -> Result<Role> {
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
 
     if depth != 0 {

@@ -67,6 +67,32 @@ fn reads_geometry_columns_references_and_preserves_unknown_content() {
 }
 
 #[test]
+fn strict_universal_measurements_decode_to_twips_and_preserve_source() {
+    let xml = br#"<s:sectPr xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:pgSz s:w="612pt" s:h="792pt"/><s:pgMar s:top="72pt" s:right="72pt" s:bottom="72pt" s:left="72pt" s:header="36pt" s:footer="36pt" s:gutter="0pt"/><s:cols s:space="36pt"/><s:docGrid s:linePitch="18pt"/></s:sectPr>"#;
+    let mut section = Section::from_xml_bytes(xml.to_vec()).unwrap();
+
+    assert_eq!(section.page_width(), Some(Emu::from_twips(12_240)));
+    assert_eq!(section.page_height(), Some(Emu::from_twips(15_840)));
+    assert_eq!(
+        section.margins(),
+        Margins {
+            top: Some(Emu::from_twips(1_440)),
+            right: Some(Emu::from_twips(1_440)),
+            bottom: Some(Emu::from_twips(1_440)),
+            left: Some(Emu::from_twips(1_440)),
+            header: Some(Emu::from_twips(720)),
+            footer: Some(Emu::from_twips(720)),
+            gutter: Some(Emu::from_twips(0)),
+        }
+    );
+    assert_eq!(
+        section.columns().unwrap().unwrap().space,
+        Some(Emu::from_twips(720))
+    );
+    assert_eq!(section.to_xml_bytes().unwrap(), xml);
+}
+
+#[test]
 fn mutations_keep_foreign_children_and_round_trip() {
     let xml = br#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:example"><x:before/><w:pgSz w:w="12240" w:h="15840"/><x:after/></w:sectPr>"#;
     let mut section = Section::from_xml_bytes(xml.to_vec()).unwrap();

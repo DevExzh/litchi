@@ -154,14 +154,13 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut limits = Limits::default();
     let mut root = false;
     let mut frames: Vec<(usize, usize)> = Vec::new();
     let mut references = Vec::new();
     loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 depth += 1;
                 structure(&mut limits, depth)?;
@@ -228,7 +227,6 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
             Event::Eof => break,
             Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
     if !root || depth != 0 || !frames.is_empty() {
         return Err(invalid("missing or unterminated document root"));
@@ -248,13 +246,12 @@ pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<Cha
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut limits = Limits::default();
     let mut root = false;
     let mut scan = ChartScan::default();
     loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 depth += 1;
                 structure(&mut limits, depth)?;
@@ -303,7 +300,6 @@ pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<Cha
             Event::Eof => break,
             Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
     if !root || depth != 0 {
         return Err(invalid("missing or unterminated chartSpace root"));

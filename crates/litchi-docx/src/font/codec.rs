@@ -75,14 +75,13 @@ pub fn parse(xml: &[u8]) -> Result<Table> {
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut buf = Vec::new();
     let mut stack = Vec::<Node>::new();
     let mut scopes = vec![HashMap::<String, String>::new()];
     let mut root = None;
     let mut count = 0usize;
     loop {
         let decoder = reader.decoder();
-        match reader.read_event_into(&mut buf).map_err(xml_error)? {
+        match reader.read_event().map_err(xml_error)? {
             Event::Start(e) => {
                 count += 1;
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
@@ -128,7 +127,6 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Decl(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
             Event::Eof => break,
         }
-        buf.clear();
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated font-table XML"));

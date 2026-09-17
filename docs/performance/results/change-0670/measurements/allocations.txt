@@ -1,0 +1,32 @@
+Change 0670 deterministic allocation isolation
+
+Probe: the retained change-0643 probe, rebuilt in release mode against
+5fa92d7ce (before) and perf/0670-docx-parser-residues (after). Each row is
+(reps=20 - reps=4) / 16 from a fresh process. CARGO_BUILD_JOBS=2,
+CARGO_PROFILE_DEV_DEBUG=0, CARGO_PROFILE_TEST_DEBUG=0. The probe's synthetic
+fixture has the indicated number of direct paragraphs. These counts are
+evidence only; this change registers no performance claim.
+
+operation             shape    before alloc/bytes    after alloc/bytes
+eager_document        24       26 / 2558            26 / 2558
+eager_text            24       42 / 6283            42 / 6283
+eager_write_text      24       69 / 4755            46 / 3605
+source_text           24       42 / 6283            42 / 6283
+source_write_text     24       70 / 4851            47 / 3701
+
+eager_document        200      26 / 2558            26 / 2558
+eager_text            200      45 / 28683           45 / 28683
+eager_write_text      200      245 / 13555          46 / 3605
+source_text           200      45 / 28683           45 / 28683
+source_write_text     200      246 / 13651          47 / 3701
+
+eager_document        10000    26 / 2558            26 / 2558
+eager_text            10000    51 / 1641483         51 / 1641483
+eager_write_text      10000    10045 / 503555       46 / 3605
+source_text           10000    51 / 1641483         51 / 1641483
+source_write_text     10000    10046 / 503651       47 / 3701
+
+The unchanged controls show that the borrowed reader and paragraph buffer do
+not alter eager/source document or text extraction. The sink rows show the
+bounded String reuse effect; the residual 46/47 allocations are operation
+workspace and sink setup, rather than one retained String per paragraph.

@@ -830,6 +830,11 @@ struct SemanticTextParser {
     paragraph_depth: Option<usize>,
     text_depth: Option<usize>,
     paragraph: Option<String>,
+    // Keep one bounded allocation across paragraphs. The parser still checks
+    // each paragraph against MAX_SEMANTIC_TEXT_PARAGRAPH_BYTES before every
+    // reserve and append; this only retains the largest paragraph capacity
+    // until the current write operation finishes.
+    paragraph_buffer: String,
     paragraphs: usize,
     runs: usize,
     decoded_document_bytes: usize,
@@ -1040,6 +1045,7 @@ impl SemanticTextParser {
             writer
                 .write_object::<Error>(TextObjectKind::Paragraph, &paragraph)
                 .map_err(SemanticTextFailure::Output)?;
+            self.paragraph_buffer = paragraph;
         }
         Ok(())
     }
@@ -1123,7 +1129,9 @@ impl SemanticTextParser {
                 let name = element.name();
                 if is_word_element(&namespace, name, b"p") {
                     self.paragraph_depth = Some(self.budget.depth);
-                    self.paragraph = Some(String::new());
+                    let mut paragraph = std::mem::take(&mut self.paragraph_buffer);
+                    paragraph.clear();
+                    self.paragraph = Some(paragraph);
                 } else if is_word_text_name(&namespace, name) {
                     if self.paragraph_depth.is_none() {
                         return Err(SemanticTextFailure::Document(Error::InvalidFormat(
