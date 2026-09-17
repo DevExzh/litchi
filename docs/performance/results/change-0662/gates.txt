@@ -1,0 +1,22 @@
+Change 0662 targeted gates
+===========================
+
+Repository: /home/zhuhe/code/litchi-worktrees/0662
+Branch: perf/0662-parallel-changed-member-deflate
+Base: ab07e2a47
+Build concurrency: CARGO_BUILD_JOBS=2
+
+PASS  CARGO_BUILD_JOBS=2 cargo fmt --all --check
+PASS  CARGO_BUILD_JOBS=2 cargo check -p litchi-core -p soapberry-zip -p litchi-opc --all-targets --locked
+PASS  CARGO_BUILD_JOBS=2 cargo test -p litchi-core -p soapberry-zip -p litchi-opc --all-targets --locked
+      litchi-core: 165 passed, 0 failed in the final targeted run
+      soapberry-zip: 488 unit/library tests plus integration suites passed, 0 failed, 1 ignored in the targeted run
+      litchi-opc: targeted library and integration tests passed, 0 failed
+PASS  CARGO_BUILD_JOBS=2 cargo clippy -p litchi-core -p soapberry-zip -p litchi-opc --all-targets --locked -- -D warnings
+PASS  CARGO_BUILD_JOBS=2 cargo doc -p litchi-core -p soapberry-zip -p litchi-opc --no-deps --locked
+
+The full workspace and consumer-suite gate is intentionally delegated to the
+coordinator after the parallel source-backed branches are cherry-picked. The
+retained timing and scaling probes were not rerun in this validation window;
+their raw outputs are the tables in this packet, each paired with its own A/A
+floor and contention limitation.

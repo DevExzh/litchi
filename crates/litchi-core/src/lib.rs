@@ -51,7 +51,7 @@ pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use execution::{
     AffinityPolicy, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,
-    ExecutionLimits,
+    ExecutionLimits, ScopedWorkers,
 };
 pub use metadata::Metadata;
 pub use patch::{

@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0662",
+  "title": "A publication's changed members deflate in parallel under the caller's execution budget",
+  "decision": "retained, implemented for the managed preservation-write boundary; the remaining ADR 0031 read-session rows stay open",
+  "code_state": "litchi-core execution dimensions and scoped facility; soapberry-zip bounded write session and preservation wave; litchi-opc managed source-backed bridge; retained probes and packet",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "change 0652 decision 6: Parallel deflate accepts ADR 0031; design and balance rule from change 0624; execution-context shape and gates from change 0615",
+  "reason_codes": [
+    "changed Deflate members are independent pure generation tasks and can be prepared before publication without moving the emission fence",
+    "the wave width is derived from the changed-set remainder after its largest member, measured at the ZIP publication boundary rather than assumed from isolated codec timings",
+    "Workers, CpuTasks, worker-state memory, cancellation and an optional caller facility are admitted before the first member is compressed",
+    "published bytes, error order, physical local order, cancellation refusal and sink-untouched budget refusal remain deterministic across widths",
+    "the ordinary save and other routes without an ExecutionContext are explicitly excluded from the speedup scope",
+    "accepted ADR 0031's IoConcurrency and existing read-session composition rows are not silently counted as implemented"
+  ],
+  "accepted_evidence": {
+    "balance_rule": "warm ZIP sweep and cold OPC sweep establish the 8 KiB warm and 64 KiB pool-building remainder thresholds, with the largest-member bound and per-task-floor narrowing",
+    "publication_timing": "paired managed source-backed fixture timings at widths 1/2/4/8 and with a caller facility, with a same-window A/A floor per row",
+    "default_path": "paired harness A/B timing rows for managed and unmanaged selectors, with output digests identical and ordinary-save rows reported without a claim",
+    "identity": "305 admitted OOXML fixtures publish identical digests at every width and on the caller facility; 11 refusal cases retain their text",
+    "determinism": "one width-eight session publishes the same plan seventeen times with identical output",
+    "correctness": "tests cover errors in plan order, cancellation before output, physical-versus-central order, appended members, stored/precompressed exclusions and caller-facility scheduling",
+    "resource_counts": "worker-state minor faults and peak RSS are retained for 200 real publications; the write wave keeps one compressor per member and reserves a measured worker envelope"
+  },
+  "accepted_costs": {
+    "cold_pool": "a 28 KiB remainder loses on a cold pool but wins on a caller facility; the 64 KiB cold threshold is retained from the measured crossover",
+    "dominant_member": "the one-dominant real fixture is 0.976x at width two against a 0.35% A/A floor and 1.21x at widths four and eight; it is reported rather than averaged away",
+    "publication_bound": "the route audits and copies unchanged members, so end-to-end gains are lower than isolated Deflate speedups",
+    "memory": "peak RSS rises with local workers; the write session reserves 640 KiB per admitted worker",
+    "host_contention": "the retained contended window shows large losses on busy CPUs, so no claim is registered"
+  },
+  "known_gaps": {
+    "adr_0031_read_sessions": "Resource::IoConcurrency is absent; soapberry_zip::office::ParallelReadSession remains eager and the CFB bulk and source-backed ordered readers do not consume shared Workers/CpuTasks or a caller ScopedWorkers facility",
+    "ordinary_save": "PackageWriter ordinary saves carry no ExecutionContext or write session and are publication-bound",
+    "other_writers": "the streaming writer, eager PackageWriter path, unmanaged packages and splice/replay path are outside this change",
+    "measurement": "cold-cache, physical-device, cross-platform and compression-level behavior were not measured; instruction counts were not taken",
+    "corpus": "fixture changed sets use deterministic compact re-serialization and do not represent every producer's editor output"
+  },
+  "withheld": [
+    "any registered performance claim",
+    "any saving for an ordinary, eager, unmanaged, streaming or replay publication",
+    "any statement that accepted ADR 0031's three read-session rows are complete"
+  ],
+  "provenance": {
+    "base_commit": "ab07e2a47",
+    "branch": "perf/0662-parallel-changed-member-deflate",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws",
+    "toolchain": "rustc 1.95.0",
+    "validation": "cargo fmt --all --check; cargo check, test and clippy --all-targets for litchi-core, soapberry-zip and litchi-opc with CARGO_BUILD_JOBS=2"
+  }
+}

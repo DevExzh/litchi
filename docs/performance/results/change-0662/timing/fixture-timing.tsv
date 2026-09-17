@@ -1,0 +1,49 @@
+fixture	leg	n	p50_ns	mean_ns	p95_ns	p99_ns	speedup_vs_w1
+no_drawing_patriarch.xlsx	w1	80	84505629	84679718	85792416	87901437	1.000
+no_drawing_patriarch.xlsx	w2	40	86625844	86856029	88702385	92426182	0.976
+no_drawing_patriarch.xlsx	w4	40	69697521	69699946	69893693	70032173	1.212
+no_drawing_patriarch.xlsx	w8	40	69599141	69998448	70042063	83952471	1.214
+no_drawing_patriarch.xlsx	w4+pool	40	70285763	70297263	70758626	70837567	1.202
+no_drawing_patriarch.xlsx	w8+pool	40	69527719	69628947	70196523	70586495	1.215
+no_drawing_patriarch.xlsx	open-only	40	40310	40597	41661	47800	2096.394
+# aa-floor no_drawing_patriarch.xlsx a1=84364594 a2=84656300 spread=0.35%
+ConditionalFormattingSamples.xlsx	w1	80	7094147	7098100	7160439	7172198	1.000
+ConditionalFormattingSamples.xlsx	w2	40	6074263	6050812	6194903	6246123	1.168
+ConditionalFormattingSamples.xlsx	w4	40	5299718	5301318	5346868	5397459	1.339
+ConditionalFormattingSamples.xlsx	w8	40	5169197	5250781	5560989	6488885	1.372
+ConditionalFormattingSamples.xlsx	w4+pool	40	5179867	5271978	5455839	5463889	1.370
+ConditionalFormattingSamples.xlsx	w8+pool	40	4662735	4824189	5034717	9640531	1.521
+ConditionalFormattingSamples.xlsx	open-only	40	472062	475290	489412	588443	15.028
+# aa-floor ConditionalFormattingSamples.xlsx a1=7110688 a2=7075848 spread=0.49%
+slide-section-test.pptx	w1	80	7834872	7847431	7929082	8009893	1.000
+slide-section-test.pptx	w2	40	6737886	6767647	6842016	8939278	1.163
+slide-section-test.pptx	w4	40	6065312	6082505	6206283	6247703	1.292
+slide-section-test.pptx	w8	40	6362764	6395315	6722936	6843517	1.231
+slide-section-test.pptx	w4+pool	40	6072583	6197834	6487264	6588045	1.290
+slide-section-test.pptx	w8+pool	40	5578800	5683087	6236063	6604905	1.404
+slide-section-test.pptx	open-only	40	364911	365317	373552	375612	21.471
+# aa-floor slide-section-test.pptx a1=7834872 a2=7838031 spread=0.04%
+layout-in-cell-2.docx	w1	80	4133712	4139784	4184242	4203162	1.000
+layout-in-cell-2.docx	w2	40	3912681	3915706	3985492	4351473	1.056
+layout-in-cell-2.docx	w4	40	3129626	3129739	3174207	3184957	1.321
+layout-in-cell-2.docx	w8	40	3201297	3215557	3302528	3678540	1.291
+layout-in-cell-2.docx	w4+pool	40	2987856	2989544	3007426	3044956	1.384
+layout-in-cell-2.docx	w8+pool	40	2968376	2972698	2984126	3210007	1.393
+layout-in-cell-2.docx	open-only	40	65330	66459	71731	78520	63.274
+# aa-floor layout-in-cell-2.docx a1=4124482 a2=4158793 spread=0.83%
+shared_formulas.xlsx	w1	80	387642	388001	401512	409092	1.000
+shared_formulas.xlsx	w2	40	385832	387018	400192	406752	1.005
+shared_formulas.xlsx	w4	40	388902	388641	406392	415962	0.997
+shared_formulas.xlsx	w8	40	387853	390069	405332	416013	0.999
+shared_formulas.xlsx	w4+pool	40	274591	273486	288071	301392	1.412
+shared_formulas.xlsx	w8+pool	40	286001	289296	351282	390582	1.355
+shared_formulas.xlsx	open-only	40	39220	39662	44410	48521	9.884
+# aa-floor shared_formulas.xlsx a1=388553 a2=386422 spread=0.55%
+sortconditionref.xlsx	w1	80	271782	273812	293302	301801	1.000
+sortconditionref.xlsx	w2	40	270231	272959	291162	293872	1.006
+sortconditionref.xlsx	w4	40	269002	271130	289201	300982	1.010
+sortconditionref.xlsx	w8	40	270072	271689	290872	295302	1.006
+sortconditionref.xlsx	w4+pool	40	271331	273377	292212	298051	1.002
+sortconditionref.xlsx	w8+pool	40	271761	273473	292092	304811	1.000
+sortconditionref.xlsx	open-only	40	29380	29773	31120	38300	9.251
+# aa-floor sortconditionref.xlsx a1=273451 a2=271411 spread=0.75%

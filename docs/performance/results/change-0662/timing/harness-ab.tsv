@@ -1,0 +1,17 @@
+case	n	before_p50	after_p50	delta_pct	before_p95	after_p95	before_p99	after_p99	aa_floor_pct	output_sha
+docx_ordinary_save_atomic_publish	60	382752	378262	-1.17	393522	392012	401162	395152	0.12	identical
+docx_ordinary_save_lifecycle	60	907185	909255	+0.23	920305	922855	926045	924525	1.26	identical
+docx_source_backed_one_edit_save	60	4602931	4623103	+0.44	4775225	4739734	4799825	4864003	2.29	identical
+opc_source_overlay_multi_part_changed	540	6161802	6076227	-1.39	116872166	116570836	117938462	116885857	3.17	identical
+opc_source_overlay_one_part_save	60	62401644	62483292	+0.13	62655170	62852337	62683381	62966578	0.26	identical
+pptx_ordinary_save_atomic_publish	60	111640	112050	+0.37	121340	121611	121701	124770	1.42	identical
+pptx_ordinary_save_lifecycle	60	2663444	2647734	-0.59	2697734	2674004	2717204	2674843	1.52	identical
+pptx_source_backed_cross_copy_media_rich_lifecycle	60	15299410	12439422	-18.69	15719951	12739905	15927383	12791955	24.44	identical
+pptx_source_backed_one_edit_save	60	7120782	7206346	+1.20	7234413	7364427	7669810	7391627	37.42	identical
+xlsx_eager_cell_values_one_edit_save	120	40464257	39775720	-1.70	40940200	40249986	41093096	40304756	0.32	identical
+xlsx_ordinary_save_atomic_publish	60	2218302	2230841	+0.57	2286662	2259731	2313432	2271021	2.75	identical
+xlsx_ordinary_save_lifecycle	60	8601544	8580332	-0.25	8796615	8752472	8983716	8765302	4.55	identical
+xlsx_source_backed_cell_values_one_edit_save	120	28981174	29200176	+0.76	29933575	30304638	30089977	30398438	1.82	identical
+xlsx_source_backed_cell_values_one_percent_edit_save	120	32798703	33056721	+0.79	33509502	33855804	33622092	34039180	1.09	identical
+xlsx_source_backed_managed_cell_values_one_edit_save	120	29120635	29298787	+0.61	29777093	30038326	29895813	30239357	1.11	identical
+xlsx_source_backed_managed_cell_values_one_percent_edit_save	120	32674113	32904801	+0.71	33425051	33739825	33604872	34085281	1.17	identical

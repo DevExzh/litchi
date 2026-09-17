@@ -8,6 +8,7 @@
 
 use crate::office::ArchiveLimits;
 use crate::office::VerifiedPrecompressedEntry;
+use crate::office::{CancellationProbe, ParallelWriteLimits, ParallelWriteSession};
 use crate::writer::{ReusableDeflateState, ReusedDeflateEncoder};
 use crate::{
     CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
@@ -17,7 +18,9 @@ use crate::{
 };
 use std::io::Write;
 use std::mem::size_of;
+use std::num::NonZeroUsize;
 use std::ops::Range;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
 mod replay;
@@ -232,6 +235,102 @@ pub enum PreservationAction {
     },
 }
 
+/// The compression wave a [`PreservationPlan`] admits under a write policy.
+///
+/// A wave is decided before any member is compressed, from the plan alone. Its
+/// width is what the *balance* of the changed set justifies, not what the
+/// set's total size suggests: the time a split can remove is the total minus
+/// the largest member, because that member is the longest pole however many
+/// workers are available. A plan whose changed set is one dominant member and
+/// a few small ones is therefore a serial wave at every requested width.
+///
+/// A width of one is the sequential path this crate has always taken, byte for
+/// byte and error for error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DeflateWave {
+    tasks: usize,
+    width: NonZeroUsize,
+    total_bytes: u64,
+    largest_bytes: u64,
+}
+
+impl DeflateWave {
+    /// Number of regenerated members this wave would compress.
+    #[must_use]
+    pub const fn tasks(self) -> usize {
+        self.tasks
+    }
+
+    /// Granted width. One means the sequential path.
+    #[must_use]
+    pub const fn width(self) -> NonZeroUsize {
+        self.width
+    }
+
+    /// Whether the wave would use more than one worker.
+    #[must_use]
+    pub const fn is_parallel(self) -> bool {
+        self.width.get() > 1
+    }
+
+    /// Total declared payload of the regenerated members, in bytes.
+    #[must_use]
+    pub const fn total_bytes(self) -> u64 {
+        self.total_bytes
+    }
+
+    /// Declared payload of the largest regenerated member, in bytes.
+    #[must_use]
+    pub const fn largest_bytes(self) -> u64 {
+        self.largest_bytes
+    }
+
+    /// Payload left once the longest pole is placed, in bytes.
+    #[must_use]
+    pub const fn remainder_bytes(self) -> u64 {
+        self.total_bytes.saturating_sub(self.largest_bytes)
+    }
+
+    /// Narrows this wave to at most `width` workers.
+    ///
+    /// A caller whose own budget granted fewer permits than the policy asked
+    /// for narrows the wave and proceeds; it never fails for that reason.
+    #[must_use]
+    pub fn narrowed_to(mut self, width: NonZeroUsize) -> Self {
+        if width < self.width {
+            self.width = width;
+        }
+        self
+    }
+}
+
+/// Declared payload length of a regenerated member that a worker would
+/// compress, or `None` when the member takes a bounded direct path.
+///
+/// Precompressed members are framed from bytes that are already compressed and
+/// stored members are copied, so neither is a compression task.
+fn deflate_task_len(entry: &RegeneratedEntry) -> Option<u64> {
+    if entry.compression != CompressionMethod::Deflate {
+        return None;
+    }
+    match &entry.data {
+        RegeneratedPayload::Owned(data) => Some(data.len() as u64),
+        RegeneratedPayload::Shared(data) => Some(data.len() as u64),
+        RegeneratedPayload::Precompressed(_) => None,
+    }
+}
+
+fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &RegeneratedEntry> {
+    plan.actions
+        .iter()
+        .filter_map(|action| match action {
+            PreservationAction::Regenerate { entry, .. } => Some(entry),
+            PreservationAction::Copy(_) | PreservationAction::Omit(_) => None,
+        })
+        .chain(plan.appended.iter())
+        .filter(|entry| deflate_task_len(entry).is_some())
+}
+
 /// A complete rewrite plan for a [`PreservationIndex`].
 ///
 /// A plan must mention every source ID exactly once. The action list itself is
@@ -309,6 +408,57 @@ impl PreservationPlan {
     /// Generated members in their requested append order.
     pub fn appended(&self) -> &[RegeneratedEntry] {
         &self.appended
+    }
+
+    /// Decides the compression wave this plan admits under `limits`.
+    ///
+    /// The decision is made from the plan alone, before any member is
+    /// compressed, and is purely advisory: a caller that ignores it, or passes
+    /// the returned wave to
+    /// [`PreservationIndex::write_to_with_session`](crate::PreservationIndex::write_to_with_session)
+    /// after narrowing it, gets the same bytes either way.
+    ///
+    /// Three conditions must all hold for a wave wider than one:
+    ///
+    /// 1. at least two regenerated members are deflate compression tasks
+    ///    (stored and already-compressed members are copied, not compressed);
+    /// 2. the payload remaining once the largest member is placed is at least
+    ///    [`ParallelWriteLimits::min_parallelizable_bytes`];
+    /// 3. that remainder supports the width at the policy's per-task floor,
+    ///    which caps the width at `1 + remainder / min_task_bytes`.
+    #[must_use]
+    pub fn deflate_wave(&self, limits: ParallelWriteLimits) -> DeflateWave {
+        let mut tasks = 0_usize;
+        let mut total_bytes = 0_u64;
+        let mut largest_bytes = 0_u64;
+        for entry in plan_deflate_tasks(self) {
+            let bytes = deflate_task_len(entry).unwrap_or_default();
+            tasks = tasks.saturating_add(1);
+            total_bytes = total_bytes.saturating_add(bytes);
+            largest_bytes = largest_bytes.max(bytes);
+        }
+        let remainder = total_bytes.saturating_sub(largest_bytes);
+        let mut width = 1_usize;
+        if tasks >= 2 && remainder >= limits.min_parallelizable_bytes() {
+            width = limits
+                .workers()
+                .get()
+                .min(limits.max_in_flight_tasks().get())
+                .min(tasks);
+            if limits.min_task_bytes() > 0 {
+                let by_floor = usize::try_from(remainder / limits.min_task_bytes())
+                    .unwrap_or(usize::MAX)
+                    .saturating_add(1);
+                width = width.min(by_floor);
+            }
+            width = width.max(1);
+        }
+        DeflateWave {
+            tasks,
+            width: NonZeroUsize::new(width).unwrap_or(NonZeroUsize::MIN),
+            total_bytes,
+            largest_bytes,
+        }
     }
 }
 
@@ -767,13 +917,103 @@ where
     pub fn write_to_with_accounting<W>(
         &self,
         plan: &PreservationPlan,
-        mut sink: W,
+        sink: W,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<W, Error>
     where
         W: Write,
     {
-        let mut prepared = self.prepare(plan)?;
+        self.write_prepared(plan, sink, accounting, None)
+    }
+
+    /// Validates `plan` completely, then writes it to a non-seekable sink,
+    /// compressing its regenerated members on an explicit write session.
+    ///
+    /// `wave` is the plan's own verdict from
+    /// [`PreservationPlan::deflate_wave`], optionally narrowed by the caller's
+    /// budget. A wave of width one takes exactly the sequential path
+    /// [`write_to`](Self::write_to) takes, builds no pool, and starts no
+    /// thread.
+    ///
+    /// Scheduling decides only *when* a member is compressed. Which bytes each
+    /// member contributes, the physical order of local records, the
+    /// central-directory order and every typed refusal are all unchanged: a
+    /// member's compressed form is a pure function of that member, and the
+    /// first error in plan order is the error returned, never the first error
+    /// in time.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`write_to`](Self::write_to), plus a typed
+    /// failure when a local worker pool cannot be created, and
+    /// [`ErrorKind::Cancelled`] when `cancellation` reports cancellation
+    /// before or during the wave — in which case nothing has been written to
+    /// `sink`, because every member is compressed before the first byte is
+    /// emitted.
+    pub fn write_to_with_session<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_accounting_and_session(
+            plan,
+            sink,
+            &mut accounting,
+            session,
+            wave,
+            cancellation,
+        )
+    }
+
+    /// [`write_to_with_session`](Self::write_to_with_session) while recording
+    /// unchanged source bytes accepted by the publication sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as
+    /// [`write_to_with_session`](Self::write_to_with_session).
+    pub fn write_to_with_accounting_and_session<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        self.write_prepared(
+            plan,
+            sink,
+            accounting,
+            Some(ScheduledWave {
+                session,
+                wave,
+                cancellation,
+            }),
+        )
+    }
+
+    fn write_prepared<W>(
+        &self,
+        plan: &PreservationPlan,
+        mut sink: W,
+        accounting: &mut ZipOperationAccounting,
+        scheduled: Option<ScheduledWave<'_>>,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut prepared = self.prepare_with(plan, scheduled)?;
         let layout = self.validate_output_layout(&mut prepared)?;
 
         let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
@@ -838,6 +1078,14 @@ where
     }
 
     fn prepare(&self, plan: &PreservationPlan) -> Result<Vec<PreparedEntry>, Error> {
+        self.prepare_with(plan, None)
+    }
+
+    fn prepare_with(
+        &self,
+        plan: &PreservationPlan,
+        scheduled: Option<ScheduledWave<'_>>,
+    ) -> Result<Vec<PreparedEntry>, Error> {
         if plan.actions.len() != self.entries.len() {
             return Err(unsupported("plan does not cover every entry exactly once"));
         }
@@ -868,6 +1116,23 @@ where
                 "new members are unsupported with local and central filename mismatch",
             ));
         }
+
+        // Every regenerated member is compressed before the first local record
+        // is emitted, so scheduling the compression cannot move the emission
+        // boundary and a cancelled wave leaves the sink untouched.
+        let mut compressed = match scheduled {
+            Some(scheduled) if scheduled.wave.is_parallel() => {
+                if scheduled.cancellation.is_cancelled() {
+                    return Err(crate::office::cancelled_error());
+                }
+                let compressed = compress_deflate_wave(plan, &scheduled)?;
+                if scheduled.cancellation.is_cancelled() {
+                    return Err(crate::office::cancelled_error());
+                }
+                Some(compressed)
+            },
+            Some(_) | None => None,
+        };
 
         let mut prepared = Vec::new();
         prepared
@@ -903,7 +1168,7 @@ where
                         generated_payload: None,
                         omitted: false,
                     },
-                    Some(entry) => generated_entry(entry)?,
+                    Some(entry) => take_prepared_entry(compressed.as_mut(), entry)?,
                 }
             });
         }
@@ -923,7 +1188,7 @@ where
             );
         }
         for entry in &plan.appended {
-            complete.push(generated_entry(entry)?);
+            complete.push(take_prepared_entry(compressed.as_mut(), entry)?);
         }
         Ok(complete)
     }
@@ -2067,6 +2332,128 @@ fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<
     Ok(member_bound >= zip32_boundary)
 }
 
+/// An explicit compression wave handed to [`PreservationIndex::write_to_with_session`].
+struct ScheduledWave<'a> {
+    session: &'a ParallelWriteSession,
+    wave: DeflateWave,
+    cancellation: &'a dyn CancellationProbe,
+}
+
+/// Compressed members waiting to be placed, in plan order.
+struct CompressedWave {
+    results: Vec<Option<Result<PreparedEntry, Error>>>,
+    next: usize,
+}
+
+impl CompressedWave {
+    fn take_next(&mut self) -> Option<Result<PreparedEntry, Error>> {
+        let result = self.results.get_mut(self.next).and_then(Option::take);
+        self.next = self.next.saturating_add(1);
+        result
+    }
+}
+
+/// Places one regenerated member, taking the scheduled result when the member
+/// was a compression task and compressing it here when it was not.
+///
+/// The cursor advances in plan order, which is the order the wave collected
+/// its tasks in, so a member always receives its own compressed bytes.
+fn take_prepared_entry(
+    compressed: Option<&mut CompressedWave>,
+    entry: &RegeneratedEntry,
+) -> Result<PreparedEntry, Error> {
+    if deflate_task_len(entry).is_some() {
+        if let Some(compressed) = compressed {
+            if let Some(result) = compressed.take_next() {
+                return result;
+            }
+        }
+    }
+    generated_entry(entry)
+}
+
+/// Compresses every regenerated deflate member of `plan` on the scheduled
+/// session, in an unspecified order, into a plan-ordered result list.
+///
+/// `generated_entry` is a pure function of one member: it borrows nothing from
+/// the index, touches no shared state and returns an owned mini-archive. That
+/// is what makes the order it runs in unobservable in the published bytes.
+fn compress_deflate_wave(
+    plan: &PreservationPlan,
+    scheduled: &ScheduledWave<'_>,
+) -> Result<CompressedWave, Error> {
+    let mut entries: Vec<&RegeneratedEntry> = Vec::new();
+    entries
+        .try_reserve_exact(scheduled.wave.tasks())
+        .map_err(|source| allocation("scheduled deflate wave", source))?;
+    entries.extend(plan_deflate_tasks(plan));
+
+    let mut results: Vec<Option<Result<PreparedEntry, Error>>> = Vec::new();
+    results
+        .try_reserve_exact(entries.len())
+        .map_err(|source| allocation("scheduled deflate wave results", source))?;
+    results.resize_with(entries.len(), || None);
+
+    let mut pairs: Vec<(
+        usize,
+        &RegeneratedEntry,
+        &mut Option<Result<PreparedEntry, Error>>,
+    )> = Vec::new();
+    pairs
+        .try_reserve_exact(entries.len())
+        .map_err(|source| allocation("scheduled deflate wave tasks", source))?;
+    pairs.extend(
+        entries
+            .iter()
+            .copied()
+            .zip(results.iter_mut())
+            .enumerate()
+            .map(|(ordinal, (entry, slot))| (ordinal, entry, slot)),
+    );
+    // Longest pole first. The time a split can remove is bounded by the
+    // largest member, so a worker must never pick that member up last.
+    pairs.sort_by_key(|(_, entry, _)| {
+        std::cmp::Reverse(deflate_task_len(entry).unwrap_or_default())
+    });
+
+    let cancellation = scheduled.cancellation;
+    let mut closures: Vec<_> = Vec::new();
+    closures
+        .try_reserve_exact(pairs.len())
+        .map_err(|source| allocation("scheduled deflate wave workers", source))?;
+    closures.extend(pairs.into_iter().map(|(ordinal, entry, slot)| {
+        move || {
+            // Cancellation is observed between members, never inside one: a
+            // member that has started is always finished, so no partially
+            // compressed member can reach the plan.
+            if cancellation.is_cancelled() {
+                *slot = Some(Err(crate::office::cancelled_error()));
+                return;
+            }
+            let prepared = catch_unwind(AssertUnwindSafe(|| generated_entry(entry)))
+                .unwrap_or_else(|_| Err(ErrorKind::ParallelWriteWorkerPanic { ordinal }.into()));
+            *slot = Some(prepared);
+        }
+    }));
+
+    let mut tasks: Vec<&mut (dyn FnMut() + Send)> = Vec::new();
+    tasks
+        .try_reserve_exact(closures.len())
+        .map_err(|source| allocation("scheduled deflate wave schedule", source))?;
+    tasks.extend(
+        closures
+            .iter_mut()
+            .map(|task| task as &mut (dyn FnMut() + Send)),
+    );
+    let outcome = scheduled
+        .session
+        .run_tasks(scheduled.wave.width(), &mut tasks);
+    drop(tasks);
+    drop(closures);
+    outcome?;
+    Ok(CompressedWave { results, next: 0 })
+}
+
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
     // Sized members already have their final CRC and sizes. Prepare only the
     // local/central framing at offset zero and retain the verified/shared
@@ -2642,6 +3029,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::office::DEFAULT_MIN_PARALLELIZABLE_BYTES;
     use flate2::{Compression, write::DeflateEncoder};
     use std::{
         cell::RefCell,
@@ -2740,6 +3128,378 @@ mod tests {
         deflated_file(&mut writer, "second.bin", b"deflated data");
         writer.new_dir("folder/").create().unwrap();
         writer.finish().unwrap()
+    }
+
+    fn scheduled_limits(workers: usize) -> ParallelWriteLimits {
+        ParallelWriteLimits::with_default_thresholds(
+            NonZeroUsize::new(workers).unwrap(),
+            NonZeroUsize::new(workers.max(64)).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[derive(Debug)]
+    struct NeverCancelled;
+
+    impl CancellationProbe for NeverCancelled {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+    }
+
+    #[derive(Debug)]
+    struct AlwaysCancelled;
+
+    impl CancellationProbe for AlwaysCancelled {
+        fn is_cancelled(&self) -> bool {
+            true
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct CountingScopedWorkers {
+        waves: std::sync::atomic::AtomicUsize,
+        tasks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::office::ScopedWorkers for CountingScopedWorkers {
+        fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]) {
+            self.waves
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.tasks
+                .fetch_add(tasks.len(), std::sync::atomic::Ordering::Relaxed);
+            for task in tasks.iter_mut() {
+                task();
+            }
+        }
+    }
+
+    /// A source archive of `count` deflate members, each `bytes` long and
+    /// compressible but not trivially so.
+    fn deflate_member_archive(count: usize, bytes: usize) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        for index in 0..count {
+            deflated_file(
+                &mut writer,
+                &format!("member-{index:04}.xml"),
+                &payload(index, bytes),
+            );
+        }
+        writer.finish().unwrap()
+    }
+
+    fn payload(seed: usize, bytes: usize) -> Vec<u8> {
+        let mut data = Vec::with_capacity(bytes);
+        let mut state = (seed as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15).max(1);
+        while data.len() < bytes {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let word = format!("<c r=\"{}\" v=\"{}\"/>", state % 4096, state % 97);
+            data.extend_from_slice(word.as_bytes());
+        }
+        data.truncate(bytes);
+        data
+    }
+
+    fn regenerate_all(
+        index: &PreservationIndex<'_, impl ReaderAt>,
+        bytes: usize,
+    ) -> PreservationPlan {
+        let mut plan = PreservationPlan::copy_all(index);
+        for (ordinal, entry) in index.entries().iter().enumerate() {
+            plan.actions[ordinal] = PreservationAction::Regenerate {
+                id: entry.id(),
+                entry: RegeneratedEntry::new(
+                    String::from_utf8(entry.raw_name_bytes().to_vec()).unwrap(),
+                    payload(ordinal + 1_000, bytes),
+                )
+                .compression_method(CompressionMethod::Deflate),
+            };
+        }
+        plan
+    }
+
+    #[test]
+    fn a_scheduled_wave_publishes_the_sequential_bytes_at_every_width() {
+        let data = deflate_member_archive(24, 6 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 6 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+
+        for workers in [1_usize, 2, 4, 8] {
+            let limits = scheduled_limits(workers);
+            let session = ParallelWriteSession::new(limits);
+            let wave = plan.deflate_wave(limits);
+            assert_eq!(wave.tasks(), 24);
+            assert_eq!(wave.is_parallel(), workers > 1, "width {workers}");
+            let scheduled = index
+                .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+                .unwrap();
+            assert_eq!(scheduled, sequential, "width {workers} changed the bytes");
+            assert_eq!(
+                session.local_pool_worker_count(),
+                if workers > 1 { workers } else { 0 },
+                "width {workers} built the wrong pool",
+            );
+        }
+    }
+
+    #[test]
+    fn a_scheduled_wave_is_deterministic_across_repeated_publications() {
+        let data = deflate_member_archive(16, 9 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 9 * 1024);
+        let limits = scheduled_limits(8);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        let first = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        for _ in 0..16 {
+            let again = index
+                .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+                .unwrap();
+            assert_eq!(again, first);
+        }
+        assert_eq!(session.local_pool_worker_count(), 8);
+    }
+
+    #[test]
+    fn a_caller_facility_replaces_the_local_pool_and_keeps_the_bytes() {
+        let data = deflate_member_archive(12, 5 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 5 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+
+        let limits = scheduled_limits(4);
+        let workers = Arc::new(CountingScopedWorkers::default());
+        let facility: Arc<dyn crate::office::ScopedWorkers> = workers.clone();
+        let session = ParallelWriteSession::with_scoped_workers(limits, facility);
+        let wave = plan.deflate_wave(limits);
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+
+        assert_eq!(scheduled, sequential);
+        assert_eq!(session.local_pool_worker_count(), 0);
+        assert_eq!(workers.waves.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(workers.tasks.load(std::sync::atomic::Ordering::Relaxed), 12);
+    }
+
+    #[test]
+    fn a_cold_session_admits_a_wave_only_from_the_larger_remainder() {
+        let data = deflate_member_archive(16, 2 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 2 * 1024);
+        let limits = scheduled_limits(4);
+        // 15 * 2 KiB of remainder clears the warm threshold and not the pool one.
+        assert!(plan.deflate_wave(limits).is_parallel());
+
+        let cold = ParallelWriteSession::new(limits);
+        assert!(!cold.wave_for(&plan).is_parallel());
+
+        let facility: Arc<dyn crate::office::ScopedWorkers> =
+            Arc::new(crate::office::SerialScopedWorkers);
+        let warm = ParallelWriteSession::with_scoped_workers(limits, facility);
+        assert!(warm.wave_for(&plan).is_parallel());
+
+        // Once a pool exists, the session is warm and admits the same wave.
+        let wide = deflate_member_archive(40, 4 * 1024);
+        let (wide_archive, mut wide_buffer) = indexed(&wide);
+        let wide_index = PreservationIndex::new(&wide_archive, &mut wide_buffer).unwrap();
+        let wide_plan = regenerate_all(&wide_index, 4 * 1024);
+        assert!(cold.wave_for(&wide_plan).is_parallel());
+        wide_index
+            .write_to_with_session(
+                &wide_plan,
+                Vec::new(),
+                &cold,
+                cold.wave_for(&wide_plan),
+                &NeverCancelled,
+            )
+            .unwrap();
+        assert!(cold.local_pool_worker_count() > 0);
+        assert!(cold.wave_for(&plan).is_parallel());
+    }
+
+    #[test]
+    fn the_balance_rule_keeps_a_single_dominant_member_serial() {
+        let data = deflate_member_archive(2, 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("member-0000.xml", payload(7, 4 * 1024 * 1024))
+                .compression_method(CompressionMethod::Deflate),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new("member-0001.xml", payload(8, 631))
+                .compression_method(CompressionMethod::Deflate),
+        };
+
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 2);
+        assert_eq!(wave.largest_bytes(), 4 * 1024 * 1024);
+        assert_eq!(wave.remainder_bytes(), 631);
+        assert!(!wave.is_parallel(), "a single pole cannot be split");
+    }
+
+    #[test]
+    fn the_balance_rule_admits_many_small_members_and_narrows_by_the_task_floor() {
+        let data = deflate_member_archive(40, 871);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 871);
+
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 40);
+        assert_eq!(wave.total_bytes(), 40 * 871);
+        // The default policy imposes no per-task floor, so the policy's own
+        // width of eight binds.
+        assert_eq!(wave.width().get(), 8);
+
+        let narrow = ParallelWriteLimits::new(
+            NonZeroUsize::new(8).unwrap(),
+            NonZeroUsize::new(64).unwrap(),
+            DEFAULT_MIN_PARALLELIZABLE_BYTES,
+            DEFAULT_MIN_PARALLELIZABLE_BYTES,
+            16 * 1024,
+        )
+        .unwrap();
+        assert_eq!(plan.deflate_wave(narrow).width().get(), 3);
+    }
+
+    #[test]
+    fn stored_and_precompressed_members_are_never_compression_tasks() {
+        let data = deflate_member_archive(3, 2048);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("member-0000.xml", payload(1, 64 * 1024)),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new_precompressed_shared(
+                "member-0001.xml",
+                verified_precompressed_token(CompressionMethod::Deflate, &payload(2, 64 * 1024)),
+            ),
+        };
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 0);
+        assert!(!wave.is_parallel());
+    }
+
+    #[test]
+    fn a_scheduled_wave_returns_the_sequential_error_in_plan_order() {
+        let data = deflate_member_archive(6, 4 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = regenerate_all(&index, 4 * 1024);
+        // Two members that the writer refuses, so the error returned is the
+        // one earliest in plan order rather than the one that failed first.
+        for ordinal in [2_usize, 4] {
+            plan.actions[ordinal] = PreservationAction::Regenerate {
+                id: index.entries()[ordinal].id(),
+                entry: RegeneratedEntry::new(
+                    format!("{}{}", "x".repeat(70_000), ordinal),
+                    payload(ordinal, 4 * 1024),
+                )
+                .compression_method(CompressionMethod::Deflate),
+            };
+        }
+
+        let sequential = index
+            .write_to(&plan, Vec::new())
+            .expect_err("an over-long member name is refused");
+        let limits = scheduled_limits(8);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert!(wave.is_parallel());
+        let mut sink = b"untouched".to_vec();
+        let scheduled = index
+            .write_to_with_session(&plan, &mut sink, &session, wave, &NeverCancelled)
+            .expect_err("an over-long member name is refused at every width");
+        assert_eq!(scheduled.to_string(), sequential.to_string());
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn a_cancelled_wave_publishes_nothing() {
+        let data = deflate_member_archive(12, 8 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 8 * 1024);
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to_with_session(&plan, &mut sink, &session, wave, &AlwaysCancelled)
+            .expect_err("a cancelled wave refuses");
+        assert!(matches!(error.kind(), ErrorKind::Cancelled));
+        assert_eq!(sink, b"untouched");
+        assert_eq!(session.local_pool_worker_count(), 0);
+    }
+
+    #[test]
+    fn a_scheduled_wave_preserves_physical_order_when_central_order_differs() {
+        let mut data = deflate_member_archive(8, 3 * 1024);
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&data[central..])
+                .unwrap()
+                .variable_length();
+        let first = data[central..central + first_len].to_vec();
+        let rest = data[central + first_len..eocd].to_vec();
+        data[central..eocd].copy_from_slice(&[rest, first].concat());
+
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = regenerate_all(&index, 3 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert!(wave.is_parallel());
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        assert_eq!(scheduled, sequential);
+    }
+
+    #[test]
+    fn an_appended_member_is_scheduled_with_the_regenerated_ones() {
+        let data = deflate_member_archive(6, 5 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = regenerate_all(&index, 5 * 1024);
+        plan.try_append(
+            RegeneratedEntry::new("appended.xml", payload(99, 5 * 1024))
+                .compression_method(CompressionMethod::Deflate),
+        )
+        .unwrap();
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert_eq!(wave.tasks(), 7);
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        assert_eq!(scheduled, sequential);
+        let reader = crate::office::ArchiveReader::new(&scheduled).unwrap();
+        assert_eq!(reader.read("appended.xml").unwrap(), payload(99, 5 * 1024));
     }
 
     fn verified_precompressed_token(

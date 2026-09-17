@@ -10,7 +10,7 @@ use thiserror::Error;
 
 type ChargedNodes = SmallVec<[Arc<Node>; 4]>;
 
-const RESOURCE_COUNT: usize = 6;
+const RESOURCE_COUNT: usize = 8;
 
 /// Resource dimensions charged by parsing, editing, and serialization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -22,6 +22,19 @@ pub enum Resource {
     Objects,
     Depth,
     Work,
+    /// Peak concurrency permits for worker threads or executor slots held by
+    /// an operation.
+    ///
+    /// Reserved before the first task starts and released when the workers are
+    /// joined, so a parent budget bounds the sum of every child session's
+    /// width rather than each session's own policy value.
+    Workers,
+    /// Cumulative count of scheduled CPU work units.
+    ///
+    /// Counted in tasks, not bytes: one deflate, decompression, parse or
+    /// validation unit is one task. Consumed like [`Resource::Work`] and never
+    /// released.
+    CpuTasks,
 }
 
 impl Resource {
@@ -33,6 +46,8 @@ impl Resource {
             Self::Objects => 3,
             Self::Depth => 4,
             Self::Work => 5,
+            Self::Workers => 6,
+            Self::CpuTasks => 7,
         }
     }
 }
@@ -53,6 +68,10 @@ pub struct Limits {
 
 impl Limits {
     /// Creates a fully explicit finite limit set.
+    ///
+    /// [`Resource::Workers`] and [`Resource::CpuTasks`] are left unbounded;
+    /// [`Limits::with_execution`] sets them. Every caller that predates those
+    /// two dimensions therefore keeps exactly its current meaning.
     #[must_use]
     pub const fn new(
         memory: u64,
@@ -63,8 +82,29 @@ impl Limits {
         work: u64,
     ) -> Self {
         Self {
-            values: [memory, input_bytes, output_bytes, objects, depth, work],
+            values: [
+                memory,
+                input_bytes,
+                output_bytes,
+                objects,
+                depth,
+                work,
+                u64::MAX,
+                u64::MAX,
+            ],
         }
+    }
+
+    /// Bounds the two execution dimensions of this limit set.
+    ///
+    /// `workers` is the peak number of worker threads or executor slots every
+    /// operation charged against this budget may hold at once; `cpu_tasks` is
+    /// the cumulative number of CPU work units they may schedule.
+    #[must_use]
+    pub const fn with_execution(mut self, workers: u64, cpu_tasks: u64) -> Self {
+        self.values[Resource::Workers.index()] = workers;
+        self.values[Resource::CpuTasks.index()] = cpu_tasks;
+        self
     }
 
     /// Conservative named defaults. Workload-specific limits remain explicit.
@@ -75,8 +115,10 @@ impl Limits {
         match profile {
             Profile::Server => {
                 Self::new(256 * MIB, 2 * GIB, 4 * GIB, 10_000_000, 256, 1_000_000_000)
+                    .with_execution(64, 1_000_000)
             },
-            Profile::Desktop => Self::new(GIB, 8 * GIB, 16 * GIB, 50_000_000, 512, 5_000_000_000),
+            Profile::Desktop => Self::new(GIB, 8 * GIB, 16 * GIB, 50_000_000, 512, 5_000_000_000)
+                .with_execution(256, 5_000_000),
             Profile::TrustedBatch => Self::new(
                 4 * GIB,
                 64 * GIB,
@@ -84,7 +126,8 @@ impl Limits {
                 250_000_000,
                 1024,
                 50_000_000_000,
-            ),
+            )
+            .with_execution(1024, 50_000_000),
         }
     }
 

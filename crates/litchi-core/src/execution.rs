@@ -40,6 +40,7 @@ pub struct ExecutionLimits {
     max_in_flight_tasks: NonZeroUsize,
     max_in_flight_bytes: NonZeroU64,
     min_parallel_bytes: u64,
+    min_task_bytes: u64,
     affinity: AffinityPolicy,
 }
 
@@ -97,8 +98,32 @@ impl ExecutionLimits {
             max_in_flight_tasks,
             max_in_flight_bytes,
             min_parallel_bytes,
+            min_task_bytes: 0,
             affinity,
         })
+    }
+
+    /// Sets the per-task size floor, in declared bytes.
+    ///
+    /// `min_parallel_bytes` is an *aggregate* threshold: a batch of many small
+    /// tasks clears it while every individual task stays far too small to pay
+    /// for scheduling. This floor is per task, and an operation whose tasks
+    /// are below it stays serial even when the aggregate qualifies. Zero, the
+    /// default, imposes no per-task floor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`ExecutionError`] when the floor exceeds the finite
+    /// in-flight byte ceiling, which would make every task ineligible.
+    pub fn with_min_task_bytes(mut self, min_task_bytes: u64) -> Result<Self, ExecutionError> {
+        if min_task_bytes > self.max_in_flight_bytes.get() {
+            return Err(ExecutionError::TaskFloorExceedsInFlightBytes {
+                min_task_bytes,
+                max_in_flight_bytes: self.max_in_flight_bytes,
+            });
+        }
+        self.min_task_bytes = min_task_bytes;
+        Ok(self)
     }
 
     /// Maximum number of workers a runtime adapter may create.
@@ -125,11 +150,39 @@ impl ExecutionLimits {
         self.min_parallel_bytes
     }
 
+    /// Smallest individual task size for which parallel scheduling is
+    /// eligible. Zero imposes no per-task floor.
+    #[must_use]
+    pub const fn min_task_bytes(self) -> u64 {
+        self.min_task_bytes
+    }
+
     /// Affinity policy selected by the caller.
     #[must_use]
     pub const fn affinity(self) -> AffinityPolicy {
         self.affinity
     }
+}
+
+/// A caller-provided facility that runs a bounded set of borrowed tasks.
+///
+/// Attaching one to an [`ExecutionContext`] replaces every private worker pool
+/// a session would otherwise build with the caller's own executor. The core
+/// crate defines this trait and implements it over no runtime: it creates no
+/// threads and depends on no scheduler.
+///
+/// Tasks are borrowed rather than `'static` because every session in this
+/// workspace hands its workers borrowed package, archive and source state; a
+/// `'static` facility would force a copy of exactly the bytes the library
+/// exists not to copy.
+pub trait ScopedWorkers: Send + Sync + std::fmt::Debug {
+    /// Runs every task exactly once and returns only after all have returned.
+    ///
+    /// Tasks may run on any thread, in any order, concurrently or serially. A
+    /// task never unwinds: callers hand this facility tasks that have already
+    /// caught their own panics, so an implementation never has to decide what
+    /// a panicking task means.
+    fn run_all(&self, tasks: &mut [&mut (dyn FnMut() + Send)]);
 }
 
 /// Handle used by an operation owner to request cooperative cancellation.
@@ -206,6 +259,7 @@ pub struct ExecutionContext {
     budget: Budget,
     cancellation: CancellationToken,
     limits: ExecutionLimits,
+    scoped_workers: Option<Arc<dyn ScopedWorkers>>,
 }
 
 impl ExecutionContext {
@@ -216,7 +270,25 @@ impl ExecutionContext {
             budget,
             cancellation,
             limits,
+            scoped_workers: None,
         }
+    }
+
+    /// Attaches a caller-provided worker facility to this context.
+    ///
+    /// Every session that honours this context runs its tasks on `workers`
+    /// instead of building a private pool. The facility is the caller's; the
+    /// library never installs a process-global one.
+    #[must_use]
+    pub fn with_scoped_workers(mut self, workers: Arc<dyn ScopedWorkers>) -> Self {
+        self.scoped_workers = Some(workers);
+        self
+    }
+
+    /// Worker facility attached by the caller, if any.
+    #[must_use]
+    pub fn scoped_workers(&self) -> Option<&Arc<dyn ScopedWorkers>> {
+        self.scoped_workers.as_ref()
     }
 
     /// Shared hierarchical budget charged by this context.
@@ -304,6 +376,17 @@ pub enum ExecutionError {
         max_in_flight_bytes: NonZeroU64,
     },
 
+    /// The per-task floor would never fit in the byte ceiling.
+    #[error(
+        "execution policy requires {min_task_bytes} byte(s) per task, exceeding the {max_in_flight_bytes} in-flight byte ceiling"
+    )]
+    TaskFloorExceedsInFlightBytes {
+        /// Minimum individual task size eligible for parallel scheduling.
+        min_task_bytes: u64,
+        /// Configured outstanding-byte ceiling.
+        max_in_flight_bytes: NonZeroU64,
+    },
+
     /// A hierarchical resource budget rejected the requested charge.
     #[error(transparent)]
     ResourceLimit(#[from] ResourceLimit),
@@ -350,6 +433,7 @@ mod tests {
         assert_eq!(limits.max_in_flight_tasks().get(), 4);
         assert_eq!(limits.max_in_flight_bytes().get(), 1024);
         assert_eq!(limits.min_parallel_bytes(), 256);
+        assert_eq!(limits.min_task_bytes(), 0);
         assert_eq!(limits.affinity(), AffinityPolicy::Inherit);
     }
 
@@ -383,6 +467,25 @@ mod tests {
                 max_in_flight_bytes: NonZeroU64::new(7).unwrap(),
             })
         );
+    }
+
+    #[test]
+    fn limits_reject_task_floor_above_byte_cap() {
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroUsize::new(2).unwrap(),
+            NonZeroU64::new(7).unwrap(),
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            limits.with_min_task_bytes(8),
+            Err(ExecutionError::TaskFloorExceedsInFlightBytes {
+                min_task_bytes: 8,
+                max_in_flight_bytes: NonZeroU64::new(7).unwrap(),
+            })
+        );
+        assert_eq!(limits.with_min_task_bytes(7).unwrap().min_task_bytes(), 7);
     }
 
     #[test]
