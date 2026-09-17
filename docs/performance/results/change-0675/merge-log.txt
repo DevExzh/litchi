@@ -1,0 +1,23 @@
+Starting branch feat/office-format-completeness at 5fa92d7ce
+0662 15e5fc0fe -> d2d7e2dcc clean cherry-pick
+0672 4b8336dfbb4b9c06728adf897cf51658f920d347 -> e21ec7e44 clean cherry-pick
+0668 ebe52e4a5 -> 1352bba52 clean cherry-pick
+0669 c3bf9dfeb3d208065f0c86e125584fed12b878be -> fe929fb9d clean cherry-pick
+0671 987663e32 -> a4844247e clean cherry-pick
+0673 69ddbfc18 -> 646986cf3 clean cherry-pick
+0665 25e0b2c75336cc6c11f5320c58d10b441721cedf -> 37d402379 clean cherry-pick
+0677 root implementation -> 029b17b22; independently reviewed, focused tests green
+0666 578df2db5f19998a78daf1e4e22d39ae9b2e9c15 -> 6fd571ed6 clean cherry-pick
+0670 435a2b674004259d9a7a4902306953a1473e6794 -> 3fe7ae0ac clean cherry-pick
+0671 c562898d2 -> 6f47e566c; fa9ad01a8 -> 28a3d1364 clean cherry-picks
+0674 2b656e664 -> 7781305c5 clean cherry-pick
+root stale MCE ceiling test -> 9833f5349; full tail-append integration 40 passed
+0667 ee43ea1c1ac98ba937b3fa4d6b9dc3e72904af07 -> 9445bbff5 clean automatic merge of0666tests and0674README
+0661 e7bb35740 -> c06534899; three conflicts resolved preserving0665allocationprovenance/audit and0669XLSBrelationshipguards withfallibledecode
+0661 7bc6ebc97 -> 03353b254 clean cherry-pick; deferredgraph audit regressions
+root PPTX memo integration followup: fallible payload access in memo projection and fingerprint; 79 opened tests passed
+0676 561d52fc7b9785184f8a733f737e967cc8388cfb -> fadd5f68a clean automatic merge
+0674 3c9e978f8 -> 02e194575 clean automatic merge; excluded prerequisite505aaf271 because0669alreadyintegrated
+0676 b915e8b673b64a50ee3a37231854a172dab42904 -> 244b2afbd clean automatic merge; final budget admission review fixes
+0663 3b7e2cacf -> b8f1303e2; b8b85c136 -> 68163834a clean cherry-picks, final correctness and measurement followup
+root CFB mini-stream padding correction -> f14e3c85aa387630744a5ca1aaffdff356d4ba33; unchanged XLS durable inverse and11CFBsmoke tests pass

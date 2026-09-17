@@ -1,0 +1,9 @@
+HEAD f14e3c85aa387630744a5ca1aaffdff356d4ba33
+$ python3 -m unittest discover -s tools -p test_perf_claims.py
+..................................................
+----------------------------------------------------------------------
+Ran 50 tests in 75.159s
+
+OK
+
+exit 0

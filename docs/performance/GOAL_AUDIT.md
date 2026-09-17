@@ -1,5 +1,258 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0675 — review and integration preserve correctness before performance
+
+Record: [0675](0675-third-wave-integration.md). Review checks deferred
+error propagation, publication provenance, source identity, sector metadata,
+pre-emission validation and shared execution-budget admission. Local format
+specifications preserve strict FBKF uniqueness and final section placement;
+PAPX compatibility is explicit opt-in. The coordinator's BOM audit fix and
+PPTX memo migration preserve typed errors. Each record retains its measured
+scope and costs; unresolved design prerequisites are not called speedups.
+
+## 0663 — preservation and deterministic fallback decide the OLE2 policy
+
+Record: [0663](0663-cfb-sector-layout-policy.md).
+
+The policy follows `docs/GOAL.md`'s ordering: validate the adopted CFB through
+the ordinary parser, preserve source directory metadata and stream identity,
+and decline to the established writer whenever a reuse invariant is not proved.
+The corpus compares reused directory metadata against the source including
+class IDs, compares stream bytes against the edited model and rewrite route,
+reopens each result and runs the CFB validation walk. Length growth consumes
+released/free sectors before append; both MiniFAT cutoff directions and
+shrink/reclaim are tested. Ordered maps, ordered allocation and a fresh-process
+digest test cover determinism. The changed `Snapshot::finish` path now carries
+the same source layout policy as `ObjectEditor::finish`, closing a route that
+would otherwise have silently rebuilt a changed DOC snapshot. The measurement
+is retained as a cost boundary: source parsing and planning remain, the Reuse
+p50 regression exceeds the paired Reuse floor in all three windows, and the
+writer reopens its composed plan view before emitting the validated plan to the
+sink. Equal-length editor overlays validate a read-only composed view before
+their final materialization. No malformed-input defence is weakened and no
+partial output is emitted before a reuse candidate passes its gates.
+
+## 0676 — explicit read sessions now honor the shared execution budget
+
+Record: [0676](0676-execution-budget-composition.md). The change completes the
+accepted execution-context composition boundary without changing ordinary CRUD
+entry points. Every managed read that reaches payload I/O admits at least one
+`IoConcurrency` permit and refuses with a typed resource error before source
+bytes when the dimension is exhausted. Worker width is bounded by the shared
+hierarchical root, CPU work is charged after deterministic preflight and
+admission but before payload tasks, and caller-owned borrowed-task facilities
+replace private pools where attached. Ordered result slots and existing source
+fences preserve deterministic bytes and error selection; focused ZIP, CFB and
+source-backed tests cover lazy construction, active-width bounds, caller
+routing, shared-root narrowing and release paths. No hidden global executor is
+introduced, and no performance claim follows from this record.
+[Record](0676-execution-budget-composition.md);
+[retained evidence](results/change-0676/README.md).
+
+## 0661 — correctness and bounded failures remain ahead of the deferred work
+
+Record: [0661](0661-opc-lazy-part-decode.md). The package invariant
+forces a deferred payload before a `&dyn Part` leaves `litchi-opc`; the
+infallible metadata iterator cannot reach payload bytes. Each deferred decode
+records its first typed error, and the consumer audit now treats only
+`PartNotFound` as optional absence. The corrupt-member witness proves that
+first-access refusal is stable and cannot become an empty generated payload.
+Exact source no-op copying remains an intentional preservation contract, and
+changed members are forced and validated before publication.
+The follow-up malformed-deferred witnesses extend this to graph publication:
+PPTX master/layout authoring rolls back after late decode failure, and XLSB
+threaded graph operations stay bound to the resolved root workbook.
+
+## 0667 — shared-string reads now preserve the workbook closure without moving the safety boundary
+
+Record: [0667](0667-xlsx-value-editor-shared-strings.md). This work
+removes the unnecessary whole-workbook refusal caused by a valid shared-string
+relationship while keeping the editor value-only: the source table stays
+unchanged, indexed cells resolve through one lazy cached table, and any edit
+that could add, remove, or renumber an index is refused before a partial
+candidate exists. The 66,935-entry witness, malformed/unreferenced-table test,
+index error test, and exact publication test cover bounded resources and
+lossless preservation. Remaining pivot/table/query dependencies and shared
+table authoring remain deferred.
+
+## 0674 — phase evidence and standing gates are scoped without changing product behavior
+
+Record: [0674](0674-performance-gate-hygiene.md). The new selector names its
+semantic tiny PPTX corpus, one selected edit, six public API stages, enclosing
+total, output digest and reopen oracle; package construction and validation
+remain outside the clocks. It is opt-in and leaves `Case::DEFAULT` and the
+catalog hash unchanged. The DOCX/ODT gate names its exact feature closure, and
+the allocator gate names its isolated binary and one test thread. These are
+reproducible harness and gate facts, not generalized latency or allocation
+claims. Structural mode validates ten claims without opening retained evidence;
+the named strict claims gate validates the same ten claims and independently
+checks their evidence root. Strict mode still requires an evidence root.
+
+## 0670 — source ranges and Strict units are corrected without widening refusal contracts
+
+Record: [0670](0670-docx-parser-residues.md).
+
+The change follows ADR 0003's source-checked, typed-refusal behavior and ADR
+0006's preserve-by-default rule. A leading BOM is part of the retained source,
+so quick-xml's three-byte position skew is corrected before ranges are stored,
+and compaction returns the original mark. Universal section measures are
+admitted only through the schema-supported unit set and existing integer
+twip/domain bounds. Existing parser ceilings, execution checks, and guarded
+source-backed refusal order are retained. The body-final `sectPr` refusal is
+not relaxed: local ECMA-376 `CT_Body` requires that element to be the optional
+last child. No speculative paragraph cache is introduced; its managed memory
+admission and generation lifetime are priced in a design memo first. The one
+broad integration failure reproduces on the base commit and is recorded as
+pre-existing.
+
+[Record and limitations](0670-docx-parser-residues.md); [retained
+evidence](README.md).
+
+## 0666 — a bounded read-side proof removes stale work while preserving the source contract
+
+Record: [0666-mce-rewrite-residue](0666-mce-rewrite-residue.md).
+The change addresses `docs/GOAL.md`'s no-unnecessary-work clause on the
+source-backed worksheet read path. A 288-declaration witness distributed over
+96 tags completes the proof even though it exceeds the old cumulative 256
+charge; each tag remains below quick-xml's unchanged 256-declaration bound.
+The proof allocates no directive set, bounds `mc:Ignorable` tokens at the
+existing 4096 MCE limit and falls back on any event-tree-changing directive.
+The preservation floor is zero differences over every one of the 205 real
+worksheet parts: successful values and exact errors match authoritative
+preprocessing. The corpus measurement is scoped evidence, not a registered
+timing claim; `dyDescent` still needs its separate x14ac value capture.
+
+## 0665 — preservation reaches producer-formatted eager members, with structural refusal boundaries intact
+
+Record: [0665](0665-opc-eager-writer-publication-audit.md).
+
+`docs/GOAL.md` makes correctness and lossless preservation precede speed. The
+eager writer had applied the repository's compact-output spelling check to
+payloads it did not author, so a producer's indentation, declaration boundary,
+line ending or attribute layout could turn a valid edit into a typed
+publication refusal. The implementation now separates the profiles: eager
+planned payloads use `verify_source`, and the provenance decision is an
+`Arc::ptr_eq` proof against the ingress allocation rather than an equality test
+that a caller could escape by replacing a payload with equal bytes. This is
+the record's implementation interpretation of 0652 decision 2, grounded in
+0654 and 0657; it does not assert a new owner decision for authored payloads.
+The source-backed replacement route is already covered by 0657 on the target
+branch.
+
+The preservation oracle keeps the goal's byte guarantees: 319 eager exact
+no-op digests, 310 compact edit digests and 33 previously published
+`xlsx-hide` digests are unchanged; all 1,022 XML members compared across the
+91 after-leg XLSX publications are byte-identical where untouched, with no
+member additions or removals. Kept structural and safety checks are exercised
+through the public streaming writer with zero sink bytes on every refusal
+family. The 63-fixture DOCX census leaves open, no-op, exact-no-op, opt-in and
+reopen aspects unchanged; every changed artifact reopens with the same
+paragraph, table and block-control counts. The remaining BOM publication and
+managed-transaction defects are the retained change-0650 witnesses in
+`results/change-0650/follow-ups.md`, not silently folded into this change.
+`performance_claim: none`; OLE2/OOXML remain active, ODF is deferred and iWork
+excluded. [Record](0665-opc-eager-writer-publication-audit.md);
+[retained evidence](results/change-0665/README.md).
+
+**0673 — the common-path resource is deferred without moving a refusal.** The
+fixed EOCD probe is already mandatory for the managed index, so putting its
+46-byte storage on the stack removes a heap reservation that was made before
+the probe. A rejected probe falls into the same backwards search with the same
+bounded 64 KiB scratch, and the central-directory prefill, ZIP64 handling,
+short-read loops, limits, and typed scan refusals remain unchanged. The focused
+tests and 533-container oracle cover the state that can be reached after the
+probe; no performance claim is taken from the allocation count.
+
+## 0677 — a valid encoding marker is preserved through publication
+
+[0677](0677-xml-publication-bom-offsets.md) turns 0650's byte-zero declaration
+refusal into successful marked-part publication and byte-identical readback.
+The DTD regression still refuses before any output; malformed and repeated
+markers remain rejected. This is a correctness fix under 0652's standing
+trade-off, separate from the managed DOCX transaction's offset correction.
+
+## 0671 — strict malformed-input handling is preserved while one format-boundary refusal moves
+
+Record: [0671](0671-doc-admission-residues.md). `docs/GOAL.md` requires
+correctness, lossless semantics and typed fail-closed behavior before speed.
+The FBKF check follows the primary specification rather than the witness's
+recoverability: equal CP values do not legalize a repeated index, so the
+duplicate remains unavailable under strict reading. The PAPX change is bounded
+to one consumer and one shape, and is enabled only by
+`OpenOptions::with_papx_alignment_padding()`. It sees an even `cb=0` payload
+ending in zero, asks the exact shared SPRM parser whether the prefix is complete
+with one byte left, and trims only that byte; a malformed operand, length,
+nonzero tail, indirection or cycle still reaches the existing typed error. The
+global SPRM parser remains strict, and the writer remains unchanged. The facade
+carries the existing `OpenOptions` and `Leniency` type through both path and byte
+entry points, while structural defects remain fatal under stylesheet tolerance.
+checked-in MS-DOC snapshot's §2.9.175 (local lines 18595 and 18684-18688)
+defines the PAPX length forms and §2.9.114 (local lines 12380 and 12469-12471)
+requires whole-Prl grammar, while neither names this alignment byte. The record
+leaves that specification gap visible and relies on repeated fixture bytes plus
+compatible implementation evidence behind an explicit format-owned option; the
+strict default still refuses the witness. `performance_claim: none`.
+
+## 0669 — the XLSB publication boundary remains staged and bounded
+
+Record: [0669](0669-xlsb-edit-residues.md). The change follows the goal's
+correctness-first rule. Candidate bytes are patched on a cloned package,
+decoded, unsigned when changed, and parsed as a complete workbook before one
+final owner assignment. Any patch, worksheet, dependency, or workbook error
+leaves the caller unchanged; exact no-ops return without a candidate parse.
+Installing the retained parse refreshes the workbook-derived fields without
+relaxing a limit or bypassing readback. Resource relationship repair occurs on
+the staged transfer package and matches internal mode, exact type, and exact
+target, so a dangling or external relationship cannot authorize a missing
+resource. The test evidence covers both repaired resource states and the
+successful and stale facade paths. No speed figure is inferred from this
+correctness evidence.
+
+## 0668 — XLS query work advances without widening the retention contract
+
+The XLS query path now eliminates proven transient work for packed numeric and
+blank cells while retaining the existing validation and output behavior. The
+open-time locator path uses the source records it already owns, and its pinned
+SST digest remains `0x9cb14f5daa02eebc` across 117 indexed fixtures and four
+typed refusals. The retained cross-query sheet index and snapshot chain hint
+remain queued behind ADR 0005's bounded weighted evictable cache requirement;
+the two 0633 framing passes remain queued behind their coverage-proof order.
+No latency or speedup claim is registered, so the goal audit advances the
+correctness-preserving work item with deterministic allocation evidence.
+
+## 0672 — bounded owning conversion sized from validated sparse records
+
+Record: [0672](0672-xlsx-stored-cell-allocation.md). The change follows
+the goal's allocation-elimination tier while preserving the typed error and
+refusal order. The stored `Store` is immutable after validation, so counting
+the selected records and copying the same iterator cannot produce a partial or
+guessed result. Allocation failure still occurs before the returned vector is
+observable. The cold scanner's EOF-before-publication guarantee is unchanged;
+its vector is explicitly left open for a separate refusal-order design.
+
+## 0662 — bounded write parallelism lands with deterministic bytes and an explicit ADR 0031 boundary
+
+Record: [0662](0662-parallel-changed-member-deflate.md). The change follows the
+goal's order at the first compatible parallel boundary: it removes serial
+Deflate work for independently regenerated preservation members while keeping
+all source audits, output preflight, cancellation fences, typed refusals and
+exact no-op handling in place. The wave threshold uses the measured remainder
+after the largest member, with a higher floor when a publication must build a
+pool; a width-one or below-threshold publication stays on the old loop and
+builds no pool. The corpus differential, error-order test, repeated
+determinism test, physical-order test and sink-untouched cancellation and
+budget tests establish the correctness side; the real-fixture medians and
+same-window floors scope the measured side. The goal's execution-context rule
+is met for this write path through explicit worker and task budgets and an
+optional caller facility. It is not silently generalized to the existing read
+sessions: `IoConcurrency` and cross-session composition for ZIP, CFB and
+source-backed reads remain a follow-up boundary under accepted ADR 0031. No
+ordinary CRUD signature exposes a scheduler, no hidden global pool is created,
+and no `unsafe` is added. `performance_claim: none`; OLE2 and OOXML remain
+active, ODF is deferred and iWork excluded.
+[Record](0662-parallel-changed-member-deflate.md);
+[retained evidence](results/change-0662/README.md).
+
 ## 0657 — the admission surface was the gap, and four dependency guards were already written for it
 
 Record: [0657](0657-xlsx-value-editor-d4-admission.md).
@@ -21,12 +274,13 @@ declare them before the scan ran. The 23 witnesses in
 `cell_values/admission_tests.rs` are the first tests to reach them. The
 remaining gaps are named rather than closed: shared strings (0602's D2, **66 of
 95**), pivot caches, tables and query tables are refused because their meaning
-depends on the value being replaced, and the publication audit (0602's D0)
-still refuses every real package, so this change makes producer files
-**editable, not saveable**. The gate that decides whether this work has any
-user-visible effect is therefore change 0654's, not this one's; re-running
-`results/change-0657/probe` over the corpus after 0654 merges is the check that
-should be recorded.
+depends on the value being replaced. The final 0657 publication measurement
+also closes the source-spliced replacement half of 0602's D0: **9 of the 10
+admitted packages publish and reopen**, changing only the workbook and selected
+worksheet members; the tenth retains a non-canonical-relationship refusal.
+This corrects an earlier paragraph that described only the intermediate
+admission leg, before the replacement-audit correction recorded in 0657's
+REPORT section.
 
 ## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
 

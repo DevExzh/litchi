@@ -1,5 +1,258 @@
 # Performance program phase report
 
+## 0675 — merged validation and cleanup, without an aggregate speedup claim
+
+Record: [0675](0675-third-wave-integration.md). The packet retains the
+merge ledger, final integration commands and results, regression evidence and
+completed-worktree cleanup outcomes. Per-record performance observations keep
+their original floors and corpus bounds. This coordination record contributes
+no timing, allocation, RSS, cold-cache or scaling claim.
+
+## 0663 — the ordinary source-backed DOC save now reaches the OLE2 sector policy
+
+Record: [0663](0663-cfb-sector-layout-policy.md).
+
+The implementation closes the route question left by 0617. `litchi-doc`'s
+`RevisionEditor` owns a source-backed `litchi-ole-common::object::Editor`; its
+ordinary `finish` calls the editor's source-aware render, whose default is
+`SectorLayoutPolicy::Reuse`. The embedded-object transaction uses the same
+common editor, and PPT's embedded-object writer adopts its original source
+before emitting. A changed common-editor snapshot also retains this policy, so
+`commit().patch().after()` and `snapshot().finish()` agree on the adopted
+layout. The separate public DOC writer authors a new CFB and therefore cannot
+reuse source sectors; that limit is documented instead of implying coverage it
+does not have. Reopened stream identity, source CLSIDs, cutoff migrations,
+append/reclaim and cross-process determinism are all corpus-tested. On
+`picture.doc`, Reuse retained 2,795 of 2,828 body sectors for no-op and
+same-length edits and appended three sectors after growth; the source and
+rewrite byte lengths are recorded beside the timing. Equal-length edits avoid
+a second CFB re-layout for unchanged source spans, but the final `Vec<u8>` is
+still materialized after validation. These are layout counts and route
+behavior, not an end-to-end 0617 speed result, so that estimate is withheld. A
+separate `FloatingPictures.doc` probe compares the clean pre-0663 opened-DOC
+commit (2.4811 ms p50) with the final Reuse route (2.5383 ms p50), and records
+a current container-only Reuse/Rewrite control (2.9724/3.9763 ms); it has no
+paired floor and carries no DOC latency claim. [Route timing](results/change-0663/doc-route-picture.txt)
+
+## 0676 — execution budgets compose across the three explicit read boundaries
+
+The ZIP, CFB and source-backed read sessions now share `Workers`,
+`IoConcurrency` and cumulative `CpuTasks` through the hierarchical budget. A
+private pool is built only after a qualifying batch and keeps its admitted
+worker width for the session; an attached caller facility runs borrowed tasks
+with operation-scoped worker permits, and cached pools submit only the current
+operation width. Serial reads still reserve one worker and one positional-read
+slot, and a zero positional-read budget refuses before the first payload read.
+Tests retain input order, typed failures, cancellation fences, active CFB read
+width and release behavior. This is an admission and correctness change for
+opt-in low-level sessions; ordinary constructors and CRUD remain serial, and
+the record registers no speedup or latency result.
+[Record](0676-execution-budget-composition.md);
+[retained evidence](results/change-0676/README.md).
+
+## 0661 — deterministic read-set evidence, no performance claim
+
+Record: [0661](0661-opc-lazy-part-decode.md), evidence packet
+[`results/change-0661`](README.md). Across 336 fixture rows, the admitted
+catalog is 5,077 parts and 45,562,463 inflated bytes across 334 successful
+opens. The exact-no-op route decoded 0 parts/0 bytes; one-part reblob decoded
+334 parts/389,581 bytes; the current XLSX hide route published 33 fixtures and
+decoded 216/550 parts and 6,044,263/8,274,037 bytes among those publications.
+These are deterministic access counters and differential results, not timing,
+RSS, allocation, or claim-registry measurements.
+The follow-up tests add correctness evidence only and do not alter these
+read-set totals.
+
+## 0667 — shared strings admitted for read and preserved on value-only edits
+
+Record: [0667](0667-xlsx-value-editor-shared-strings.md). The change
+retains one valid internal `sharedStrings.xml` part, resolves `t="s"` indexes
+through a lazy `OnceLock` table, and publishes an adjacent numeric edit while
+transferring the shared part unchanged. Medium and dense producer-shaped
+evidence contain 40% shared cells and 64 unique entries; both read variants
+record the shared-string fact as admitted. The 12-case release run is
+after-only evidence with no baseline or registered performance claim, and its
+stability floor excludes the dense open case.
+
+## 0674 — an opened PPTX edit can be attributed by phase, while omitted test surfaces become standing gates
+
+Record: [0674](0674-performance-gate-hygiene.md). The phase selector emits
+aligned vectors for the six transaction stages and `total_ns`, verifies the
+edited package after reopening, and requires one deterministic output digest
+across retained samples. It reports attribution evidence only; no timing
+number, speedup, allocation ratio, physical-I/O result or claim-registry entry
+is published. The XLSB structure selector also retains phase vectors, output
+digest and typed reopen checks without a performance claim. The facade
+polyglot command runs the `docx,odt` feature pair and the harness command runs
+the process-global allocator tests serially. The packet's `gates.log` retains
+the focused outcomes for both claims modes.
+
+## 0670 — the remaining borrowed parser work and a three-byte transaction witness
+
+Record: [0670](0670-docx-parser-residues.md).
+
+The DOCX parser's slice readers no longer allocate an event buffer for each
+token, and the text sink keeps one paragraph buffer across the operation. At
+10,000 paragraphs, the retained allocation probe records eager sink work moving
+from 10,045 allocations and 503,555 bytes to 46 and 3,605; source sink work
+moves from 10,046 and 503,651 to 47 and 3,701. Eager/source text controls are
+unchanged. A managed BOM-marked document now reads and edits both paragraphs,
+keeps `EF BB BF` in the committed XML, and releases managed memory. Strict
+`612pt`/`792pt` section values round to the same twips as their integer forms,
+and the reader preserves the original XML bytes. These are evidence counts and
+correctness witnesses, not a registered performance claim. The body-final
+section rule and the guarded buffered readers remain explicit boundaries.
+
+[Record and limitations](0670-docx-parser-residues.md); [retained
+evidence](README.md).
+
+## 0666 — MCE worksheet admission residue and adjacent consumer audit
+
+Record: [0666-mce-rewrite-residue](0666-mce-rewrite-residue.md).
+`raw/worksheet/mod.rs` now observes namespace declarations per start tag and
+resolves prefixed attributes before deciding whether the MCE proof can replace
+the processed stream. A bound non-MCE prefixed attribute is safe because the
+worksheet parser does not read prefixed attributes; the value-only validator
+still refuses `r:id` relationships inside `sheetData`. `mc:Ignorable` is
+validated for NCName syntax, duplicate prefixes, binding, MCE self-reference
+and the existing 4096-token bound. Focused adversarial tests cover valid
+Ignorable with a bound ignored attribute, unbound/duplicate/MCE prefixes,
+`ProcessContent`, `PreserveAttributes` and the distributed declaration chain.
+The checked fixtures contain 130 `mc:Ignorable`, 104 `dyDescent`, three other
+MCE-directive and zero `AlternateContent` worksheet markers; 25 of 30 rewritten
+candidates complete the validator-backed shared path. Query-table extension
+lists retain an owned XML tree, auto-filter and data-validation captures retain
+bounded detached fragments, and named-sheet-view filter payloads are adapted
+into a generated auto-filter root before typed publication, so none of those
+four consumers is changed. No release benchmark or allocation measurement was
+taken.
+
+## 0665 — eager OPC publication accepts producer XML without dropping safety checks
+
+Record: [0665](0665-opc-eager-writer-publication-audit.md).
+
+`litchi-opc` replaces its eager `validate_authored_xml` boundary with a
+structural `audit_published_xml` and a debug-only `audit_authored_xml` for
+library-generated manifest and relationship XML. `OpcPackage` now proves an
+untouched source XML payload by allocation identity, and DOCX's preservation
+gate asks the same source auditor as the writer. The public surface and typed
+error identity stay unchanged. Three new OPC tests publish the four formerly
+rejected non-compact spellings, assert generated members remain compact and
+drive eleven structural/encoding/DOCTYPE/attribute/limit refusal families
+through `write_to_stream` with zero output; moved tests retain the structural
+fallback. The retained corpus packet contains 321-fixture eager routes,
+180-fixture `xlsx-hide` and member identity checks, a 63-fixture DOCX census,
+callgrind isolation pairs, paired timing and all gate tails. `cargo fmt`,
+clippy, OPC/DOCX tests and docs, XLSX/PPTX consumers, the feature-bearing
+facade and the non-iWork gate passed with `CARGO_BUILD_JOBS=2` for the costly
+builds. The timing window reports a +1.22% PPTX p50 against a 0.04% floor and
+does not explain or register it; no performance claim is made. The 0650 BOM
+and managed-transaction follow-ups remain explicitly scoped out.
+[Record](0665-opc-eager-writer-publication-audit.md);
+[retained evidence](results/change-0665/README.md).
+
+**0673 — the managed ZIP index no longer allocates its locator window on the
+exact terminal-EOCD path.** Retained in `soapberry-zip`, with no public API or
+claim-registry change. The paired release probe records open allocated bytes
+falling 2,256,370 → 2,190,833 on `xlsx-132`, 541,256 → 475,719 on
+`pptx-shapes`, and 365,976 → 300,439 on `docx-comment`, one allocation less
+each; every request count, byte count, and source-version observation is equal.
+The 533-container reports are byte-identical. The fallback remains measured by
+read-shape tests rather than a latency claim.
+
+## 0677 — XML audit transport parity includes valid UTF-8 markers
+
+[0677](0677-xml-publication-bom-offsets.md) records a failing-before,
+passing-after declaration witness, all 16 marked XML members across three real
+packages, tiny-chunk slice/stream parity, and a public OPC replacement
+publication test. Input-byte limits and reports include the marker; XML token
+limits exclude it. The removed streaming scratch is not promoted to an
+allocation or latency claim. `performance_claim: none`.
+
+## 0671 — the DOC fixtures now stop at the right boundary
+
+Record: [0671](0671-doc-admission-residues.md). The 0640 packet left two
+DOC refusals provisionally unresolved. The first is still a refusal: the
+watermark's repeated `ibkl` maps two FBKFs to the same `PlcfBkl` CP, but the
+current Microsoft definition makes that index unique. The second was an
+alignment boundary: POI's `test.doc` stores six bytes for `istd` plus a
+three-byte paragraph SPRM, with one zero completing the `cb=0` even-byte
+container; all 24 PAPX entries repeat it. The strict consumer still refuses
+that shape by default; the explicit `OpenOptions::with_papx_alignment_padding()`
+profile accepts precisely it, and direct tests prove a nonzero trailing byte
+and an uncontextualized trailing zero still fail. The unified facade's new
+options methods admit the existing duplicate-style fixture only when the caller
+opts into `TolerateStylesheetDefects`; default facade reads remain strict.
+Validation is
+`litchi-doc` 1,007 passed/2 ignored, its four leniency integration tests passed,
+the DOC facade's 31 unit tests passed, and the combined `doc,docx` facade check
+passed. The repository's 57-file DOC inventory and 0640 corpus scan are retained
+as the corpus baseline; this follow-up does not claim a new full differential,
+timing, instruction, allocation or RSS number. The checked-in MS-DOC reference
+confirms FBKF uniqueness at §2.9.70 (local line 6648) and the PAPX length/whole-
+Prl constraints at §§2.9.175 and 2.9.114 (local lines 18684-18688 and
+12469-12471); it does not make the alignment-byte allowance normative.
+
+## 0669 — the named XLSB edit residues are closed
+
+Record: [0669](0669-xlsb-edit-residues.md). A workbook-structure replay
+that inserts or transfers a cell no longer reparses the candidate after the
+candidate parse has already validated it. Sparkline and cell-watch edits now
+publish the complete workbook built from their candidate, keeping package bytes
+and derived metadata in one transaction. Styles and shared strings also repair
+the case where the part is present but the workbook relationship is absent.
+`cargo fmt`, `cargo check`, clippy with warnings denied, all 575 library tests,
+and the 144 XLSB integration tests pass with the requested jobs-2 and debug
+settings. This record reports no benchmark or registered performance claim;
+the selector needed to price the remaining path is handed to 0674.
+
+## 0668 — packed-cell measure-only validation and a smaller SST locator scan
+
+The `scan_worksheet` `MulRk` and `MulBlank` arms now follow the same
+measure-only rule as the seven scalar cell kinds. They still visit and validate
+every packed cell, while selected queries retain only their target. The SST
+open scan replaces a temporary slice-of-payloads vector with a cursor over the
+existing `RecordRef` list. Base versus after allocation counts on the two SST
+fixtures move from 246/754,968 to 245/754,520 and 208/153,205 to 207/152,997;
+the whole-sheet walk remains 35,793 allocations and 1,389,460 bytes. The full
+`litchi-xls` suite passes, including the packed-cell equivalence and corpus SST
+differential tests. The packet reports no timing floor, so these counts carry
+no registered performance claim.
+
+## 0672 — exact stored-route reservation removes the 42% capacity residue
+
+`SourceWorksheet::cells` previously used `try_reserve(1)` for each stored cell.
+On the 75,770-cell POI worksheet that reached 131,072 slots, or 10,485,760
+bytes. The landed route reserves 75,770 slots once, retaining 6,061,600 bytes:
+one allocation and 42.2% fewer bytes in the warm result. A paired pinned warm
+run has a 1.770% p50 same-binary floor and reports 3.751% and 4.134% p50
+improvements in the before/after directions. The p95/p99 floor is noisy and no
+tail claim is made. Cold POI allocation bytes fall by 4,424,160 while peak live
+bytes stay unchanged, and the selected scanner's own record vector is outside
+this change.
+
+## 0662 — changed-member Deflate is a bounded publication wave, with savings scoped to the route that carries the context
+
+The preservation writer can now compress regenerated Deflate members in a
+bounded wave before writing the first byte. The balance rule is measured at the
+publication boundary: warm sessions use an 8 KiB remainder floor, pool-building
+sessions use 64 KiB, and a caller's per-task floor can narrow the granted width.
+The ZIP sweep establishes the crossover and the largest-member bound; the OPC
+sweep captures the cold-pool cost and caller-facility path; real fixtures report
+1.21×–1.52× paired median end-to-end gains on eligible multi-member scenarios.
+All outputs stay byte-identical at widths 1/2/4/8 and after seventeen repeated
+width-eight publications. The 2.4% width-two regression on the one-dominant
+`no_drawing_patriarch.xlsx` fixture is retained against its 0.35% A/A floor and
+is below the 5% review trigger; no averaging hides it. These measurements are
+publication measurements for managed source-backed overlays. The ordinary
+save, eager writer, unmanaged package, streaming writer and replay route carry
+no session and are unchanged, so the record makes no claim for them. The
+implementation's accepted ADR 0031 scope is the write wave; the ZIP/CFB/read
+session budget-composition rows are not included in these numbers and remain
+open. `performance_claim: none`; no claim-registry entry is made.
+[Record](0662-parallel-changed-member-deflate.md);
+[retained evidence](results/change-0662/README.md).
+
 ## 0657 — the value-only editor's allow-lists become one property, and 10 of 95 real packages are admitted
 
 Record: [0657](0657-xlsx-value-editor-d4-admission.md).

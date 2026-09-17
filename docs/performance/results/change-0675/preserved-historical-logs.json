@@ -1,0 +1,17 @@
+[
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-deterministic-s131072-a64-short-c64/strace.log",
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-deterministic-s64-a16384-short-c64/strace.log",
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-file_store-s131072-a64-short-c64/strace.log",
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-file_store-s64-a16384-short-c64/strace.log",
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-memory_store-s131072-a64-short-c64/strace.log",
+  "docs/performance/results/change-0484/route-profiles/profiles1/strace-memory_store-s64-a16384-short-c64/strace.log",
+  "docs/performance/results/change-0587/core-facade-parallel/microbench/build.log",
+  "docs/performance/results/change-0587/doc-ppt/docppt-survey/build.log",
+  "docs/performance/results/change-0587/docx-pptx/build.log",
+  "docs/performance/results/change-0587/docx-pptx/cg-docx_semantic_one_edit_save.log",
+  "docs/performance/results/change-0587/docx-pptx/cg-pptx_cross_copy_media_rich.log",
+  "docs/performance/results/change-0587/docx-pptx/cg-pptx_eager_batch_edit_save.log",
+  "docs/performance/results/change-0587/opc-save/build-edit_cells.log",
+  "docs/performance/results/change-0587/opc-save/build-pptx-smoke.log",
+  "docs/performance/results/change-0587/xlsx/alloc-build.log"
+]

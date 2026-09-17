@@ -1,0 +1,18 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.75s
+     Running tests/sector_layout_smoke.rs (target/debug/deps/sector_layout_smoke-167b6ae5d965f4db)
+
+running 11 tests
+test a_changed_stream_set_declines ... ok
+test rewrite_policy_declines_and_matches_today ... ok
+test reused_v3_zero_length_stream_masks_high_size_word ... ok
+test reuse_handles_regular_to_mini_cutoff_migration ... ok
+test explicit_zero_clsids_clear_source_directory_fields ... ok
+test reuse_handles_mini_to_regular_cutoff_migration ... ok
+test shape_fallback_preserves_adopted_clsids_until_explicitly_changed ... ok
+test reuse_keeps_sectors_for_a_same_length_edit ... ok
+test shrinking_a_mini_stream_clears_former_payload_from_root_padding ... ok
+test reuse_appends_when_a_stream_outgrows_its_allocation ... ok
+test shrinking_a_stream_reclaims_its_sectors ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
