@@ -1,0 +1,14 @@
+Base checkout: 70d7768cc6dada420ede063f72c88dc99ad30383
+Branch: perf/0663-cfb-sector-layout-policy
+
+cargo fmt --all --check                                      PASS
+cargo clippy -p litchi-cfb --all-targets --locked -- -D warnings   PASS
+cargo clippy -p litchi-ole-common -p litchi-ppt --all-targets --locked -- -D warnings PASS
+cargo doc -p litchi-cfb -p litchi-ole-common -p litchi-doc -p litchi-ppt --no-deps --locked PASS
+cargo test -p litchi-cfb --all-targets --locked                PASS (338 unit + 7 corpus + 7 smoke + 13 sequential + 6 determinism + 6 move tests)
+cargo test -p litchi-cfb --test sector_layout_corpus --locked   PASS (7 tests)
+cargo test -p litchi-cfb --test sector_layout_smoke --locked    PASS (7 tests)
+cargo test -p litchi-ole-common --all-targets --locked          PASS (129 unit + 15 object + remaining integration tests)
+cargo test -p litchi-doc --all-targets --locked                 PASS (1002 unit tests and integration suites)
+cargo test -p litchi-doc --test doc_tracked_revision_editor ordinary_tracked_revision_save_reuses_the_opened_doc_layout --locked PASS
+cargo test -p litchi-ppt --all-targets --locked                 PASS (1088 unit tests and integration suites)

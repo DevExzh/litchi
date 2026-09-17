@@ -106,6 +106,7 @@ fn open_with_limit(
         removed_persist_ids: HashSet::default(),
         rewrite_object_list: false,
         changed: false,
+        layout: litchi_cfb::SectorLayoutPolicy::default(),
     })
 }
 

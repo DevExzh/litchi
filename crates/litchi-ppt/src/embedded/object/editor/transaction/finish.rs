@@ -121,6 +121,8 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
 
 fn write_package(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
+    writer.set_sector_layout_policy(editor.layout);
+    writer.adopt_source_layout(&editor.original)?;
     for (path, data) in &editor.streams {
         let stream_data = if path == &editor.document_path {
             appended

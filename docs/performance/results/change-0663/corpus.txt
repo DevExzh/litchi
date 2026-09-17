@@ -1,0 +1,17 @@
+Command: CARGO_BUILD_JOBS=2 cargo test -p litchi-cfb --release --test sector_layout_corpus every_ole2_fixture_agrees_stream_by_stream_under_both_policies --locked -- --nocapture
+Result: ok
+fixtures=214 examined=211 skipped=3 reused_noop=209 reused_same_length=209 reused_length_changing=209 appended=195
+
+Command: CARGO_BUILD_JOBS=2 cargo test -p litchi-cfb --release --test sector_layout_corpus a_mutated_source_never_steers_the_layout --locked -- --nocapture
+Result: ok
+mutations declined=37 admitted=5
+
+Additional gates in the corpus suite:
+- source directory metadata, including every directory-entry CLSID, matches the adopted source on all reused outputs;
+- all stream paths and bytes match the edited model and the rewrite-policy reopen;
+- the CFB validation walk completes without errors;
+- both MiniFAT cutoff directions and shrink/reclaim are covered by sector_layout_smoke;
+- a fresh child process reports the same layout digest three times.
+- `doc_tracked_revision_editor::ordinary_tracked_revision_save_reuses_the_opened_doc_layout`
+  edits `picture.doc` through the ordinary DOC revision editor and retains the
+  untouched table stream's source allocation start sector.

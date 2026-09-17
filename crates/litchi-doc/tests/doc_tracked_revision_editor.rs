@@ -32,6 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
+use litchi_cfb::OleFile;
 use litchi_doc::Package;
 use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
@@ -60,6 +61,17 @@ fn base_doc() -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
+}
+
+fn root_stream_start(bytes: &[u8], name: &str) -> (u32, u64) {
+    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("DOC CFB should open");
+    let entry = ole
+        .list_directory_entries(&[])
+        .expect("DOC root directory should open")
+        .into_iter()
+        .find(|entry| entry.name == name)
+        .expect("DOC stream should exist");
+    (entry.start_sector, entry.size)
 }
 
 #[test]
@@ -214,4 +226,37 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
             Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
         }
     }
+}
+
+#[test]
+fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source_path = root.join("test-data/ole/doc/picture.doc");
+    let source = std::fs::read(source_path).expect("DOC fixture should exist");
+    let table_name = {
+        let ole = OleFile::open(Cursor::new(source.clone())).expect("DOC CFB should open");
+        ole.list_directory_entries(&[])
+            .expect("DOC root directory should open")
+            .into_iter()
+            .find(|entry| entry.name == "0Table" || entry.name == "1Table")
+            .expect("DOC table stream should exist")
+            .name
+            .clone()
+    };
+    let before = root_stream_start(&source, &table_name);
+
+    let mut editor = RevisionEditor::open(source.clone(), Limits::default())
+        .expect("DOC fixture should enter the tracked editor");
+    editor
+        .add_text(
+            0,
+            "inserted ",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("0663"),
+        )
+        .expect("tracked edit should commit");
+    let output = editor.finish().expect("tracked DOC save should finish");
+    let after = root_stream_start(&output, &table_name);
+    assert_eq!(after.0, before.0, "DOC table allocation moved during save");
+    assert_ne!(output, source, "the tracked edit should publish a change");
 }

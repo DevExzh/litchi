@@ -42,6 +42,7 @@ pub struct Editor {
     pub(super) removed_persist_ids: HashSet<u32>,
     pub(super) rewrite_object_list: bool,
     pub(super) changed: bool,
+    pub(super) layout: litchi_cfb::SectorLayoutPolicy,
 }
 
 impl Editor {
@@ -92,6 +93,25 @@ impl Editor {
         max_output_bytes: usize,
     ) -> Result<Self> {
         lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes)
+    }
+
+    /// Selects where a finished package places its sectors.
+    ///
+    /// The default is [`litchi_cfb::SectorLayoutPolicy::Reuse`]: the appended
+    /// edit keeps every untouched stream on the sectors the opened deck
+    /// already gave it and appends only the sectors the grown `PowerPoint
+    /// Document` stream needs. [`litchi_cfb::SectorLayoutPolicy::Rewrite`]
+    /// re-lays out the whole container.
+    ///
+    /// Both policies publish the same logical package.
+    pub const fn set_sector_layout_policy(&mut self, policy: litchi_cfb::SectorLayoutPolicy) {
+        self.layout = policy;
+    }
+
+    /// The sector-layout policy a finished package will apply.
+    #[must_use]
+    pub const fn sector_layout_policy(&self) -> litchi_cfb::SectorLayoutPolicy {
+        self.layout
     }
 
     /// Live persisted identifiers in ascending order.

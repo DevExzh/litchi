@@ -6,7 +6,7 @@ use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
 use crate::property_set::Guid;
 use crate::protection::reject_protected_container;
-use litchi_cfb::{OleError, OleFile, OleWriter};
+use litchi_cfb::{OleError, OleFile, OleWriter, SectorLayoutPolicy};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -442,7 +442,25 @@ impl Package {
     }
 
     pub(crate) fn render(&self) -> Result<Vec<u8>, OleError> {
+        self.render_with_layout(None, SectorLayoutPolicy::default())
+    }
+
+    /// Renders the package, optionally reusing `source`'s sector layout.
+    ///
+    /// `source` is the artifact this package was captured from. Under
+    /// [`SectorLayoutPolicy::Reuse`] the writer keeps that artifact's sector
+    /// assignment wherever the package's stream and storage set still matches
+    /// it, and falls back to the from-scratch serialization otherwise.
+    pub(crate) fn render_with_layout(
+        &self,
+        source: Option<&[u8]>,
+        policy: SectorLayoutPolicy,
+    ) -> Result<Vec<u8>, OleError> {
         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
+        writer.set_sector_layout_policy(policy);
+        if let Some(source) = source {
+            writer.adopt_source_layout(source)?;
+        }
         if let Some(clsid) = self.root_clsid {
             writer.set_root_clsid(*clsid.as_bytes());
         }
@@ -462,7 +480,7 @@ impl Package {
         }
         for stream in &self.streams {
             let refs = path_refs(stream.path());
-            writer.create_stream(&refs, stream.bytes())?;
+            writer.create_stream_shared(&refs, stream.bytes_shared())?;
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output)?;

@@ -1,0 +1,12 @@
+Fixture: test-data/ole/doc/picture.doc (1,448,448 bytes)
+Method: release integration test, 24 ABBA samples per window, source adopted
+for both Reuse and Rewrite, three warmups, same-window paired A/A floor.
+
+window  reuse_p50_ns  rewrite_p50_ns  reuse_AA_floor_p50  rewrite_AA_floor_p50
+1             265081          252786               2.58%                 2.65%
+2             255796          241471               3.33%                 1.99%
+3             263856          245191               7.47%                 4.19%
+
+The observed Reuse p50 difference is within the noisy floor range across the
+windows. No timing claim is registered. The measurement includes source-layout
+parsing and planning and does not claim avoided payload-copy work.
