@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0691 — repeated PPTX capture processing remains the next target
+
+[0691](0691-pptx-repeated-mce-baseline.md) confirms 44 owned MCE outputs from
+14 raw buffers in a real capture: five presentation passes and three per
+slide. Capture and commit dominate the native edit phases; marker-sensitive
+processing remains materially expensive. Prefer capture-local root/name
+projection reuse with deferred name errors, preserving all-root-before-name
+validation order. A persistent XML cache still needs an explicit budget and
+identity/invalidation proof. This batch changes no production code.
+
 ## 0690 — borrow ASCII queries during CFB directory lookup
 
 [0690](0690-cfb-borrowed-directory-lookups.md) follows a fresh 18% owned-key

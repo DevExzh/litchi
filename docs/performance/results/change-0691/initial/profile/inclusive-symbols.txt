@@ -1,0 +1,79 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+
+#
+# Total Lost Samples: 0
+#
+# Samples: 9K of event 'cpu/cycles/P'
+# Event count (approx.): 42854227999
+#
+# Children      Self  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  ........  .......  ................  ...............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    20.38%    20.38%  native   native            [.] litchi_ooxml_common::mce::codec::start
+     5.53%     5.52%  native   libc.so.6         [.] __memcmp_evex_movbe
+            |          
+             --5.28%--__memcmp_evex_movbe
+
+     5.46%     5.46%  native   native            [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>
+     4.21%     4.21%  native   native            [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     3.19%     3.19%  native   native            [.] litchi_ooxml_common::mce::codec::write_start
+     3.03%     3.03%  native   native            [.] sha2::sha256::x86_sha::compress
+     2.98%     2.83%  native   libc.so.6         [.] __memmove_avx512_unaligned_erms
+            |          
+             --2.67%--__memmove_avx512_unaligned_erms
+
+     2.92%     2.92%  native   native            [.] quick_xml::events::attributes::IterState::next
+     2.57%     2.57%  native   native            [.] core::str::converts::from_utf8
+     2.41%     2.41%  native   native            [.] litchi_ooxml_common::xml_name::validation::is_ncname
+     2.39%     2.39%  native   native            [.] litchi_ooxml_common::mce::codec::close
+     2.31%     2.31%  native   native            [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+     2.09%     2.09%  native   native            [.] zlib_rs::inflate::inflate_fast_help
+     2.04%     2.04%  native   native            [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     1.98%     0.00%  native   libc.so.6         [.] __libc_malloc (inlined)
+            |
+            ---__libc_malloc (inlined)
+
+     1.97%     1.97%  native   libc.so.6         [.] malloc
+            |          
+             --1.90%--__libc_malloc (inlined)
+
+     1.58%     1.58%  native   native            [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     1.50%     1.22%  native   libc.so.6         [.] _int_malloc
+            |          
+             --1.02%--__libc_malloc2
+                       _int_malloc
+
+     1.41%     0.11%  native   libc.so.6         [.] __libc_malloc2
+            |          
+             --1.40%--__libc_malloc2
+                       |          
+                        --1.30%--_int_malloc
+
+     1.34%     1.34%  native   native            [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     1.32%     1.32%  native   native            [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     1.32%     1.32%  native   native            [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     1.29%     1.29%  native   native            [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     1.27%     1.27%  native   native            [.] litchi_ooxml_common::mce::codec::BoundedOutput::reserve
+     1.19%     0.11%  native   libc.so.6         [.] _int_free_chunk
+            |          
+             --1.13%--_int_free_chunk
+
+     1.18%     1.18%  native   native            [.] litchi_pptx::notes::codec::scan_xml
+     1.18%     1.18%  native   native            [.] quick_xml::reader::state::ReaderState::emit_start
+     1.13%     1.13%  native   native            [.] litchi_pptx::notes::codec::inspect_element
+     1.04%     1.04%  native   native            [.] litchi_ooxml_common::mce::codec::expand_parts
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

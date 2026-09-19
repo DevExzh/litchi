@@ -1,0 +1,67 @@
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -1415,8 +1415,21 @@
+ ///
+ /// Returns an error when input violates OOXML constraints, exceeds a configured
+ /// bound, or an underlying XML or package operation fails.
++static LITCHI_0691_TRACE_CALL: std::sync::atomic::AtomicU64 =
++    std::sync::atomic::AtomicU64::new(0);
+ pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
+-    process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
++    let call = LITCHI_0691_TRACE_CALL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++    let profile = std::env::var("LITCHI_0691_TRACE_PROFILE").unwrap_or_else(|_| "unset".to_owned());
++    let stage = std::env::var("LITCHI_0691_TRACE_STAGE").unwrap_or_else(|_| "unset".to_owned());
++    let input_ptr = x.as_ptr() as usize;
++    let input_len = x.len();
++    let result = process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml);
++    match &result {
++        Ok(Cow::Borrowed(o)) => eprintln!("LITCHI0691_CODEC call={} profile={} stage={} input_ptr=0x{:x} input_len={} output_ptr=0x{:x} output_len={} mode=borrow status=ok", call, profile, stage, input_ptr, input_len, o.as_ptr() as usize, o.len()),
++        Ok(Cow::Owned(o)) => eprintln!("LITCHI0691_CODEC call={} profile={} stage={} input_ptr=0x{:x} input_len={} output_ptr=0x{:x} output_len={} mode=owned status=ok", call, profile, stage, input_ptr, input_len, o.as_ptr() as usize, o.len()),
++        Err(_) => eprintln!("LITCHI0691_CODEC call={} profile={} stage={} input_ptr=0x{:x} input_len={} output_ptr=0x0 output_len=0 mode=error status=error", call, profile, stage, input_ptr, input_len),
++    }
++    result
+ }
+ 
+ /// Applies baseline preprocessing to one OPC part.
+--- a/crates/litchi-pptx/src/parts/mod.rs
++++ b/crates/litchi-pptx/src/parts/mod.rs
+@@ -24,11 +24,16 @@
+ pub(crate) const MAX_SLIDES: usize = 100_000;
+ 
+ pub(crate) fn processed_xml(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
+-    if part.blob().len() > MAX_PART_XML_BYTES {
+-        return Err(Error::Limit {
+-            resource: "PresentationML part XML",
+-            limit: MAX_PART_XML_BYTES,
+-        });
++    let visible = part.blob();
++    let (arc_struct, arc_bytes, arc_len, alias) = {
++        let shared = part.blob_arc();
++        (std::sync::Arc::as_ptr(&shared) as usize, shared.as_ptr() as usize, shared.len(),
++         shared.len() == visible.len() && std::ptr::eq(shared.as_slice(), visible))
++    };
++    let profile = std::env::var("LITCHI_0691_TRACE_PROFILE").unwrap_or_else(|_| "unset".to_owned());
++    eprintln!("LITCHI0691_PART profile={} stage=process_part uri={} visible_ptr=0x{:x} visible_len={} arc_struct_ptr=0x{:x} arc_bytes_ptr=0x{:x} arc_len={} alias={}", profile, part.partname().as_str(), visible.as_ptr() as usize, visible.len(), arc_struct, arc_bytes, arc_len, alias);
++    if visible.len() > MAX_PART_XML_BYTES {
++        return Err(Error::Limit { resource: "PresentationML part XML", limit: MAX_PART_XML_BYTES });
+     }
+     Ok(process_part(part)?)
+ }
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -615,6 +615,7 @@
+     physical_source_provenance: bool,
+     revision: Revision<'_>,
+ ) -> Result<Snapshot> {
++    eprintln!("LITCHI0691_MODEL profile={} stage=capture_begin parts={}", std::env::var("LITCHI_0691_TRACE_PROFILE").unwrap_or_else(|_| "unset".to_owned()), package.part_count());
+     let presentation = PresentationPart::from_package(package)?;
+     let presentation_name = presentation.part().partname().clone();
+     let references = presentation.slide_references()?;
+@@ -703,6 +704,7 @@
+         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
+         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
+     };
++    eprintln!("LITCHI0691_MODEL profile={} stage=capture_success parts={} slides={}", std::env::var("LITCHI_0691_TRACE_PROFILE").unwrap_or_else(|_| "unset".to_owned()), package.part_count(), slides.len());
+     Ok(Snapshot {
+         package: owned,
+         presentation_name,

@@ -1,0 +1,1532 @@
+[
+  {
+    "case": "real",
+    "phase": "capture",
+    "metrics": {
+      "alloc_calls": [
+        157951,
+        157951,
+        157951
+      ],
+      "requested_bytes": [
+        10516822,
+        10516822,
+        10516822
+      ],
+      "baseline_live_bytes": [
+        967522,
+        967522,
+        967522
+      ],
+      "peak_live_bytes": [
+        1221455,
+        1221455,
+        1221455
+      ],
+      "current_live_bytes": [
+        1058530,
+        1058530,
+        1058530
+      ],
+      "realloc_calls": [
+        4111,
+        4111,
+        4111
+      ],
+      "realloc_requested_bytes": [
+        2588160,
+        2588160,
+        2588160
+      ]
+    },
+    "peak_above_start": [
+      253933,
+      253933,
+      253933
+    ],
+    "net_live_change": [
+      91008,
+      91008,
+      91008
+    ]
+  },
+  {
+    "case": "real",
+    "phase": "clone",
+    "metrics": {
+      "alloc_calls": [
+        1046,
+        1046,
+        1046
+      ],
+      "requested_bytes": [
+        85371,
+        85371,
+        85371
+      ],
+      "baseline_live_bytes": [
+        1058530,
+        1058530,
+        1058530
+      ],
+      "peak_live_bytes": [
+        1143901,
+        1143901,
+        1143901
+      ],
+      "current_live_bytes": [
+        1143901,
+        1143901,
+        1143901
+      ],
+      "realloc_calls": [
+        0,
+        0,
+        0
+      ],
+      "realloc_requested_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "peak_above_start": [
+      85371,
+      85371,
+      85371
+    ],
+    "net_live_change": [
+      85371,
+      85371,
+      85371
+    ]
+  },
+  {
+    "case": "real",
+    "phase": "settext",
+    "metrics": {
+      "alloc_calls": [
+        16292,
+        16292,
+        16292
+      ],
+      "requested_bytes": [
+        2404063,
+        2404063,
+        2404063
+      ],
+      "baseline_live_bytes": [
+        1143901,
+        1143901,
+        1143901
+      ],
+      "peak_live_bytes": [
+        1242442,
+        1242442,
+        1242442
+      ],
+      "current_live_bytes": [
+        1160975,
+        1160975,
+        1160975
+      ],
+      "realloc_calls": [
+        341,
+        341,
+        341
+      ],
+      "realloc_requested_bytes": [
+        197455,
+        197455,
+        197455
+      ]
+    },
+    "peak_above_start": [
+      98541,
+      98541,
+      98541
+    ],
+    "net_live_change": [
+      17074,
+      17074,
+      17074
+    ]
+  },
+  {
+    "case": "real",
+    "phase": "commit",
+    "metrics": {
+      "alloc_calls": [
+        172534,
+        172534,
+        172534
+      ],
+      "requested_bytes": [
+        12806432,
+        12806432,
+        12806432
+      ],
+      "baseline_live_bytes": [
+        1160975,
+        1160975,
+        1160975
+      ],
+      "peak_live_bytes": [
+        1430681,
+        1430681,
+        1430681
+      ],
+      "current_live_bytes": [
+        1175073,
+        1175073,
+        1175073
+      ],
+      "realloc_calls": [
+        4560,
+        4560,
+        4560
+      ],
+      "realloc_requested_bytes": [
+        2737033,
+        2737033,
+        2737033
+      ]
+    },
+    "peak_above_start": [
+      269706,
+      269706,
+      269706
+    ],
+    "net_live_change": [
+      14098,
+      14098,
+      14098
+    ]
+  },
+  {
+    "case": "real",
+    "phase": "apply",
+    "metrics": {
+      "alloc_calls": [
+        2325,
+        2325,
+        2325
+      ],
+      "requested_bytes": [
+        203059,
+        203059,
+        203059
+      ],
+      "baseline_live_bytes": [
+        1175073,
+        1175073,
+        1175073
+      ],
+      "peak_live_bytes": [
+        1347583,
+        1347583,
+        1347583
+      ],
+      "current_live_bytes": [
+        1163252,
+        1163252,
+        1163252
+      ],
+      "realloc_calls": [
+        18,
+        18,
+        18
+      ],
+      "realloc_requested_bytes": [
+        8437,
+        8437,
+        8437
+      ]
+    },
+    "peak_above_start": [
+      172510,
+      172510,
+      172510
+    ],
+    "net_live_change": [
+      -11821,
+      -11821,
+      -11821
+    ]
+  },
+  {
+    "case": "real",
+    "phase": "total",
+    "metrics": {
+      "alloc_calls": [
+        350148,
+        350148,
+        350148
+      ],
+      "requested_bytes": [
+        26015747,
+        26015747,
+        26015747
+      ],
+      "baseline_live_bytes": [
+        967522,
+        967522,
+        967522
+      ],
+      "peak_live_bytes": [
+        1430681,
+        1430681,
+        1430681
+      ],
+      "current_live_bytes": [
+        1163252,
+        1163252,
+        1163252
+      ],
+      "realloc_calls": [
+        9030,
+        9030,
+        9030
+      ],
+      "realloc_requested_bytes": [
+        5531085,
+        5531085,
+        5531085
+      ]
+    },
+    "peak_above_start": [
+      463159,
+      463159,
+      463159
+    ],
+    "net_live_change": [
+      195730,
+      195730,
+      195730
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "capture",
+    "metrics": {
+      "alloc_calls": [
+        37763,
+        37763,
+        37763
+      ],
+      "requested_bytes": [
+        1334654,
+        1334654,
+        1334654
+      ],
+      "baseline_live_bytes": [
+        965879,
+        965879,
+        965879
+      ],
+      "peak_live_bytes": [
+        1060364,
+        1060364,
+        1060364
+      ],
+      "current_live_bytes": [
+        1056887,
+        1056887,
+        1056887
+      ],
+      "realloc_calls": [
+        925,
+        925,
+        925
+      ],
+      "realloc_requested_bytes": [
+        143843,
+        143843,
+        143843
+      ]
+    },
+    "peak_above_start": [
+      94485,
+      94485,
+      94485
+    ],
+    "net_live_change": [
+      91008,
+      91008,
+      91008
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "clone",
+    "metrics": {
+      "alloc_calls": [
+        1046,
+        1046,
+        1046
+      ],
+      "requested_bytes": [
+        85371,
+        85371,
+        85371
+      ],
+      "baseline_live_bytes": [
+        1056887,
+        1056887,
+        1056887
+      ],
+      "peak_live_bytes": [
+        1142258,
+        1142258,
+        1142258
+      ],
+      "current_live_bytes": [
+        1142258,
+        1142258,
+        1142258
+      ],
+      "realloc_calls": [
+        0,
+        0,
+        0
+      ],
+      "realloc_requested_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "peak_above_start": [
+      85371,
+      85371,
+      85371
+    ],
+    "net_live_change": [
+      85371,
+      85371,
+      85371
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "settext",
+    "metrics": {
+      "alloc_calls": [
+        7484,
+        7484,
+        7484
+      ],
+      "requested_bytes": [
+        1455965,
+        1455965,
+        1455965
+      ],
+      "baseline_live_bytes": [
+        1142258,
+        1142258,
+        1142258
+      ],
+      "peak_live_bytes": [
+        1172655,
+        1172655,
+        1172655
+      ],
+      "current_live_bytes": [
+        1159332,
+        1159332,
+        1159332
+      ],
+      "realloc_calls": [
+        78,
+        78,
+        78
+      ],
+      "realloc_requested_bytes": [
+        25997,
+        25997,
+        25997
+      ]
+    },
+    "peak_above_start": [
+      30397,
+      30397,
+      30397
+    ],
+    "net_live_change": [
+      17074,
+      17074,
+      17074
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "commit",
+    "metrics": {
+      "alloc_calls": [
+        45959,
+        45959,
+        45959
+      ],
+      "requested_bytes": [
+        2887430,
+        2887430,
+        2887430
+      ],
+      "baseline_live_bytes": [
+        1159332,
+        1159332,
+        1159332
+      ],
+      "peak_live_bytes": [
+        1268422,
+        1268422,
+        1268422
+      ],
+      "current_live_bytes": [
+        1173430,
+        1173430,
+        1173430
+      ],
+      "realloc_calls": [
+        1198,
+        1198,
+        1198
+      ],
+      "realloc_requested_bytes": [
+        180240,
+        180240,
+        180240
+      ]
+    },
+    "peak_above_start": [
+      109090,
+      109090,
+      109090
+    ],
+    "net_live_change": [
+      14098,
+      14098,
+      14098
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "apply",
+    "metrics": {
+      "alloc_calls": [
+        2059,
+        2059,
+        2059
+      ],
+      "requested_bytes": [
+        177208,
+        177208,
+        177208
+      ],
+      "baseline_live_bytes": [
+        1173430,
+        1173430,
+        1173430
+      ],
+      "peak_live_bytes": [
+        1345940,
+        1345940,
+        1345940
+      ],
+      "current_live_bytes": [
+        1161609,
+        1161609,
+        1161609
+      ],
+      "realloc_calls": [
+        7,
+        7,
+        7
+      ],
+      "realloc_requested_bytes": [
+        1486,
+        1486,
+        1486
+      ]
+    },
+    "peak_above_start": [
+      172510,
+      172510,
+      172510
+    ],
+    "net_live_change": [
+      -11821,
+      -11821,
+      -11821
+    ]
+  },
+  {
+    "case": "control",
+    "phase": "total",
+    "metrics": {
+      "alloc_calls": [
+        94311,
+        94311,
+        94311
+      ],
+      "requested_bytes": [
+        5940628,
+        5940628,
+        5940628
+      ],
+      "baseline_live_bytes": [
+        965879,
+        965879,
+        965879
+      ],
+      "peak_live_bytes": [
+        1345940,
+        1345940,
+        1345940
+      ],
+      "current_live_bytes": [
+        1161609,
+        1161609,
+        1161609
+      ],
+      "realloc_calls": [
+        2208,
+        2208,
+        2208
+      ],
+      "realloc_requested_bytes": [
+        351566,
+        351566,
+        351566
+      ]
+    },
+    "peak_above_start": [
+      380061,
+      380061,
+      380061
+    ],
+    "net_live_change": [
+      195730,
+      195730,
+      195730
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "capture",
+    "metrics": {
+      "alloc_calls": [
+        9603,
+        9603,
+        9603
+      ],
+      "requested_bytes": [
+        471675,
+        471675,
+        471675
+      ],
+      "baseline_live_bytes": [
+        247182,
+        247182,
+        247182
+      ],
+      "peak_live_bytes": [
+        329593,
+        329593,
+        329593
+      ],
+      "current_live_bytes": [
+        303550,
+        303550,
+        303550
+      ],
+      "realloc_calls": [
+        417,
+        417,
+        417
+      ],
+      "realloc_requested_bytes": [
+        51765,
+        51765,
+        51765
+      ]
+    },
+    "peak_above_start": [
+      82411,
+      82411,
+      82411
+    ],
+    "net_live_change": [
+      56368,
+      56368,
+      56368
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "clone",
+    "metrics": {
+      "alloc_calls": [
+        695,
+        695,
+        695
+      ],
+      "requested_bytes": [
+        54481,
+        54481,
+        54481
+      ],
+      "baseline_live_bytes": [
+        303550,
+        303550,
+        303550
+      ],
+      "peak_live_bytes": [
+        358031,
+        358031,
+        358031
+      ],
+      "current_live_bytes": [
+        358031,
+        358031,
+        358031
+      ],
+      "realloc_calls": [
+        0,
+        0,
+        0
+      ],
+      "realloc_requested_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "peak_above_start": [
+      54481,
+      54481,
+      54481
+    ],
+    "net_live_change": [
+      54481,
+      54481,
+      54481
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "settext",
+    "metrics": {
+      "alloc_calls": [
+        2016,
+        2016,
+        2016
+      ],
+      "requested_bytes": [
+        239371,
+        239371,
+        239371
+      ],
+      "baseline_live_bytes": [
+        358031,
+        358031,
+        358031
+      ],
+      "peak_live_bytes": [
+        368306,
+        368306,
+        368306
+      ],
+      "current_live_bytes": [
+        361567,
+        361567,
+        361567
+      ],
+      "realloc_calls": [
+        61,
+        61,
+        61
+      ],
+      "realloc_requested_bytes": [
+        9698,
+        9698,
+        9698
+      ]
+    },
+    "peak_above_start": [
+      10275,
+      10275,
+      10275
+    ],
+    "net_live_change": [
+      3536,
+      3536,
+      3536
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "commit",
+    "metrics": {
+      "alloc_calls": [
+        12167,
+        12167,
+        12167
+      ],
+      "requested_bytes": [
+        757108,
+        757108,
+        757108
+      ],
+      "baseline_live_bytes": [
+        361567,
+        361567,
+        361567
+      ],
+      "peak_live_bytes": [
+        452015,
+        452015,
+        452015
+      ],
+      "current_live_bytes": [
+        368515,
+        368515,
+        368515
+      ],
+      "realloc_calls": [
+        545,
+        545,
+        545
+      ],
+      "realloc_requested_bytes": [
+        62222,
+        62222,
+        62222
+      ]
+    },
+    "peak_above_start": [
+      90448,
+      90448,
+      90448
+    ],
+    "net_live_change": [
+      6948,
+      6948,
+      6948
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "apply",
+    "metrics": {
+      "alloc_calls": [
+        1291,
+        1291,
+        1291
+      ],
+      "requested_bytes": [
+        110850,
+        110850,
+        110850
+      ],
+      "baseline_live_bytes": [
+        368515,
+        368515,
+        368515
+      ],
+      "peak_live_bytes": [
+        475291,
+        475291,
+        475291
+      ],
+      "current_live_bytes": [
+        361438,
+        361438,
+        361438
+      ],
+      "realloc_calls": [
+        6,
+        6,
+        6
+      ],
+      "realloc_requested_bytes": [
+        862,
+        862,
+        862
+      ]
+    },
+    "peak_above_start": [
+      106776,
+      106776,
+      106776
+    ],
+    "net_live_change": [
+      -7077,
+      -7077,
+      -7077
+    ]
+  },
+  {
+    "case": "generated",
+    "phase": "total",
+    "metrics": {
+      "alloc_calls": [
+        25772,
+        25772,
+        25772
+      ],
+      "requested_bytes": [
+        1633485,
+        1633485,
+        1633485
+      ],
+      "baseline_live_bytes": [
+        247182,
+        247182,
+        247182
+      ],
+      "peak_live_bytes": [
+        475291,
+        475291,
+        475291
+      ],
+      "current_live_bytes": [
+        361438,
+        361438,
+        361438
+      ],
+      "realloc_calls": [
+        1029,
+        1029,
+        1029
+      ],
+      "realloc_requested_bytes": [
+        124547,
+        124547,
+        124547
+      ]
+    },
+    "peak_above_start": [
+      228109,
+      228109,
+      228109
+    ],
+    "net_live_change": [
+      114256,
+      114256,
+      114256
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "capture",
+    "metrics": {
+      "alloc_calls": [
+        4606,
+        4606,
+        4606
+      ],
+      "requested_bytes": [
+        214111,
+        214111,
+        214111
+      ],
+      "baseline_live_bytes": [
+        135766,
+        135766,
+        135766
+      ],
+      "peak_live_bytes": [
+        188941,
+        188941,
+        188941
+      ],
+      "current_live_bytes": [
+        158012,
+        158012,
+        158012
+      ],
+      "realloc_calls": [
+        155,
+        155,
+        155
+      ],
+      "realloc_requested_bytes": [
+        19847,
+        19847,
+        19847
+      ]
+    },
+    "peak_above_start": [
+      53175,
+      53175,
+      53175
+    ],
+    "net_live_change": [
+      22246,
+      22246,
+      22246
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "clone",
+    "metrics": {
+      "alloc_calls": [
+        265,
+        265,
+        265
+      ],
+      "requested_bytes": [
+        20300,
+        20300,
+        20300
+      ],
+      "baseline_live_bytes": [
+        158012,
+        158012,
+        158012
+      ],
+      "peak_live_bytes": [
+        178312,
+        178312,
+        178312
+      ],
+      "current_live_bytes": [
+        178312,
+        178312,
+        178312
+      ],
+      "realloc_calls": [
+        0,
+        0,
+        0
+      ],
+      "realloc_requested_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "peak_above_start": [
+      20300,
+      20300,
+      20300
+    ],
+    "net_live_change": [
+      20300,
+      20300,
+      20300
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "settext",
+    "metrics": {
+      "alloc_calls": [
+        1756,
+        1756,
+        1756
+      ],
+      "requested_bytes": [
+        220339,
+        220339,
+        220339
+      ],
+      "baseline_live_bytes": [
+        178312,
+        178312,
+        178312
+      ],
+      "peak_live_bytes": [
+        187618,
+        187618,
+        187618
+      ],
+      "current_live_bytes": [
+        182825,
+        182825,
+        182825
+      ],
+      "realloc_calls": [
+        60,
+        60,
+        60
+      ],
+      "realloc_requested_bytes": [
+        6865,
+        6865,
+        6865
+      ]
+    },
+    "peak_above_start": [
+      9306,
+      9306,
+      9306
+    ],
+    "net_live_change": [
+      4513,
+      4513,
+      4513
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "commit",
+    "metrics": {
+      "alloc_calls": [
+        6541,
+        6541,
+        6541
+      ],
+      "requested_bytes": [
+        453818,
+        453818,
+        453818
+      ],
+      "baseline_live_bytes": [
+        182825,
+        182825,
+        182825
+      ],
+      "peak_live_bytes": [
+        240733,
+        240733,
+        240733
+      ],
+      "current_live_bytes": [
+        188040,
+        188040,
+        188040
+      ],
+      "realloc_calls": [
+        226,
+        226,
+        226
+      ],
+      "realloc_requested_bytes": [
+        25024,
+        25024,
+        25024
+      ]
+    },
+    "peak_above_start": [
+      57908,
+      57908,
+      57908
+    ],
+    "net_live_change": [
+      5215,
+      5215,
+      5215
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "apply",
+    "metrics": {
+      "alloc_calls": [
+        582,
+        582,
+        582
+      ],
+      "requested_bytes": [
+        46850,
+        46850,
+        46850
+      ],
+      "baseline_live_bytes": [
+        188040,
+        188040,
+        188040
+      ],
+      "peak_live_bytes": [
+        230471,
+        230471,
+        230471
+      ],
+      "current_live_bytes": [
+        183875,
+        183875,
+        183875
+      ],
+      "realloc_calls": [
+        6,
+        6,
+        6
+      ],
+      "realloc_requested_bytes": [
+        862,
+        862,
+        862
+      ]
+    },
+    "peak_above_start": [
+      42431,
+      42431,
+      42431
+    ],
+    "net_live_change": [
+      -4165,
+      -4165,
+      -4165
+    ]
+  },
+  {
+    "case": "notes-poi",
+    "phase": "total",
+    "metrics": {
+      "alloc_calls": [
+        13750,
+        13750,
+        13750
+      ],
+      "requested_bytes": [
+        955418,
+        955418,
+        955418
+      ],
+      "baseline_live_bytes": [
+        135766,
+        135766,
+        135766
+      ],
+      "peak_live_bytes": [
+        240733,
+        240733,
+        240733
+      ],
+      "current_live_bytes": [
+        183875,
+        183875,
+        183875
+      ],
+      "realloc_calls": [
+        447,
+        447,
+        447
+      ],
+      "realloc_requested_bytes": [
+        52598,
+        52598,
+        52598
+      ]
+    },
+    "peak_above_start": [
+      104967,
+      104967,
+      104967
+    ],
+    "net_live_change": [
+      48109,
+      48109,
+      48109
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "capture",
+    "metrics": {
+      "alloc_calls": [
+        5493,
+        5493,
+        5493
+      ],
+      "requested_bytes": [
+        234563,
+        234563,
+        234563
+      ],
+      "baseline_live_bytes": [
+        109828,
+        109828,
+        109828
+      ],
+      "peak_live_bytes": [
+        155179,
+        155179,
+        155179
+      ],
+      "current_live_bytes": [
+        129655,
+        129655,
+        129655
+      ],
+      "realloc_calls": [
+        163,
+        163,
+        163
+      ],
+      "realloc_requested_bytes": [
+        23960,
+        23960,
+        23960
+      ]
+    },
+    "peak_above_start": [
+      45351,
+      45351,
+      45351
+    ],
+    "net_live_change": [
+      19827,
+      19827,
+      19827
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "clone",
+    "metrics": {
+      "alloc_calls": [
+        239,
+        239,
+        239
+      ],
+      "requested_bytes": [
+        17881,
+        17881,
+        17881
+      ],
+      "baseline_live_bytes": [
+        129655,
+        129655,
+        129655
+      ],
+      "peak_live_bytes": [
+        147536,
+        147536,
+        147536
+      ],
+      "current_live_bytes": [
+        147536,
+        147536,
+        147536
+      ],
+      "realloc_calls": [
+        0,
+        0,
+        0
+      ],
+      "realloc_requested_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "peak_above_start": [
+      17881,
+      17881,
+      17881
+    ],
+    "net_live_change": [
+      17881,
+      17881,
+      17881
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "settext",
+    "metrics": {
+      "alloc_calls": [
+        5030,
+        5030,
+        5030
+      ],
+      "requested_bytes": [
+        647100,
+        647100,
+        647100
+      ],
+      "baseline_live_bytes": [
+        147536,
+        147536,
+        147536
+      ],
+      "peak_live_bytes": [
+        168365,
+        168365,
+        168365
+      ],
+      "current_live_bytes": [
+        161857,
+        161857,
+        161857
+      ],
+      "realloc_calls": [
+        85,
+        85,
+        85
+      ],
+      "realloc_requested_bytes": [
+        16205,
+        16205,
+        16205
+      ]
+    },
+    "peak_above_start": [
+      20829,
+      20829,
+      20829
+    ],
+    "net_live_change": [
+      14321,
+      14321,
+      14321
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "commit",
+    "metrics": {
+      "alloc_calls": [
+        10658,
+        10658,
+        10658
+      ],
+      "requested_bytes": [
+        915368,
+        915368,
+        915368
+      ],
+      "baseline_live_bytes": [
+        161857,
+        161857,
+        161857
+      ],
+      "peak_live_bytes": [
+        211709,
+        211709,
+        211709
+      ],
+      "current_live_bytes": [
+        166800,
+        166800,
+        166800
+      ],
+      "realloc_calls": [
+        249,
+        249,
+        249
+      ],
+      "realloc_requested_bytes": [
+        34831,
+        34831,
+        34831
+      ]
+    },
+    "peak_above_start": [
+      49852,
+      49852,
+      49852
+    ],
+    "net_live_change": [
+      4943,
+      4943,
+      4943
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "apply",
+    "metrics": {
+      "alloc_calls": [
+        530,
+        530,
+        530
+      ],
+      "requested_bytes": [
+        42012,
+        42012,
+        42012
+      ],
+      "baseline_live_bytes": [
+        166800,
+        166800,
+        166800
+      ],
+      "peak_live_bytes": [
+        204393,
+        204393,
+        204393
+      ],
+      "current_live_bytes": [
+        163003,
+        163003,
+        163003
+      ],
+      "realloc_calls": [
+        6,
+        6,
+        6
+      ],
+      "realloc_requested_bytes": [
+        862,
+        862,
+        862
+      ]
+    },
+    "peak_above_start": [
+      37593,
+      37593,
+      37593
+    ],
+    "net_live_change": [
+      -3797,
+      -3797,
+      -3797
+    ]
+  },
+  {
+    "case": "notes-lo",
+    "phase": "total",
+    "metrics": {
+      "alloc_calls": [
+        21950,
+        21950,
+        21950
+      ],
+      "requested_bytes": [
+        1856924,
+        1856924,
+        1856924
+      ],
+      "baseline_live_bytes": [
+        109828,
+        109828,
+        109828
+      ],
+      "peak_live_bytes": [
+        211709,
+        211709,
+        211709
+      ],
+      "current_live_bytes": [
+        163003,
+        163003,
+        163003
+      ],
+      "realloc_calls": [
+        503,
+        503,
+        503
+      ],
+      "realloc_requested_bytes": [
+        75858,
+        75858,
+        75858
+      ]
+    },
+    "peak_above_start": [
+      101881,
+      101881,
+      101881
+    ],
+    "net_live_change": [
+      53175,
+      53175,
+      53175
+    ]
+  }
+]

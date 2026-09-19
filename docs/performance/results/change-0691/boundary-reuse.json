@@ -1,0 +1,5 @@
+{
+  "evidence": "docs/performance/results/change-0690/evidence/crate-boundaries.log",
+  "sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+  "reason": "No workspace or crate source/manifest changed from the previously checked baseline; the new standalone probe is outside the workspace."
+}

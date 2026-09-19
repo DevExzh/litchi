@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0691 — refresh evidence before changing PPTX capture
+
+[0691](0691-pptx-repeated-mce-baseline.md) adds 2,000 native phase samples across
+five cases, separate allocator diagnostics, open-plus-capture profiles, and
+raw-identity MCE traces with exact source restoration. Public-API semantic
+reopen and output hashes repeat across the four native legs. The measured
+repeated work supports capture-local projection reuse as the next candidate;
+no speculative production cache is added. The broader GOAL remains active,
+iWork is excluded, and no registered performance claim or coverage promotion
+is made.
+
 ## 0690 — remove temporary CFB lookup keys with explicit costs
 
 [0690](0690-cfb-borrowed-directory-lookups.md) preserves validated length-first

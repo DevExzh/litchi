@@ -1,0 +1,87 @@
+[
+  {
+    "case": "real",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "3",
+      "2"
+    ],
+    "exit_code": 0,
+    "output": "allocations/real.tsv",
+    "output_sha256": "d2fe9d227abbf551193fb4ca24de293d54079c4b2eabd933e8d8449e9decdb86",
+    "binary_sha256": "5ae711076cd608b13b69f816b68894e015198c89a77076a9348a0bbf05477067"
+  },
+  {
+    "case": "control",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "3",
+      "2"
+    ],
+    "exit_code": 0,
+    "output": "allocations/control.tsv",
+    "output_sha256": "dd3638b5061dcfd998e95f1754217ed79925de0b4d9c6fcd2e99599eecaff369",
+    "binary_sha256": "5ae711076cd608b13b69f816b68894e015198c89a77076a9348a0bbf05477067"
+  },
+  {
+    "case": "generated",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/allocations",
+      "phases",
+      "generated:12x8",
+      "3",
+      "2"
+    ],
+    "exit_code": 0,
+    "output": "allocations/generated.tsv",
+    "output_sha256": "4a4dee898ba9e7da1e32aab46f6fe9a8da95266dbf665f4aefb12bab8ae0bf6e",
+    "binary_sha256": "5ae711076cd608b13b69f816b68894e015198c89a77076a9348a0bbf05477067"
+  },
+  {
+    "case": "notes-poi",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "3",
+      "2"
+    ],
+    "exit_code": 0,
+    "output": "allocations/notes-poi.tsv",
+    "output_sha256": "a376070a6b20dbd4f40663f93cb79f16459cdb39084802a3bc4ab03932b874cc",
+    "binary_sha256": "5ae711076cd608b13b69f816b68894e015198c89a77076a9348a0bbf05477067"
+  },
+  {
+    "case": "notes-lo",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "3",
+      "2"
+    ],
+    "exit_code": 0,
+    "output": "allocations/notes-lo.tsv",
+    "output_sha256": "b973412841480b75c77ddfd9500f97795746cb091df91a353cfd6d354ced409d",
+    "binary_sha256": "5ae711076cd608b13b69f816b68894e015198c89a77076a9348a0bbf05477067"
+  }
+]

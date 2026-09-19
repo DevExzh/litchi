@@ -1,0 +1,26 @@
+{
+  "cases": [
+    [
+      "real",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+    ],
+    [
+      "generated",
+      "generated:12x8"
+    ],
+    [
+      "control",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx"
+    ]
+  ],
+  "diagnostic_only": true,
+  "model_trace": true,
+  "operations": [
+    "capture",
+    "apply"
+  ],
+  "profile": "baseline",
+  "schema": "litchi-0691-trace-v1",
+  "status": "started",
+  "timing_evidence": false
+}

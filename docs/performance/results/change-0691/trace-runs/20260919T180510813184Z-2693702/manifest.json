@@ -1,0 +1,67 @@
+{
+  "binary": "/home/zhuhe/code/litchi-target-0691/release/probe0691",
+  "binary_sha256": "afc3db6fa23c14566526d5756294ff48a6a1aaa6db0213932269bd1352d194a0",
+  "build": {
+    "skipped": true
+  },
+  "cases": [
+    [
+      "real",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx"
+    ]
+  ],
+  "diagnostic_only": true,
+  "model_trace": true,
+  "operations": [
+    "capture"
+  ],
+  "probe_runs": [
+    {
+      "case": "real",
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-target-0691/release/probe0691",
+        "prefix",
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+        "capture",
+        "1"
+      ],
+      "count": 1,
+      "exit_code": 0,
+      "operation": "capture",
+      "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+      "stderr_sha256": "f1b62212090742d9dd4c79255782880044e5d7e05525a6f0f61ebb208f7dbd8e",
+      "stdout_sha256": "d03c3f743e9d5259470b3520b872d9b06c31471d52f0d63c06461e36a0c9125a"
+    }
+  ],
+  "profile": "baseline",
+  "restoration": [
+    {
+      "current_sha256": "51044e2b69a8d0b4700ccadb5f8c93b3678e1d126b906d32d89ea1ecffd01a43",
+      "path": "crates/litchi-pptx/src/opened/model.rs",
+      "restored_exact": true,
+      "restored_sha256": "f526bb19167bb5ec2c4bbfa87c63d8952dcfc70dcfe4cd2a02515bbd7280312d",
+      "was_patched": true
+    },
+    {
+      "current_sha256": "4a715329460e23b17d6561fd58c976ae96ad1d064a645af52641329fed5daae4",
+      "path": "crates/litchi-pptx/src/parts/mod.rs",
+      "restored_exact": true,
+      "restored_sha256": "5ca760af4c79fe0d810509c2d7e9f265c2ae5f4d620b5d0521dd0d68b91e7955",
+      "was_patched": true
+    },
+    {
+      "current_sha256": "9d9409b45aff1480822d3458e4afbdb0bf86fe562839fbc974e9f1acd0630d5f",
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "restored_exact": true,
+      "restored_sha256": "e3836100c13eaee212631965bd7ffb25f67e30a9d953e60686d0be937fe48fa9",
+      "was_patched": true
+    }
+  ],
+  "schema": "litchi-0691-trace-v1",
+  "source_restored_exact": true,
+  "status": "completed",
+  "timing_evidence": false
+}

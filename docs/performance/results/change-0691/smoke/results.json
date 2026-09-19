@@ -1,0 +1,94 @@
+[
+  {
+    "case": "real",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "stdout_sha256": "bf96003908b0a0a6949ce09a085253e3231dddcb54e76e4f22af2d496fea9cfb"
+  },
+  {
+    "case": "control",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "stdout_sha256": "c99ad7744f335647aebe9374f0492f174cc3340d1bb7b7dfa83b6b06eeab237d"
+  },
+  {
+    "case": "generated",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "generated:12x8",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "stdout_sha256": "35b3e1130a0a4e679a650e228e1e80b5264ca6cf4488ca97abbc3f017a118c67"
+  },
+  {
+    "case": "notes-poi",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "stdout_sha256": "2c03306970f8c04a13d976f6b0fbc608bda08ddee9ed465355a8954d0f35cfec"
+  },
+  {
+    "case": "notes-lo",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "stdout_sha256": "a20a72ce78e403fa1ade4d09affd5d03e9a3ff2606cb56120326e9bdf974f100"
+  },
+  {
+    "case": "notes-mce",
+    "command": [
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+      "1",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_refusal": "no editable text shape found"
+  }
+]
