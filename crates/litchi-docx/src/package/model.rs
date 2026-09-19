@@ -33,7 +33,7 @@ pub(super) use crate::mail_merge::{
     self, Recipients, RelationshipId, Settings as MailMergeSettings, Source, Target,
     is_mail_merge_relationship_type, map_docx_error,
 };
-pub(super) use crate::parts::DocumentPart;
+pub(super) use crate::parts::{DocumentPart, ParagraphIndexCache};
 pub(super) use crate::settings::{
     ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, extract_document_variables,
     patch_attached_template, patch_document_variables, patch_mail_merge,
@@ -132,6 +132,9 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 pub struct Package {
     /// The underlying OPC package
     pub(super) opc: OpcPackage,
+    /// Package-scoped clean paragraph memo; entries are invalidated by source
+    /// allocation identity when the main relationship or payload changes.
+    pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
     /// Mutable document for writing (cached)
     pub(super) mutable_doc: Option<MutableDocument>,
     /// Whether a committed raw edit has disabled the legacy document writer.
@@ -569,7 +572,10 @@ impl Package {
             .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
 
         // Create DocumentPart wrapper
-        let doc_part = DocumentPart::from_part(main_part)?;
+        let doc_part = DocumentPart::from_part_with_cache(
+            main_part,
+            std::sync::Arc::clone(&self.paragraph_index_cache),
+        )?;
 
         // Create and return Document with reference to OPC package
         Ok(Document::new(doc_part, &self.opc))

@@ -1,0 +1,341 @@
+{
+  "groups": {
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/100000": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 256183.40625,
+        "p50": 250936.5,
+        "p95": 271954.05,
+        "p99": 285062.30000000005
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 32,
+      "result_digests": [
+        13635915274603500608
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/100000": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 254260.0,
+        "p50": 251556.5,
+        "p95": 266087.5,
+        "p99": 274061.1
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 32,
+      "result_digests": [
+        12609570239344764419
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  },
+  "paired": {
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 257001.625,
+          "p50": 251706.5,
+          "p95": 269470.5,
+          "p99": 269999.7
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 255838.625,
+          "p50": 251201.0,
+          "p95": 276777.0,
+          "p99": 287316.2
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 255506.125,
+          "p50": 250731.5,
+          "p95": 271125.5,
+          "p99": 273569.9
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 256387.25,
+          "p50": 251091.0,
+          "p95": 268007.5,
+          "p99": 269466.3
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": -0.04378963459540364,
+      "before_after_p50_percent": -0.38735590856811,
+      "p50_delta_percent": -0.20082914028839438,
+      "p95_delta_percent": 2.711428523715953
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 256991.375,
+          "p50": 256141.5,
+          "p95": 269923.14999999997,
+          "p99": 274322.23
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 252776.25,
+          "p50": 251706.5,
+          "p95": 258595.65,
+          "p99": 258864.73
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 254208.625,
+          "p50": 252761.0,
+          "p95": 260788.65,
+          "p99": 261791.33
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 253063.75,
+          "p50": 250491.0,
+          "p95": 264326.0,
+          "p99": 269690.8
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": -0.4829036993482472,
+      "before_after_p50_percent": -1.3197783256520323,
+      "p50_delta_percent": -1.7314648348666695,
+      "p95_delta_percent": -4.196564837065653
+    }
+  },
+  "rows": 64,
+  "schema": "change-0682-summary-v1",
+  "source": "docs/performance/results/change-0682/measurements/control-abba/control.jsonl"
+}

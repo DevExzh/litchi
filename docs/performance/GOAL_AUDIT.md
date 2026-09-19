@@ -1,5 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0682 — repeated DOCX paragraph views share a bounded semantic index
+
+[0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo for eager,
+source-backed and managed documents. Repeated fresh-view/count p50 decreases
+58.45–63.44% on generated eager/source-backed cases, 77.86–79.75% on managed
+cases and 15.82–20.24% on the real fixture in the scoped paired windows.
+A measured hot-query regression led to removing a redundant inner `Arc`;
+the final longer control has no observed regression. Clean managed
+reservations remain charged until reclamation, an explicit retained cost.
+All 114 differential cases agree; final quality checks, 1,627 Rust
+tests and seven evidence/dependency checks pass. No coverage row or registered
+claim is promoted. Physical cold behavior, broader producers, concurrency
+performance and the full program audit remain open; iWork is excluded.
+
 ## 0681 — measured prerequisites remain distinct from implemented outcomes
 
 [0681](0681-next-batch-evidence-audit.md) corrects the retained XLSX timing

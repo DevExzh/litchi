@@ -21,12 +21,14 @@
 
 use super::model::{
     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
-    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package, Path, Read,
-    Result, Slot, Write, WriteRollbackGuard, ct, docx_web, validate_document_main_content_type,
+    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package,
+    ParagraphIndexCache, Path, Read, Result, Slot, Write, WriteRollbackGuard, ct, docx_web,
+    validate_document_main_content_type,
 };
 #[cfg(feature = "encryption")]
 pub(super) use super::model::{Limits, Mode};
 use litchi_opc::OpcError;
+use std::sync::Arc;
 
 impl Package {
     /// Create a new empty .docx package.
@@ -217,6 +219,7 @@ impl Package {
 
         Ok(Self {
             opc,
+            paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             mutable_doc,
             raw_edit_committed: false,
             properties,
@@ -374,6 +377,7 @@ impl Package {
 
         Ok(Self {
             opc,
+            paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             mutable_doc: None,
             raw_edit_committed: false,
             properties,

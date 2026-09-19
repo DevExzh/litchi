@@ -1,0 +1,112 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo check -p litchi-docx --all-features --all-targets --locked
+    Checking digest v0.11.3
+    Checking cipher v0.5.2
+    Checking sha2 v0.11.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking aes v0.9.3
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking hmac v0.13.0
+    Checking sha1 v0.11.0
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/model.rs:671:23
+    |
+671 |         let payload = std::sync::Arc::new(payload.into_bytes());
+    |                       ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+671 -         let payload = std::sync::Arc::new(payload.into_bytes());
+671 +         let payload = Arc::new(payload.into_bytes());
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/tests/graph.rs:747:13
+    |
+747 |     assert!(std::sync::Arc::ptr_eq(
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+747 -     assert!(std::sync::Arc::ptr_eq(
+747 +     assert!(Arc::ptr_eq(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/tests/graph.rs:755:13
+    |
+755 |     assert!(std::sync::Arc::ptr_eq(
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+755 -     assert!(std::sync::Arc::ptr_eq(
+755 +     assert!(Arc::ptr_eq(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/tests/graph.rs:872:13
+    |
+872 |     assert!(std::sync::Arc::ptr_eq(
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+872 -     assert!(std::sync::Arc::ptr_eq(
+872 +     assert!(Arc::ptr_eq(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/tests/graph.rs:876:13
+    |
+876 |     assert!(std::sync::Arc::ptr_eq(
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+876 -     assert!(std::sync::Arc::ptr_eq(
+876 +     assert!(Arc::ptr_eq(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-docx/src/package/tests/graph.rs:957:13
+    |
+957 |     assert!(std::sync::Arc::ptr_eq(
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+957 -     assert!(std::sync::Arc::ptr_eq(
+957 +     assert!(Arc::ptr_eq(
+    |
+
+error: unnecessary qualification
+    --> crates/litchi-docx/src/package/tests/graph.rs:1005:13
+     |
+1005 |     assert!(std::sync::Arc::ptr_eq(&main_before, &main_after_noop));
+     |             ^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1005 -     assert!(std::sync::Arc::ptr_eq(&main_before, &main_after_noop));
+1005 +     assert!(Arc::ptr_eq(&main_before, &main_after_noop));
+     |
+
+error: could not compile `litchi-docx` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-docx` (lib test) due to 7 previous errors
+
+exit 101

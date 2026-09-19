@@ -1,0 +1,6 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo check -p litchi-docx --all-features --all-targets --locked
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.59s
+
+exit 0

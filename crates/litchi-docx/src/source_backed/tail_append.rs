@@ -381,6 +381,7 @@ impl<'package, 'text> Edit<'package, 'text> {
 
 /// Prepared source/candidate semantic proof plus OPC splice plan.
 pub struct Plan<'package> {
+    package: &'package Package,
     splice: SourcePartSplicePlan<'package>,
     source: SourceProof,
     candidate: CandidateProof,
@@ -498,6 +499,7 @@ impl Publication {
     /// complete artifact fingerprint. This is a new operation governed by the
     /// current package's execution context, including its cancellation token.
     pub fn write_inverse_to_stream(&self, current: &Package, writer: impl Write) -> Result<()> {
+        current.trim_clean_paragraph_index_for_operation();
         self.splice
             .write_inverse_to_stream(&current.package, writer)
             .map_err(|error| Error::Document(DocumentError::from(error)))
@@ -555,6 +557,7 @@ impl Package {
 fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan<'package>> {
     edit.limits.validate()?;
     let package = edit.package;
+    package.trim_clean_paragraph_index_for_operation();
     check_options(&edit.options)?;
     let options = effective_options(package, &edit.options);
     check_options(&options)?;
@@ -694,6 +697,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     check_options(&options)?;
     Ok(Plan {
+        package,
         splice,
         source: source_scan.source_proof(source_version),
         candidate: candidate_scan.candidate_proof(),
@@ -778,6 +782,7 @@ fn prepare_noop(
     };
     check_options(&options)?;
     Ok(Plan {
+        package,
         splice,
         source,
         candidate,
@@ -788,6 +793,7 @@ fn prepare_noop(
 
 fn publish_commit(commit: Commit<'_>, writer: impl Write) -> Result<Publication> {
     let Commit { plan } = commit;
+    plan.package.trim_clean_paragraph_index_for_operation();
     check_options(&plan.options)?;
     let source = plan.source;
     let candidate = plan.candidate;

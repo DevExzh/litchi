@@ -1,0 +1,14 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo check -p litchi-docx --all-features --all-targets --locked
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0433]: cannot find type `ReadLimits` in this scope
+  --> crates/litchi-docx/src/source_backed/paragraph_index_tests.rs:58:9
+   |
+58 |         ReadLimits::default(),
+   |         ^^^^^^^^^^ use of undeclared type `ReadLimits`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `litchi-docx` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+
+exit 101

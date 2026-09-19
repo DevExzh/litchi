@@ -1,0 +1,5 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo clippy -p litchi-docx --all-features --lib --no-deps --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+exit 0

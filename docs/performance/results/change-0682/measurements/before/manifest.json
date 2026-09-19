@@ -1,0 +1,71 @@
+{
+  "schema": "change-0682-before-manifest-v1",
+  "phase": "before",
+  "performance_claim": "none",
+  "repository_revision": "35686023471e066d54a26737316e0d648f787f91",
+  "worktree": "/home/zhuhe/code/litchi-docx-cache-baseline",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-target-0682-before/release/probe0682",
+    "sha256": "9834dca016973ba5b773d55b5ad22b43f859b2a477011e583861c28152bb4ac5"
+  },
+  "build": {
+    "command": "env CARGO_BUILD_JOBS=2 cargo build --manifest-path docs/performance/results/change-0682/probe/Cargo.toml --release --offline --locked --target-dir /home/zhuhe/code/litchi-target-0682-before",
+    "target_dir_external": true,
+    "cargo_jobs": 2
+  },
+  "environment": {
+    "os": "Linux 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 2026 x86_64",
+    "cpu": "AMD EPYC 9R45",
+    "logical_cpus": 32,
+    "pinned_cpu": 12,
+    "rustc": "1.95.0 (59807616 2026-04-14)",
+    "cargo": "1.95.0 (f2d3ce0bd 2026-03-21)",
+    "perf": "7.0.14",
+    "valgrind": "3.26.0"
+  },
+  "probe": {
+    "cargo_toml_sha256": "b7d81facd01cc99a64a1fcf67b9d074f54125aaf7f807114c58c1173921abfe0",
+    "cargo_lock_sha256": "83ca2b1fee71bb0b677fa76b2464415b738a0f0aa4e7b2b592f2f51ae9eb6c62",
+    "main_rs_sha256": "07940463cf9aab7cbb5e74005c65eff618544dc64265805a18b2017c92a7c24e",
+    "run_before_sha256": "e95a0a26b66f46a3394e1318668ea733dfdae3fb931933cd34cc348bdc37eee2",
+    "run_aa_sha256": "b85ced6ef263df5390d2333add97999a8d2d7465e37091bf9d07ef824f3a74db",
+    "run_abba_sha256": "d1eb89d578f016f14e8b431ea77ae5f0d2d17d15dd67450a909555534f9df701",
+    "summarize_sha256": "d15c2ae95982249d3b93727462530764dba5c12f04852c286d78f6c86a71afc9"
+  },
+  "corpora": [
+    {
+      "label": "generated-200",
+      "paragraphs": 200,
+      "visible_xml_bytes": 10113,
+      "archive_bytes": 1454,
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405"
+    },
+    {
+      "label": "generated-10000",
+      "paragraphs": 10000,
+      "visible_xml_bytes": 500113,
+      "archive_bytes": 27080,
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f"
+    },
+    {
+      "label": "ComplexNumberedLists.docx",
+      "path": "test-data/ooxml/docx/ComplexNumberedLists.docx",
+      "paragraphs": 17,
+      "archive_bytes": 14458,
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6"
+    }
+  ],
+  "measurements": {
+    "matrix": "matrix.jsonl",
+    "matrix_sha256": "56379f35cb18d49c3f630bd7731fb9f322cba848a6504fb920443bfb498c705a",
+    "matrix_rows": 114,
+    "aa": "aa.jsonl",
+    "aa_sha256": "6157a816c8a9fd75ec211d5eed5da0be9739c9f60f21b886d59e2068b0a77278",
+    "aa_rows": 224,
+    "timing_scope": "package opening and base source-cache allocation are outside the timed loop; fresh-view construction and queries are inside fresh iterations, while same-view query loops are timed after setup",
+    "semantic_assertion": "every count row equals expected_paragraphs; every selected text row has a paragraph",
+    "physical_source_assertion": "source rows report one cold load followed by hits for fresh-view repetitions",
+    "claim_scope": "paragraph view/index work only; no whole-package speedup or zero-allocation claim"
+  },
+  "audit_note": "Coordinator corrected a missing character in the hand-transcribed run_abba_sha256 field before candidate measurements. Baseline binary, probe source/lock, baseline runners and raw measurement hashes were independently verified unchanged."
+}

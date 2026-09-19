@@ -1220,6 +1220,7 @@ impl Package {
         writer: W,
         patch: &Patch,
     ) -> Result<Publication> {
+        self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
         let execution = self.package.execution_context();
         let current = capture(&self, patch.before.selector.clone(), patch.before.limits)?;
@@ -1273,6 +1274,7 @@ impl Package {
         writer: W,
         publication: &Publication,
     ) -> Result<Snapshot> {
+        self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
         let execution = self.package.execution_context();
         let current = self.package.source_artifact().fingerprint()?;
@@ -1293,6 +1295,7 @@ impl Package {
 }
 
 fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snapshot> {
+    package.trim_clean_paragraph_index_for_operation();
     package.package.check_execution()?;
     if let Selector::Glossary(glossary) = &selector {
         validate_glossary_selector(glossary)?;
@@ -5092,6 +5095,7 @@ impl Package {
         writer: W,
         patch: &GlossaryBatchPatch,
     ) -> Result<GlossaryBatchPublication> {
+        self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
         let execution = self.package.execution_context();
         let current =
@@ -5146,6 +5150,7 @@ impl Package {
         writer: W,
         publication: &GlossaryBatchPublication,
     ) -> Result<GlossaryBatchSnapshot> {
+        self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
         let execution = self.package.execution_context();
         let current = self.package.source_artifact().fingerprint()?;
@@ -5170,6 +5175,7 @@ fn capture_glossary_batch(
     selector: GlossaryBatchSelector,
     limits: Limits,
 ) -> Result<GlossaryBatchSnapshot> {
+    package.trim_clean_paragraph_index_for_operation();
     package.package.check_execution()?;
     validate_glossary_batch_selector_limits(&selector.selectors, limits)?;
 

@@ -1,0 +1,661 @@
+{
+  "performance_claim": "none; scoped observations, not registered claims",
+  "source_files_verified": 392,
+  "raw_streams_verified": 12,
+  "matched_matrix_cases": 114,
+  "primary_abba_samples": 448,
+  "fresh_count": [
+    {
+      "route": "eager",
+      "corpus": "ComplexNumberedLists.docx",
+      "repetitions": 5,
+      "a1_p50_ns": 357476.0,
+      "b1_p50_ns": 295751.0,
+      "b1_vs_a1_percent": -17.266893441797492,
+      "b2_vs_a2_percent": -20.24047988572104,
+      "aa_p50_percent": -2.186030643772341,
+      "allocation_calls_before": 3300.0,
+      "allocation_calls_after": 3212.0,
+      "allocated_bytes_before": 287650.0,
+      "allocated_bytes_after": 266798.0
+    },
+    {
+      "route": "eager",
+      "corpus": "generated-200",
+      "repetitions": 5,
+      "a1_p50_ns": 345237.0,
+      "b1_p50_ns": 134605.0,
+      "b1_vs_a1_percent": -61.01084182749821,
+      "b2_vs_a2_percent": -61.01224121135449,
+      "aa_p50_percent": 0.3201689593385515,
+      "allocation_calls_before": 225.0,
+      "allocation_calls_after": 149.0,
+      "allocated_bytes_before": 44225.0,
+      "allocated_bytes_after": 19085.0
+    },
+    {
+      "route": "eager",
+      "corpus": "generated-10000",
+      "repetitions": 5,
+      "a1_p50_ns": 16403814.0,
+      "b1_p50_ns": 5997918.5,
+      "b1_vs_a1_percent": -63.43582961864844,
+      "b2_vs_a2_percent": -63.33242770038847,
+      "aa_p50_percent": 0.8400605380978865,
+      "allocation_calls_before": 255.0,
+      "allocation_calls_after": 155.0,
+      "allocated_bytes_before": 1726465.0,
+      "allocated_bytes_after": 355533.0
+    },
+    {
+      "route": "managed",
+      "corpus": "generated-200",
+      "repetitions": 5,
+      "a1_p50_ns": 839704.5,
+      "b1_p50_ns": 185896.0,
+      "b1_vs_a1_percent": -77.86173588446889,
+      "b2_vs_a2_percent": -78.05874021155442,
+      "aa_p50_percent": -0.39533067227744967,
+      "allocation_calls_before": 17253.0,
+      "allocation_calls_after": 3477.0,
+      "allocated_bytes_before": 1782905.0,
+      "allocated_bytes_after": 430565.0
+    },
+    {
+      "route": "managed",
+      "corpus": "generated-10000",
+      "repetitions": 5,
+      "a1_p50_ns": 39433034.5,
+      "b1_p50_ns": 8107829.0,
+      "b1_vs_a1_percent": -79.4389929590633,
+      "b2_vs_a2_percent": -79.75057049098497,
+      "aa_p50_percent": -0.26449637913869006,
+      "allocation_calls_before": 850283.0,
+      "allocation_calls_after": 170083.0,
+      "allocated_bytes_before": 83311771.0,
+      "allocated_bytes_after": 17148839.0
+    },
+    {
+      "route": "source",
+      "corpus": "ComplexNumberedLists.docx",
+      "repetitions": 5,
+      "a1_p50_ns": 366421.0,
+      "b1_p50_ns": 302952.0,
+      "b1_vs_a1_percent": -17.32133256554619,
+      "b2_vs_a2_percent": -15.817725694118023,
+      "aa_p50_percent": 0.2619902067817481,
+      "allocation_calls_before": 3310.0,
+      "allocation_calls_after": 3222.0,
+      "allocated_bytes_before": 374437.0,
+      "allocated_bytes_after": 353585.0
+    },
+    {
+      "route": "source",
+      "corpus": "generated-200",
+      "repetitions": 5,
+      "a1_p50_ns": 374757.0,
+      "b1_p50_ns": 152921.0,
+      "b1_vs_a1_percent": -59.19462478352639,
+      "b2_vs_a2_percent": -58.44678345234271,
+      "aa_p50_percent": -0.2750969169603601,
+      "allocation_calls_before": 235.0,
+      "allocation_calls_after": 159.0,
+      "allocated_bytes_before": 135915.0,
+      "allocated_bytes_after": 110775.0
+    },
+    {
+      "route": "source",
+      "corpus": "generated-10000",
+      "repetitions": 5,
+      "a1_p50_ns": 16519104.5,
+      "b1_p50_ns": 6145825.0,
+      "b1_vs_a1_percent": -62.79565275466354,
+      "b2_vs_a2_percent": -62.61743420447956,
+      "aa_p50_percent": 0.37701541129719907,
+      "allocation_calls_before": 265.0,
+      "allocation_calls_after": 165.0,
+      "allocated_bytes_before": 2333781.0,
+      "allocated_bytes_after": 962849.0
+    }
+  ],
+  "control_aa": {
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 256867.5,
+          "p50": 251921.5,
+          "p95": 267635.0,
+          "p99": 268239.8
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 255418.625,
+          "p50": 251386.5,
+          "p95": 270383.5,
+          "p99": 272805.5
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 257567.25,
+          "p50": 252391.0,
+          "p95": 271037.5,
+          "p99": 271712.3
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 256326.25,
+          "p50": 252591.5,
+          "p95": 269526.65,
+          "p99": 271626.93
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": 0.47934157164366553,
+      "before_after_p50_percent": 0.1863675787894259,
+      "p50_delta_percent": -0.21236774153853277,
+      "p95_delta_percent": 1.026958357464447
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 255061.375,
+          "p50": 251371.5,
+          "p95": 266575.0,
+          "p99": 269363.8
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 252430.125,
+          "p50": 251881.0,
+          "p95": 257847.0,
+          "p99": 259891.0
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 253496.0,
+          "p50": 251021.0,
+          "p95": 265633.5,
+          "p99": 271527.5
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 252913.75,
+          "p50": 251746.5,
+          "p95": 258172.0,
+          "p99": 258379.2
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": -0.05339823170464886,
+      "before_after_p50_percent": -0.13943505926486965,
+      "p50_delta_percent": 0.20268805333938378,
+      "p95_delta_percent": -3.2741254806339715
+    }
+  },
+  "control_abba": {
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 257001.625,
+          "p50": 251706.5,
+          "p95": 269470.5,
+          "p99": 269999.7
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 255838.625,
+          "p50": 251201.0,
+          "p95": 276777.0,
+          "p99": 287316.2
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 255506.125,
+          "p50": 250731.5,
+          "p95": 271125.5,
+          "p99": 273569.9
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-200"
+        ],
+        "elapsed_ns": {
+          "mean": 256387.25,
+          "p50": 251091.0,
+          "p95": 268007.5,
+          "p99": 269466.3
+        },
+        "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+        "n": 8,
+        "result_digests": [
+          13635915274603500608
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": -0.04378963459540364,
+      "before_after_p50_percent": -0.38735590856811,
+      "p50_delta_percent": -0.20082914028839438,
+      "p95_delta_percent": 2.711428523715953
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/100000": {
+      "A1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 256991.375,
+          "p50": 256141.5,
+          "p95": 269923.14999999997,
+          "p99": 274322.23
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "A2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 252776.25,
+          "p50": 251706.5,
+          "p95": 258595.65,
+          "p99": 258864.73
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B1": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 254208.625,
+          "p50": 252761.0,
+          "p95": 260788.65,
+          "p99": 261791.33
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "B2": {
+        "allocated_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "allocations": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "corpus_labels": [
+          "generated-10000"
+        ],
+        "elapsed_ns": {
+          "mean": 253063.75,
+          "p50": 250491.0,
+          "p95": 264326.0,
+          "p99": 269690.8
+        },
+        "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+        "n": 8,
+        "result_digests": [
+          12609570239344764419
+        ],
+        "source_versions": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "after_before_p50_percent": -0.4829036993482472,
+      "before_after_p50_percent": -1.3197783256520323,
+      "p50_delta_percent": -1.7314648348666695,
+      "p95_delta_percent": -4.196564837065653
+    }
+  }
+}

@@ -1,0 +1,1272 @@
+diff --git a/crates/litchi-docx/src/package/codec.rs b/crates/litchi-docx/src/package/codec.rs
+index 11eafe079..11b64cf67 100644
+--- a/crates/litchi-docx/src/package/codec.rs
++++ b/crates/litchi-docx/src/package/codec.rs
+@@ -21,12 +21,14 @@
+ 
+ use super::model::{
+     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
+-    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package, Path, Read,
+-    Result, Slot, Write, WriteRollbackGuard, ct, docx_web, validate_document_main_content_type,
++    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package,
++    ParagraphIndexCache, Path, Read, Result, Slot, Write, WriteRollbackGuard, ct, docx_web,
++    validate_document_main_content_type,
+ };
+ #[cfg(feature = "encryption")]
+ pub(super) use super::model::{Limits, Mode};
+ use litchi_opc::OpcError;
++use std::sync::Arc;
+ 
+ impl Package {
+     /// Create a new empty .docx package.
+@@ -217,6 +219,7 @@ impl Package {
+ 
+         Ok(Self {
+             opc,
++            paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
+             mutable_doc,
+             raw_edit_committed: false,
+             properties,
+@@ -374,6 +377,7 @@ impl Package {
+ 
+         Ok(Self {
+             opc,
++            paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
+             mutable_doc: None,
+             raw_edit_committed: false,
+             properties,
+diff --git a/crates/litchi-docx/src/package/model.rs b/crates/litchi-docx/src/package/model.rs
+index cfc340c61..6b80a6716 100644
+--- a/crates/litchi-docx/src/package/model.rs
++++ b/crates/litchi-docx/src/package/model.rs
+@@ -33,7 +33,7 @@ pub(super) use crate::mail_merge::{
+     self, Recipients, RelationshipId, Settings as MailMergeSettings, Source, Target,
+     is_mail_merge_relationship_type, map_docx_error,
+ };
+-pub(super) use crate::parts::DocumentPart;
++pub(super) use crate::parts::{DocumentPart, ParagraphIndexCache};
+ pub(super) use crate::settings::{
+     ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, extract_document_variables,
+     patch_attached_template, patch_document_variables, patch_mail_merge,
+@@ -132,6 +132,9 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
+ pub struct Package {
+     /// The underlying OPC package
+     pub(super) opc: OpcPackage,
++    /// Package-scoped clean paragraph memo; entries are invalidated by source
++    /// allocation identity when the main relationship or payload changes.
++    pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
+     /// Mutable document for writing (cached)
+     pub(super) mutable_doc: Option<MutableDocument>,
+     /// Whether a committed raw edit has disabled the legacy document writer.
+@@ -569,7 +572,10 @@ impl Package {
+             .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
+ 
+         // Create DocumentPart wrapper
+-        let doc_part = DocumentPart::from_part(main_part)?;
++        let doc_part = DocumentPart::from_part_with_cache(
++            main_part,
++            std::sync::Arc::clone(&self.paragraph_index_cache),
++        )?;
+ 
+         // Create and return Document with reference to OPC package
+         Ok(Document::new(doc_part, &self.opc))
+diff --git a/crates/litchi-docx/src/parts/document_part.rs b/crates/litchi-docx/src/parts/document_part.rs
+index f4c918857..a102dbf86 100644
+--- a/crates/litchi-docx/src/parts/document_part.rs
++++ b/crates/litchi-docx/src/parts/document_part.rs
+@@ -17,12 +17,14 @@ use crate::error::Result;
+ use crate::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
+ use crate::paragraph::{Paragraph, extract_word_text};
+ use crate::table::Table;
++use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
+ use litchi_opc::part::Part;
+ use quick_xml::events::Event;
+ use quick_xml::reader::NsReader;
+ use smallvec::SmallVec;
+ use std::collections::BTreeSet;
+-use std::sync::{Arc, OnceLock};
++use std::mem::size_of;
++use std::sync::{Arc, Mutex, OnceLock, Weak};
+ 
+ /// Maximum number of paragraph ranges retained by the reusable semantic
+ /// index.  Documents beyond this bound continue to use the established
+@@ -83,6 +85,324 @@ impl ParagraphIndex {
+     pub(crate) fn iter(&self) -> impl Iterator<Item = ParagraphRange> + '_ {
+         self.ranges.iter().copied()
+     }
++
++    fn weight_bytes(&self) -> usize {
++        self.ranges
++            .len()
++            .saturating_mul(size_of::<ParagraphRange>())
++            .saturating_add(PARAGRAPH_INDEX_MEMO_OVERHEAD_BYTES)
++    }
++}
++
++/// A semantic route whose paragraph offsets are valid for one source view.
++///
++/// Managed source-backed payloads are already in their source XML view and
++/// therefore must never share an index with a materialized MCE-visible view,
++/// even when both happen to refer to the same allocation.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub(crate) enum ParagraphIndexRoute {
++    Visible,
++    Managed,
++}
++
++/// A retained paragraph index and the reservation that admitted it.
++///
++/// The reservation is attached to the memo rather than to the cache itself.
++/// A cache entry can be evicted while a document still uses it; the document's
++/// `Arc` then keeps the admitted resource live until that view is dropped.
++pub(crate) struct ParagraphIndexMemo {
++    pub(crate) index: Arc<ParagraphIndex>,
++    pub(crate) _admission: Option<Arc<DocumentIndexAdmission>>,
++}
++
++pub(crate) struct ParagraphIndexBuild {
++    pub(crate) memo: Option<Arc<ParagraphIndexMemo>>,
++    pub(crate) admission: Option<Arc<DocumentIndexAdmission>>,
++}
++
++impl ParagraphIndexBuild {
++    pub(crate) fn indexed(
++        index: Arc<ParagraphIndex>,
++        admission: Option<Arc<DocumentIndexAdmission>>,
++    ) -> Self {
++        Self {
++            memo: Some(Arc::new(ParagraphIndexMemo {
++                index,
++                _admission: admission,
++            })),
++            admission: None,
++        }
++    }
++
++    pub(crate) const fn unavailable(admission: Option<Arc<DocumentIndexAdmission>>) -> Self {
++        Self {
++            memo: None,
++            admission,
++        }
++    }
++}
++
++const PARAGRAPH_INDEX_MEMO_OVERHEAD_BYTES: usize = 128;
++const PARAGRAPH_INDEX_CACHE_MAX_BYTES: usize = 8 * 1024 * 1024;
++
++struct ParagraphIndexCacheEntry {
++    key: ParagraphIndexCacheKey,
++    memo: Arc<ParagraphIndexMemo>,
++}
++
++enum ParagraphIndexCacheKey {
++    Allocation {
++        raw: Weak<Vec<u8>>,
++        route: ParagraphIndexRoute,
++    },
++    Source {
++        version: SourceVersion,
++        route: ParagraphIndexRoute,
++    },
++}
++
++impl ParagraphIndexCacheKey {
++    fn allocation(raw: &Arc<Vec<u8>>, route: ParagraphIndexRoute) -> Self {
++        Self::Allocation {
++            raw: Arc::downgrade(raw),
++            route,
++        }
++    }
++
++    const fn source(version: SourceVersion, route: ParagraphIndexRoute) -> Self {
++        Self::Source { version, route }
++    }
++
++    fn matches(&self, other: &Self) -> bool {
++        match (self, other) {
++            (
++                Self::Allocation {
++                    raw: left,
++                    route: left_route,
++                },
++                Self::Allocation {
++                    raw: right,
++                    route: right_route,
++                },
++            ) => {
++                *left_route == *right_route
++                    && left.upgrade().is_some_and(|candidate| {
++                        right
++                            .upgrade()
++                            .is_some_and(|other| Arc::ptr_eq(&candidate, &other))
++                    })
++            },
++            (
++                Self::Source {
++                    version: left,
++                    route: left_route,
++                },
++                Self::Source {
++                    version: right,
++                    route: right_route,
++                },
++            ) => left == right && left_route == right_route,
++            _ => false,
++        }
++    }
++}
++
++#[derive(Default)]
++struct ParagraphIndexCacheState {
++    entry: Option<ParagraphIndexCacheEntry>,
++    hits: u64,
++    misses: u64,
++    builds: u64,
++    clean_evictions: u64,
++    pinned_evictions: u64,
++    oversized_bypasses: u64,
++}
++
++/// Package-scoped, single-entry memo for paragraph offsets.
++///
++/// The cache retains only a weak identity key and the bounded offset memo. It
++/// never keeps XML alive by itself. Holding the state lock while building
++/// coalesces concurrent first queries without exposing an in-progress or
++/// failed result to another caller; malformed input and admission failures
++/// remain retryable and are never negatively cached.
++pub(crate) struct ParagraphIndexCache {
++    state: Mutex<ParagraphIndexCacheState>,
++}
++
++impl ParagraphIndexCache {
++    pub(crate) fn new() -> Self {
++        Self {
++            state: Mutex::new(ParagraphIndexCacheState::default()),
++        }
++    }
++
++    fn lock_state(&self) -> std::sync::MutexGuard<'_, ParagraphIndexCacheState> {
++        self.state
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner())
++    }
++
++    fn evict_entry(state: &mut ParagraphIndexCacheState) {
++        let Some(entry) = state.entry.take() else {
++            return;
++        };
++        if Arc::strong_count(&entry.memo) == 1 {
++            state.clean_evictions = state.clean_evictions.saturating_add(1);
++        } else {
++            state.pinned_evictions = state.pinned_evictions.saturating_add(1);
++        }
++    }
++
++    /// Drop an unpinned clean memo before another package operation reserves
++    /// workspace. Active documents keep their memo and admission alive.
++    pub(crate) fn trim_clean(&self) {
++        let mut state = self.lock_state();
++        let clean = state
++            .entry
++            .as_ref()
++            .is_some_and(|entry| Arc::strong_count(&entry.memo) == 1);
++        if clean {
++            Self::evict_entry(&mut state);
++        }
++    }
++
++    fn get_or_build_with_key<F>(
++        &self,
++        key: ParagraphIndexCacheKey,
++        build: F,
++    ) -> Result<ParagraphIndexBuild>
++    where
++        F: FnOnce() -> Result<ParagraphIndexBuild>,
++    {
++        let mut state = self.lock_state();
++        let hit = state
++            .entry
++            .as_ref()
++            .is_some_and(|entry| entry.key.matches(&key));
++        if hit {
++            state.hits = state.hits.saturating_add(1);
++            let Some(entry) = state.entry.as_ref() else {
++                return Err(crate::Error::InvalidFormat(
++                    "paragraph index cache hit lost its entry".into(),
++                ));
++            };
++            let memo = Arc::clone(&entry.memo);
++            return Ok(ParagraphIndexBuild {
++                memo: Some(memo),
++                admission: None,
++            });
++        }
++
++        state.misses = state.misses.saturating_add(1);
++        Self::evict_entry(&mut state);
++        let built = build()?;
++        state.builds = state.builds.saturating_add(1);
++        let Some(memo) = built.memo.as_ref() else {
++            return Ok(built);
++        };
++        let weight = memo.index.weight_bytes();
++        if weight > PARAGRAPH_INDEX_CACHE_MAX_BYTES {
++            state.oversized_bypasses = state.oversized_bypasses.saturating_add(1);
++            return Ok(built);
++        }
++        state.entry = Some(ParagraphIndexCacheEntry {
++            key,
++            memo: Arc::clone(memo),
++        });
++        Ok(built)
++    }
++
++    pub(crate) fn get_or_build<F>(
++        &self,
++        raw: &Arc<Vec<u8>>,
++        route: ParagraphIndexRoute,
++        build: F,
++    ) -> Result<ParagraphIndexBuild>
++    where
++        F: FnOnce() -> Result<ParagraphIndexBuild>,
++    {
++        self.get_or_build_with_key(ParagraphIndexCacheKey::allocation(raw, route), build)
++    }
++
++    pub(crate) fn get_or_build_source<F>(
++        &self,
++        version: SourceVersion,
++        route: ParagraphIndexRoute,
++        build: F,
++    ) -> Result<ParagraphIndexBuild>
++    where
++        F: FnOnce() -> Result<ParagraphIndexBuild>,
++    {
++        self.get_or_build_with_key(ParagraphIndexCacheKey::source(version, route), build)
++    }
++
++    #[cfg(test)]
++    pub(crate) fn diagnostics(&self) -> ParagraphIndexCacheDiagnostics {
++        let state = self.lock_state();
++        let (clean_entries, pinned_entries, retained_weight) =
++            state.entry.as_ref().map_or((0, 0, 0), |entry| {
++                if Arc::strong_count(&entry.memo) == 1 {
++                    (1, 0, entry.memo.index.weight_bytes())
++                } else {
++                    (0, 1, entry.memo.index.weight_bytes())
++                }
++            });
++        ParagraphIndexCacheDiagnostics {
++            hits: state.hits,
++            misses: state.misses,
++            builds: state.builds,
++            clean_evictions: state.clean_evictions,
++            pinned_evictions: state.pinned_evictions,
++            oversized_bypasses: state.oversized_bypasses,
++            clean_entries,
++            pinned_entries,
++            retained_weight,
++        }
++    }
++}
++
++#[cfg(test)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub(crate) struct ParagraphIndexCacheDiagnostics {
++    pub(crate) hits: u64,
++    pub(crate) misses: u64,
++    pub(crate) builds: u64,
++    pub(crate) clean_evictions: u64,
++    pub(crate) pinned_evictions: u64,
++    pub(crate) oversized_bypasses: u64,
++    pub(crate) clean_entries: usize,
++    pub(crate) pinned_entries: usize,
++    pub(crate) retained_weight: usize,
++}
++
++/// Shared execution-budget reservation for a managed paragraph index.
++pub(crate) struct DocumentIndexAdmission {
++    _memory: Reservation,
++    _objects: Reservation,
++}
++
++impl DocumentIndexAdmission {
++    pub(crate) fn new(context: &ExecutionContext, xml_len: usize) -> Result<Arc<Self>> {
++        let ranges = xml_len as u64 / 4 + 1;
++        let bytes = ranges.saturating_mul(24).saturating_add(1024);
++        let memory = context
++            .reserve(Resource::Memory, bytes)
++            .map_err(index_execution_error)?;
++        let objects = context
++            .reserve(Resource::Objects, ranges + 3)
++            .map_err(index_execution_error)?;
++        Ok(Arc::new(Self {
++            _memory: memory,
++            _objects: objects,
++        }))
++    }
++}
++
++fn index_execution_error(error: ExecutionError) -> crate::Error {
++    match error {
++        ExecutionError::Cancelled => crate::Error::Opc(litchi_opc::OpcError::Cancelled),
++        error => crate::Error::Opc(litchi_opc::OpcError::Execution(error)),
++    }
+ }
+ 
+ const MAX_DOCUMENT_SEMANTIC_VALUES: usize = 1_000_000;
+@@ -146,11 +466,16 @@ pub struct DocumentPart<'a> {
+     /// Reference to the underlying part
+     part: &'a dyn Part,
+     xml: Arc<Vec<u8>>,
++    /// The source allocation identity used to find a package-scoped memo.
++    /// This weak key never keeps the physical payload alive.
++    paragraph_source: Weak<Vec<u8>>,
++    paragraph_cache: Arc<ParagraphIndexCache>,
++    paragraph_route: ParagraphIndexRoute,
+     /// Best-effort cache built from the validated visible XML on the first
+     /// paragraph query. A malformed or over-bound payload leaves the cached
+     /// value empty so the legacy query path keeps reporting the same error at
+     /// query time.
+-    paragraph_index: OnceLock<Option<Arc<ParagraphIndex>>>,
++    paragraph_memo: OnceLock<Option<Arc<ParagraphIndexMemo>>>,
+ }
+ 
+ /// Select markup-compatibility branches for a main-document payload.
+@@ -575,11 +900,24 @@ impl<'a> DocumentPart<'a> {
+     ///
+     /// Returns an error if the operation cannot be completed.
+     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
+-        let xml = visible_document_xml(part.blob_arc())?;
++        Self::from_part_with_cache(part, Arc::new(ParagraphIndexCache::new()))
++    }
++
++    /// Create a document part sharing a package's paragraph memo cache.
++    pub(crate) fn from_part_with_cache(
++        part: &'a dyn Part,
++        paragraph_cache: Arc<ParagraphIndexCache>,
++    ) -> Result<Self> {
++        let raw = part.blob_arc();
++        let paragraph_source = Arc::downgrade(&raw);
++        let xml = visible_document_xml(raw)?;
+         Ok(Self {
+             part,
+             xml,
+-            paragraph_index: OnceLock::new(),
++            paragraph_source,
++            paragraph_cache,
++            paragraph_route: ParagraphIndexRoute::Visible,
++            paragraph_memo: OnceLock::new(),
+         })
+     }
+ 
+@@ -593,13 +931,30 @@ impl<'a> DocumentPart<'a> {
+     /// same operations as before. Text, table, block and element reads never
+     /// consult the index, so they no longer pay for a scan they cannot use.
+     fn paragraph_ranges(&self) -> Option<&ParagraphIndex> {
+-        self.paragraph_index
++        self.paragraph_memo
+             .get_or_init(|| {
+-                ParagraphIndex::from_xml(self.xml.as_slice())
++                let Some(raw) = self.paragraph_source.upgrade() else {
++                    return ParagraphIndex::from_xml(self.xml.as_slice())
++                        .ok()
++                        .map(|index| {
++                            Arc::new(ParagraphIndexMemo {
++                                index: Arc::new(index),
++                                _admission: None,
++                            })
++                        });
++                };
++                self.paragraph_cache
++                    .get_or_build(&raw, self.paragraph_route, || {
++                        Ok(ParagraphIndexBuild::indexed(
++                            Arc::new(ParagraphIndex::from_xml(self.xml.as_slice())?),
++                            None,
++                        ))
++                    })
+                     .ok()
+-                    .map(Arc::new)
++                    .and_then(|build| build.memo)
+             })
+-            .as_deref()
++            .as_ref()
++            .map(|memo| memo.index.as_ref())
+     }
+ 
+     /// Get the shared Arc of XML bytes (zero-copy from Part).
+@@ -848,7 +1203,7 @@ mod tests {
+         let document = DocumentPart::from_part(&part).unwrap();
+ 
+         assert!(
+-            document.paragraph_index.get().is_none(),
++            document.paragraph_memo.get().is_none(),
+             "construction must not scan for paragraph ranges"
+         );
+         assert_eq!(document.extract_text().unwrap(), "outercelltail");
+@@ -858,13 +1213,13 @@ mod tests {
+         assert_eq!(document.blocks().unwrap().len(), 3);
+         assert_eq!(document.xml_bytes(), xml);
+         assert!(
+-            document.paragraph_index.get().is_none(),
++            document.paragraph_memo.get().is_none(),
+             "text, table, element and block reads must not build the index"
+         );
+ 
+         assert_eq!(document.paragraph_count().unwrap(), 3);
+         assert!(
+-            document.paragraph_index.get().is_some(),
++            document.paragraph_memo.get().is_some(),
+             "the first paragraph query builds the index once"
+         );
+     }
+@@ -942,7 +1297,7 @@ mod tests {
+                 assert_eq!(all, vec!["outer".to_owned(), "tail".to_owned()]);
+             }
+         });
+-        assert!(document.paragraph_index.get().is_some());
++        assert!(document.paragraph_memo.get().is_some());
+     }
+ 
+     #[test]
+@@ -960,4 +1315,150 @@ mod tests {
+         }
+         assert!(document_paragraph_from_index(source, &index, expected.len()).is_none());
+     }
++
++    #[test]
++    fn package_cache_reuses_allocation_identity_and_rejects_equal_new_allocations() {
++        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:p/></w:body></w:document>"#;
++        let cache = Arc::new(ParagraphIndexCache::new());
++        let raw = Arc::new(xml.to_vec());
++        let first = cache
++            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                Ok(ParagraphIndexBuild::indexed(
++                    Arc::new(ParagraphIndex::from_xml(raw.as_slice())?),
++                    None,
++                ))
++            })
++            .unwrap();
++        let second = cache
++            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                Err(crate::Error::InvalidFormat(
++                    "same allocation unexpectedly missed the package cache".into(),
++                ))
++            })
++            .unwrap();
++        assert!(Arc::ptr_eq(
++            first.memo.as_ref().unwrap(),
++            second.memo.as_ref().unwrap()
++        ));
++
++        let equal_new_allocation = Arc::new(xml.to_vec());
++        let third = cache
++            .get_or_build(&equal_new_allocation, ParagraphIndexRoute::Visible, || {
++                Ok(ParagraphIndexBuild::indexed(
++                    Arc::new(ParagraphIndex::from_xml(equal_new_allocation.as_slice())?),
++                    None,
++                ))
++            })
++            .unwrap();
++        assert!(!Arc::ptr_eq(
++            first.memo.as_ref().unwrap(),
++            third.memo.as_ref().unwrap()
++        ));
++        let diagnostics = cache.diagnostics();
++        assert_eq!(diagnostics.hits, 1);
++        assert_eq!(diagnostics.misses, 2);
++        assert_eq!(diagnostics.builds, 2);
++    }
++
++    #[test]
++    fn package_cache_coalesces_builds_and_trims_only_clean_entries() {
++        let cache = Arc::new(ParagraphIndexCache::new());
++        let raw = Arc::new(b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>".to_vec());
++        let builds = Arc::new(std::sync::atomic::AtomicUsize::new(0));
++        std::thread::scope(|scope| {
++            let handles: Vec<_> = (0..8)
++                .map(|_| {
++                    let cache = Arc::clone(&cache);
++                    let raw = Arc::clone(&raw);
++                    let builds = Arc::clone(&builds);
++                    scope.spawn(move || {
++                        cache
++                            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                                builds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++                                Ok(ParagraphIndexBuild::indexed(
++                                    Arc::new(ParagraphIndex::from_xml(raw.as_slice())?),
++                                    None,
++                                ))
++                            })
++                            .unwrap()
++                    })
++                })
++                .collect();
++            for handle in handles {
++                drop(handle.join().unwrap());
++            }
++        });
++        assert_eq!(builds.load(std::sync::atomic::Ordering::Relaxed), 1);
++        assert_eq!(cache.diagnostics().hits, 7);
++
++        cache.trim_clean();
++        assert_eq!(cache.diagnostics().clean_evictions, 1);
++        assert_eq!(cache.diagnostics().clean_entries, 0);
++
++        let active = cache
++            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                Ok(ParagraphIndexBuild::indexed(
++                    Arc::new(ParagraphIndex::from_xml(raw.as_slice())?),
++                    None,
++                ))
++            })
++            .unwrap();
++        cache.trim_clean();
++        assert_eq!(cache.diagnostics().pinned_entries, 1);
++        drop(active);
++        cache.trim_clean();
++        assert_eq!(cache.diagnostics().clean_evictions, 2);
++    }
++
++    #[test]
++    fn package_cache_retries_failed_builds_and_bypasses_oversized_indexes() {
++        let cache = Arc::new(ParagraphIndexCache::new());
++        let raw = Arc::new(vec![0_u8; 1]);
++        let attempts = std::sync::atomic::AtomicUsize::new(0);
++        assert!(
++            cache
++                .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                    attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++                    Err(crate::Error::InvalidFormat("retryable test failure".into()))
++                })
++                .is_err()
++        );
++        let retry = cache
++            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
++                attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++                Ok(ParagraphIndexBuild::indexed(
++                    Arc::new(ParagraphIndex {
++                        ranges: Vec::<ParagraphRange>::new().into(),
++                    }),
++                    None,
++                ))
++            })
++            .unwrap();
++        assert_eq!(retry.memo.unwrap().index.len(), 0);
++        assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 2);
++        assert_eq!(cache.diagnostics().misses, 2);
++
++        let oversized_raw = Arc::new(vec![1_u8; 1]);
++        let oversized_ranges = vec![
++            ParagraphRange {
++                start: 0,
++                length: 1
++            };
++            1_100_000
++        ];
++        let oversized = cache
++            .get_or_build(&oversized_raw, ParagraphIndexRoute::Visible, || {
++                Ok(ParagraphIndexBuild::indexed(
++                    Arc::new(ParagraphIndex {
++                        ranges: oversized_ranges.into(),
++                    }),
++                    None,
++                ))
++            })
++            .unwrap();
++        assert!(oversized.memo.is_some());
++        let diagnostics = cache.diagnostics();
++        assert_eq!(diagnostics.oversized_bypasses, 1);
++        assert_eq!(diagnostics.clean_entries, 0);
++    }
+ }
+diff --git a/crates/litchi-docx/src/parts/mod.rs b/crates/litchi-docx/src/parts/mod.rs
+index 8d1035282..6ec9e8f40 100644
+--- a/crates/litchi-docx/src/parts/mod.rs
++++ b/crates/litchi-docx/src/parts/mod.rs
+@@ -5,3 +5,4 @@
+ pub mod document_part;
+ 
+ pub use document_part::DocumentPart;
++pub(crate) use document_part::ParagraphIndexCache;
+diff --git a/crates/litchi-docx/src/source_backed.rs b/crates/litchi-docx/src/source_backed.rs
+index 8b1c18e92..02efbc721 100644
+--- a/crates/litchi-docx/src/source_backed.rs
++++ b/crates/litchi-docx/src/source_backed.rs
+@@ -10,6 +10,9 @@
+ 
+ mod document_policy;
+ 
++#[cfg(test)]
++mod paragraph_index_tests;
++
+ pub mod paragraph_copy;
+ pub mod paragraph_remove;
+ pub mod story_text;
+@@ -73,9 +76,11 @@ use crate::namespace::scan_word_element_ranges;
+ use crate::package::validate_document_main_content_type;
+ use crate::paragraph::Paragraph;
+ use crate::parts::document_part::{
+-    ParagraphIndex, body_block_ranges, document_blocks, document_elements, document_paragraph,
+-    document_paragraph_count, document_paragraph_from_index, document_paragraphs,
+-    document_paragraphs_from_index, document_tables, is_xml_outer_whitespace, visible_document_xml,
++    DocumentIndexAdmission, ParagraphIndex, ParagraphIndexBuild, ParagraphIndexCache,
++    ParagraphIndexMemo, ParagraphIndexRoute, body_block_ranges, document_blocks, document_elements,
++    document_paragraph, document_paragraph_count, document_paragraph_from_index,
++    document_paragraphs, document_paragraphs_from_index, document_tables, is_xml_outer_whitespace,
++    visible_document_xml,
+ };
+ use crate::redact;
+ use crate::sanitize::{self, RelationshipState};
+@@ -87,7 +92,7 @@ use litchi_core::FileSource;
+ use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion};
+ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{
+-    BlobPart, PackURI, Part, PartData, SourceArtifact, SourceArtifactFingerprint,
++    BlobPart, PackURI, Part, PartData, PartView, SourceArtifact, SourceArtifactFingerprint,
+     SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, SourceTopologyPlan,
+ };
+ use quick_xml::events::{BytesRef, BytesStart, Event};
+@@ -105,6 +110,7 @@ use std::sync::{Arc, Mutex, OnceLock};
+ pub struct Package {
+     package: SourceBackedPackage,
+     execution: Option<ExecutionContext>,
++    paragraph_index_cache: Arc<ParagraphIndexCache>,
+ }
+ 
+ /// A checked selector for one active `w:altChunk` anchor in the main story.
+@@ -587,7 +593,11 @@ impl Package {
+         let main = package.main_document_part()?;
+         validate_document_main_content_type(main.content_type())?;
+         package.check_execution()?;
+-        Ok(Self { package, execution })
++        Ok(Self {
++            package,
++            execution,
++            paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
++        })
+     }
+ 
+     /// Adopt an already-indexed source-backed OPC package.
+@@ -634,54 +644,140 @@ impl Package {
+     /// queries do not revisit the positional source. Managed opens retain the
+     /// budgeted [`PartData`] handle instead of detaching an `Arc`.
+     pub fn document(&self) -> Result<Document> {
+-        self.package.check_execution()?;
+-        let main = self.package.main_document_part()?;
+-        validate_document_main_content_type(main.content_type())?;
+-        let data = main.data()?;
+-        let managed = self.package.cache_diagnostics().budget_managed;
+-        let document: Result<Document> = (|| {
+-            let (xml, paragraph_index, index_admission) = if managed {
+-                ensure_source_document_xml(
+-                    data.as_bytes(),
+-                    self.package.execution_context().as_ref(),
+-                )?;
+-                let context = self.package.execution_context().ok_or_else(|| {
+-                    Error::InvalidFormat("managed document context is unavailable".into())
+-                })?;
+-                let index_admission = DocumentIndexAdmission::new(&context, data.as_bytes().len())?;
+-                let _parser = admit_document_query_parser(Some(&context), data.as_bytes().len())?;
+-                // Budget-managed opens keep the eager scan. Its parser
+-                // admission is reserved and its work consumed here, so
+-                // deferring only the scan would run it with fewer live
+-                // reservations than the managed contract established.
+-                let paragraph_index = ParagraphIndex::from_xml(data.as_bytes()).ok().map(Arc::new);
+-                (
+-                    DocumentPayload::Managed(data),
+-                    OnceLock::from(paragraph_index),
+-                    Some(index_admission),
+-                )
+-            } else {
+-                // Unmanaged opens reserve nothing for the index and swallow
+-                // its failure, so the scan is deferred to the first paragraph
+-                // query that can use it.
+-                let xml = visible_document_xml(data.into_arc()?)?;
+-                (DocumentPayload::Owned(xml), OnceLock::new(), None)
+-            };
++        let result: Result<Document> = (|| {
++            self.package.check_execution()?;
++            let main = self.package.main_document_part()?;
++            validate_document_main_content_type(main.content_type())?;
++            let data = self.main_data(main)?;
++            let managed = self.package.cache_diagnostics().budget_managed;
+             let source_version = self.package.source_version()?;
+-            Ok(Document {
+-                xml,
+-                paragraph_index,
+-                _index_admission: index_admission,
+-                source_version,
+-                execution: self.execution.clone(),
+-            })
++            let document: Result<Document> = (|| {
++                let (xml, paragraph_memo, index_admission, paragraph_route) = if managed {
++                    let context = self.package.execution_context().ok_or_else(|| {
++                        Error::InvalidFormat("managed document context is unavailable".into())
++                    })?;
++                    let build = self.paragraph_index_cache.get_or_build_source(
++                        source_version,
++                        ParagraphIndexRoute::Managed,
++                        || {
++                            // The cache lock has already removed any clean old
++                            // entry. Admit and validate only on a miss, so cache
++                            // hits do not repeat the workspace/work envelope or
++                            // contend for budget before joining the memo.
++                            ensure_source_document_xml(
++                                data.as_bytes(),
++                                self.package.execution_context().as_ref(),
++                            )?;
++                            let index_admission =
++                                DocumentIndexAdmission::new(&context, data.as_bytes().len())?;
++                            let _parser =
++                                admit_document_query_parser(Some(&context), data.as_bytes().len())?;
++                            // Budget-managed opens keep the eager scan. Its parser
++                            // admission is reserved and its work consumed here, so
++                            // deferring only the scan would run it with fewer live
++                            // reservations than the managed contract established.
++                            let paragraph_index =
++                                ParagraphIndex::from_xml(data.as_bytes()).ok().map(Arc::new);
++                            // Do not publish an index whose source or execution
++                            // fence was crossed while the managed scan ran.
++                            self.package.source_version()?;
++                            self.package.check_execution()?;
++                            Ok(match paragraph_index {
++                                Some(index) => {
++                                    ParagraphIndexBuild::indexed(index, Some(index_admission))
++                                },
++                                None => ParagraphIndexBuild::unavailable(Some(index_admission)),
++                            })
++                        },
++                    )?;
++                    (
++                        DocumentPayload::Managed(data),
++                        OnceLock::from(build.memo),
++                        build.admission,
++                        ParagraphIndexRoute::Managed,
++                    )
++                } else {
++                    // Unmanaged opens reserve nothing for the index and swallow
++                    // its failure, so the scan is deferred to the first paragraph
++                    // query that can use it.
++                    let xml = visible_document_xml(data.into_arc()?)?;
++                    (
++                        DocumentPayload::Owned(xml),
++                        OnceLock::new(),
++                        None,
++                        ParagraphIndexRoute::Visible,
++                    )
++                };
++                Ok(Document {
++                    xml,
++                    paragraph_memo,
++                    _index_admission: index_admission,
++                    source_version,
++                    execution: self.execution.clone(),
++                    paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
++                    paragraph_route,
++                })
++            })();
++            // The semantic/MCE stage can fail after the payload read has
++            // completed. Check freshness once more before exposing that error so
++            // a source mutation during parsing wins over a stale parse result.
++            let freshness = (|| {
++                self.package.source_version()?;
++                self.package.check_execution()?;
++                Ok::<_, Error>(())
++            })();
++            match freshness {
++                Ok(()) => {
++                    if document.is_err() {
++                        self.paragraph_index_cache.trim_clean();
++                    }
++                    document
++                },
++                Err(error) => {
++                    drop(document);
++                    self.paragraph_index_cache.trim_clean();
++                    Err(error)
++                },
++            }
+         })();
+-        // The semantic/MCE stage can fail after the payload read has
+-        // completed. Check freshness once more before exposing that error so
+-        // a source mutation during parsing wins over a stale parse result.
+-        self.package.source_version()?;
+-        self.package.check_execution()?;
+-        document
++        if result.is_err() {
++            self.paragraph_index_cache.trim_clean();
++        }
++        result
++    }
++
++    fn ensure_source_document_xml(
++        &self,
++        xml: &[u8],
++        context: Option<&ExecutionContext>,
++    ) -> Result<()> {
++        match ensure_source_document_xml(xml, context) {
++            Ok(()) => Ok(()),
++            Err(error) if is_index_pressure_error(&error) => {
++                // A clean memo may retain a managed index reservation after
++                // its last document view was dropped. Release that
++                // cache-only reference and retry only the failed admission.
++                // Active documents keep their memo and reservation pinned.
++                self.paragraph_index_cache.trim_clean();
++                ensure_source_document_xml(xml, context)
++            },
++            Err(error) => Err(error),
++        }
++    }
++
++    fn trim_clean_paragraph_index_for_operation(&self) {
++        self.paragraph_index_cache.trim_clean();
++    }
++
++    fn main_data(&self, main: PartView<'_>) -> Result<PartData> {
++        match main.data().map_err(Error::from) {
++            Ok(data) => Ok(data),
++            Err(error) if is_index_pressure_error(&error) => {
++                self.paragraph_index_cache.trim_clean();
++                main.data().map_err(Error::from)
++            },
++            Err(error) => Err(error),
++        }
+     }
+ 
+     /// Stream visible main-document paragraphs to a caller-owned sink.
+@@ -736,12 +832,12 @@ impl Package {
+                     "semantic DOCX declared XML exceeds {limit} bytes"
+                 ))));
+             }
+-            let data = main
+-                .data()
+-                .map_err(|source| writer.document_error(source.into()))?;
++            let data = self
++                .main_data(main)
++                .map_err(|source| writer.document_error(source))?;
+             let managed = self.package.cache_diagnostics().budget_managed;
+             let visible: Cow<'_, [u8]> = if managed {
+-                ensure_source_document_xml(
++                self.ensure_source_document_xml(
+                     data.as_bytes(),
+                     self.package.execution_context().as_ref(),
+                 )
+@@ -807,11 +903,12 @@ impl Package {
+         &self,
+         limits: &crate::section::Limits,
+     ) -> Result<crate::section::Snapshot> {
++        self.trim_clean_paragraph_index_for_operation();
+         self.package.check_execution()?;
+         let main = self.package.main_document_part()?;
+         validate_document_main_content_type(main.content_type())?;
+         let source_version = self.package.source_version()?;
+-        let raw = main.data()?;
++        let raw = self.main_data(main)?;
+         let snapshot = (|| {
+             ensure_source_section_inventory_xml(raw.as_bytes(), limits)?;
+             crate::section::Snapshot::from_source_xml(raw.as_bytes(), source_version, limits)
+@@ -889,6 +986,7 @@ impl Package {
+     /// the selected payload read by the common source-backed property reader;
+     /// execution cancellation is checked at the same boundaries.
+     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
++        self.trim_clean_paragraph_index_for_operation();
+         self.package.check_execution()?;
+         let properties = litchi_ooxml_common::properties::read_source_backed(&self.package);
+         self.package.source_version()?;
+@@ -904,6 +1002,7 @@ impl Package {
+     /// fallible operation on the returned entry rather than part of this
+     /// inventory call.
+     pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
++        self.trim_clean_paragraph_index_for_operation();
+         Ok(litchi_ooxml_common::embedded::scan_source(&self.package)?)
+     }
+ 
+@@ -916,6 +1015,7 @@ impl Package {
+         &self,
+         limits: &litchi_ooxml_common::embedded::Limits,
+     ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
++        self.trim_clean_paragraph_index_for_operation();
+         Ok(litchi_ooxml_common::embedded::scan_source_with(
+             &self.package,
+             limits,
+@@ -1549,6 +1649,7 @@ impl Package {
+         &self,
+         limits: crate::story_hyperlinks::Limits,
+     ) -> Result<crate::story_hyperlinks::Snapshot> {
++        self.trim_clean_paragraph_index_for_operation();
+         self.package.check_execution()?;
+         crate::story_hyperlinks::capture_source(&self.package, limits)
+     }
+@@ -1614,7 +1715,7 @@ impl Package {
+         self.package.check_execution()?;
+         let main = self.package.main_document_part()?;
+         let main_name = main.partname().clone();
+-        let data = main.data()?;
++        let data = self.main_data(main)?;
+         let chunks = crate::alt::scan(data.as_bytes())?;
+         // `body_block_ranges` uses this stable private kind ordering for the
+         // third variant, the direct-body altChunk block.
+@@ -1762,6 +1863,11 @@ impl Package {
+             let partname = main.partname();
+             let context = self.package.execution_context();
+             let managed = self.package.cache_diagnostics().budget_managed;
++            if managed {
++                // Transaction snapshots do not use the paragraph memo. Drop
++                // only an unpinned clean entry before their own admissions.
++                self.paragraph_index_cache.trim_clean();
++            }
+             let source_version = self.package.source_version().map_err(Error::from)?;
+             let source_lineage = self.package.source_lineage();
+             let snapshot = if managed {
+@@ -1776,8 +1882,8 @@ impl Package {
+                         })
+                         .and_then(|snapshot| snapshot.source_xml().map(|hint| (snapshot, hint)));
+                     let source = match &hinted_before {
+-                        Some((_, hint)) => main.source_xml_with_hint(hint),
+-                        None => main.source_xml(),
++                        Some((_, hint)) => main.source_xml_with_hint(hint).map_err(Error::from),
++                        None => main.source_xml().map_err(Error::from),
+                     };
+                     match source {
+                         Ok(source) => {
+@@ -1796,7 +1902,7 @@ impl Package {
+                             if let Some(snapshot) = reused {
+                                 snapshot
+                             } else {
+-                                ensure_source_document_xml(source.bytes(), context.as_ref())?;
++                                self.ensure_source_document_xml(source.bytes(), context.as_ref())?;
+                                 Snapshot::from_source_xml(
+                                     source,
+                                     source_lineage.clone(),
+@@ -1810,9 +1916,11 @@ impl Package {
+                                 )?
+                             }
+                         },
+-                        Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy) => {
+-                            let data = main.data().map_err(Error::from)?;
+-                            ensure_source_document_xml(data.as_bytes(), context.as_ref())?;
++                        Err(Error::Opc(
++                            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
++                        )) => {
++                            let data = self.main_data(main)?;
++                            self.ensure_source_document_xml(data.as_bytes(), context.as_ref())?;
+                             Snapshot::from_managed_part(
+                                 data,
+                                 source_lineage.clone(),
+@@ -1825,11 +1933,11 @@ impl Package {
+                                 })?,
+                             )?
+                         },
+-                        Err(error) => return Err(Error::from(error).into()),
++                        Err(error) => return Err(error.into()),
+                     }
+                 } else {
+-                    let data = main.data().map_err(Error::from)?;
+-                    ensure_source_document_xml(
++                    let data = self.main_data(main)?;
++                    self.ensure_source_document_xml(
+                         data.as_bytes(),
+                         self.package.execution_context().as_ref(),
+                     )?;
+@@ -1844,7 +1952,7 @@ impl Package {
+                     )?
+                 }
+             } else {
+-                let data = main.data().map_err(Error::from)?;
++                let data = self.main_data(main)?;
+                 let raw = data.into_arc().map_err(Error::from)?;
+                 let snapshot: TransactionResult<Snapshot> = (|| {
+                     let visible = visible_document_xml(Arc::clone(&raw))?;
+@@ -1890,7 +1998,7 @@ impl Package {
+         }
+         let source_version = self.package.source_version()?;
+         let lineage = self.package.source_lineage();
+-        let data = main.data()?;
++        let data = self.main_data(main)?;
+         let raw = data.into_arc()?;
+         let artifact_fingerprint = self.package.source_artifact().fingerprint()?;
+         let snapshot = layout::Snapshot::from_source_xml(
+@@ -2168,6 +2276,15 @@ fn source_document_execution_error(error: ExecutionError) -> Error {
+     }
+ }
+ 
++fn is_index_pressure_error(error: &Error) -> bool {
++    matches!(
++        error,
++        Error::Opc(litchi_opc::OpcError::Execution(
++            ExecutionError::ResourceLimit(limit)
++        )) if matches!(limit.resource, Resource::Memory | Resource::Objects)
++    )
++}
++
+ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) -> Result<()> {
+     if xml.len() > SOURCE_DOCUMENT_SCAN_MAX_BYTES {
+         return Err(Error::InvalidFormat(
+@@ -2860,31 +2977,6 @@ impl DocumentPayload {
+     }
+ }
+ 
+-/// Shared reservation for the read-only paragraph index, including the brief
+-/// Vec-to-Arc overlap during construction. Each XML element needs at least
+-/// four bytes; three range arrays cover geometric Vec capacity plus Arc output.
+-struct DocumentIndexAdmission {
+-    _memory: Reservation,
+-    _objects: Reservation,
+-}
+-
+-impl DocumentIndexAdmission {
+-    fn new(context: &ExecutionContext, xml_len: usize) -> Result<Arc<Self>> {
+-        let ranges = xml_len as u64 / 4 + 1;
+-        let bytes = ranges.saturating_mul(24).saturating_add(1024);
+-        let memory = context
+-            .reserve(Resource::Memory, bytes)
+-            .map_err(source_document_execution_error)?;
+-        let objects = context
+-            .reserve(Resource::Objects, ranges + 3)
+-            .map_err(source_document_execution_error)?;
+-        Ok(Arc::new(Self {
+-            _memory: memory,
+-            _objects: objects,
+-        }))
+-    }
+-}
+-
+ struct DocumentQueryAdmission {
+     _memory: Reservation,
+     _objects: Reservation,
+@@ -2934,10 +3026,12 @@ pub struct Document {
+     /// Bounded offsets into the pinned XML, admitted separately from its
+     /// payload. Managed opens fill this during [`Package::document`]; unmanaged
+     /// opens fill it on the first paragraph query.
+-    paragraph_index: OnceLock<Option<Arc<ParagraphIndex>>>,
++    paragraph_memo: OnceLock<Option<Arc<ParagraphIndexMemo>>>,
+     _index_admission: Option<Arc<DocumentIndexAdmission>>,
+     source_version: SourceVersion,
+     execution: Option<ExecutionContext>,
++    paragraph_index_cache: Arc<ParagraphIndexCache>,
++    paragraph_route: ParagraphIndexRoute,
+ }
+ 
+ impl Document {
+@@ -2950,13 +3044,21 @@ impl Document {
+     /// can observe the same swallowed failure, and text, table, block and
+     /// element reads - which never consult the index - no longer pay for it.
+     fn paragraph_ranges(&self) -> Option<&ParagraphIndex> {
+-        self.paragraph_index
++        self.paragraph_memo
+             .get_or_init(|| {
+-                ParagraphIndex::from_xml(self.xml.as_bytes())
++                self.paragraph_index_cache
++                    .get_or_build_source(self.source_version, self.paragraph_route, || {
++                        let build = ParagraphIndex::from_xml(self.xml.as_bytes())
++                            .ok()
++                            .map(|index| ParagraphIndexBuild::indexed(Arc::new(index), None))
++                            .unwrap_or_else(|| ParagraphIndexBuild::unavailable(None));
++                        Ok(build)
++                    })
+                     .ok()
+-                    .map(Arc::new)
++                    .and_then(|build| build.memo)
+             })
+-            .as_deref()
++            .as_ref()
++            .map(|memo| memo.index.as_ref())
+     }
+ 
+     fn check_execution(&self) -> Result<()> {
+@@ -2971,6 +3073,11 @@ impl Document {
+         })
+     }
+ 
++    fn admit_query_parser(&self, xml_len: usize) -> Result<Option<DocumentQueryAdmission>> {
++        self.paragraph_index_cache.trim_clean();
++        admit_document_query_parser(self.execution.as_ref(), xml_len)
++    }
++
+     fn check_selective_operation(&self, operation: &'static str) -> Result<()> {
+         self.check_execution()?;
+         if self.xml.is_managed() {
+@@ -2992,8 +3099,7 @@ impl Document {
+     /// Extract all visible paragraph text from the pinned document.
+     pub fn extract_text(&self) -> Result<String> {
+         self.check_execution()?;
+-        let _parser =
+-            admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
++        let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
+         let result = crate::paragraph::extract_word_text(self.xml.as_bytes());
+         self.check_execution()?;
+         result
+@@ -3005,8 +3111,7 @@ impl Document {
+         if let Some(index) = self.paragraph_ranges() {
+             return Ok(index.len());
+         }
+-        let _parser =
+-            admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
++        let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
+         let result = document_paragraph_count(self.xml.as_bytes());
+         self.check_execution()?;
+         result
+@@ -3026,8 +3131,7 @@ impl Document {
+         let (start, length) = if let Some(selected) = selected {
+             selected
+         } else {
+-            let _parser =
+-                admit_document_query_parser(self.execution.as_ref(), self.xml.as_bytes().len())?;
++            let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
+             let mut position = 0usize;
+             let mut selected = None;
+             scan_word_element_ranges(self.xml.as_bytes(), &[b"p"], |_, start, length| {
+@@ -3054,7 +3158,7 @@ impl Document {
+         let xml = self.xml.as_bytes().get(start..end).ok_or_else(|| {
+             Error::InvalidFormat("document paragraph range is outside XML".into())
+         })?;
+-        let _parser = admit_document_query_parser(self.execution.as_ref(), xml.len())?;
++        let _parser = self.admit_query_parser(xml.len())?;
+         let text = crate::paragraph::extract_word_text(xml)?;
+         self.check_execution()?;
+         Ok(Some(text))
+diff --git a/crates/litchi-docx/src/source_backed/paragraph_copy.rs b/crates/litchi-docx/src/source_backed/paragraph_copy.rs
+index 16aa254bb..8eb0e4958 100644
+--- a/crates/litchi-docx/src/source_backed/paragraph_copy.rs
++++ b/crates/litchi-docx/src/source_backed/paragraph_copy.rs
+@@ -946,6 +946,7 @@ impl Package {
+ 
+     /// Capture the exact closure under caller-selected finite limits.
+     pub fn plain_paragraph_copy_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
++        self.trim_clean_paragraph_index_for_operation();
+         let source_version = self.package.source_version().map_err(crate::Error::from)?;
+         self.validate_plain_paragraph_copy_topology()?;
+         let main = self
+diff --git a/crates/litchi-docx/src/source_backed/story_text.rs b/crates/litchi-docx/src/source_backed/story_text.rs
+index 756acb106..dead23ec7 100644
+--- a/crates/litchi-docx/src/source_backed/story_text.rs
++++ b/crates/litchi-docx/src/source_backed/story_text.rs
+@@ -1293,6 +1293,7 @@ impl Package {
+ }
+ 
+ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snapshot> {
++    package.trim_clean_paragraph_index_for_operation();
+     package.package.check_execution()?;
+     if let Selector::Glossary(glossary) = &selector {
+         validate_glossary_selector(glossary)?;
+@@ -5170,6 +5171,7 @@ fn capture_glossary_batch(
+     selector: GlossaryBatchSelector,
+     limits: Limits,
+ ) -> Result<GlossaryBatchSnapshot> {
++    package.trim_clean_paragraph_index_for_operation();
+     package.package.check_execution()?;
+     validate_glossary_batch_selector_limits(&selector.selectors, limits)?;
+ 
+diff --git a/crates/litchi-docx/src/source_backed/tail_append.rs b/crates/litchi-docx/src/source_backed/tail_append.rs
+index 9a708b00d..96a8dd503 100644
+--- a/crates/litchi-docx/src/source_backed/tail_append.rs
++++ b/crates/litchi-docx/src/source_backed/tail_append.rs
+@@ -555,6 +555,7 @@ impl Package {
+ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan<'package>> {
+     edit.limits.validate()?;
+     let package = edit.package;
++    package.trim_clean_paragraph_index_for_operation();
+     check_options(&edit.options)?;
+     let options = effective_options(package, &edit.options);
+     check_options(&options)?;
