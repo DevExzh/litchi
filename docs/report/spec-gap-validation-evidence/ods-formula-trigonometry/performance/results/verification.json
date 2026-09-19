@@ -1,0 +1,7 @@
+{
+  "status": "ok",
+  "baseline_records": 300,
+  "candidate_records": 1500,
+  "expected_warmups": 3,
+  "expected_samples": 15
+}
