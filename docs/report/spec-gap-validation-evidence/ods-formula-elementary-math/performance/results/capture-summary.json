@@ -1,0 +1,137 @@
+{
+  "baseline_commit": "8ef0057e5",
+  "captures": [
+    {
+      "binary_sha256": "de84eab3bdcdb794e78ce1b78a6648ae6c398de62bbd1c88c9bffd39a254d73f",
+      "case_scope": "matched-controls",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-round",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-round",
+        "array-control-16x16-arithmetic",
+        "array-control-16x16-round",
+        "reference-scalar-arithmetic",
+        "reference-scalar-round",
+        "reference-array-arithmetic",
+        "reference-array-round",
+        "scalar-control-sin",
+        "array-control-4x4-sin",
+        "array-control-16x16-sin",
+        "reference-scalar-sin",
+        "reference-array-sin"
+      ],
+      "label": "baseline-8ef0057e5",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 450,
+      "source_git_head": "8ef0057e5eca7c136c85c71c64b816bc3b520c37"
+    },
+    {
+      "binary_sha256": "9f8028b56432065c0e7c16b57c5a8a24b6f823c6146e303d7993e644fa48411c",
+      "case_scope": "all-named-cases",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-round",
+        "scalar-control-sin",
+        "scalar-elementary-abs",
+        "scalar-elementary-exp",
+        "scalar-elementary-ln",
+        "scalar-elementary-log",
+        "scalar-elementary-log10",
+        "scalar-elementary-power",
+        "scalar-elementary-sqrt",
+        "scalar-elementary-sqrtpi",
+        "scalar-elementary-sign",
+        "scalar-elementary-mod",
+        "scalar-elementary-quotient",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-round",
+        "array-control-4x4-sin",
+        "array-elementary-4x4-abs",
+        "array-elementary-4x4-exp",
+        "array-elementary-4x4-ln",
+        "array-elementary-4x4-sqrt",
+        "array-elementary-4x4-sign",
+        "array-control-16x16-arithmetic",
+        "array-control-16x16-round",
+        "array-control-16x16-sin",
+        "array-elementary-16x16-abs",
+        "array-elementary-16x16-exp",
+        "array-elementary-16x16-ln",
+        "array-elementary-16x16-sqrt",
+        "array-elementary-16x16-sign",
+        "reference-scalar-arithmetic",
+        "reference-scalar-round",
+        "reference-scalar-sin",
+        "reference-elementary-abs",
+        "reference-elementary-ln",
+        "reference-elementary-sqrt",
+        "reference-array-arithmetic",
+        "reference-array-round",
+        "reference-array-sin",
+        "reference-elementary-array-abs",
+        "reference-elementary-array-ln",
+        "reference-elementary-array-sqrt"
+      ],
+      "freeze_base_commit": "8ef0057e5eca7c136c85c71c64b816bc3b520c37",
+      "freeze_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-elementary-math/gates/freeze.json",
+      "label": "candidate-final",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 1260,
+      "source_git_head": "8ef0057e5eca7c136c85c71c64b816bc3b520c37"
+    }
+  ],
+  "cleanup": {
+    "baseline_removed": true,
+    "baseline_worktree": "/tmp/litchi-ods-elementary-baseline-1jzewp_r"
+  },
+  "controls": [
+    "scalar-control-arithmetic",
+    "scalar-control-round",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-round",
+    "array-control-16x16-arithmetic",
+    "array-control-16x16-round",
+    "reference-scalar-arithmetic",
+    "reference-scalar-round",
+    "reference-array-arithmetic",
+    "reference-array-round",
+    "scalar-control-sin",
+    "array-control-4x4-sin",
+    "array-control-16x16-sin",
+    "reference-scalar-sin",
+    "reference-array-sin"
+  ],
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "profile_input_sha256_after": {
+    "PLAN.md": "87cfe00018a75eb923a67b7f97c6e81428b418e499d9d59a08275d80410459c4",
+    "README.md": "4aa205e16b46e91f66db2033b0fa04b480af38c030e02464817853231441e938",
+    "harness/Cargo.lock": "42389a297dd5f0032903893aab0d9c6f7e2c2fb39afb7beadad57cfa22acea93",
+    "harness/Cargo.toml": "6b6c743fb9cc9f9fd971deba18a9da68bf159175ebb38e7867a4bedad158ccce",
+    "harness/src/main.rs": "257688fc1e9d971660aee03b06deda0504522ccf09bf9c8da601ba61483ec419",
+    "run_profile.py": "6720b48eb6a3747e771ab8d4c84df126455b46b35dbf55d1817c88e355dac055",
+    "summarize.py": "428db61bc70e57d9533f79d5183ae1c83315b82f6ce03b8be7127c672dee7c10",
+    "verify.py": "b44e196ad986d905fb909b68be0b5d567f54d65d2b9736b60b0f608cab7047b5"
+  },
+  "profile_input_sha256_before": {
+    "PLAN.md": "87cfe00018a75eb923a67b7f97c6e81428b418e499d9d59a08275d80410459c4",
+    "README.md": "4aa205e16b46e91f66db2033b0fa04b480af38c030e02464817853231441e938",
+    "harness/Cargo.lock": "42389a297dd5f0032903893aab0d9c6f7e2c2fb39afb7beadad57cfa22acea93",
+    "harness/Cargo.toml": "6b6c743fb9cc9f9fd971deba18a9da68bf159175ebb38e7867a4bedad158ccce",
+    "harness/src/main.rs": "257688fc1e9d971660aee03b06deda0504522ccf09bf9c8da601ba61483ec419",
+    "run_profile.py": "6720b48eb6a3747e771ab8d4c84df126455b46b35dbf55d1817c88e355dac055",
+    "summarize.py": "428db61bc70e57d9533f79d5183ae1c83315b82f6ce03b8be7127c672dee7c10",
+    "verify.py": "b44e196ad986d905fb909b68be0b5d567f54d65d2b9736b60b0f608cab7047b5"
+  },
+  "samples_per_group": 15,
+  "warmups_per_child": 3
+}

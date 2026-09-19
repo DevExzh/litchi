@@ -29,7 +29,10 @@
 //! See [`super::complex`] for the finite representation and selected profile.
 //! The scalar function bridge also covers the complete section 6.16
 //! trigonometric/hyperbolic family, and matrix-mode calls apply those same
-//! finite kernels elementwise to arrays and materialized references.
+//! finite kernels elementwise to arrays and materialized references.  It also
+//! covers the bounded real elementary family (`ABS`, `EXP`, `LN`, `LOG`,
+//! `LOG10`, `MOD`, `POWER`, `QUOTIENT`, `SIGN`, `SQRT`, and `SQRTPI`) through
+//! the same scalar kernels.
 //!
 //! [`Context::new`] defaults to [`Mode::Matrix`]. A bare reference in that mode
 //! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
