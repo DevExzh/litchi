@@ -1,0 +1,42 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/mathematical/fods/acos.fods": "3c10ab6f41a4976607a5eb7f8b897184c121db033da37e15c23b0eb7075438bd",
+    "sc/qa/unit/data/functions/mathematical/fods/acosh.fods": "2258e1b4dd7a39afae1715dffa858ba646cef8104fc072aec7c986137c38c489",
+    "sc/qa/unit/data/functions/mathematical/fods/acot.fods": "2410f8796747a80288b3538012679708fdeaf24ec211ac69f3c02108a4c5ac37",
+    "sc/qa/unit/data/functions/mathematical/fods/acoth.fods": "96c94334c61a3d50e3969fed37e8d44dd390b592eefd57f74a2966bfcc620efe",
+    "sc/qa/unit/data/functions/mathematical/fods/asin.fods": "013f881f9ba1ee4d10124c1f463396e49d318e613b676fa75ac6c5665640eb01",
+    "sc/qa/unit/data/functions/mathematical/fods/asinh.fods": "ef9610f5684de956c845eaf82866d16f1e5caab9b0001876cd8e675b65a4b6a8",
+    "sc/qa/unit/data/functions/mathematical/fods/atan.fods": "7fbf607b7cc9334ea95253588602292c64ed3c1bcbd6575dbdb909e39120f0f3",
+    "sc/qa/unit/data/functions/mathematical/fods/atan2.fods": "f7d54c86d1853e91e240c6d91dc2735053b18e511c9ad3f436699e7e74a98956",
+    "sc/qa/unit/data/functions/mathematical/fods/atanh.fods": "d5a669bde2eb5b885474c886ad86db1e7437c7f29fe0f8e85d2ec40211bbd7ac",
+    "sc/qa/unit/data/functions/mathematical/fods/cos.fods": "c411f0ea877226c1caa21d2b5e05cb9deea8e3080129a77ba04b1397e6294ec8",
+    "sc/qa/unit/data/functions/mathematical/fods/cosh.fods": "065f0301b888f09112cacb8169b45722254e5e4d514574a68e561c66d32fa272",
+    "sc/qa/unit/data/functions/mathematical/fods/cot.fods": "0dca9ad286bd34fbb9b2082c9996105d39f90a72232537705f1e92229099d295",
+    "sc/qa/unit/data/functions/mathematical/fods/coth.fods": "fbf8b761b7801e66c9dcffda77ea570c7c67a6ecf1d2dcb2b6e9b84db344571d",
+    "sc/qa/unit/data/functions/mathematical/fods/csc.fods": "13f7f53dfde44fa18289ce741570898c8b528005aa0aecd55c4293270b97f4c8",
+    "sc/qa/unit/data/functions/mathematical/fods/csch.fods": "ec963dcfbfd84a8f3a834549370140389ad0003f06ff2b60c6dbf18121ab1ea1",
+    "sc/qa/unit/data/functions/mathematical/fods/sec.fods": "69e355afd5be1d718ab4f36742ebc11abec2083db5a24448ea7a44ddaf377636",
+    "sc/qa/unit/data/functions/mathematical/fods/sech.fods": "c7504254c38ef1fac8e238b5d5e313a2763f631d312260100b6c9e1260c18610",
+    "sc/qa/unit/data/functions/mathematical/fods/sin.fods": "78bf4477ee71691f40172584dfe27f565e629aea9baba7cee9429281b1446096",
+    "sc/qa/unit/data/functions/mathematical/fods/sinh.fods": "6aa4e24eca7725b8e5242eb4a3e4eb459120b14fdebff0eae2685371013cc9e1",
+    "sc/qa/unit/data/functions/mathematical/fods/tan.fods": "3c7a1ff379fbe7038e2568fe15ba93bcf88b2fd27e2202b235704543e60a5b35",
+    "sc/qa/unit/data/functions/mathematical/fods/tanh.fods": "83d497fc60db083cfe4df8ef2a955ddbcc78ea5431714a9b9646fdb4c574fa8b",
+    "sc/qa/unit/data/functions/mathematical/fods/degrees.fods": "11870dcfbc4a2cdaf025c6b61911e2de90f72ef220a93677071e5a99043f5821",
+    "sc/qa/unit/data/functions/mathematical/fods/radians.fods": "0dc433af672661eb5454c0fdfe45bef4e99e0f7d5a7a4ebd16663d145c90351f",
+    "sc/qa/unit/data/functions/mathematical/fods/pi.fods": "a586995fbd291b517f9825eaa3c25a6015862d12ba87315ccb7aaac2bd71ee9e"
+  },
+  "excluded_profile_variances": [
+    {
+      "function": "ATAN2",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/atan2.fods",
+      "sheet": "Sheet2",
+      "row": 11,
+      "column": 1,
+      "formula": "of:=ATAN2(0;0)",
+      "cached": "0",
+      "reason": "OpenFormula permits zero or an error; this evaluator selects an error."
+    }
+  ]
+}

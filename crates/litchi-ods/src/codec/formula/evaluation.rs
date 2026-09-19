@@ -9,10 +9,16 @@
 //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
 //! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
 //! `ARABIC` and `ROMAN` conversions.  It also carries the complete section
-//! 6.8 complex-number family as a distinguished scalar value, and the complete
-//! OpenFormula 1.4 section 6.17 rounding family (`CEILING`, `INT`, `FLOOR`,
-//! `MROUND`, `ROUND`, `ROUNDDOWN`, `ROUNDUP`, and `TRUNC`).  Rounding uses the
-//! normative sign, mode, tie, and decimal-place rules, while retaining the
+//! 6.8 complex-number family as a distinguished scalar value, the complete
+//! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
+//! `ACOSH`, `ACOT`, `ACOTH`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `COS`,
+//! `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DEGREES`, `PI`, `RADIANS`, `SEC`,
+//! `SECH`, `SIN`, `SINH`, `TAN`, and `TANH`), and the complete section 6.17
+//! rounding family (`CEILING`, `INT`, `FLOOR`, `MROUND`, `ROUND`, `ROUNDDOWN`,
+//! `ROUNDUP`, and `TRUNC`). Trigonometric kernels use finite `f64` libm
+//! operations, with stable large-argument forms for reciprocal hyperbolic
+//! functions. Rounding uses the normative sign, mode, tie, and decimal-place
+//! rules, while retaining the
 //! finite-`f64` Number profile described below.  References, arrays, names,
 //! labels, and other functions are reported as typed capability refusals in
 //! this scalar profile.
@@ -22,6 +28,15 @@
 //!
 //! * all numbers are finite `f64` values; non-finite literals and results are
 //!   returned as a Number error;
+//! * section 6.16 uses the OpenFormula `ACOT` principal branch `(0, π)`,
+//!   interprets `ATAN2(x; y)` as `atan2(y, x)`, reports `#NUM!` for the
+//!   implementation-defined `ATAN2(0; 0)` case, and maps only the exact
+//!   negative-x, zero-y `-π` branch-cut result to `+π`. A nonzero lower-
+//!   quadrant y value may still round to `-π` in finite libm arithmetic;
+//!   reciprocal trigonometric poles at an exact zero return `#DIV/0!`. No
+//!   epsilon-based pole or angle snapping is applied, and ordinary
+//!   libm/platform rounding remains observable rather than promising exact
+//!   bit patterns;
 //! * number equality is exact `f64` equality;
 //! * text is compared without Unicode normalization, using case-sensitive
 //!   Unicode scalar ordering by default;
@@ -113,6 +128,7 @@ pub mod complex;
 mod radix;
 mod roman;
 mod rounding;
+mod trigonometry;
 pub mod value;
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
@@ -855,6 +871,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if trigonometry::is_trigonometric_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -943,6 +963,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if rounding::is_rounding_function(name) {
             return rounding::apply(self, node, name);
+        }
+        if trigonometry::is_trigonometric_function(name) {
+            return trigonometry::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all

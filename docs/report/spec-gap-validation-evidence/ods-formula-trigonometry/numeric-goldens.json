@@ -1,0 +1,97 @@
+{
+  "oracle": "mpmath 1.3.0",
+  "decimal_precision": 600,
+  "observations": [
+    {
+      "function": "ACOTH",
+      "input_binary64_hex": "0x1.1ccf385ebc8a0p+1023",
+      "reference_decimal": "9.99999999999999989020936370559544703134915083e-309",
+      "rounded_binary64_hex": "0x0.730d67819e8d2p-1022",
+      "rounded_binary64_bits": "000730d67819e8d2"
+    },
+    {
+      "function": "ACOTH",
+      "input_binary64_hex": "-0x1.1ccf385ebc8a0p+1023",
+      "reference_decimal": "-9.99999999999999989020936370559544703134915083e-309",
+      "rounded_binary64_hex": "-0x0.730d67819e8d2p-1022",
+      "rounded_binary64_bits": "800730d67819e8d2"
+    },
+    {
+      "function": "ACOSH",
+      "input_binary64_hex": "0x1.1ccf385ebc8a0p+1023",
+      "reference_decimal": "709.889355822726015997937663793682807866349763",
+      "rounded_binary64_hex": "0x1.62f1d6695e8ecp+9",
+      "rounded_binary64_bits": "40862f1d6695e8ec"
+    },
+    {
+      "function": "ASINH",
+      "input_binary64_hex": "0x1.1ccf385ebc8a0p+1023",
+      "reference_decimal": "709.889355822726015997937663793682807866349763",
+      "rounded_binary64_hex": "0x1.62f1d6695e8ecp+9",
+      "rounded_binary64_bits": "40862f1d6695e8ec"
+    },
+    {
+      "function": "ASINH",
+      "input_binary64_hex": "-0x1.1ccf385ebc8a0p+1023",
+      "reference_decimal": "-709.889355822726015997937663793682807866349763",
+      "rounded_binary64_hex": "-0x1.62f1d6695e8ecp+9",
+      "rounded_binary64_bits": "c0862f1d6695e8ec"
+    },
+    {
+      "function": "SECH",
+      "input_binary64_hex": "0x1.6300000000000p+9",
+      "reference_decimal": "8.95257245135025991216632140458264468098722418e-309",
+      "rounded_binary64_hex": "0x0.67005fa516786p-1022",
+      "rounded_binary64_bits": "00067005fa516786"
+    },
+    {
+      "function": "CSCH",
+      "input_binary64_hex": "0x1.6300000000000p+9",
+      "reference_decimal": "8.95257245135025991216632140458264468098722418e-309",
+      "rounded_binary64_hex": "0x0.67005fa516786p-1022",
+      "rounded_binary64_bits": "00067005fa516786"
+    },
+    {
+      "function": "SECH",
+      "input_binary64_hex": "0x1.6800000000000p+9",
+      "reference_decimal": "4.06446160484858630573326753282962459344845633e-313",
+      "rounded_binary64_hex": "0x0.000132769b92ap-1022",
+      "rounded_binary64_bits": "000000132769b92a"
+    },
+    {
+      "function": "CSCH",
+      "input_binary64_hex": "0x1.6800000000000p+9",
+      "reference_decimal": "4.06446160484858630573326753282962459344845633e-313",
+      "rounded_binary64_hex": "0x0.000132769b92ap-1022",
+      "rounded_binary64_bits": "000000132769b92a"
+    },
+    {
+      "function": "SECH",
+      "input_binary64_hex": "0x1.74c0000000000p+9",
+      "reference_decimal": "3.42368450098715367918817262538414495497968968e-324",
+      "rounded_binary64_hex": "0x0.0000000000001p-1022",
+      "rounded_binary64_bits": "0000000000000001"
+    },
+    {
+      "function": "CSCH",
+      "input_binary64_hex": "0x1.74c0000000000p+9",
+      "reference_decimal": "3.42368450098715367918817262538414495497968968e-324",
+      "rounded_binary64_hex": "0x0.0000000000001p-1022",
+      "rounded_binary64_bits": "0000000000000001"
+    },
+    {
+      "function": "SECH",
+      "input_binary64_hex": "0x1.74e6666666666p+9",
+      "reference_decimal": "2.53632786019699366241936551982915498550048435e-324",
+      "rounded_binary64_hex": "0x0.0000000000001p-1022",
+      "rounded_binary64_bits": "0000000000000001"
+    },
+    {
+      "function": "CSCH",
+      "input_binary64_hex": "0x1.74e6666666666p+9",
+      "reference_decimal": "2.53632786019699366241936551982915498550048435e-324",
+      "rounded_binary64_hex": "0x0.0000000000001p-1022",
+      "rounded_binary64_bits": "0000000000000001"
+    }
+  ]
+}

@@ -1,0 +1,759 @@
+{
+  "gates": {
+    "passed": 1193,
+    "failed": 0,
+    "ignored": 0
+  },
+  "native": {
+    "cached_observations": 115,
+    "functions": 24,
+    "profile_variances": 1
+  },
+  "performance": {
+    "baseline_samples": 300,
+    "candidate_samples": 1500,
+    "candidate_groups": 100,
+    "control_comparisons": {
+      "array-control-16x16-arithmetic/evaluate": {
+        "elapsed_ns": {
+          "baseline": 181741,
+          "candidate": 180421,
+          "ratio": 0.9927369168211906
+        },
+        "alloc_calls": {
+          "baseline": 88,
+          "candidate": 88,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 703648,
+          "candidate": 703648,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 110776,
+          "candidate": 110776,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 14372,
+          "candidate": 14372,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 22528,
+          "candidate": 22528,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 3120,
+          "candidate": 3200,
+          "ratio": 1.0256410256410255
+        }
+      },
+      "array-control-16x16-arithmetic/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 242041,
+          "candidate": 243621,
+          "ratio": 1.0065278196669158
+        },
+        "alloc_calls": {
+          "baseline": 352,
+          "candidate": 352,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1155132,
+          "candidate": 1155132,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 167103,
+          "candidate": 167103,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 14372,
+          "candidate": 14372,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 22528,
+          "candidate": 22528,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 3140,
+          "candidate": 3164,
+          "ratio": 1.0076433121019108
+        }
+      },
+      "array-control-16x16-round/evaluate": {
+        "elapsed_ns": {
+          "baseline": 713023,
+          "candidate": 689283,
+          "ratio": 0.9667051413488765
+        },
+        "alloc_calls": {
+          "baseline": 2144,
+          "candidate": 2144,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1279328,
+          "candidate": 1279328,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 111896,
+          "candidate": 111896,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 17460,
+          "candidate": 17460,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 22528,
+          "candidate": 22528,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 3124,
+          "candidate": 3208,
+          "ratio": 1.0268886043533931
+        }
+      },
+      "array-control-16x16-round/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 784244,
+          "candidate": 759123,
+          "ratio": 0.9679678773442959
+        },
+        "alloc_calls": {
+          "baseline": 2412,
+          "candidate": 2412,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1730956,
+          "candidate": 1730956,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 168227,
+          "candidate": 168227,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 17460,
+          "candidate": 17460,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 22528,
+          "candidate": 22528,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 3136,
+          "candidate": 3164,
+          "ratio": 1.0089285714285714
+        }
+      },
+      "array-control-4x4-arithmetic/evaluate": {
+        "elapsed_ns": {
+          "baseline": 352022,
+          "candidate": 359392,
+          "ratio": 1.020936191488032
+        },
+        "alloc_calls": {
+          "baseline": 1120,
+          "candidate": 1120,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 863360,
+          "candidate": 863360,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 7096,
+          "candidate": 7096,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 18640,
+          "candidate": 18640,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2892,
+          "candidate": 2940,
+          "ratio": 1.016597510373444
+        }
+      },
+      "array-control-4x4-arithmetic/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 421242,
+          "candidate": 426752,
+          "ratio": 1.0130803671048945
+        },
+        "alloc_calls": {
+          "baseline": 2240,
+          "candidate": 2240,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1391280,
+          "candidate": 1391280,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 10623,
+          "candidate": 10623,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 18640,
+          "candidate": 18640,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2884,
+          "candidate": 2940,
+          "ratio": 1.0194174757281553
+        }
+      },
+      "array-control-4x4-round/evaluate": {
+        "elapsed_ns": {
+          "baseline": 1050835,
+          "candidate": 1028465,
+          "ratio": 0.9787121669910119
+        },
+        "alloc_calls": {
+          "baseline": 3840,
+          "candidate": 3840,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1624960,
+          "candidate": 1624960,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 8216,
+          "candidate": 8216,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 22800,
+          "candidate": 22800,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2880,
+          "candidate": 2936,
+          "ratio": 1.0194444444444444
+        }
+      },
+      "array-control-4x4-round/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 1122366,
+          "candidate": 1096415,
+          "ratio": 0.9768783088582512
+        },
+        "alloc_calls": {
+          "baseline": 5040,
+          "candidate": 5040,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 2155760,
+          "candidate": 2155760,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 11747,
+          "candidate": 11747,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 22800,
+          "candidate": 22800,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2904,
+          "candidate": 2904,
+          "ratio": 1.0
+        }
+      },
+      "reference-array-arithmetic/evaluate": {
+        "elapsed_ns": {
+          "baseline": 254071,
+          "candidate": 254041,
+          "ratio": 0.9998819227696195
+        },
+        "alloc_calls": {
+          "baseline": 800,
+          "candidate": 800,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 318080,
+          "candidate": 318080,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 3512,
+          "candidate": 3512,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 3360,
+          "candidate": 3360,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2888,
+          "candidate": 2952,
+          "ratio": 1.0221606648199446
+        }
+      },
+      "reference-array-arithmetic/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 281111,
+          "candidate": 280741,
+          "ratio": 0.9986837939461636
+        },
+        "alloc_calls": {
+          "baseline": 1280,
+          "candidate": 1280,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 424400,
+          "candidate": 424400,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 4841,
+          "candidate": 4841,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 3360,
+          "candidate": 3360,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2864,
+          "candidate": 2940,
+          "ratio": 1.026536312849162
+        }
+      },
+      "reference-array-round/evaluate": {
+        "elapsed_ns": {
+          "baseline": 972445,
+          "candidate": 944395,
+          "ratio": 0.971155181012808
+        },
+        "alloc_calls": {
+          "baseline": 3520,
+          "candidate": 3520,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1079680,
+          "candidate": 1079680,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 4632,
+          "candidate": 4632,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 7520,
+          "candidate": 7520,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2900,
+          "candidate": 2896,
+          "ratio": 0.9986206896551724
+        }
+      },
+      "reference-array-round/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 1002594,
+          "candidate": 970745,
+          "ratio": 0.9682334025537755
+        },
+        "alloc_calls": {
+          "baseline": 4080,
+          "candidate": 4080,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 1188880,
+          "candidate": 1188880,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 5965,
+          "candidate": 5965,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 7520,
+          "candidate": 7520,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 1408,
+          "candidate": 1408,
+          "ratio": 1.0
+        },
+        "rss_kib": {
+          "baseline": 2892,
+          "candidate": 2936,
+          "ratio": 1.0152143845089903
+        }
+      },
+      "reference-scalar-arithmetic/evaluate": {
+        "elapsed_ns": {
+          "baseline": 737203,
+          "candidate": 758034,
+          "ratio": 1.0282568030786636
+        },
+        "alloc_calls": {
+          "baseline": 5000,
+          "candidate": 5000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 760000,
+          "candidate": 760000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 696,
+          "candidate": 696,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 9000,
+          "candidate": 9000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2880,
+          "candidate": 2948,
+          "ratio": 1.023611111111111
+        }
+      },
+      "reference-scalar-arithmetic/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 985814,
+          "candidate": 1018445,
+          "ratio": 1.033100564609551
+        },
+        "alloc_calls": {
+          "baseline": 10000,
+          "candidate": 10000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 2084000,
+          "candidate": 2084000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 2020,
+          "candidate": 2020,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 9000,
+          "candidate": 9000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2880,
+          "candidate": 2944,
+          "ratio": 1.0222222222222221
+        }
+      },
+      "reference-scalar-round/evaluate": {
+        "elapsed_ns": {
+          "baseline": 1911569,
+          "candidate": 1880539,
+          "ratio": 0.9837672613439535
+        },
+        "alloc_calls": {
+          "baseline": 12000,
+          "candidate": 12000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 2280000,
+          "candidate": 2280000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 1864,
+          "candidate": 1864,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 16000,
+          "candidate": 16000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2892,
+          "candidate": 2900,
+          "ratio": 1.0027662517289073
+        }
+      },
+      "reference-scalar-round/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 2224250,
+          "candidate": 2192231,
+          "ratio": 0.9856045858154434
+        },
+        "alloc_calls": {
+          "baseline": 18000,
+          "candidate": 18000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 3640000,
+          "candidate": 3640000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 3192,
+          "candidate": 3192,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 16000,
+          "candidate": 16000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2880,
+          "candidate": 2904,
+          "ratio": 1.0083333333333333
+        }
+      },
+      "scalar-control-arithmetic/evaluate": {
+        "elapsed_ns": {
+          "baseline": 585523,
+          "candidate": 580413,
+          "ratio": 0.9912727595670879
+        },
+        "alloc_calls": {
+          "baseline": 5000,
+          "candidate": 5000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 496000,
+          "candidate": 496000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 448,
+          "candidate": 448,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 12000,
+          "candidate": 12000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2836,
+          "candidate": 2680,
+          "ratio": 0.9449929478138223
+        }
+      },
+      "scalar-control-arithmetic/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 730904,
+          "candidate": 713393,
+          "ratio": 0.9760419973074439
+        },
+        "alloc_calls": {
+          "baseline": 8000,
+          "candidate": 8000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 922000,
+          "candidate": 922000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 874,
+          "candidate": 874,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 12000,
+          "candidate": 12000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2704,
+          "candidate": 2680,
+          "ratio": 0.9911242603550295
+        }
+      },
+      "scalar-control-round/evaluate": {
+        "elapsed_ns": {
+          "baseline": 743094,
+          "candidate": 742074,
+          "ratio": 0.9986273607376724
+        },
+        "alloc_calls": {
+          "baseline": 5000,
+          "candidate": 5000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 496000,
+          "candidate": 496000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 448,
+          "candidate": 448,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 17000,
+          "candidate": 17000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2844,
+          "candidate": 2732,
+          "ratio": 0.960618846694796
+        }
+      },
+      "scalar-control-round/parse-evaluate": {
+        "elapsed_ns": {
+          "baseline": 980675,
+          "candidate": 978995,
+          "ratio": 0.9982868942310144
+        },
+        "alloc_calls": {
+          "baseline": 9000,
+          "candidate": 9000,
+          "ratio": 1.0
+        },
+        "requested_bytes": {
+          "baseline": 959000,
+          "candidate": 959000,
+          "ratio": 1.0
+        },
+        "peak_live_delta": {
+          "baseline": 879,
+          "candidate": 879,
+          "ratio": 1.0
+        },
+        "work": {
+          "baseline": 17000,
+          "candidate": 17000,
+          "ratio": 1.0
+        },
+        "memory_retained": {
+          "baseline": 0,
+          "candidate": 0,
+          "ratio": null
+        },
+        "rss_kib": {
+          "baseline": 2840,
+          "candidate": 2664,
+          "ratio": 0.9380281690140845
+        }
+      }
+    }
+  }
+}
