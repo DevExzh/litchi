@@ -1,0 +1,583 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 6K of event 'cycles:u'
+# Event count (approx.): 28527382450
+#
+# Overhead  Symbol                                                                                                                  IPC   [IPC Coverage]
+# ........  ......................................................................................................................  ....................
+#
+    43.73%  [.] litchi_xlsx::raw::strings::decode_spreadsheet_text                                                                  -      -            
+            |          
+             --21.35%--decode_spreadsheet_text (inlined)
+
+    12.11%  [.] litchi_xlsx::raw::strings::spreadsheet_escape_at                                                                    -      -            
+            |          
+            |--5.51%--unlikely (inlined)
+            |          checked_add (inlined)
+            |          spreadsheet_escape_at (inlined)
+            |          |          
+            |          |--0.11%--0x17
+            |          |          
+            |          |--0.09%--0xcd
+            |          |          
+            |          |--0.08%--0x5
+            |          |          
+            |          |--0.08%--0x6e
+            |          |          
+            |          |--0.06%--0x55
+            |          |          
+            |          |--0.06%--0xf
+            |          |          
+            |          |--0.06%--0x3
+            |          |          
+            |          |--0.06%--0x70
+            |          |          
+            |          |--0.06%--0x90
+            |          |          
+            |           --0.06%--0xd9
+            |          
+            |--0.28%--spreadsheet_escape_at (inlined)
+            |          
+             --0.17%--checked_add (inlined)
+                       spreadsheet_escape_at (inlined)
+
+     5.43%  [.] litchi_ooxml_common::mce::stream::clone_bounded_name_part                                                           -      -            
+            |          
+             --2.45%--clone_bounded_name_part (inlined)
+                       |          
+                       |--0.60%--0x100000
+                       |          
+                       |--0.42%--0x7
+                       |          
+                       |--0.39%--grow_one<alloc::alloc::Global> (inlined)
+                       |          grow_one<litchi_ooxml_common::mce::stream::Frame, alloc::alloc::Global> (inlined)
+                       |          
+                       |--0.20%--0x1
+                       |          
+                       |--0.15%--0x2
+                       |          
+                       |--0.09%--0x1003
+                       |          
+                        --0.06%--0x1002
+
+     4.28%  [.] litchi_ooxml_common::mce::stream::Processor::start                                                                  -      -            
+            |          
+            |--0.62%--clone<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |          clone (inlined)
+            |          |          
+            |          |--0.35%--{closure#0}<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          |          map_or_else<&litchi_ooxml_common::mce::stream::RawFrame, litchi_ooxml_common::mce::stream::Namespaces, fn() -> litchi_ooxml_common::mce::stream::Namespaces, litchi_ooxml_common::mce::stream::{impl#31}::start::{closure_env#0}<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>>> (inlined)
+            |          |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          |          
+            |           --0.26%--clone (inlined)
+            |                     {closure#2}<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |                     map_or_else<&litchi_ooxml_common::mce::stream::Frame, litchi_ooxml_common::mce::stream::Context, fn() -> litchi_ooxml_common::mce::stream::Context, litchi_ooxml_common::mce::stream::{impl#31}::start::{closure_env#2}<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>>> (inlined)
+            |                     start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |                     0x602f00000000
+            |          
+            |--0.56%--drop<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |          drop_in_place<litchi_ooxml_common::mce::stream::Namespaces> (inlined)
+            |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          0x602f00000000
+            |          
+            |--0.25%--branch<alloc::vec::Vec<litchi_ooxml_common::mce::stream::SemanticAttribute, alloc::alloc::Global>, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          0x1
+            |          
+            |--0.23%--branch<litchi_ooxml_common::mce::model::Name, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          
+            |--0.17%--branch<alloc::vec::Vec<litchi_ooxml_common::mce::stream::RawAttribute, alloc::alloc::Global>, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          
+            |--0.15%--start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          |          
+            |           --0.08%--process_markup_compatibility_stream_with_stoppable_observers<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |                     capture_stream_with_stoppable_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}> (inlined)
+            |          
+             --0.11%--branch<litchi_ooxml_common::mce::stream::SemanticEvent, litchi_ooxml_common::mce::model::Error> (inlined)
+                       start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+                       0x1
+
+     3.45%  [.] __memmove_avx512_unaligned_erms                                                                                     -      -            
+            |          
+            |--1.62%--copy_nonoverlapping<u8> (inlined)
+            |          |          
+            |          |--0.76%--append_elements<u8, alloc::alloc::Global> (inlined)
+            |          |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          |          |          
+            |          |          |--0.69%--extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          |          |          |          
+            |          |          |          |--0.57%--push_str (inlined)
+            |          |          |          |          |          
+            |          |          |          |          |--0.23%--decode_spreadsheet_text (inlined)
+            |          |          |          |          |          
+            |          |          |          |          |--0.17%--append_inline (inlined)
+            |          |          |          |          |          text (inlined)
+            |          |          |          |          |          
+            |          |          |          |          |--0.09%--clone_bounded_name_part (inlined)
+            |          |          |          |          |          
+            |          |          |          |           --0.08%--clone_bounded_string (inlined)
+            |          |          |          |          
+            |          |          |           --0.09%--read_text<litchi_ooxml_common::mce::stream::EventMeter> (inlined)
+            |          |          |                     read_event_impl<litchi_ooxml_common::mce::stream::EventMeter, &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          |          |          
+            |          |           --0.06%--extend<u8, alloc::alloc::Global, &[u8]> (inlined)
+            |          |                     emit_start (inlined)
+            |          |          
+            |          |--0.49%--copy_from_slice_impl<u8> (inlined)
+            |          |          copy_from_slice<u8> (inlined)
+            |          |          |          
+            |          |          |--0.28%--extend (inlined)
+            |          |          |          
+            |          |           --0.22%--read<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+            |          |                     fill_buf (inlined)
+            |          |                     |          
+            |          |                      --0.20%--fill_buf (inlined)
+            |          |                                |          
+            |          |                                 --0.19%--0x2626262626262625
+            |          |          
+            |          |--0.23%--copy_from_slice<u8> (inlined)
+            |          |          from_slice<u8> (inlined)
+            |          |          from<u8> (inlined)
+            |          |          from (inlined)
+            |          |          from (inlined)
+            |          |          into<alloc::string::String, alloc::sync::Arc<str, alloc::alloc::Global>> (inlined)
+            |          |          from (inlined)
+            |          |          into<alloc::string::String, litchi_xlsx::cell::Text> (inlined)
+            |          |          finish_cell (inlined)
+            |          |          0x10000003a
+            |          |          
+            |           --0.14%--copy_to_nonoverlapping<u8> (inlined)
+            |                     to_vec<u8, alloc::alloc::Global> (inlined)
+            |                     to_vec_in<u8, alloc::alloc::Global> (inlined)
+            |                     to_vec<u8> (inlined)
+            |                     to_owned<u8> (inlined)
+            |                     to_owned (inlined)
+            |                     |          
+            |                      --0.12%--from_parts (inlined)
+            |                                parse (inlined)
+            |          
+             --0.12%--write<litchi_ooxml_common::mce::stream::Frame> (inlined)
+                       push_mut<litchi_ooxml_common::mce::stream::Frame, alloc::alloc::Global> (inlined)
+                       push<litchi_ooxml_common::mce::stream::Frame, alloc::alloc::Global> (inlined)
+                       close_start (inlined)
+
+     2.75%  [.] litchi_ooxml_common::mce::stream::Processor::parse_element                                                          -      -            
+            |          
+            |--0.43%--branch<alloc::borrow::Cow<[u8]>, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          parse_element (inlined)
+            |          start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          
+            |--0.29%--write<litchi_ooxml_common::mce::stream::RawAttribute> (inlined)
+            |          push_mut<litchi_ooxml_common::mce::stream::RawAttribute, alloc::alloc::Global> (inlined)
+            |          push<litchi_ooxml_common::mce::stream::RawAttribute, alloc::alloc::Global> (inlined)
+            |          parse_element (inlined)
+            |          
+            |--0.23%--branch<litchi_ooxml_common::mce::model::Name, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          parse_element (inlined)
+            |          0x1
+            |          
+            |--0.22%--parse_element (inlined)
+            |          |          
+            |           --0.06%--start<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+            |          
+             --0.22%--branch<alloc::vec::Vec<(alloc::string::String, alloc::string::String), alloc::alloc::Global>, litchi_ooxml_common::mce::model::Error> (inlined)
+                       parse_element (inlined)
+
+     1.60%  [.] litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active                                            -      -            
+            |          
+             --0.68%--process_markup_compatibility_stream_with_stoppable_observers<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#0}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+                       capture_stream_with_stoppable_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}> (inlined)
+
+     1.60%  [.] litchi_ooxml_common::mce::stream::clone_bounded_string                                                              -      -            
+            |          
+             --0.54%--clone_bounded_string (inlined)
+                       |          
+                       |--0.28%--0x38
+                       |          
+                        --0.12%--0xfffff
+
+     1.27%  [.] core::str::count::do_count_chars                                                                                    -      -            
+            |          
+            |--0.37%--contains_non_continuation_byte (inlined)
+            |          do_count_chars (inlined)
+            |          
+            |--0.22%--do_count_chars (inlined)
+            |          
+             --0.09%--utf8_is_cont_byte (inlined)
+                       {closure#0} (inlined)
+                       {closure#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}> (inlined)
+                       {closure#0}<&u8, usize, usize, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>, core::iter::traits::accum::{impl#48}::sum::{closure_env#0}<core::iter::adapters::map::Map<core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>>>> (inlined)
+                       fold<u8, usize, core::iter::adapters::map::map_fold::{closure_env#0}<&u8, usize, usize, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>, core::iter::traits::accum::{impl#48}::sum::{closure_env#0}<core::iter::adapters::map::Map<core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>>>>> (inlined)
+                       fold<usize, core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>, usize, core::iter::traits::accum::{impl#48}::sum::{closure_env#0}<core::iter::adapters::map::Map<core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>>>> (inlined)
+                       sum<core::iter::adapters::map::Map<core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>>> (inlined)
+                       sum<core::iter::adapters::map::Map<core::slice::iter::Iter<u8>, core::iter::adapters::filter::{impl#3}::count::to_usize::{closure_env#0}<&u8, core::str::count::char_count_general_case::{closure_env#0}>>, usize> (inlined)
+                       count<core::slice::iter::Iter<u8>, core::str::count::char_count_general_case::{closure_env#0}> (inlined)
+                       char_count_general_case (inlined)
+                       do_count_chars (inlined)
+
+     1.22%  [.] zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch                                                       -      -            
+            |          
+             --0.59%--spec_fill<core::mem::maybe_uninit::MaybeUninit<u8>> (inlined)
+                       fill<core::mem::maybe_uninit::MaybeUninit<u8>> (inlined)
+                       copy_match_help<8> (inlined)
+                       copy_match_runtime_dispatch (inlined)
+                       0x533
+
+     1.22%  [.] litchi_ooxml_common::mce::stream::Namespaces::with_local                                                            -      -            
+            |          
+             --0.40%--clone<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       clone<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       clone (inlined)
+                       with_local (inlined)
+
+     1.13%  [.] litchi_ooxml_common::mce::stream::invoke_active                                                                     -      -            
+            |          
+             --0.54%--invoke_active<litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_stoppable_active::{closure_env#1}<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure_env#0}>> (inlined)
+                       |          
+                       |--0.12%--0x38
+                       |          
+                       |--0.11%--0x1
+                       |          
+                        --0.09%--0x2
+
+     1.11%  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::stream::RawFrame>                                                -      -            
+            |          
+             --0.57%--drop<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::stream::Namespaces> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::stream::RawFrame> (inlined)
+
+     1.08%  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::stream::Context>                                                 -      -            
+            |          
+             --0.65%--drop<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::stream::Namespaces> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::stream::Context> (inlined)
+
+     0.82%  [.] malloc                                                                                                              -      -            
+            |          
+            |--0.43%--__libc_malloc (inlined)
+            |          |          
+            |           --0.22%--alloc (inlined)
+            |                     alloc_impl_runtime (inlined)
+            |                     alloc_impl (inlined)
+            |                     allocate (inlined)
+            |                     |          
+            |                      --0.20%--finish_grow<alloc::alloc::Global> (inlined)
+            |                                |          
+            |                                 --0.12%--grow_exact<alloc::alloc::Global> (inlined)
+            |                                           try_reserve_exact<alloc::alloc::Global> (inlined)
+            |                                           try_reserve_exact<u8, alloc::alloc::Global> (inlined)
+            |                                           try_reserve_exact<u8, alloc::alloc::Global> (inlined)
+            |                                           try_reserve_exact (inlined)
+            |                                           |          
+            |                                            --0.06%--clone_bounded_name_part (inlined)
+            |          
+             --0.39%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __libc_malloc (inlined)
+                       |          
+                        --0.14%--alloc (inlined)
+                                  alloc_impl_runtime (inlined)
+                                  alloc_impl (inlined)
+                                  allocate (inlined)
+                                  |          
+                                   --0.08%--finish_grow<alloc::alloc::Global> (inlined)
+
+     0.82%  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match                                      -      -            
+            |          
+            |--0.34%--next_match (inlined)
+            |          
+             --0.06%--memchr_naive (inlined)
+                       memchr (inlined)
+                       next_match (inlined)
+
+     0.82%  [.] litchi_ooxml_common::mce::stream::Processor::close_start                                                            -      -            
+            |          
+             --0.39%--drop<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::stream::Namespaces> (inlined)
+                       close_start (inlined)
+
+     0.82%  [.] crc32fast::specialized::pclmulqdq::calculate_avx512                                                                 -      -            
+            |          
+            |--0.12%--_mm512_clmulepi64_epi128<0> (inlined)
+            |          reduce512 (inlined)
+            |          calculate_avx512 (inlined)
+            |          update (inlined)
+            |          update (inlined)
+            |          |          
+            |           --0.11%--find_avx2 (inlined)
+            |          
+            |--0.11%--_mm512_xor_si512 (inlined)
+            |          reduce512 (inlined)
+            |          calculate_avx512 (inlined)
+            |          update (inlined)
+            |          update (inlined)
+            |          find_avx2 (inlined)
+            |          
+             --0.06%--_mm512_clmulepi64_epi128<17> (inlined)
+                       reduce512 (inlined)
+                       calculate_avx512 (inlined)
+                       update (inlined)
+                       update (inlined)
+
+     0.79%  [.] core::str::converts::from_utf8                                                                                      -      -            
+            |          
+            |--0.32%--run_utf8_validation (inlined)
+            |          from_utf8 (inlined)
+            |          
+             --0.08%--from_utf8 (inlined)
+
+     0.72%  [.] litchi_ooxml_common::mce::stream::Processor::raw_start_commit                                                       -      -            
+            |          
+             --0.29%--clone<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       clone<alloc::sync::Arc<litchi_ooxml_common::mce::stream::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       clone (inlined)
+                       raw_start_commit (inlined)
+
+     0.68%  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with  -      -            
+            |          
+            |--0.23%--read_with<litchi_ooxml_common::mce::stream::EventMeter, quick_xml::parser::element::ElementParser> (inlined)
+            |          
+             --0.08%--feed (inlined)
+                       read_with<litchi_ooxml_common::mce::stream::EventMeter, quick_xml::parser::element::ElementParser> (inlined)
+
+     0.66%  [.] litchi_ooxml_common::mce::stream::clone_raw_attributes                                                              -      -            
+            |          
+            |--0.17%--branch<litchi_ooxml_common::mce::model::Name, litchi_ooxml_common::mce::model::Error> (inlined)
+            |          borrow_raw_attribute (inlined)
+            |          clone_raw_attributes (inlined)
+            |          |          
+            |           --0.09%--0x38
+            |          
+             --0.09%--write<litchi_ooxml_common::mce::stream::RawAttribute> (inlined)
+                       push_mut<litchi_ooxml_common::mce::stream::RawAttribute, alloc::alloc::Global> (inlined)
+                       push<litchi_ooxml_common::mce::stream::RawAttribute, alloc::alloc::Global> (inlined)
+                       clone_raw_attributes (inlined)
+
+     0.61%  [.] <litchi_ooxml_common::mce::stream::EventMeter as std::io::BufRead>::fill_buf                                        -      -            
+            |          
+             --0.27%--fill_buf (inlined)
+
+     0.51%  [.] litchi_ooxml_common::mce::stream::semantic_attrs                                                                    -      -            
+            |          
+            |--0.14%--semantic_attrs (inlined)
+            |          |          
+            |           --0.08%--0x7
+            |          
+             --0.12%--write<litchi_ooxml_common::mce::stream::SemanticAttribute> (inlined)
+                       push_mut<litchi_ooxml_common::mce::stream::SemanticAttribute, alloc::alloc::Global> (inlined)
+                       push<litchi_ooxml_common::mce::stream::SemanticAttribute, alloc::alloc::Global> (inlined)
+                       semantic_attrs (inlined)
+
+     0.48%  [.] cfree@GLIBC_2.2.5                                                                                                   -      -            
+            |          
+            |--0.35%--__libc_free (inlined)
+            |          |          
+            |           --0.14%--dealloc (inlined)
+            |                     deallocate_impl_runtime (inlined)
+            |                     deallocate_impl (inlined)
+            |                     deallocate (inlined)
+            |                     |          
+            |                      --0.12%--deallocate<alloc::alloc::Global> (inlined)
+            |                                drop<u8, alloc::alloc::Global> (inlined)
+            |                                drop_in_place<alloc::raw_vec::RawVec<u8, alloc::alloc::Global>> (inlined)
+            |                                drop_in_place<alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |                                drop_in_place<alloc::string::String> (inlined)
+            |                                drop_in_place<litchi_ooxml_common::mce::model::Name> (inlined)
+            |                                |          
+            |                                 --0.06%--drop_in_place<litchi_ooxml_common::mce::stream::SemanticElement> (inlined)
+            |          
+             --0.12%--tcache_put_n (inlined)
+                       tcache_put (inlined)
+                       __libc_free (inlined)
+                       |          
+                        --0.06%--dealloc (inlined)
+                                  deallocate_impl_runtime (inlined)
+                                  deallocate_impl (inlined)
+                                  deallocate (inlined)
+                                  deallocate<alloc::alloc::Global> (inlined)
+                                  drop<u8, alloc::alloc::Global> (inlined)
+                                  drop_in_place<alloc::raw_vec::RawVec<u8, alloc::alloc::Global>> (inlined)
+                                  drop_in_place<alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+                                  drop_in_place<alloc::string::String> (inlined)
+                                  drop_in_place<litchi_ooxml_common::mce::model::Name> (inlined)
+
+     0.48%  [.] zlib_rs::inflate::inflate_fast_help                                                                                 -      -            
+            |          
+            |--0.11%--remaining (inlined)
+            |          inflate_fast_help_impl<0> (inlined)
+            |          inflate_fast_help_vanilla (inlined)
+            |          inflate_fast_help (inlined)
+            |          0x533
+            |          
+             --0.06%--inflate_fast_help_impl<0> (inlined)
+                       inflate_fast_help_vanilla (inlined)
+                       inflate_fast_help (inlined)
+
+     0.43%  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with                                         -      -            
+            |          
+             --0.22%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+                       decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+
+     0.37%  [.] __memcmp_evex_movbe                                                                                                 -      -            
+            |          
+             --0.14%--equal_same_length<u8, u8> (inlined)
+                       eq<u8, u8> (inlined)
+                       ne<[u8], [u8]> (inlined)
+                       ne<[u8], [u8]> (inlined)
+                       emit_end (inlined)
+
+     0.34%  [.] <litchi_ooxml_common::mce::stream::PrefixReader as std::io::BufRead>::fill_buf                                      -      -            
+            |          
+             --0.15%--fill_buf (inlined)
+
+     0.34%  [.] litchi_ooxml_common::xml_name::validation::is_ncname                                                                -      -            
+            |          
+             --0.12%--is_name_start (inlined)
+                       is_ncname_start (inlined)
+                       call_once<fn(char) -> bool, (char)> (inlined)
+                       is_some_and<char, fn(char) -> bool> (inlined)
+                       is_ncname (inlined)
+                       |          
+                        --0.09%--0xfffff
+
+     0.34%  [.] _int_malloc                                                                                                         -      -            
+            |          
+             --0.32%--_int_malloc
+                       __libc_malloc2
+                       |          
+                        --0.17%--alloc (inlined)
+                                  alloc_impl_runtime (inlined)
+                                  alloc_impl (inlined)
+                                  allocate (inlined)
+                                  |          
+                                   --0.14%--finish_grow<alloc::alloc::Global> (inlined)
+                                             |          
+                                              --0.09%--grow_amortized<alloc::alloc::Global> (inlined)
+                                                        try_reserve<alloc::alloc::Global> (inlined)
+                                                        try_reserve<u8, alloc::alloc::Global> (inlined)
+                                                        try_reserve<u8, alloc::alloc::Global> (inlined)
+                                                        try_reserve (inlined)
+                                                        |          
+                                                         --0.06%--append_inline (inlined)
+                                                                   text (inlined)
+
+     0.32%  [.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                            -      -            
+     0.32%  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2                                                              -      -            
+     0.32%  [.] <litchi_ooxml_common::mce::stream::EventMeter as std::io::BufRead>::consume                                         -      -            
+            |          
+            |--0.11%--consume (inlined)
+            |          
+             --0.06%--remaining (inlined)
+                       consume (inlined)
+
+     0.31%  [.] <alloc::raw_vec::RawVecInner>::finish_grow                                                                          -      -            
+            |          
+             --0.08%--finish_grow<alloc::alloc::Global> (inlined)
+
+     0.29%  [.] core::hash::BuildHasher::hash_one                                                                                   -      -            
+     0.28%  [.] quick_xml::reader::state::ReaderState::emit_start                                                                   -      -            
+     0.28%  [.] litchi_xlsx::raw::worksheet::selected::Scanner::finish_cell                                                         -      -            
+            |          
+             --0.12%--finish_cell (inlined)
+
+     0.26%  [.] litchi_ooxml_common::mce::stream::SemanticEvent::from_element                                                       -      -            
+            |          
+             --0.09%--branch<litchi_ooxml_common::mce::model::Name, litchi_ooxml_common::mce::model::Error> (inlined)
+                       from_element (inlined)
+
+     0.25%  [k] 0xffffffff9e800ef0                                                                                                  -      -            
+            |          
+             --0.11%--statx
+
+     0.25%  [.] litchi_ooxml_common::mce::stream::expand                                                                            -      -            
+     0.22%  [.] <alloc::string::String>::try_reserve_exact                                                                          -      -            
+     0.22%  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2                                                            -      -            
+            |          
+             --0.06%--search_chunk<core::core_arch::x86::__m256i, fn(memchr::vector::SensibleMoveMask) -> usize> (inlined)
+                       find_raw<core::core_arch::x86::__m256i> (inlined)
+                       find_raw_avx2 (inlined)
+                       0x3e3e3e3e3e3e3e3d
+                       memchr3_raw (inlined)
+                       memchr3_raw (inlined)
+                       {closure#0} (inlined)
+                       next<memchr::memchr::{impl#9}::next::{closure_env#0}> (inlined)
+                       next (inlined)
+                       feed (inlined)
+                       read_with<litchi_ooxml_common::mce::stream::EventMeter, quick_xml::parser::element::ElementParser> (inlined)
+
+     0.22%  [.] litchi_xlsx::raw::worksheet::selected::Scanner::event                                                               -      -            
+            |          
+             --0.08%--event (inlined)
+
+     0.20%  [.] __rustc::__rust_no_alloc_shim_is_unstable_v2                                                                        -      -            
+            |          
+             --0.09%--__rustc::__rust_no_alloc_shim_is_unstable_v2
+
+     0.19%  [.] alloc::raw_vec::RawVecInner<A>::finish_grow                                                                         -      -            
+            |          
+             --0.06%--finish_grow<alloc::alloc::Global> (inlined)
+
+     0.17%  [.] quick_xml::reader::state::ReaderState::emit_end                                                                     -      -            
+            |          
+             --0.06%--emit_end (inlined)
+
+     0.15%  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::stream::SemanticEvent>                                           -      -            
+            |          
+             --0.08%--drop_in_place<litchi_ooxml_common::mce::stream::SemanticEvent> (inlined)
+
+     0.15%  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2                                                                -      -            
+     0.15%  [.] __rustc::__rdl_alloc                                                                                                -      -            
+            |          
+             --0.06%--__rdl_alloc (inlined)
+
+     0.15%  [.] __rustc::__rust_alloc                                                                                               -      -            
+     0.15%  [.] litchi_xlsx::raw::worksheet::selected::Scanner::start                                                               -      -            
+     0.14%  [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write                                                           -      -            
+            |          
+             --0.08%--write<core::hash::sip::Sip13Rounds> (inlined)
+
+     0.14%  [.] litchi_xlsx::raw::worksheet::selected::Scanner::retain_selected                                                     -      -            
+            |          
+             --0.09%--retain_selected (inlined)
+                       0x1003
+
+     0.14%  [.] quick_xml::reader::Reader<R>::read_event_impl                                                                       -      -            
+     0.12%  [.] <litchi_ooxml_common::mce::stream::PrefixReader as std::io::BufRead>::consume                                       -      -            
+            |          
+             --0.06%--consume (inlined)
+
+     0.11%  [.] litchi_ooxml_common::xml_name::codec::parse                                                                         -      -            
+     0.11%  [.] litchi_ooxml_common::xml_name::model::NcName::new                                                                   -      -            
+     0.11%  [.] litchi_ooxml_common::xml_name::validation::is_name_character                                                        -      -            
+     0.09%  [.] __memset_avx512_unaligned_erms                                                                                      -      -            
+     0.09%  [.] <litchi_ooxml_common::mce::stream::InterruptedRetryReader as std::io::BufRead>::fill_buf                            -      -            
+     0.08%  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw                                                                 -      -            
+     0.08%  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match                                      -      -            
+     0.06%  [.] hashbrown::raw::RawTable<T,A>::reserve_rehash                                                                       -      -            
+     0.06%  [.] soapberry_zip::office::VerifiedEntryBufReader<D>::fill_buf_internal                                                 -      -            
+     0.06%  [.] litchi_xlsx::raw::worksheet::selected::Scanner::push                                                                -      -            
+     0.06%  [.] __memset_avx512_unaligned                                                                                           -      -            
+     0.06%  [.] _int_free_merge_chunk                                                                                               -      -            
+     0.06%  [.] __rustc::__rdl_dealloc                                                                                              -      -            
+     0.06%  [.] zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch                                               -      -            
+     0.06%  [.] litchi_xlsx::workbook::source::SourceWorksheet::cells                                                               -      -            
+     0.06%  [.] __libc_malloc2                                                                                                      -      -            
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

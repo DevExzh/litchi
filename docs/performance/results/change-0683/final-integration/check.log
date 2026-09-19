@@ -1,0 +1,6 @@
+HEAD 0a292428d598b5235ca0075f2b1a5d5b931af31d
+$ cargo check -p litchi-xlsx --all-features --all-targets --locked
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.52s
+
+exit 0

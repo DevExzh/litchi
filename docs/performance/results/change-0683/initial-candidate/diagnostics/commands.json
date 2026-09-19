@@ -1,0 +1,90 @@
+[
+  {
+    "command": [
+      "perf",
+      "stat",
+      "-x,",
+      "-e",
+      "cycles,instructions,cache-misses,page-faults",
+      "-o",
+      "docs/performance/results/change-0683/diagnostics/a1.csv",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "1000"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "perf",
+      "stat",
+      "-x,",
+      "-e",
+      "cycles,instructions,cache-misses,page-faults",
+      "-o",
+      "docs/performance/results/change-0683/diagnostics/b1.csv",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "1000"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "perf",
+      "stat",
+      "-x,",
+      "-e",
+      "cycles,instructions,cache-misses,page-faults",
+      "-o",
+      "docs/performance/results/change-0683/diagnostics/b2.csv",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "1000"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "perf",
+      "stat",
+      "-x,",
+      "-e",
+      "cycles,instructions,cache-misses,page-faults",
+      "-o",
+      "docs/performance/results/change-0683/diagnostics/a2.csv",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "1000"
+    ],
+    "exit_code": 0
+  }
+]

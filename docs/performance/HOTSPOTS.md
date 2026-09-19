@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0683 — compact XLSX selections and measured plain-text escape skipping
+
+[0683](0683-xlsx-selected-record-compaction.md) shrinks retained selected records
+from 88 to 80 bytes on the measured target and reserves SST staging for actual
+references. Dense numeric/shared-string selected peaks each fall 512 KiB
+(3.57%/3.54%). An initial long-inline owning-query regression was profiled and
+resolved by skipping impossible escape starts; the combined final patch lowers
+long-inline selected p50 by 54.82–55.09% in paired windows, with a longer native
+ABBA confirmation and fewer instructions. Dense numeric timing remains close
+to baseline. All ten differential cases, 1,477 Rust tests and final evidence
+bindings pass. Raw scanner payload fields change to a tagged enum; ordinary
+query signatures and complete-validation-before-callback behavior remain.
+`performance_claim: none`; broader admission/corpus/concurrency work remains.
+
 ## 0675 — the authorized third wave is integrated and the remaining queue names design prerequisites
 
 Record: [0675](0675-third-wave-integration.md). The ten decisions in 0652
@@ -8382,7 +8396,7 @@ the accepted decisions are no longer listed as awaiting an owner.
 | Priority | Remaining work | Required proof or design |
 | ---: | --- | --- |
 | 1 | XLS retained sheet indexes and snapshot chain hints | Implement and measure the occurrence-preserving weighted cache in [0678](0678-xls-query-cache-design.md), including candidate/retained admission and target-specific refusal order. Snapshot chain hints remain separate. |
-| 2 | XLSX selected scanner's retained record vector | Measure compact retained records or direct owning-result construction first; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the current callback contract. |
+| 2 | XLSX selected scanner's retained record vector | [0683](0683-xlsx-selected-record-compaction.md) implements compact records and exact SST staging, with an additional profiled escape-search optimization. Direct owning-result construction and managed semantic-vector admission remain open; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the callback contract. |
 | 3 | DOCX cache breadth and remaining per-view work | [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo with scoped fresh-view gains, pressure reclamation and replacement/rollback tests; its measured hot-query regression was removed by direct index ownership. Extend producer/concurrent/cold measurements and attribute remaining MCE visibility work before broader claims. |
 | 4 | XLS framing fusion and full SST locator scan | Preserve the coverage proof, validation order and malformed-input boundaries; pointer scratch removal does not eliminate the full scan; [0668](0668-xls-query-residues.md). |
 | 5 | Guarded DOCX source reader buffers | Prove equivalent token ceilings, source freshness, cancellation and refusal-before-output before borrowing source events; [0670](0670-docx-parser-residues.md). |

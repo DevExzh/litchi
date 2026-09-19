@@ -63,7 +63,7 @@ const X14AC_NAMESPACE: &[u8] = x14ac::NAMESPACE;
 /// or that a valid non-formula shared-string record was deferred. The latter
 /// is identified by [`SelectedCell::dependencies`] retaining its shared-string
 /// index. `Some(Cell::Empty)` is an explicitly stored empty cell. The range
-/// API exposes the same distinction directly through [`SelectedRecord`].
+/// API exposes the same distinction through [`SelectedRecord::payload`].
 #[derive(Debug)]
 pub struct SelectedCell {
     /// Requested coordinate, retained so later source readers can bind the
@@ -85,17 +85,33 @@ pub struct SelectedCell {
 /// One physical cell record retained by a rectangular worksheet selection.
 ///
 /// The range scanner is sparse: absent coordinates do not produce records.
-/// An explicit empty `<c>` record is represented by `cell: Some(Cell::Empty)`.
-/// A valid non-formula shared-string record is deferred instead, with its
-/// index in [`Self::shared_string_index`] and `cell` set to `None`.
+/// An explicit empty `<c>` record is represented by
+/// [`SelectedPayload::Cell`] containing [`Cell::Empty`]. A valid non-formula
+/// shared-string record is deferred as [`SelectedPayload::SharedString`].
 #[derive(Debug)]
 pub struct SelectedRecord {
     /// Physical worksheet coordinate of the stored `<c>` record.
     pub address: Address,
-    /// Stored semantic cell, or `None` for a deferred shared-string record.
-    pub cell: Option<Cell>,
-    /// Zero-based shared-string index for a deferred `t="s"` record.
-    pub shared_string_index: Option<u32>,
+    /// Exactly one retained payload. The tagged representation keeps the
+    /// scanner's invariant in the type and avoids carrying two independent
+    /// option discriminants for every physical record.
+    pub payload: SelectedPayload,
+}
+
+/// The mutually exclusive payload retained for one selected physical cell.
+///
+/// A selected record is either a fully validated semantic cell or a deferred
+/// shared-string reference. The scanner never publishes a record without one
+/// of these payloads, so callers do not need to reproduce the former
+/// both/neither defensive check before resolving it.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SelectedPayload {
+    /// A fully validated semantic cell, including an explicit empty cell.
+    Cell(Cell),
+    /// A zero-based shared-string index whose text is resolved after the
+    /// worksheet reader has been released.
+    SharedString(u32),
 }
 
 /// Sparse physical records retained by an eligible rectangular scan.
@@ -128,7 +144,7 @@ pub struct SelectedDependencies {
     /// cell and is distinct from a missing coordinate or an explicit empty
     /// cell. For a range scan this compatibility field is populated only when
     /// exactly one physical record was selected; use
-    /// [`SelectedRecord::shared_string_index`] for per-record indexes.
+    /// [`SelectedRecord::payload`] for per-record indexes.
     pub target_shared_string_index: Option<u32>,
 }
 
@@ -286,12 +302,17 @@ pub fn scan(
                 },
             };
             let mut dependencies = selected.dependencies;
-            dependencies.target_shared_string_index = record
-                .as_ref()
-                .and_then(|record| record.shared_string_index);
+            dependencies.target_shared_string_index =
+                record.as_ref().and_then(|record| match &record.payload {
+                    SelectedPayload::Cell(_) => None,
+                    SelectedPayload::SharedString(index) => Some(*index),
+                });
             Ok(ScanOutcome::Eligible(SelectedCell {
                 address: requested,
-                cell: record.and_then(|record| record.cell),
+                cell: record.and_then(|record| match record.payload {
+                    SelectedPayload::Cell(cell) => Some(cell),
+                    SelectedPayload::SharedString(_) => None,
+                }),
                 covering_merge,
                 dependencies,
             }))
@@ -540,7 +561,10 @@ impl Scanner {
             None
         };
         let target_shared_string_index = (self.selected.len() == 1)
-            .then(|| self.selected[0].shared_string_index)
+            .then(|| match &self.selected[0].payload {
+                SelectedPayload::Cell(_) => None,
+                SelectedPayload::SharedString(index) => Some(*index),
+            })
             .flatten();
         let mut dependencies = self.dependencies;
         dependencies.target_shared_string_index = target_shared_string_index;
@@ -1162,8 +1186,7 @@ impl Scanner {
             if selected {
                 self.retain_selected(SelectedRecord {
                     address,
-                    cell: None,
-                    shared_string_index: Some(index),
+                    payload: SelectedPayload::SharedString(index),
                 })?;
             }
             return Ok(());
@@ -1213,8 +1236,7 @@ impl Scanner {
         if selected {
             self.retain_selected(SelectedRecord {
                 address,
-                cell: Some(semantic),
-                shared_string_index: None,
+                payload: SelectedPayload::Cell(semantic),
             })?;
         }
         self.recycle_numeric_value(cell);

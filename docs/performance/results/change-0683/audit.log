@@ -1,0 +1,2 @@
+Verified source, constraints, probe, raw bindings, 10 differential cases, 56 workload groups; wrote comparison.json
+Verified native diagnostic binary/corpus/raw bindings and 4,000 matching samples

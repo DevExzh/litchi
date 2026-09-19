@@ -1,0 +1,21 @@
+candidate matrix dense
+candidate matrix sparse
+candidate matrix long-inline
+candidate matrix shared-string
+candidate matrix formula
+candidate matrix late-fallback
+candidate matrix late-refusal
+candidate matrix escaped-text
+candidate matrix malformed-escape
+candidate matrix real-fallback
+candidate timing dense
+candidate timing sparse
+candidate timing long-inline
+candidate timing shared-string
+candidate timing formula
+candidate timing late-fallback
+candidate timing late-refusal
+candidate timing escaped-text
+candidate timing malformed-escape
+candidate timing real-fallback
+candidate complete

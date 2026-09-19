@@ -1,0 +1,1 @@
+operation=cells-selected	callbacks=65536	result=ok	allocation_calls=2233978	allocated_bytes=77744716	deallocation_calls=2168413	deallocated_bytes=66301245	peak_live_delta=14671449	retained_live_delta=5674516	elapsed_ns=153810201

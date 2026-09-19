@@ -1,0 +1,72 @@
+[
+  {
+    "case": "dense",
+    "rows": 256,
+    "columns": 256,
+    "records": 65536,
+    "shared_references": 0,
+    "worksheet_bytes": 1974559,
+    "archive_bytes": 193528,
+    "sha256": "ed45032f36dc39cc8a51285cefa0a3b4d230a0287c4e70beb9e4ad6fc029c99c"
+  },
+  {
+    "case": "sparse",
+    "rows": 256,
+    "columns": 256,
+    "records": 292,
+    "shared_references": 0,
+    "worksheet_bytes": 14381,
+    "archive_bytes": 3689,
+    "sha256": "588bf3f23f2d65d5a6d7ad6bebe9662e727ef06cdd25cdcff60270c5946eca3d"
+  },
+  {
+    "case": "long-inline",
+    "rows": 256,
+    "columns": 256,
+    "records": 256,
+    "shared_references": 0,
+    "worksheet_bytes": 1066055,
+    "archive_bytes": 5349,
+    "sha256": "72f2fc184bc2d31dca30674aff1deea359500beb340bd8a8ae43708315450a3b"
+  },
+  {
+    "case": "shared-string",
+    "rows": 256,
+    "columns": 256,
+    "records": 65536,
+    "shared_references": 65536,
+    "worksheet_bytes": 2128390,
+    "archive_bytes": 244697,
+    "sha256": "41c7e810c6f705b84cd83dc3c4737b9dc376405446403c2f80ba62d1709277f7"
+  },
+  {
+    "case": "formula",
+    "rows": 256,
+    "columns": 256,
+    "records": 512,
+    "shared_references": 0,
+    "worksheet_bytes": 22842,
+    "archive_bytes": 5485,
+    "sha256": "c83a32e3c0b5c6a94c98179b61502bceb1e2f3847c8e14df77c20102af1bc766"
+  },
+  {
+    "case": "late-fallback",
+    "rows": 256,
+    "columns": 256,
+    "records": 65536,
+    "shared_references": 0,
+    "worksheet_bytes": 1974647,
+    "archive_bytes": 193606,
+    "sha256": "d1caf6f47993c305a952b1258296f51bfcc1563de6e3e56888044b9d1216ae46"
+  },
+  {
+    "case": "late-refusal",
+    "rows": 256,
+    "columns": 256,
+    "records": 65536,
+    "shared_references": 0,
+    "worksheet_bytes": 1974557,
+    "archive_bytes": 193530,
+    "sha256": "a5c60c888b0ec269ce08ba578b18f77f117c0c4362be44283e6c456e76031a9f"
+  }
+]

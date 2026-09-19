@@ -1,0 +1,1 @@
+operation=visit-cold	callbacks=65536	result=ok	allocation_calls=2499607	allocated_bytes=121470772	deallocation_calls=2499518	deallocated_bytes=101003729	peak_live_delta=29261138	retained_live_delta=0	elapsed_ns=200691231

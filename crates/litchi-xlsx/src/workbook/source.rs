@@ -34,6 +34,7 @@ use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
 use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
 use crate::raw;
+use crate::raw::selected_worksheet::SelectedPayload;
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -930,16 +931,24 @@ impl SourceWorksheet {
         };
 
         let dependencies = selected.dependencies;
+        // Only shared-string records need this staging vector. Reserving for
+        // every selected physical cell made numeric/inline ranges allocate a
+        // temporary index table whose length was always zero after the scan.
+        let requested_count = selected
+            .cells
+            .iter()
+            .filter(|record| matches!(&record.payload, SelectedPayload::SharedString(_)))
+            .count();
         let mut requested = Vec::new();
         requested
-            .try_reserve_exact(selected.cells.len())
+            .try_reserve_exact(requested_count)
             .map_err(|source| allocation("source-backed selected shared-string indexes", source))?;
         let mut fallback = false;
         for record in &selected.cells {
-            let Some(index) = record.shared_string_index else {
+            let SelectedPayload::SharedString(index) = &record.payload else {
                 continue;
             };
-            let Ok(index) = usize::try_from(index) else {
+            let Ok(index) = usize::try_from(*index) else {
                 fallback = true;
                 break;
             };
@@ -973,10 +982,10 @@ impl SourceWorksheet {
 
         if !fallback {
             for record in &selected.cells {
-                let Some(index) = record.shared_string_index else {
+                let SelectedPayload::SharedString(index) = &record.payload else {
                     continue;
                 };
-                let Ok(index) = usize::try_from(index) else {
+                let Ok(index) = usize::try_from(*index) else {
                     fallback = true;
                     break;
                 };
@@ -1001,27 +1010,6 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         if fallback {
             return Ok(Selection::Stored(self.store()?));
-        }
-
-        // Refuse a malformed retained record here, where the whole-range read
-        // refused it, rather than part-way through a caller's visit. The two
-        // refusals below are defensive: the scanner retains a record through
-        // one constructor whose only two call sites set exactly one of the
-        // two fields, so neither shape is reachable from a valid scan.
-        for record in &selected.cells {
-            match (&record.cell, record.shared_string_index) {
-                (Some(_), None) | (None, Some(_)) => {},
-                (Some(_), Some(_)) => {
-                    return Err(invalid(
-                        "selected worksheet record has both a semantic cell and shared-string dependency",
-                    ));
-                },
-                (None, None) => {
-                    return Err(invalid(
-                        "selected worksheet record has neither a semantic cell nor dependency",
-                    ));
-                },
-            }
         }
         Ok(Selection::Selected {
             cells: selected.cells,
@@ -1132,9 +1120,10 @@ fn collect_stored_cells(store: &Store, range: Rect) -> Result<Vec<SourceCell>> {
 
 /// Bind one retained selected record to its resolved shared-string payload.
 ///
-/// `stream_selection` has already refused every record shape this cannot
-/// resolve, so the refusals below are defensive and unreachable from a valid
-/// scan; they are kept so that no record can be published unchecked.
+/// `SelectedRecord::payload` makes the semantic/deferred choice an invariant,
+/// so this conversion has no late both/neither refusal branch. Dependency
+/// presence and source fences are still checked before the selection is
+/// published by `stream_selection`.
 ///
 /// Always inlined: the record and the produced cell are both larger than a
 /// register pair, so an out-of-line call copies each of them through the stack
@@ -1146,9 +1135,9 @@ fn resolve_selected_record(
     record: raw::selected_worksheet::SelectedRecord,
     shared_text: Option<&[(usize, Text)]>,
 ) -> Result<SourceCell> {
-    let cell = match (record.cell, record.shared_string_index) {
-        (Some(cell), None) => cell,
-        (None, Some(index)) => {
+    let cell = match record.payload {
+        SelectedPayload::Cell(cell) => cell,
+        SelectedPayload::SharedString(index) => {
             let index = usize::try_from(index)
                 .map_err(|_error| invalid("shared-string index exceeds this platform"))?;
             let text = shared_text
@@ -1160,16 +1149,6 @@ fn resolve_selected_record(
                 .map(|(_, text)| text.clone())
                 .ok_or_else(|| invalid("selected shared-string dependency was not retained"))?;
             Cell::Value(Value::Text(text))
-        },
-        (Some(_), Some(_)) => {
-            return Err(invalid(
-                "selected worksheet record has both a semantic cell and shared-string dependency",
-            ));
-        },
-        (None, None) => {
-            return Err(invalid(
-                "selected worksheet record has neither a semantic cell nor dependency",
-            ));
         },
     };
     Ok(SourceCell {

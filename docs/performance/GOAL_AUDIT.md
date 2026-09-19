@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0683 — compact XLSX selections retain complete validation
+
+[0683](0683-xlsx-selected-record-compaction.md) implements the compact-record
+option from 0679 and skips impossible SpreadsheetML escape starts after
+profiling a regression in the initial candidate. Ordinary range reads still
+finish worksheet/dependency validation before callbacks. Final owner/facade
+checks pass 1,477 Rust tests. The packet retains the initial regression and
+separate final measurements; no registered claim or coverage row is promoted.
+Direct owning-result construction, managed semantic-vector admission, broader
+producers and physical cold/concurrent performance remain open. OLE2/OOXML
+work continues; iWork is excluded.
+
 ## 0682 — repeated DOCX paragraph views share a bounded semantic index
 
 [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo for eager,

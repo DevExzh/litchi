@@ -1,0 +1,1 @@
+operation=cells-warm	callbacks=65536	result=ok	allocation_calls=65537	allocated_bytes=5673984	deallocation_calls=0	deallocated_bytes=0	peak_live_delta=5673984	retained_live_delta=5673984	elapsed_ns=3318706

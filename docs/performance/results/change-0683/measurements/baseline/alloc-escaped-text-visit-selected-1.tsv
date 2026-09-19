@@ -1,0 +1,1 @@
+operation=visit-selected	callbacks=256	result=ok	allocation_calls=19826	allocated_bytes=11063116	deallocation_calls=19548	deallocated_bytes=11006509	peak_live_delta=8931825	retained_live_delta=532	elapsed_ns=2414931
