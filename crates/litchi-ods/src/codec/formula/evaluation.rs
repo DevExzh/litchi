@@ -12,8 +12,13 @@
 //! 6.16 scalar aggregate admission (`SUM`, `PRODUCT`, `SUMSQ`, `SUMPRODUCT`,
 //! `SUMX2MY2`, `SUMX2PY2`, and `SUMXMY2`); forced-array calls with scalar
 //! operands use their normative 1x1 shape, while multi-cell arrays and
-//! references remain in the value VM. It also carries the complete section
-//! 6.8 complex-number family as a distinguished scalar value, the complete
+//! references remain in the value VM. It recognizes the six conditional
+//! aggregate names from §§6.13, 6.16, and 6.18 (`SUMIF`, `SUMIFS`, `COUNTIF`,
+//! `COUNTIFS`, `AVERAGEIF`, and `AVERAGEIFS`): constant range arguments
+//! produce a formula `#VALUE!`, while reference arguments retain a typed
+//! scalar-profile capability refusal and are evaluated by the value VM. It
+//! also carries the complete section 6.8 complex-number family as a
+//! distinguished scalar value, the complete
 //! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
 //! `ACOSH`, `ACOT`, `ACOTH`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `COS`,
 //! `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DEGREES`, `PI`, `RADIANS`, `SEC`,
@@ -140,6 +145,24 @@ mod roman;
 mod rounding;
 mod trigonometry;
 pub mod value;
+
+/// Return whether `name` is one of the six OpenFormula conditional aggregate
+/// functions. Their range parameters are reference-only, so the scalar
+/// profile admits the names to produce a formula `#VALUE!` for invalid
+/// constant ranges while preserving a typed reference capability refusal when
+/// a reference is encountered. The value VM owns their actual evaluation.
+pub(super) fn is_conditional_aggregate_function(name: &str) -> bool {
+    [
+        "SUMIF",
+        "SUMIFS",
+        "COUNTIF",
+        "COUNTIFS",
+        "AVERAGEIF",
+        "AVERAGEIFS",
+    ]
+    .iter()
+    .any(|function| name.eq_ignore_ascii_case(function))
+}
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
 use litchi_core::{
@@ -874,6 +897,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
 
         if aggregate::is_aggregate_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
+        if is_conditional_aggregate_function(name) {
             return self.schedule_eager_function(node);
         }
 

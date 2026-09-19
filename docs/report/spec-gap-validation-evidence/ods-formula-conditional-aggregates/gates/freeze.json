@@ -1,0 +1,21 @@
+{
+  "base_commit": "5b125e9ea5870a56b2648ad02917894a5549c571",
+  "selected_files": {
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "106721b9b2c958dda4174ae51ba19da62dd9747013630372660e37c03136bb74",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "4f2efec3ac2986f5827730453cd510bdefb10b1f706cab810b4b4771602001c9",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/conditional.rs": "a4190a50e671fac01a8dd7512bcd12c077d9e5696036de1dbc7e6df086512500",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/criteria.rs": "c707ee3e566a5c888af560f6437b8969a4608d9ae55721dcbd9cb48d2d1ad68f",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs": "0346f25e874ee1d7ba823bb52bffdb7aac9f0747869767d4710cde10aa36f8b8",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "d511571650e971999ae3de33568c51c89d546ca29fdb3b865f71ab696e0d41c2",
+    "crates/litchi-ods/tests/ods_formula_conditional_evaluation.rs": "7f55cf26fba516845901bd697a6dadb92b774e8c7d4fd9ab314a7d2262d87720",
+    "crates/litchi-ods/tests/ods_formula_conditional_limits.rs": "b49c10b2f40f15e6087ae57e8e559e4c0ab490c292dfb149da8d367235a6692b",
+    "crates/litchi-ods/tests/ods_formula_conditional_native.rs": "bde07241648d6e7f3d0bbd6fa8870cd4a78a26600689d1c7ea7b96f658172832",
+    "crates/litchi-ods/tests/ods_formula_conditional_oracle.rs": "16524d7b330103efb2a0ae1deb7eedc068e1cb12640e200fc957dea10491b68c",
+    "crates/litchi-ods/tests/ods_formula_criterion_text_profile.rs": "421d4778291b6aa8ad30c30e5071aeb0f2c48f83a57d15259afe1c12616ad9b1",
+    "crates/litchi-ods/tests/ods_formula_evaluation.rs": "fc92fc8ffe6680a1bf06b6626fa9d624c27e2120d24df424e85b64a7a04126a8",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/cached-results.json": "8a93522797d5f3cd6a61d13305d15bd2f77a4bf7057f12d96d65ab908174e369",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/provenance.json": "0a7edd5151586cc4fbd3ea09c532716c2fb9ffd777bef542c1fdad884fb8a8e8",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/numeric-goldens.json": "73c5393c4ae49efa77bd34c3ac7badbaa4e1fab9ca74471fcd1fba088ed06f91"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/conditional.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/criteria.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+  "crates/litchi-ods/tests/ods_formula_conditional_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_conditional_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_conditional_native.rs",
+  "crates/litchi-ods/tests/ods_formula_conditional_oracle.rs",
+  "crates/litchi-ods/tests/ods_formula_criterion_text_profile.rs",
+  "crates/litchi-ods/tests/ods_formula_evaluation.rs"
+]
