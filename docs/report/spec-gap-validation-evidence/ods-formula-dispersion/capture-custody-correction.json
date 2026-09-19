@@ -1,0 +1,13 @@
+{
+  "discarded_capture_reason": "Isolated candidate staging omitted the noncompiled oracle generator. Rust and golden JSON hashes matched, but the source manifest did not cover the authored generator. Fresh complete capture required.",
+  "mismatches": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/numeric_oracle.py",
+      "captured": null,
+      "current": "69c370cdacafeff2f625414124ab60c75fb36cb088de5e3cee8f6c9e4575e39f"
+    }
+  ],
+  "production_changed": false,
+  "golden_data_changed": false,
+  "disposition": "Complete baseline and candidate capture repeated with generator present; independent verification passes all 3,600 final samples. No metric reuse from discarded capture."
+}

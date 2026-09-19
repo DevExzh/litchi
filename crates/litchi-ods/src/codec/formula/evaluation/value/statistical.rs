@@ -21,10 +21,14 @@ pub(super) fn is_statistical_function(name: &str) -> bool {
 type Function = StatisticalFunction;
 
 const fn accepts_reference_list(function: Function) -> bool {
-    // NumberSequence has one singular exception: AVERAGE does not admit an
-    // explicit ReferenceList. The Any reducers retain ordered list
-    // occurrences, as do the NumberSequenceList reducers.
-    !matches!(function, Function::Average)
+    // NumberSequence has singular exceptions for AVERAGE, VAR, VARP, and
+    // STDEVP: those signatures do not admit an explicit ReferenceList. Any
+    // reducers retain ordered list occurrences, as does STDEV's
+    // NumberSequenceList signature.
+    !matches!(
+        function,
+        Function::Average | Function::Variance | Function::VarianceP | Function::StandardDeviationP
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -307,14 +311,10 @@ where
     }
 
     if arguments.is_empty() {
-        return Ok(match function {
-            Function::Count | Function::CountA => number(0.0),
-            Function::Average | Function::AverageA => formula_error(ScalarError::DivisionByZero),
-            Function::Minimum | Function::Maximum | Function::MinimumA | Function::MaximumA => {
-                number(0.0)
-            },
-            Function::CountBlank => formula_error(ScalarError::Value),
-        });
+        if let Some(error) = function.empty_error() {
+            return Ok(formula_error(error));
+        }
+        return Ok(number(0.0));
     }
 
     let mut state = StatisticalState::new(function);

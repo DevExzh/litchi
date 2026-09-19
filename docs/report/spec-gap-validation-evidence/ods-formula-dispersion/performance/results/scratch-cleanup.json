@@ -1,0 +1,22 @@
+{
+  "baseline_target": {
+    "path": "/var/tmp/litchi-ods-dispersion-baseline-55e147bfa0676ce6ecdc609efc682b98568b8a5f-mba40qsa",
+    "removed": true
+  },
+  "baseline_worktree": {
+    "path": "/tmp/litchi-ods-dispersion-baseline-vrngdtvw",
+    "removed": true
+  },
+  "candidate_copied_harness": {
+    "path": "/tmp/litchi-ods-dispersion/docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/harness",
+    "removed": true
+  },
+  "candidate_target": {
+    "path": "/var/tmp/litchi-ods-dispersion-candidate-final-z7i4x4zh",
+    "removed": true
+  },
+  "local_pycache": {
+    "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/__pycache__",
+    "removed": true
+  }
+}
