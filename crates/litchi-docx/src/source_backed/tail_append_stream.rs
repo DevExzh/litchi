@@ -1523,6 +1523,7 @@ impl<'package, S> ParagraphStreamEdit<'package, S> {
 
 /// Prepared semantic and physical plan for one authored stream append.
 pub struct ParagraphStreamPlan<'package> {
+    package: &'package Package,
     splice: litchi_opc::source_backed::SourcePartSplicePlan<'package>,
     source: tail_append::SourceProof,
     candidate: tail_append::CandidateProof,
@@ -1762,6 +1763,7 @@ impl ParagraphStreamPublication {
         current: &Package,
         writer: impl Write,
     ) -> Result<(), Error> {
+        current.trim_clean_paragraph_index_for_operation();
         self.splice
             .write_inverse_to_stream(&current.package, writer)
             .map_err(Error::Opc)
@@ -1831,6 +1833,7 @@ impl Package {
         R: patch::AuthoredReplayResolver,
         W: Write,
     {
+        self.trim_clean_paragraph_index_for_operation();
         let limits = ParagraphStreamLimits::from_patch_limits(durable.limits())?;
         let expected = PatchExpectations::from_patch(durable);
         let expected_reference = expected
@@ -1888,6 +1891,7 @@ impl Package {
 }
 
 fn ensure_current_archive(package: &Package, expected: patch::ArtifactProof) -> Result<(), Error> {
+    package.trim_clean_paragraph_index_for_operation();
     let artifact = package.package.source_artifact();
     let actual = patch::ArtifactProof::new(
         artifact.len(),
@@ -1938,6 +1942,7 @@ fn prepare_stream<'package, S>(
         expected,
         marker: _,
     } = edit;
+    package.trim_clean_paragraph_index_for_operation();
     let context = package.package.execution_context();
     if let Some(context) = context.as_ref() {
         context
@@ -2129,6 +2134,7 @@ fn prepare_stream<'package, S>(
             .map_err(|error| Error::TailAppend(tail_append::Error::Execution(error)))?;
     }
     Ok(ParagraphStreamPlan {
+        package,
         splice,
         source: source_proof,
         candidate: candidate_proof,
@@ -2235,8 +2241,10 @@ fn publish_stream(
     writer: impl Write,
 ) -> Result<ParagraphStreamPublication> {
     let ParagraphStreamCommit { plan } = commit;
+    plan.package.trim_clean_paragraph_index_for_operation();
     let replay_reference = plan.replay_handle().durable_reference();
     let ParagraphStreamPlan {
+        package: _,
         splice,
         source,
         candidate,
@@ -2275,6 +2283,10 @@ fn publish_stream_to_path(
     commit: ParagraphStreamCommit<'_>,
     path: &Path,
 ) -> Result<ParagraphStreamPublication> {
+    commit
+        .plan
+        .package
+        .trim_clean_paragraph_index_for_operation();
     let mut publication = None;
     litchi_opc::atomic::replace_with::<Error>(path, |temporary| {
         let published = publish_stream(commit, temporary)?;

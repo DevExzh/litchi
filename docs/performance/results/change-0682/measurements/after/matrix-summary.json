@@ -1,0 +1,3655 @@
+{
+  "groups": {
+    "eager/first-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17640.0,
+        "p50": 17640.0,
+        "p95": 17640.0,
+        "p99": 17640.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/first-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55630.0,
+        "p50": 55630.0,
+        "p95": 55630.0,
+        "p99": 55630.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/first-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2579583.0,
+        "p50": 2579583.0,
+        "p95": 2579583.0,
+        "p99": 2579583.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 57538.0,
+        "p50": 57538.0,
+        "p95": 57538.0
+      },
+      "allocations": {
+        "mean": 660.0,
+        "p50": 660.0,
+        "p95": 660.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 79061.0,
+        "p50": 79061.0,
+        "p95": 79061.0,
+        "p99": 79061.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 1313098.0,
+        "p50": 1313098.0,
+        "p95": 1313098.0
+      },
+      "allocations": {
+        "mean": 15972.0,
+        "p50": 15972.0,
+        "p95": 15972.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 1347446.0,
+        "p50": 1347446.0,
+        "p95": 1347446.0,
+        "p99": 1347446.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4497986910620632685
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 266798.0,
+        "p50": 266798.0,
+        "p95": 266798.0
+      },
+      "allocations": {
+        "mean": 3212.0,
+        "p50": 3212.0,
+        "p95": 3212.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 290132.0,
+        "p50": 290132.0,
+        "p95": 290132.0,
+        "p99": 290132.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 8853.0,
+        "p50": 8853.0,
+        "p95": 8853.0
+      },
+      "allocations": {
+        "mean": 45.0,
+        "p50": 45.0,
+        "p95": 45.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 76361.0,
+        "p50": 76361.0,
+        "p95": 76361.0,
+        "p99": 76361.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 70245.0,
+        "p50": 70245.0,
+        "p95": 70245.0
+      },
+      "allocations": {
+        "mean": 669.0,
+        "p50": 669.0,
+        "p95": 669.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 451572.0,
+        "p50": 451572.0,
+        "p95": 451572.0,
+        "p99": 451572.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 19085.0,
+        "p50": 19085.0,
+        "p95": 19085.0
+      },
+      "allocations": {
+        "mean": 149.0,
+        "p50": 149.0,
+        "p95": 149.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 148421.0,
+        "p50": 148421.0,
+        "p95": 148421.0,
+        "p99": 148421.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 345301.0,
+        "p50": 345301.0,
+        "p95": 345301.0
+      },
+      "allocations": {
+        "mean": 51.0,
+        "p50": 51.0,
+        "p95": 51.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3291226.0,
+        "p50": 3291226.0,
+        "p95": 3291226.0,
+        "p99": 3291226.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 406693.0,
+        "p50": 406693.0,
+        "p95": 406693.0
+      },
+      "allocations": {
+        "mean": 675.0,
+        "p50": 675.0,
+        "p95": 675.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 19473234.0,
+        "p50": 19473234.0,
+        "p95": 19473234.0,
+        "p99": 19473234.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 355533.0,
+        "p50": 355533.0,
+        "p95": 355533.0
+      },
+      "allocations": {
+        "mean": 155.0,
+        "p50": 155.0,
+        "p95": 155.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 5989529.0,
+        "p50": 5989529.0,
+        "p95": 5989529.0,
+        "p99": 5989529.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 52315.0,
+        "p50": 52315.0,
+        "p95": 52315.0
+      },
+      "allocations": {
+        "mean": 638.0,
+        "p50": 638.0,
+        "p95": 638.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 60661.0,
+        "p50": 60661.0,
+        "p95": 60661.0,
+        "p99": 60661.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 1307875.0,
+        "p50": 1307875.0,
+        "p95": 1307875.0
+      },
+      "allocations": {
+        "mean": 15950.0,
+        "p50": 15950.0,
+        "p95": 15950.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 1324136.0,
+        "p50": 1324136.0,
+        "p95": 1324136.0,
+        "p99": 1324136.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 261575.0,
+        "p50": 261575.0,
+        "p95": 261575.0
+      },
+      "allocations": {
+        "mean": 3190.0,
+        "p50": 3190.0,
+        "p95": 3190.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 275592.0,
+        "p50": 275592.0,
+        "p95": 275592.0,
+        "p99": 275592.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 2558.0,
+        "p50": 2558.0,
+        "p95": 2558.0
+      },
+      "allocations": {
+        "mean": 26.0,
+        "p50": 26.0,
+        "p95": 26.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 21730.0,
+        "p50": 21730.0,
+        "p95": 21730.0,
+        "p99": 21730.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 63950.0,
+        "p50": 63950.0,
+        "p95": 63950.0
+      },
+      "allocations": {
+        "mean": 650.0,
+        "p50": 650.0,
+        "p95": 650.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 441612.0,
+        "p50": 441612.0,
+        "p95": 441612.0,
+        "p99": 441612.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 12790.0,
+        "p50": 12790.0,
+        "p95": 12790.0
+      },
+      "allocations": {
+        "mean": 130.0,
+        "p50": 130.0,
+        "p95": 130.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 79220.0,
+        "p50": 79220.0,
+        "p95": 79220.0,
+        "p99": 79220.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 2558.0,
+        "p50": 2558.0,
+        "p95": 2558.0
+      },
+      "allocations": {
+        "mean": 26.0,
+        "p50": 26.0,
+        "p95": 26.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 706924.0,
+        "p50": 706924.0,
+        "p95": 706924.0,
+        "p99": 706924.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 63950.0,
+        "p50": 63950.0,
+        "p95": 63950.0
+      },
+      "allocations": {
+        "mean": 650.0,
+        "p50": 650.0,
+        "p95": 650.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 16862441.0,
+        "p50": 16862441.0,
+        "p95": 16862441.0,
+        "p99": 16862441.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 12790.0,
+        "p50": 12790.0,
+        "p95": 12790.0
+      },
+      "allocations": {
+        "mean": 130.0,
+        "p50": 130.0,
+        "p95": 130.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3377056.0,
+        "p50": 3377056.0,
+        "p95": 3377056.0,
+        "p99": 3377056.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraph/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 57538.0,
+        "p50": 57538.0,
+        "p95": 57538.0
+      },
+      "allocations": {
+        "mean": 660.0,
+        "p50": 660.0,
+        "p95": 660.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 78461.0,
+        "p50": 78461.0,
+        "p95": 78461.0,
+        "p99": 78461.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraph/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 8853.0,
+        "p50": 8853.0,
+        "p95": 8853.0
+      },
+      "allocations": {
+        "mean": 45.0,
+        "p50": 45.0,
+        "p95": 45.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 86481.0,
+        "p50": 86481.0,
+        "p95": 86481.0,
+        "p99": 86481.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraph/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 345301.0,
+        "p50": 345301.0,
+        "p95": 345301.0
+      },
+      "allocations": {
+        "mean": 51.0,
+        "p50": 51.0,
+        "p95": 51.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3298156.0,
+        "p50": 3298156.0,
+        "p95": 3298156.0,
+        "p99": 3298156.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraphs/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 58082.0,
+        "p50": 58082.0,
+        "p95": 58082.0
+      },
+      "allocations": {
+        "mean": 661.0,
+        "p50": 661.0,
+        "p95": 661.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 78770.0,
+        "p50": 78770.0,
+        "p95": 78770.0,
+        "p99": 78770.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraphs/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 31093.0,
+        "p50": 31093.0,
+        "p95": 31093.0
+      },
+      "allocations": {
+        "mean": 50.0,
+        "p50": 50.0,
+        "p95": 50.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 79400.0,
+        "p50": 79400.0,
+        "p95": 79400.0,
+        "p99": 79400.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/fresh-paragraphs/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 1745589.0,
+        "p50": 1745589.0,
+        "p95": 1745589.0
+      },
+      "allocations": {
+        "mean": 62.0,
+        "p50": 62.0,
+        "p95": 62.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3617667.0,
+        "p50": 3617667.0,
+        "p95": 3617667.0,
+        "p99": 3617667.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17330.0,
+        "p50": 17330.0,
+        "p95": 17330.0,
+        "p99": 17330.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17410.0,
+        "p50": 17410.0,
+        "p95": 17410.0,
+        "p99": 17410.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4497986910620632685
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17611.0,
+        "p50": 17611.0,
+        "p95": 17611.0,
+        "p99": 17611.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 56160.0,
+        "p50": 56160.0,
+        "p95": 56160.0,
+        "p99": 56160.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55370.0,
+        "p50": 55370.0,
+        "p95": 55370.0,
+        "p99": 55370.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55740.0,
+        "p50": 55740.0,
+        "p95": 55740.0,
+        "p99": 55740.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2616662.0,
+        "p50": 2616662.0,
+        "p95": 2616662.0,
+        "p99": 2616662.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2630742.0,
+        "p50": 2630742.0,
+        "p95": 2630742.0,
+        "p99": 2630742.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2654072.0,
+        "p50": 2654072.0,
+        "p95": 2654072.0,
+        "p99": 2654072.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraph/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17660.0,
+        "p50": 17660.0,
+        "p95": 17660.0,
+        "p99": 17660.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraph/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55461.0,
+        "p50": 55461.0,
+        "p95": 55461.0,
+        "p99": 55461.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraph/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2603033.0,
+        "p50": 2603033.0,
+        "p95": 2603033.0,
+        "p99": 2603033.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraphs/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 7943.0,
+        "p50": 7943.0,
+        "p95": 7943.0
+      },
+      "allocations": {
+        "mean": 27.0,
+        "p50": 27.0,
+        "p95": 27.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 19600.0,
+        "p50": 19600.0,
+        "p95": 19600.0,
+        "p99": 19600.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraphs/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 117495.0,
+        "p50": 117495.0,
+        "p95": 117495.0
+      },
+      "allocations": {
+        "mean": 44.0,
+        "p50": 44.0,
+        "p95": 44.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 90780.0,
+        "p50": 90780.0,
+        "p95": 90780.0,
+        "p99": 90780.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "eager/same-paragraphs/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 7344183.0,
+        "p50": 7344183.0,
+        "p95": 7344183.0
+      },
+      "allocations": {
+        "mean": 80.0,
+        "p50": 80.0,
+        "p95": 80.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3737888.0,
+        "p50": 3737888.0,
+        "p95": 3737888.0,
+        "p99": 3737888.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    "managed/first-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 150.0,
+        "p50": 150.0,
+        "p95": 150.0,
+        "p99": 150.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/first-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 150.0,
+        "p50": 150.0,
+        "p95": 150.0,
+        "p99": 150.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 430133.0,
+        "p50": 430133.0,
+        "p95": 430133.0
+      },
+      "allocations": {
+        "mean": 3461.0,
+        "p50": 3461.0,
+        "p95": 3461.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 182891.0,
+        "p50": 182891.0,
+        "p95": 182891.0,
+        "p99": 182891.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 432725.0,
+        "p50": 432725.0,
+        "p95": 432725.0
+      },
+      "allocations": {
+        "mean": 3557.0,
+        "p50": 3557.0,
+        "p95": 3557.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 204991.0,
+        "p50": 204991.0,
+        "p95": 204991.0,
+        "p99": 204991.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 430565.0,
+        "p50": 430565.0,
+        "p95": 430565.0
+      },
+      "allocations": {
+        "mean": 3477.0,
+        "p50": 3477.0,
+        "p95": 3477.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 185871.0,
+        "p50": 185871.0,
+        "p95": 185871.0,
+        "p99": 185871.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 17148407.0,
+        "p50": 17148407.0,
+        "p95": 17148407.0
+      },
+      "allocations": {
+        "mean": 170067.0,
+        "p50": 170067.0,
+        "p95": 170067.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8042669.0,
+        "p50": 8042669.0,
+        "p95": 8042669.0,
+        "p99": 8042669.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 17150999.0,
+        "p50": 17150999.0,
+        "p95": 17150999.0
+      },
+      "allocations": {
+        "mean": 170163.0,
+        "p50": 170163.0,
+        "p95": 170163.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8206720.0,
+        "p50": 8206720.0,
+        "p95": 8206720.0,
+        "p99": 8206720.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 17148839.0,
+        "p50": 17148839.0,
+        "p95": 17148839.0
+      },
+      "allocations": {
+        "mean": 170083.0,
+        "p50": 170083.0,
+        "p95": 170083.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8017189.0,
+        "p50": 8017189.0,
+        "p95": 8017189.0,
+        "p99": 8017189.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 430133.0,
+        "p50": 430133.0,
+        "p95": 430133.0
+      },
+      "allocations": {
+        "mean": 3461.0,
+        "p50": 3461.0,
+        "p95": 3461.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 187021.0,
+        "p50": 187021.0,
+        "p95": 187021.0,
+        "p99": 187021.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 432725.0,
+        "p50": 432725.0,
+        "p95": 432725.0
+      },
+      "allocations": {
+        "mean": 3557.0,
+        "p50": 3557.0,
+        "p95": 3557.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 199441.0,
+        "p50": 199441.0,
+        "p95": 199441.0,
+        "p99": 199441.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 430565.0,
+        "p50": 430565.0,
+        "p95": 430565.0
+      },
+      "allocations": {
+        "mean": 3477.0,
+        "p50": 3477.0,
+        "p95": 3477.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 184011.0,
+        "p50": 184011.0,
+        "p95": 184011.0,
+        "p99": 184011.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 17148407.0,
+        "p50": 17148407.0,
+        "p95": 17148407.0
+      },
+      "allocations": {
+        "mean": 170067.0,
+        "p50": 170067.0,
+        "p95": 170067.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8115389.0,
+        "p50": 8115389.0,
+        "p95": 8115389.0,
+        "p99": 8115389.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 17150999.0,
+        "p50": 17150999.0,
+        "p95": 17150999.0
+      },
+      "allocations": {
+        "mean": 170163.0,
+        "p50": 170163.0,
+        "p95": 170163.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8139759.0,
+        "p50": 8139759.0,
+        "p95": 8139759.0,
+        "p99": 8139759.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 17148839.0,
+        "p50": 17148839.0,
+        "p95": 17148839.0
+      },
+      "allocations": {
+        "mean": 170083.0,
+        "p50": 170083.0,
+        "p95": 170083.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8039469.0,
+        "p50": 8039469.0,
+        "p95": 8039469.0,
+        "p99": 8039469.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-text/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 430466.0,
+        "p50": 430466.0,
+        "p95": 430466.0
+      },
+      "allocations": {
+        "mean": 3476.0,
+        "p50": 3476.0,
+        "p95": 3476.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 188601.0,
+        "p50": 188601.0,
+        "p95": 188601.0,
+        "p99": 188601.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14924902014125558298
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/fresh-text/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 17148740.0,
+        "p50": 17148740.0,
+        "p95": 17148740.0
+      },
+      "allocations": {
+        "mean": 170082.0,
+        "p50": 170082.0,
+        "p95": 170082.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 8022918.0,
+        "p50": 8022918.0,
+        "p95": 8022918.0,
+        "p99": 8022918.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        13508935313329229298
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 160.0,
+        "p50": 160.0,
+        "p95": 160.0,
+        "p99": 160.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 240.0,
+        "p50": 240.0,
+        "p95": 240.0,
+        "p99": 240.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 220.0,
+        "p50": 220.0,
+        "p95": 220.0,
+        "p99": 220.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 160.0,
+        "p50": 160.0,
+        "p95": 160.0,
+        "p99": 160.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 250.0,
+        "p50": 250.0,
+        "p95": 250.0,
+        "p99": 250.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "allocations": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 200.0,
+        "p50": 200.0,
+        "p95": 200.0,
+        "p99": 200.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-text/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 1665.0,
+        "p50": 1665.0,
+        "p95": 1665.0
+      },
+      "allocations": {
+        "mean": 75.0,
+        "p50": 75.0,
+        "p95": 75.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 6950.0,
+        "p50": 6950.0,
+        "p95": 6950.0,
+        "p99": 6950.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        10137219180888695106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "managed/same-text/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 1665.0,
+        "p50": 1665.0,
+        "p95": 1665.0
+      },
+      "allocations": {
+        "mean": 75.0,
+        "p50": 75.0,
+        "p95": 75.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 7880.0,
+        "p50": 7880.0,
+        "p95": 7880.0,
+        "p99": 7880.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        10177157067752491206
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/first-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17540.0,
+        "p50": 17540.0,
+        "p95": 17540.0,
+        "p99": 17540.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/first-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55681.0,
+        "p50": 55681.0,
+        "p95": 55681.0,
+        "p99": 55681.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/first-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2626963.0,
+        "p50": 2626963.0,
+        "p95": 2626963.0,
+        "p99": 2626963.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 144325.0,
+        "p50": 144325.0,
+        "p95": 144325.0
+      },
+      "allocations": {
+        "mean": 670.0,
+        "p50": 670.0,
+        "p95": 670.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 85410.0,
+        "p50": 85410.0,
+        "p95": 85410.0,
+        "p99": 85410.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 1399885.0,
+        "p50": 1399885.0,
+        "p95": 1399885.0
+      },
+      "allocations": {
+        "mean": 15982.0,
+        "p50": 15982.0,
+        "p95": 15982.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 1380587.0,
+        "p50": 1380587.0,
+        "p95": 1380587.0,
+        "p99": 1380587.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4497986910620632685
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 353585.0,
+        "p50": 353585.0,
+        "p95": 353585.0
+      },
+      "allocations": {
+        "mean": 3222.0,
+        "p50": 3222.0,
+        "p95": 3222.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 300911.0,
+        "p50": 300911.0,
+        "p95": 300911.0,
+        "p99": 300911.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 100543.0,
+        "p50": 100543.0,
+        "p95": 100543.0
+      },
+      "allocations": {
+        "mean": 55.0,
+        "p50": 55.0,
+        "p95": 55.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 91580.0,
+        "p50": 91580.0,
+        "p95": 91580.0,
+        "p99": 91580.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 161935.0,
+        "p50": 161935.0,
+        "p95": 161935.0
+      },
+      "allocations": {
+        "mean": 679.0,
+        "p50": 679.0,
+        "p95": 679.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 469232.0,
+        "p50": 469232.0,
+        "p95": 469232.0,
+        "p99": 469232.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 110775.0,
+        "p50": 110775.0,
+        "p95": 110775.0
+      },
+      "allocations": {
+        "mean": 159.0,
+        "p50": 159.0,
+        "p95": 159.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 151110.0,
+        "p50": 151110.0,
+        "p95": 151110.0,
+        "p99": 151110.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 952617.0,
+        "p50": 952617.0,
+        "p95": 952617.0
+      },
+      "allocations": {
+        "mean": 61.0,
+        "p50": 61.0,
+        "p95": 61.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3460546.0,
+        "p50": 3460546.0,
+        "p95": 3460546.0,
+        "p99": 3460546.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 1014009.0,
+        "p50": 1014009.0,
+        "p95": 1014009.0
+      },
+      "allocations": {
+        "mean": 685.0,
+        "p50": 685.0,
+        "p95": 685.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 19615154.0,
+        "p50": 19615154.0,
+        "p95": 19615154.0,
+        "p99": 19615154.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 962849.0,
+        "p50": 962849.0,
+        "p95": 962849.0
+      },
+      "allocations": {
+        "mean": 165.0,
+        "p50": 165.0,
+        "p95": 165.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 6138569.0,
+        "p50": 6138569.0,
+        "p95": 6138569.0,
+        "p99": 6138569.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 139102.0,
+        "p50": 139102.0,
+        "p95": 139102.0
+      },
+      "allocations": {
+        "mean": 648.0,
+        "p50": 648.0,
+        "p95": 648.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 68181.0,
+        "p50": 68181.0,
+        "p95": 68181.0,
+        "p99": 68181.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 1394662.0,
+        "p50": 1394662.0,
+        "p95": 1394662.0
+      },
+      "allocations": {
+        "mean": 15960.0,
+        "p50": 15960.0,
+        "p95": 15960.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 1345246.0,
+        "p50": 1345246.0,
+        "p95": 1345246.0,
+        "p99": 1345246.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 348362.0,
+        "p50": 348362.0,
+        "p95": 348362.0
+      },
+      "allocations": {
+        "mean": 3200.0,
+        "p50": 3200.0,
+        "p95": 3200.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 284602.0,
+        "p50": 284602.0,
+        "p95": 284602.0,
+        "p99": 284602.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 94248.0,
+        "p50": 94248.0,
+        "p95": 94248.0
+      },
+      "allocations": {
+        "mean": 36.0,
+        "p50": 36.0,
+        "p95": 36.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 40540.0,
+        "p50": 40540.0,
+        "p95": 40540.0,
+        "p99": 40540.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 155640.0,
+        "p50": 155640.0,
+        "p95": 155640.0
+      },
+      "allocations": {
+        "mean": 660.0,
+        "p50": 660.0,
+        "p95": 660.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 415532.0,
+        "p50": 415532.0,
+        "p95": 415532.0,
+        "p99": 415532.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 104480.0,
+        "p50": 104480.0,
+        "p95": 104480.0
+      },
+      "allocations": {
+        "mean": 140.0,
+        "p50": 140.0,
+        "p95": 140.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 96301.0,
+        "p50": 96301.0,
+        "p95": 96301.0,
+        "p99": 96301.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 609874.0,
+        "p50": 609874.0,
+        "p95": 609874.0
+      },
+      "allocations": {
+        "mean": 36.0,
+        "p50": 36.0,
+        "p95": 36.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 858634.0,
+        "p50": 858634.0,
+        "p95": 858634.0,
+        "p99": 858634.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 671266.0,
+        "p50": 671266.0,
+        "p95": 671266.0
+      },
+      "allocations": {
+        "mean": 660.0,
+        "p50": 660.0,
+        "p95": 660.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 17007711.0,
+        "p50": 17007711.0,
+        "p95": 17007711.0,
+        "p99": 17007711.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        4057226060239568005
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-document/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 620106.0,
+        "p50": 620106.0,
+        "p95": 620106.0
+      },
+      "allocations": {
+        "mean": 140.0,
+        "p50": 140.0,
+        "p95": 140.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3550948.0,
+        "p50": 3550948.0,
+        "p95": 3550948.0,
+        "p99": 3550948.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraph/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 144325.0,
+        "p50": 144325.0,
+        "p95": 144325.0
+      },
+      "allocations": {
+        "mean": 670.0,
+        "p50": 670.0,
+        "p95": 670.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 99220.0,
+        "p50": 99220.0,
+        "p95": 99220.0,
+        "p99": 99220.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraph/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 100543.0,
+        "p50": 100543.0,
+        "p95": 100543.0
+      },
+      "allocations": {
+        "mean": 55.0,
+        "p50": 55.0,
+        "p95": 55.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 89510.0,
+        "p50": 89510.0,
+        "p95": 89510.0,
+        "p99": 89510.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraph/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 952617.0,
+        "p50": 952617.0,
+        "p95": 952617.0
+      },
+      "allocations": {
+        "mean": 61.0,
+        "p50": 61.0,
+        "p95": 61.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3471856.0,
+        "p50": 3471856.0,
+        "p95": 3471856.0,
+        "p99": 3471856.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        14951706938929119791
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraphs/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 144325.0,
+        "p50": 144325.0,
+        "p95": 144325.0
+      },
+      "allocations": {
+        "mean": 670.0,
+        "p50": 670.0,
+        "p95": 670.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 85760.0,
+        "p50": 85760.0,
+        "p95": 85760.0,
+        "p99": 85760.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraphs/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 116383.0,
+        "p50": 116383.0,
+        "p95": 116383.0
+      },
+      "allocations": {
+        "mean": 59.0,
+        "p50": 59.0,
+        "p95": 59.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 93710.0,
+        "p50": 93710.0,
+        "p95": 93710.0,
+        "p99": 93710.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-paragraphs/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 2032905.0,
+        "p50": 2032905.0,
+        "p95": 2032905.0
+      },
+      "allocations": {
+        "mean": 71.0,
+        "p50": 71.0,
+        "p95": 71.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3703628.0,
+        "p50": 3703628.0,
+        "p95": 3703628.0,
+        "p99": 3703628.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-text/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 144650.0,
+        "p50": 144650.0,
+        "p95": 144650.0
+      },
+      "allocations": {
+        "mean": 685.0,
+        "p50": 685.0,
+        "p95": 685.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 91010.0,
+        "p50": 91010.0,
+        "p95": 91010.0,
+        "p99": 91010.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        10329696087365644132
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/fresh-text/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 100876.0,
+        "p50": 100876.0,
+        "p95": 100876.0
+      },
+      "allocations": {
+        "mean": 70.0,
+        "p50": 70.0,
+        "p95": 70.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 94590.0,
+        "p50": 94590.0,
+        "p95": 94590.0,
+        "p99": 94590.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        14924902014125558298
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/fresh-text/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 952950.0,
+        "p50": 952950.0,
+        "p95": 952950.0
+      },
+      "allocations": {
+        "mean": 76.0,
+        "p50": 76.0,
+        "p95": 76.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3771128.0,
+        "p50": 3771128.0,
+        "p95": 3771128.0,
+        "p99": 3771128.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        13508935313329229298
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/1": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17221.0,
+        "p50": 17221.0,
+        "p95": 17221.0,
+        "p99": 17221.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        6419788032871563823
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/25": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17050.0,
+        "p50": 17050.0,
+        "p95": 17050.0,
+        "p99": 17050.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        4497986910620632685
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-count/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17290.0,
+        "p50": 17290.0,
+        "p95": 17290.0,
+        "p99": 17290.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/1": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55240.0,
+        "p50": 55240.0,
+        "p95": 55240.0,
+        "p99": 55240.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        3375528922599719471
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/25": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55381.0,
+        "p50": 55381.0,
+        "p95": 55381.0,
+        "p99": 55381.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        748628887032598914
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 56291.0,
+        "p50": 56291.0,
+        "p95": 56291.0,
+        "p99": 56291.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/1": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2633673.0,
+        "p50": 2633673.0,
+        "p95": 2633673.0,
+        "p99": 2633673.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        16450515895859348015
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/25": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2590283.0,
+        "p50": 2590283.0,
+        "p95": 2590283.0,
+        "p99": 2590283.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        8623085429607523615
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-count/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2628463.0,
+        "p50": 2628463.0,
+        "p95": 2628463.0,
+        "p99": 2628463.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraph/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 17300.0,
+        "p50": 17300.0,
+        "p95": 17300.0,
+        "p99": 17300.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraph/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 6295.0,
+        "p50": 6295.0,
+        "p95": 6295.0
+      },
+      "allocations": {
+        "mean": 19.0,
+        "p50": 19.0,
+        "p95": 19.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 55810.0,
+        "p50": 55810.0,
+        "p95": 55810.0,
+        "p99": 55810.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraph/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 342743.0,
+        "p50": 342743.0,
+        "p95": 342743.0
+      },
+      "allocations": {
+        "mean": 25.0,
+        "p50": 25.0,
+        "p95": 25.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2626933.0,
+        "p50": 2626933.0,
+        "p95": 2626933.0,
+        "p99": 2626933.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        479004100049282255
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraphs/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 5223.0,
+        "p50": 5223.0,
+        "p95": 5223.0
+      },
+      "allocations": {
+        "mean": 22.0,
+        "p50": 22.0,
+        "p95": 22.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 18590.0,
+        "p50": 18590.0,
+        "p95": 18590.0,
+        "p99": 18590.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        13495293326793141693
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraphs/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 85495.0,
+        "p50": 85495.0,
+        "p95": 85495.0
+      },
+      "allocations": {
+        "mean": 39.0,
+        "p50": 39.0,
+        "p95": 39.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 72501.0,
+        "p50": 72501.0,
+        "p95": 72501.0,
+        "p99": 72501.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        15442542930770036106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-paragraphs/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 5744183.0,
+        "p50": 5744183.0,
+        "p95": 5744183.0
+      },
+      "allocations": {
+        "mean": 75.0,
+        "p50": 75.0,
+        "p95": 75.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 3470516.0,
+        "p50": 3470516.0,
+        "p95": 3470516.0,
+        "p99": 3470516.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        17207113904284810665
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-text/297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6/5": {
+      "allocated_bytes": {
+        "mean": 6848.0,
+        "p50": 6848.0,
+        "p95": 6848.0
+      },
+      "allocations": {
+        "mean": 97.0,
+        "p50": 97.0,
+        "p95": 97.0
+      },
+      "corpus_labels": [
+        "/home/zhuhe/code/litchi/test-data/ooxml/docx/ComplexNumberedLists.docx"
+      ],
+      "elapsed_ns": {
+        "mean": 22750.0,
+        "p50": 22750.0,
+        "p95": 22750.0,
+        "p99": 22750.0
+      },
+      "input_sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "n": 1,
+      "result_digests": [
+        12557405033987319074
+      ],
+      "source_versions": [
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "source/same-text/c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405/5": {
+      "allocated_bytes": {
+        "mean": 7960.0,
+        "p50": 7960.0,
+        "p95": 7960.0
+      },
+      "allocations": {
+        "mean": 94.0,
+        "p50": 94.0,
+        "p95": 94.0
+      },
+      "corpus_labels": [
+        "generated-200"
+      ],
+      "elapsed_ns": {
+        "mean": 60560.0,
+        "p50": 60560.0,
+        "p95": 60560.0,
+        "p99": 60560.0
+      },
+      "input_sha256": "c8a34325e82a3239bb56b4fda5cb0cb132831ca368b1941ea9a1a68caa66b405",
+      "n": 1,
+      "result_digests": [
+        10137219180888695106
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "source/same-text/f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f/5": {
+      "allocated_bytes": {
+        "mean": 344408.0,
+        "p50": 344408.0,
+        "p95": 344408.0
+      },
+      "allocations": {
+        "mean": 100.0,
+        "p50": 100.0,
+        "p95": 100.0
+      },
+      "corpus_labels": [
+        "generated-10000"
+      ],
+      "elapsed_ns": {
+        "mean": 2646293.0,
+        "p50": 2646293.0,
+        "p95": 2646293.0,
+        "p99": 2646293.0
+      },
+      "input_sha256": "f8ff818837365e2004a9b057db83ae78459a99a15daac319d26fd78c987dc90f",
+      "n": 1,
+      "result_digests": [
+        10177157067752491206
+      ],
+      "source_versions": [
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  },
+  "rows": 114,
+  "schema": "change-0682-summary-v1",
+  "source": "docs/performance/results/change-0682/measurements/after/matrix.jsonl"
+}

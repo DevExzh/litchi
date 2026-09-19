@@ -5,3 +5,4 @@
 pub mod document_part;
 
 pub use document_part::DocumentPart;
+pub(crate) use document_part::ParagraphIndexCache;

@@ -1,0 +1,6 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo clippy -p litchi-docx --all-features --lib --no-deps --locked -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.65s
+
+exit 0

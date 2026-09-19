@@ -1,0 +1,16 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ cargo fmt --all --check
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/src/source_backed/tail_append_stream.rs:2283:
+     commit: ParagraphStreamCommit<'_>,
+     path: &Path,
+ ) -> Result<ParagraphStreamPublication> {
+-    commit.plan.package.trim_clean_paragraph_index_for_operation();
++    commit
++        .plan
++        .package
++        .trim_clean_paragraph_index_for_operation();
+     let mut publication = None;
+     litchi_opc::atomic::replace_with::<Error>(path, |temporary| {
+         let published = publish_stream(commit, temporary)?;
+
+exit 1

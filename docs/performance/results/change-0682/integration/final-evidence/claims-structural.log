@@ -1,0 +1,5 @@
+HEAD 35686023471e066d54a26737316e0d648f787f91
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+OK: 10 performance claims validated (structural)
+
+exit 0

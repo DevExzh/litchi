@@ -1,0 +1,12 @@
+[
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "head": "35686023471e066d54a26737316e0d648f787f91",
+    "exit_code": 0,
+    "seconds": 263.59
+  }
+]

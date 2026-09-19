@@ -17,12 +17,14 @@ use crate::error::Result;
 use crate::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::table::Table;
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::BTreeSet;
-use std::sync::{Arc, OnceLock};
+use std::mem::size_of;
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 /// Maximum number of paragraph ranges retained by the reusable semantic
 /// index.  Documents beyond this bound continue to use the established
@@ -82,6 +84,324 @@ impl ParagraphIndex {
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = ParagraphRange> + '_ {
         self.ranges.iter().copied()
+    }
+
+    fn weight_bytes(&self) -> usize {
+        self.ranges
+            .len()
+            .saturating_mul(size_of::<ParagraphRange>())
+            .saturating_add(PARAGRAPH_INDEX_MEMO_OVERHEAD_BYTES)
+    }
+}
+
+/// A semantic route whose paragraph offsets are valid for one source view.
+///
+/// Managed source-backed payloads are already in their source XML view and
+/// therefore must never share an index with a materialized MCE-visible view,
+/// even when both happen to refer to the same allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ParagraphIndexRoute {
+    Visible,
+    Managed,
+}
+
+/// A retained paragraph index and the reservation that admitted it.
+///
+/// The reservation is attached to the memo rather than to the cache itself.
+/// A cache entry can be evicted while a document still uses it; the document's
+/// `Arc` then keeps the admitted resource live until that view is dropped.
+pub(crate) struct ParagraphIndexMemo {
+    pub(crate) index: ParagraphIndex,
+    pub(crate) _admission: Option<Arc<DocumentIndexAdmission>>,
+}
+
+pub(crate) struct ParagraphIndexBuild {
+    pub(crate) memo: Option<Arc<ParagraphIndexMemo>>,
+    pub(crate) admission: Option<Arc<DocumentIndexAdmission>>,
+}
+
+impl ParagraphIndexBuild {
+    pub(crate) fn indexed(
+        index: ParagraphIndex,
+        admission: Option<Arc<DocumentIndexAdmission>>,
+    ) -> Self {
+        Self {
+            memo: Some(Arc::new(ParagraphIndexMemo {
+                index,
+                _admission: admission,
+            })),
+            admission: None,
+        }
+    }
+
+    pub(crate) const fn unavailable(admission: Option<Arc<DocumentIndexAdmission>>) -> Self {
+        Self {
+            memo: None,
+            admission,
+        }
+    }
+}
+
+const PARAGRAPH_INDEX_MEMO_OVERHEAD_BYTES: usize = 128;
+const PARAGRAPH_INDEX_CACHE_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+struct ParagraphIndexCacheEntry {
+    key: ParagraphIndexCacheKey,
+    memo: Arc<ParagraphIndexMemo>,
+}
+
+enum ParagraphIndexCacheKey {
+    Allocation {
+        raw: Weak<Vec<u8>>,
+        route: ParagraphIndexRoute,
+    },
+    Source {
+        version: SourceVersion,
+        route: ParagraphIndexRoute,
+    },
+}
+
+impl ParagraphIndexCacheKey {
+    fn allocation(raw: &Arc<Vec<u8>>, route: ParagraphIndexRoute) -> Self {
+        Self::Allocation {
+            raw: Arc::downgrade(raw),
+            route,
+        }
+    }
+
+    const fn source(version: SourceVersion, route: ParagraphIndexRoute) -> Self {
+        Self::Source { version, route }
+    }
+
+    fn matches(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Allocation {
+                    raw: left,
+                    route: left_route,
+                },
+                Self::Allocation {
+                    raw: right,
+                    route: right_route,
+                },
+            ) => {
+                *left_route == *right_route
+                    && left.upgrade().is_some_and(|candidate| {
+                        right
+                            .upgrade()
+                            .is_some_and(|other| Arc::ptr_eq(&candidate, &other))
+                    })
+            },
+            (
+                Self::Source {
+                    version: left,
+                    route: left_route,
+                },
+                Self::Source {
+                    version: right,
+                    route: right_route,
+                },
+            ) => left == right && left_route == right_route,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Default)]
+struct ParagraphIndexCacheState {
+    entry: Option<ParagraphIndexCacheEntry>,
+    hits: u64,
+    misses: u64,
+    builds: u64,
+    clean_evictions: u64,
+    pinned_evictions: u64,
+    oversized_bypasses: u64,
+}
+
+/// Package-scoped, single-entry memo for paragraph offsets.
+///
+/// The cache retains only a weak identity key and the bounded offset memo. It
+/// never keeps XML alive by itself. Holding the state lock while building
+/// coalesces concurrent first queries without exposing an in-progress or
+/// failed result to another caller; malformed input and admission failures
+/// remain retryable and are never negatively cached.
+pub(crate) struct ParagraphIndexCache {
+    state: Mutex<ParagraphIndexCacheState>,
+}
+
+impl ParagraphIndexCache {
+    pub(crate) fn new() -> Self {
+        Self {
+            state: Mutex::new(ParagraphIndexCacheState::default()),
+        }
+    }
+
+    fn lock_state(&self) -> std::sync::MutexGuard<'_, ParagraphIndexCacheState> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn evict_entry(state: &mut ParagraphIndexCacheState) {
+        let Some(entry) = state.entry.take() else {
+            return;
+        };
+        if Arc::strong_count(&entry.memo) == 1 {
+            state.clean_evictions = state.clean_evictions.saturating_add(1);
+        } else {
+            state.pinned_evictions = state.pinned_evictions.saturating_add(1);
+        }
+    }
+
+    /// Drop an unpinned clean memo before another package operation reserves
+    /// workspace. Active documents keep their memo and admission alive.
+    pub(crate) fn trim_clean(&self) {
+        let mut state = self.lock_state();
+        let clean = state
+            .entry
+            .as_ref()
+            .is_some_and(|entry| Arc::strong_count(&entry.memo) == 1);
+        if clean {
+            Self::evict_entry(&mut state);
+        }
+    }
+
+    fn get_or_build_with_key<F>(
+        &self,
+        key: ParagraphIndexCacheKey,
+        build: F,
+    ) -> Result<ParagraphIndexBuild>
+    where
+        F: FnOnce() -> Result<ParagraphIndexBuild>,
+    {
+        let mut state = self.lock_state();
+        let hit = state
+            .entry
+            .as_ref()
+            .is_some_and(|entry| entry.key.matches(&key));
+        if hit {
+            state.hits = state.hits.saturating_add(1);
+            let Some(entry) = state.entry.as_ref() else {
+                return Err(crate::Error::InvalidFormat(
+                    "paragraph index cache hit lost its entry".into(),
+                ));
+            };
+            let memo = Arc::clone(&entry.memo);
+            return Ok(ParagraphIndexBuild {
+                memo: Some(memo),
+                admission: None,
+            });
+        }
+
+        state.misses = state.misses.saturating_add(1);
+        Self::evict_entry(&mut state);
+        let built = build()?;
+        state.builds = state.builds.saturating_add(1);
+        let Some(memo) = built.memo.as_ref() else {
+            return Ok(built);
+        };
+        let weight = memo.index.weight_bytes();
+        if weight > PARAGRAPH_INDEX_CACHE_MAX_BYTES {
+            state.oversized_bypasses = state.oversized_bypasses.saturating_add(1);
+            return Ok(built);
+        }
+        state.entry = Some(ParagraphIndexCacheEntry {
+            key,
+            memo: Arc::clone(memo),
+        });
+        Ok(built)
+    }
+
+    pub(crate) fn get_or_build<F>(
+        &self,
+        raw: &Arc<Vec<u8>>,
+        route: ParagraphIndexRoute,
+        build: F,
+    ) -> Result<ParagraphIndexBuild>
+    where
+        F: FnOnce() -> Result<ParagraphIndexBuild>,
+    {
+        self.get_or_build_with_key(ParagraphIndexCacheKey::allocation(raw, route), build)
+    }
+
+    pub(crate) fn get_or_build_source<F>(
+        &self,
+        version: SourceVersion,
+        route: ParagraphIndexRoute,
+        build: F,
+    ) -> Result<ParagraphIndexBuild>
+    where
+        F: FnOnce() -> Result<ParagraphIndexBuild>,
+    {
+        self.get_or_build_with_key(ParagraphIndexCacheKey::source(version, route), build)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> ParagraphIndexCacheDiagnostics {
+        let state = self.lock_state();
+        let (clean_entries, pinned_entries, retained_weight) =
+            state.entry.as_ref().map_or((0, 0, 0), |entry| {
+                if Arc::strong_count(&entry.memo) == 1 {
+                    (1, 0, entry.memo.index.weight_bytes())
+                } else {
+                    (0, 1, entry.memo.index.weight_bytes())
+                }
+            });
+        ParagraphIndexCacheDiagnostics {
+            hits: state.hits,
+            misses: state.misses,
+            builds: state.builds,
+            clean_evictions: state.clean_evictions,
+            pinned_evictions: state.pinned_evictions,
+            oversized_bypasses: state.oversized_bypasses,
+            clean_entries,
+            pinned_entries,
+            retained_weight,
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ParagraphIndexCacheDiagnostics {
+    pub(crate) hits: u64,
+    pub(crate) misses: u64,
+    pub(crate) builds: u64,
+    pub(crate) clean_evictions: u64,
+    pub(crate) pinned_evictions: u64,
+    pub(crate) oversized_bypasses: u64,
+    pub(crate) clean_entries: usize,
+    pub(crate) pinned_entries: usize,
+    pub(crate) retained_weight: usize,
+}
+
+/// Shared execution-budget reservation for a managed paragraph index.
+pub(crate) struct DocumentIndexAdmission {
+    _memory: Reservation,
+    _objects: Reservation,
+}
+
+impl DocumentIndexAdmission {
+    pub(crate) fn new(context: &ExecutionContext, xml_len: usize) -> Result<Arc<Self>> {
+        let ranges = xml_len as u64 / 4 + 1;
+        let bytes = ranges.saturating_mul(24).saturating_add(1024);
+        let memory = context
+            .reserve(Resource::Memory, bytes)
+            .map_err(index_execution_error)?;
+        let objects = context
+            .reserve(Resource::Objects, ranges + 3)
+            .map_err(index_execution_error)?;
+        Ok(Arc::new(Self {
+            _memory: memory,
+            _objects: objects,
+        }))
+    }
+}
+
+fn index_execution_error(error: ExecutionError) -> crate::Error {
+    match error {
+        ExecutionError::Cancelled => crate::Error::Opc(litchi_opc::OpcError::Cancelled),
+        error => crate::Error::Opc(litchi_opc::OpcError::Execution(error)),
     }
 }
 
@@ -146,11 +466,16 @@ pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
+    /// The source allocation identity used to find a package-scoped memo.
+    /// This weak key never keeps the physical payload alive.
+    paragraph_source: Weak<Vec<u8>>,
+    paragraph_cache: Arc<ParagraphIndexCache>,
+    paragraph_route: ParagraphIndexRoute,
     /// Best-effort cache built from the validated visible XML on the first
     /// paragraph query. A malformed or over-bound payload leaves the cached
     /// value empty so the legacy query path keeps reporting the same error at
     /// query time.
-    paragraph_index: OnceLock<Option<Arc<ParagraphIndex>>>,
+    paragraph_memo: OnceLock<Option<Arc<ParagraphIndexMemo>>>,
 }
 
 /// Select markup-compatibility branches for a main-document payload.
@@ -575,11 +900,24 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml = visible_document_xml(part.blob_arc())?;
+        Self::from_part_with_cache(part, Arc::new(ParagraphIndexCache::new()))
+    }
+
+    /// Create a document part sharing a package's paragraph memo cache.
+    pub(crate) fn from_part_with_cache(
+        part: &'a dyn Part,
+        paragraph_cache: Arc<ParagraphIndexCache>,
+    ) -> Result<Self> {
+        let raw = part.blob_arc();
+        let paragraph_source = Arc::downgrade(&raw);
+        let xml = visible_document_xml(raw)?;
         Ok(Self {
             part,
             xml,
-            paragraph_index: OnceLock::new(),
+            paragraph_source,
+            paragraph_cache,
+            paragraph_route: ParagraphIndexRoute::Visible,
+            paragraph_memo: OnceLock::new(),
         })
     }
 
@@ -593,13 +931,30 @@ impl<'a> DocumentPart<'a> {
     /// same operations as before. Text, table, block and element reads never
     /// consult the index, so they no longer pay for a scan they cannot use.
     fn paragraph_ranges(&self) -> Option<&ParagraphIndex> {
-        self.paragraph_index
+        self.paragraph_memo
             .get_or_init(|| {
-                ParagraphIndex::from_xml(self.xml.as_slice())
+                let Some(raw) = self.paragraph_source.upgrade() else {
+                    return ParagraphIndex::from_xml(self.xml.as_slice())
+                        .ok()
+                        .map(|index| {
+                            Arc::new(ParagraphIndexMemo {
+                                index,
+                                _admission: None,
+                            })
+                        });
+                };
+                self.paragraph_cache
+                    .get_or_build(&raw, self.paragraph_route, || {
+                        Ok(ParagraphIndexBuild::indexed(
+                            ParagraphIndex::from_xml(self.xml.as_slice())?,
+                            None,
+                        ))
+                    })
                     .ok()
-                    .map(Arc::new)
+                    .and_then(|build| build.memo)
             })
-            .as_deref()
+            .as_ref()
+            .map(|memo| &memo.index)
     }
 
     /// Get the shared Arc of XML bytes (zero-copy from Part).
@@ -848,7 +1203,7 @@ mod tests {
         let document = DocumentPart::from_part(&part).unwrap();
 
         assert!(
-            document.paragraph_index.get().is_none(),
+            document.paragraph_memo.get().is_none(),
             "construction must not scan for paragraph ranges"
         );
         assert_eq!(document.extract_text().unwrap(), "outercelltail");
@@ -858,13 +1213,13 @@ mod tests {
         assert_eq!(document.blocks().unwrap().len(), 3);
         assert_eq!(document.xml_bytes(), xml);
         assert!(
-            document.paragraph_index.get().is_none(),
+            document.paragraph_memo.get().is_none(),
             "text, table, element and block reads must not build the index"
         );
 
         assert_eq!(document.paragraph_count().unwrap(), 3);
         assert!(
-            document.paragraph_index.get().is_some(),
+            document.paragraph_memo.get().is_some(),
             "the first paragraph query builds the index once"
         );
     }
@@ -942,7 +1297,7 @@ mod tests {
                 assert_eq!(all, vec!["outer".to_owned(), "tail".to_owned()]);
             }
         });
-        assert!(document.paragraph_index.get().is_some());
+        assert!(document.paragraph_memo.get().is_some());
     }
 
     #[test]
@@ -959,5 +1314,151 @@ mod tests {
             assert_eq!(paragraph.text().unwrap(), expected_text);
         }
         assert!(document_paragraph_from_index(source, &index, expected.len()).is_none());
+    }
+
+    #[test]
+    fn package_cache_reuses_allocation_identity_and_rejects_equal_new_allocations() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:p/></w:body></w:document>"#;
+        let cache = Arc::new(ParagraphIndexCache::new());
+        let raw = Arc::new(xml.to_vec());
+        let first = cache
+            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                Ok(ParagraphIndexBuild::indexed(
+                    ParagraphIndex::from_xml(raw.as_slice())?,
+                    None,
+                ))
+            })
+            .unwrap();
+        let second = cache
+            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                Err(crate::Error::InvalidFormat(
+                    "same allocation unexpectedly missed the package cache".into(),
+                ))
+            })
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            first.memo.as_ref().unwrap(),
+            second.memo.as_ref().unwrap()
+        ));
+
+        let equal_new_allocation = Arc::new(xml.to_vec());
+        let third = cache
+            .get_or_build(&equal_new_allocation, ParagraphIndexRoute::Visible, || {
+                Ok(ParagraphIndexBuild::indexed(
+                    ParagraphIndex::from_xml(equal_new_allocation.as_slice())?,
+                    None,
+                ))
+            })
+            .unwrap();
+        assert!(!Arc::ptr_eq(
+            first.memo.as_ref().unwrap(),
+            third.memo.as_ref().unwrap()
+        ));
+        let diagnostics = cache.diagnostics();
+        assert_eq!(diagnostics.hits, 1);
+        assert_eq!(diagnostics.misses, 2);
+        assert_eq!(diagnostics.builds, 2);
+    }
+
+    #[test]
+    fn package_cache_coalesces_builds_and_trims_only_clean_entries() {
+        let cache = Arc::new(ParagraphIndexCache::new());
+        let raw = Arc::new(b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>".to_vec());
+        let builds = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| {
+                    let cache = Arc::clone(&cache);
+                    let raw = Arc::clone(&raw);
+                    let builds = Arc::clone(&builds);
+                    scope.spawn(move || {
+                        cache
+                            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                                builds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                Ok(ParagraphIndexBuild::indexed(
+                                    ParagraphIndex::from_xml(raw.as_slice())?,
+                                    None,
+                                ))
+                            })
+                            .unwrap()
+                    })
+                })
+                .collect();
+            for handle in handles {
+                drop(handle.join().unwrap());
+            }
+        });
+        assert_eq!(builds.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(cache.diagnostics().hits, 7);
+
+        cache.trim_clean();
+        assert_eq!(cache.diagnostics().clean_evictions, 1);
+        assert_eq!(cache.diagnostics().clean_entries, 0);
+
+        let active = cache
+            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                Ok(ParagraphIndexBuild::indexed(
+                    ParagraphIndex::from_xml(raw.as_slice())?,
+                    None,
+                ))
+            })
+            .unwrap();
+        cache.trim_clean();
+        assert_eq!(cache.diagnostics().pinned_entries, 1);
+        drop(active);
+        cache.trim_clean();
+        assert_eq!(cache.diagnostics().clean_evictions, 2);
+    }
+
+    #[test]
+    fn package_cache_retries_failed_builds_and_bypasses_oversized_indexes() {
+        let cache = Arc::new(ParagraphIndexCache::new());
+        let raw = Arc::new(vec![0_u8; 1]);
+        let attempts = std::sync::atomic::AtomicUsize::new(0);
+        assert!(
+            cache
+                .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                    attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(crate::Error::InvalidFormat("retryable test failure".into()))
+                })
+                .is_err()
+        );
+        let retry = cache
+            .get_or_build(&raw, ParagraphIndexRoute::Visible, || {
+                attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                Ok(ParagraphIndexBuild::indexed(
+                    ParagraphIndex {
+                        ranges: Vec::<ParagraphRange>::new().into(),
+                    },
+                    None,
+                ))
+            })
+            .unwrap();
+        assert_eq!(retry.memo.unwrap().index.len(), 0);
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(cache.diagnostics().misses, 2);
+
+        let oversized_raw = Arc::new(vec![1_u8; 1]);
+        let oversized_ranges = vec![
+            ParagraphRange {
+                start: 0,
+                length: 1
+            };
+            1_100_000
+        ];
+        let oversized = cache
+            .get_or_build(&oversized_raw, ParagraphIndexRoute::Visible, || {
+                Ok(ParagraphIndexBuild::indexed(
+                    ParagraphIndex {
+                        ranges: oversized_ranges.into(),
+                    },
+                    None,
+                ))
+            })
+            .unwrap();
+        assert!(oversized.memo.is_some());
+        let diagnostics = cache.diagnostics();
+        assert_eq!(diagnostics.oversized_bypasses, 1);
+        assert_eq!(diagnostics.clean_entries, 0);
     }
 }

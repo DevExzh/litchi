@@ -1,0 +1,9 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.75s
+     Running unittests src/lib.rs (target/debug/deps/litchi_docx-cf049980a7ec6454)
+
+running 1 test
+test source_backed::paragraph_index_tests::delayed_managed_tail_append_publishes_after_clean_index_warm ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 980 filtered out; finished in 0.00s
+

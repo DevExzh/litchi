@@ -946,6 +946,7 @@ impl Package {
 
     /// Capture the exact closure under caller-selected finite limits.
     pub fn plain_paragraph_copy_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+        self.trim_clean_paragraph_index_for_operation();
         let source_version = self.package.source_version().map_err(crate::Error::from)?;
         self.validate_plain_paragraph_copy_topology()?;
         let main = self
@@ -1016,6 +1017,7 @@ impl Package {
         writer: W,
         patch: &Patch,
     ) -> Result<Publication> {
+        self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_copy_snapshot_with_limits(patch.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.package.source_artifact();
@@ -1055,6 +1057,7 @@ impl Package {
         writer: W,
         publication: &Publication,
     ) -> Result<Snapshot> {
+        self.trim_clean_paragraph_index_for_operation();
         let current = fingerprint_artifact(&self.package.source_artifact())?;
         if current != publication.published_fingerprint {
             return Err(Error::StaleSource);
@@ -1083,6 +1086,7 @@ impl Package {
         writer: W,
         patch: &RemovalPatch,
     ) -> Result<RemovalPublication> {
+        self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_removal_snapshot_with_limits(patch.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.package.source_artifact();
@@ -1122,6 +1126,7 @@ impl Package {
         writer: W,
         publication: &RemovalPublication,
     ) -> Result<Snapshot> {
+        self.trim_clean_paragraph_index_for_operation();
         let current = fingerprint_artifact(&self.package.source_artifact())?;
         if current != publication.published_fingerprint {
             return Err(Error::StaleSource);

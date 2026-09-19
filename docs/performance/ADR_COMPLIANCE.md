@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0682 — DOCX semantic reuse retains ownership and admission
+
+[0682](0682-docx-paragraph-index-reuse.md) keeps paragraph ranges in the DOCX
+owner under ADRs 0003, 0005 and 0006. Weak allocation identity protects eager
+replacement/rollback; source identity and revision protect owner-local
+source-backed reuse. The one-entry cache has a finite logical weight and does
+not retain raw XML through its key. Managed payload handles and index
+reservations remain attached to their owners, including pinned old views.
+Only successful complete indexes are shared; the existing fallback and MCE
+refusal paths remain. No ordinary public CRUD signature, dependency direction,
+accepted ADR, ambient executor, or unsafe-code policy changes.
+
 ## 0681 — design review preserves admission and publication boundaries
 
 [0678](0678-xls-query-cache-design.md) requires occurrence-preserving XLS
