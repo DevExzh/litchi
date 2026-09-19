@@ -1,0 +1,1 @@
+{"allocated_bytes":9651,"allocation_calls":10,"budget":2097152,"callbacks":0,"column":0,"deallocated_bytes":5180,"deallocation_calls":3,"mode":"file","operation":"q8","outcome":"error:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token","peak_live_delta":5235,"retained_live_delta":55,"row":0,"worksheet":6}

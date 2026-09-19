@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0687 — inline ASCII directory keys reduce repeated CFB lookup work
+
+[0687](0687-cfb-ascii-directory-keys.md) follows a fresh profile attributing
+12.87% self samples to CFB name construction. Bounded inline ASCII keys remove
+generic UTF-16/SmallVec iteration while preserving validation and Unicode
+fallback. Stored eighth-query medians improve about 13–22% on several owned
+routes; Simple open-plus-eight improves 16.5% owned and 8% file. Large 54016
+workflows remain approximately flat. Initial open regressions were rejected
+and disappear in the final bound-first candidate.
+
+The 45365-2 build phase regresses 5–9%, some workflows rise 1–5%, and native
+RSS has flags up to 8.72%. Helper code/stack grow 807/128 bytes on the measured
+build. These costs remain explicit. Final chain traversal still accounts for
+51.52% self samples; within-sheet/SST walks and the 45365-2 build path remain
+open. No registered claim or coverage promotion follows this batch.
+
 ## 0686 — bounded index growth and proven oversized retries
 
 [0686](0686-xls-oversized-index-admission.md) admits indexes that fit between
@@ -8443,7 +8459,7 @@ the accepted decisions are no longer listed as awaiting an owner.
 
 | Priority | Remaining work | Required proof or design |
 | ---: | --- | --- |
-| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. [0685](0685-xls-worksheet-chain-checkpoints.md) adds immutable worksheet-start checkpoints; the new warm profile still attributes 53.07% self samples to chain traversal. [0686](0686-xls-oversized-index-admission.md) bounds geometric growth and suppresses intrinsically oversized retries after complete scans. SST/within-sheet traversal, tiny/no-benefit admission and refusal overhead remain open. |
+| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. [0685](0685-xls-worksheet-chain-checkpoints.md) adds immutable worksheet-start checkpoints; the new warm profile still attributes 53.07% self samples to chain traversal. [0686](0686-xls-oversized-index-admission.md) bounds geometric growth and suppresses intrinsically oversized retries after complete scans. [0687](0687-cfb-ascii-directory-keys.md) reduces shared name-construction work with explicit 45365-2 build/RSS costs; its final chain profile is still 51.52% self. SST/within-sheet traversal, tiny/no-benefit admission and residual refusal/build overhead remain open. |
 | 2 | XLSX selected scanner's retained record vector | [0683](0683-xlsx-selected-record-compaction.md) implements compact records and exact SST staging, with an additional profiled escape-search optimization. Direct owning-result construction and managed semantic-vector admission remain open; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the callback contract. |
 | 3 | DOCX cache breadth and remaining per-view work | [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo with scoped fresh-view gains, pressure reclamation and replacement/rollback tests; its measured hot-query regression was removed by direct index ownership. Extend producer/concurrent/cold measurements and attribute remaining MCE visibility work before broader claims. |
 | 4 | XLS framing fusion and full SST locator scan | Preserve the coverage proof, validation order and malformed-input boundaries; pointer scratch removal does not eliminate the full scan; [0668](0668-xls-query-residues.md). |

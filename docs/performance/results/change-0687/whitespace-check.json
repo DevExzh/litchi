@@ -1,0 +1,21 @@
+{
+  "exit_code": 0,
+  "raw_tool_outputs_excluded": [
+    "docs/performance/results/change-0687/baseline-directory-name-assembly.txt",
+    "docs/performance/results/change-0687/baseline-profile-report.stderr",
+    "docs/performance/results/change-0687/baseline-profile-symbols.txt",
+    "docs/performance/results/change-0687/candidate-directory-name-assembly.txt",
+    "docs/performance/results/change-0687/candidate-profile-report.stderr",
+    "docs/performance/results/change-0687/candidate-profile-symbols.txt",
+    "docs/performance/results/change-0687/initial-candidate/baseline-cold-profile-symbols.txt",
+    "docs/performance/results/change-0687/initial-candidate/baseline-cold-report.stderr",
+    "docs/performance/results/change-0687/initial-candidate/baseline-directory-name-assembly.txt",
+    "docs/performance/results/change-0687/initial-candidate/candidate-cold-profile-symbols.txt",
+    "docs/performance/results/change-0687/initial-candidate/candidate-cold-report.stderr",
+    "docs/performance/results/change-0687/initial-candidate/candidate-directory-name-assembly.txt",
+    "docs/performance/results/change-0687/initial-candidate/candidate-profile-report.stderr",
+    "docs/performance/results/change-0687/initial-candidate/candidate-profile-symbols.txt",
+    "docs/performance/results/change-0687/initial-candidate/tracked.patch"
+  ],
+  "reason": "Preserve exact retained tool output and archived patch bytes; hashes remain unchanged."
+}

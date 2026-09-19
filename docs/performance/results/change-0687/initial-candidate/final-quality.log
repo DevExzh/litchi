@@ -1,0 +1,6 @@
+fmt 0 18.04
+check 0 6.87
+clippy 0 6.16
+tests 0 29.65
+facade 0 6.49
+rustdoc 0 10.69

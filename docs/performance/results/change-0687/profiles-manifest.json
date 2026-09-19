@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "baseline-profile.tsv": "8f6f41386406d6df5b5d177f900bf919b988f1e3c9dd1d254d08100d76524b10",
+    "baseline-profile-symbols.txt": "e0f6a487c9cc16f18820793659df909bdb8c7863cae8ae25670e0960dc51f1cd",
+    "baseline-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "baseline-profile.stderr": "1f48b60430eabffee3b2e17920824d311530cb9dd12bb5f1e9e520aa5dec4e6b",
+    "baseline-profile-command.json": "3f471fb4829f886c81fc3e10574985771ac4aa36c37c42b2f73f2f732af866ec"
+  },
+  "candidate": {
+    "candidate-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "candidate-profile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-profile.stderr": "4459f2668a172ec6c5eb9394b6c3a8b0afdbb916a5509b53de72fd46045113a6",
+    "candidate-profile-symbols.txt": "02136c37d5e44b98eaf035c73337e9e64f005f5cc16f61da3999e4d9749533ad",
+    "candidate-profile-command.json": "cc92b8195d0d2f50ee58d45c2c74af7f86cb09cd68db6279d18bba615585649f",
+    "candidate-profile.tsv": "a60e39715714e858b2149dd32ce0a71c95d4aac2a2b835014a8a50f25dde25b3"
+  }
+}

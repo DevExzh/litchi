@@ -1,0 +1,11 @@
+{
+  "removed_owned_paths": [
+    "/home/zhuhe/code/litchi-target-0687",
+    "/home/zhuhe/code/litchi-target-0687-before",
+    "/home/zhuhe/code/litchi-target-0687-after",
+    "/home/zhuhe/code/litchi-target-0687-initial",
+    "/home/zhuhe/code/litchi-0687-profile"
+  ],
+  "unrelated_worktrees_untouched": true,
+  "existing_shared_targets_untouched": true
+}

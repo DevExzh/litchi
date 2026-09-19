@@ -1,0 +1,12 @@
+candidate 54016-stored-0
+candidate 54016-stored-2097152
+candidate 54016-missing-1048576
+candidate Plan1-stored-2097152
+candidate Simple-stored-2097152
+candidate Simple-missing-2097152
+candidate synthetic-70000-default
+candidate 54016-late
+candidate Plan1-late
+candidate 45365-first
+candidate 45365-late
+candidate formula-refusal-2097152

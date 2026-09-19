@@ -1,0 +1,32 @@
+[
+  {
+    "phase": "baseline",
+    "command": [
+      "objdump",
+      "-d",
+      "-C",
+      "--start-address=0x00000000000b7a90",
+      "--stop-address=0xb80f1",
+      "/home/zhuhe/code/litchi-target-0687-before/release/xls0684-repeat"
+    ],
+    "symbol": "_ZN10litchi_cfb14directory_name19directory_name_data17h6249ab6139e083a1E",
+    "code_bytes": 1633,
+    "binary_sha256": "7128d6ccef4c1bd83706612543562e0056bd663a13b5352b8103e43339a847a2",
+    "assembly_sha256": "f28d66b387475fd1a45d5d6b9641a2dd0a736b08b92e24ab8669e7599e9af07b"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "objdump",
+      "-d",
+      "-C",
+      "--start-address=0x00000000000b7680",
+      "--stop-address=0xb80f0",
+      "/home/zhuhe/code/litchi-target-0687-after/release/xls0684-repeat"
+    ],
+    "symbol": "_ZN10litchi_cfb14directory_name19directory_name_data17h6249ab6139e083a1E",
+    "code_bytes": 2672,
+    "binary_sha256": "f12dac56d69196595b0415009b78e0447ffa9f93be45ca7e2206736302719b63",
+    "assembly_sha256": "5007c85d2c762fda9224a1608d315bff0847406eb1a04792528d3c6f4703778f"
+  }
+]
