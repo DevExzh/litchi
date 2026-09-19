@@ -1,0 +1,23 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0688/candidate-cursor-assembly.txt",
+    ":(exclude)docs/performance/results/change-0688/baseline-profile-symbols.txt",
+    ":(exclude)docs/performance/results/change-0688/baseline-cursor-assembly.txt",
+    ":(exclude)docs/performance/results/change-0688/candidate-profile-symbols.txt",
+    ":(exclude)docs/performance/results/change-0688/candidate-chain-walk-assembly.txt",
+    ":(exclude)docs/performance/results/change-0688/baseline-binary-sections.txt",
+    ":(exclude)docs/performance/results/change-0688/baseline-profile-report.stderr",
+    ":(exclude)docs/performance/results/change-0688/candidate-binary-sections.txt",
+    ":(exclude)docs/performance/results/change-0688/candidate-profile-report.stderr"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "raw_exclusions_reason": "Preserve hash-bound perf/objdump/size raw trailing whitespace and terminal blank lines verbatim."
+}

@@ -1,0 +1,13 @@
+workspace_packages=64
+excluded_packages=18
+bulk_packages=45
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1

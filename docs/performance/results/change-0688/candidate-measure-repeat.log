@@ -1,0 +1,12 @@
+candidate 54016-stored-2097152 owned
+candidate 54016-stored-2097152 file
+candidate 54016-late owned
+candidate 54016-late file
+candidate 54016-missing-1048576 owned
+candidate 54016-missing-1048576 file
+candidate Plan1-stored-2097152 owned
+candidate Plan1-stored-2097152 file
+candidate Simple-stored-2097152 owned
+candidate Simple-stored-2097152 file
+candidate 45365-first owned
+candidate 45365-first file

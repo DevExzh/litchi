@@ -1,0 +1,22 @@
+{
+  "baseline": "9df782b7c133a36eda339b9d45858142710cec73",
+  "quality_gates": 6,
+  "additional_consumer_test_gate": 1,
+  "rust_tests_passed": 4394,
+  "rust_tests_ignored": 27,
+  "real_corpus_files": 126,
+  "generated_fixtures": 1,
+  "native_groups": 24,
+  "native_owner_records": 14400,
+  "native_query_records": 115200,
+  "allocation_groups": 96,
+  "allocation_captures": 576,
+  "counted_source_routes": 12,
+  "long_loop_groups": 12,
+  "long_loop_process_samples": 648,
+  "long_loop_queries_per_sample": 50000,
+  "diagnostic_groups": 8,
+  "diagnostic_processes": 96,
+  "source_sha256": "ff0fa5ce612b5670fe03e697ff7d396327eebb50c44adeb26e56830fde0993ef",
+  "performance_claim": "none"
+}

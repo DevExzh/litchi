@@ -1,0 +1,632 @@
+[
+  {
+    "path": "test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls",
+    "sha256": "cb820eb4d8e243d229c7cb7e59f0d34bf2a60c681dc597be35a5545041555175",
+    "bytes": 7168
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls",
+    "sha256": "dec7ca9e99c34ca690e2de7a43dee20f97e593829e4debaeb18fef163b26d82c",
+    "bytes": 41472
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls",
+    "sha256": "940fb6f143e8d54c545e62599dd7c38e45846db6787397283b7ec93e70eb96ae",
+    "bytes": 11264
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls",
+    "sha256": "4722bfa239b04667d88a30a99ccb4eb09223dfa52373ccd3cfadcb4c26c34ceb",
+    "bytes": 25088
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
+    "sha256": "198d430b62a84d30b27e9c281c5e9d61990dd98728433421f65663f6d7359f58",
+    "bytes": 14336
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls",
+    "sha256": "18f8f4292446f1be6f6aefeef4a805f63ee3bfd21e68b1e65cec8f99f85a16f3",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls",
+    "sha256": "bb4236efcf7f6949823fb0c136dcf28945b3b93890c6362b988ca3159906cd8b",
+    "bytes": 5632
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
+    "sha256": "9bc5f2007aedd1041728d6670b188eceedd6273f9b49507fa2904e76e6b4ee97",
+    "bytes": 9728
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls",
+    "sha256": "3eb9c3e217ba34177847b668b4b005f1bc207bb7d0541dff2a6a67791bfa2ce1",
+    "bytes": 27136
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls",
+    "sha256": "9f0f311ee9dc2960e5f4c2fc109e3e8e075bbcb1d25e3291e9f02423dd3ff0b8",
+    "bytes": 166912
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls",
+    "sha256": "d6fad9fe6fedf39e0bc483289d16bfcac9009b0e7e28f5a68d13e394d4476d26",
+    "bytes": 23040
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls",
+    "sha256": "6b4f96a131c3840938e2f757f30931ca6a824407b44f7512faab915ff270c0ff",
+    "bytes": 23552
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls",
+    "sha256": "e03b4b11db8aae26460cb0b56785e890fa324ccbf66b3299a624522792203927",
+    "bytes": 76800
+  },
+  {
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls",
+    "sha256": "dd0113ffb8dfd579169fc01a5d7e06e70e2f98dbde79c1be6291a92b85986efb",
+    "bytes": 25600
+  },
+  {
+    "path": "test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls",
+    "sha256": "eab8ae4797e6499e5c45c01b0ad55502c021103385c6fd14271e91b81e9ec537",
+    "bytes": 11264
+  },
+  {
+    "path": "test-data/office-interop/litchi-changed/tdf78897-litchi.xls",
+    "sha256": "8f881ec4ccdef867154424f296665c37cdd114456c7c9ec5efe85ff460da870d",
+    "bytes": 10752
+  },
+  {
+    "path": "test-data/ole/xls/ComplexFunctionTestCaseData.xls",
+    "sha256": "e64097dffec5a2c7ce9226efc204aa1187430a2e6bea57d0aa40deee60006bcd",
+    "bytes": 28160
+  },
+  {
+    "path": "test-data/ole/xls/ConditionalFormattingSamples copy.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "bytes": 1402368
+  },
+  {
+    "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "bytes": 1402368
+  },
+  {
+    "path": "test-data/ole/xls/DateFormats.xls",
+    "sha256": "f3ac7e6f0f23e638cfeb0d34543e18f3b07cd93edd1e7a71be907c73a767310c",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/DateTimeToNumberTestCases.xls",
+    "sha256": "424f0d0c9a183458bfa3b7c09a8cbf4edcc9cec3d72b00e68e4bb0bf27292b6c",
+    "bytes": 34304
+  },
+  {
+    "path": "test-data/ole/xls/FormulaEvalTestData.xls",
+    "sha256": "c2040c1fac1088f1e112abef197ae1f9bcb03547861783b89c1d4281a42049d1",
+    "bytes": 178176
+  },
+  {
+    "path": "test-data/ole/xls/FormulaRefs.xls",
+    "sha256": "3843a69fd55c27258b4563ea9b9efe97bd0e18c73a5f82db59daa84b5334602d",
+    "bytes": 17408
+  },
+  {
+    "path": "test-data/ole/xls/FormulaSheetRange.xls",
+    "sha256": "7b5c3e6573bb05ea488c996a95190450871b6afeef9d4abe58393f92d8973a64",
+    "bytes": 22016
+  },
+  {
+    "path": "test-data/ole/xls/HyperlinksOnManySheets.xls",
+    "sha256": "e03ddd49d757af31b897ffcc394d733131dc28ab484f9cca484351810d0935af",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/Simple.xls",
+    "sha256": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleChart.xls",
+    "sha256": "8fbef881f6d869515eca2c36dde5b74bc5ffc900ec586b01d0b547234e111569",
+    "bytes": 14336
+  },
+  {
+    "path": "test-data/ole/xls/SimpleMacro.xls",
+    "sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+    "bytes": 30720
+  },
+  {
+    "path": "test-data/ole/xls/SimpleMultiCell.xls",
+    "sha256": "f8f04c014b7503e62fa52c3b194dfaf010140a36298764d07dd9d1837ab1d037",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleScatterChart.xls",
+    "sha256": "514e82ceda320555fd8ecf7b72de55e4aeb3641f778c6447fb5073b50a691444",
+    "bytes": 43008
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithAutofilter copy.xls",
+    "sha256": "cb257bdaa23f9b36061f598af134e3ac12f84dfd54c4faa82d7f0e8bae25d971",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithAutofilter.xls",
+    "sha256": "cb257bdaa23f9b36061f598af134e3ac12f84dfd54c4faa82d7f0e8bae25d971",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithChoose copy.xls",
+    "sha256": "86a1c556ad1f976e25032fd68cb4cbef856181320932c3640c61b42dbef663c6",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithChoose.xls",
+    "sha256": "86a1c556ad1f976e25032fd68cb4cbef856181320932c3640c61b42dbef663c6",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithColours copy.xls",
+    "sha256": "350ea9306c60c4d4bf7949858e75f3277cf702f7b684a8b0597d7b2ec718070e",
+    "bytes": 6144
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithColours.xls",
+    "sha256": "350ea9306c60c4d4bf7949858e75f3277cf702f7b684a8b0597d7b2ec718070e",
+    "bytes": 6144
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithComments copy.xls",
+    "sha256": "e3f2cc5b39c78c27fc6ab9dcc7a68ab61c5d63e1f2d2bb7fa5bd41e466e34639",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithComments.xls",
+    "sha256": "e3f2cc5b39c78c27fc6ab9dcc7a68ab61c5d63e1f2d2bb7fa5bd41e466e34639",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithDataFormat copy.xls",
+    "sha256": "46f9eb234edc8c3803742415ad3e6906ec96f3de3de299fdd2ac4202f0652413",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithDataFormat.xls",
+    "sha256": "46f9eb234edc8c3803742415ad3e6906ec96f3de3de299fdd2ac4202f0652413",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithFormula copy.xls",
+    "sha256": "da02c7e43e96d8c899ec21eb07118a63eafe3d0b7287ff067c33b1c3adc8b68c",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithFormula.xls",
+    "sha256": "da02c7e43e96d8c899ec21eb07118a63eafe3d0b7287ff067c33b1c3adc8b68c",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithImages copy.xls",
+    "sha256": "43ca8e823646683b5b5c6b235f30513235f9ac1158a3dff73442fe7c0b72ee55",
+    "bytes": 48128
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithImages-mac copy.xls",
+    "sha256": "c9152232dc6df9e080d35312796ffaed232ea43848c84fb3bd170fa94ee437ce",
+    "bytes": 91648
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithImages-mac.xls",
+    "sha256": "c9152232dc6df9e080d35312796ffaed232ea43848c84fb3bd170fa94ee437ce",
+    "bytes": 91648
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithImages.xls",
+    "sha256": "43ca8e823646683b5b5c6b235f30513235f9ac1158a3dff73442fe7c0b72ee55",
+    "bytes": 48128
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithPageBreaks copy.xls",
+    "sha256": "b0634993f101dcce02e368f733a98b86dd05b3e6e29e4c1fe119f5cf3344865f",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithPageBreaks.xls",
+    "sha256": "b0634993f101dcce02e368f733a98b86dd05b3e6e29e4c1fe119f5cf3344865f",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithPrintArea copy.xls",
+    "sha256": "bbc8d3c9b3d41319e66f04bd20132077e20c19340021b014674111a8a3fd0888",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithPrintArea.xls",
+    "sha256": "bbc8d3c9b3d41319e66f04bd20132077e20c19340021b014674111a8a3fd0888",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithSkip copy.xls",
+    "sha256": "54ea1c9ec234638d7c47888350fc8996080904914788e600bb93a77e6aca2639",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithSkip.xls",
+    "sha256": "54ea1c9ec234638d7c47888350fc8996080904914788e600bb93a77e6aca2639",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithStyling copy.xls",
+    "sha256": "029d30c42f2f328bbca166bfba986b9aa8def448b7e238177999cd76602fe87b",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SimpleWithStyling.xls",
+    "sha256": "029d30c42f2f328bbca166bfba986b9aa8def448b7e238177999cd76602fe87b",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/SingleLetterRanges.xls",
+    "sha256": "2f70b43129876bda6049deb44e301ad65f2e5a806011a3969730d111ea64ca1f",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/WeekNumFunctionTestCaseData.xls",
+    "sha256": "412ac3c961af66c897102b92260f5ba6b5c51045e1fd92dcadfc92c648291bdd",
+    "bytes": 35840
+  },
+  {
+    "path": "test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls",
+    "sha256": "e31ef3a53462d9e365cbc79478bc05762c47055e5f626ecd8fe97cd4dd5b44c2",
+    "bytes": 29696
+  },
+  {
+    "path": "test-data/ole/xls/WithChart.xls",
+    "sha256": "e72315361da2e7a59d50ad5f8b92dd7464004661014b2ab9b462c2c6a48b70f1",
+    "bytes": 20992
+  },
+  {
+    "path": "test-data/ole/xls/WithCheckBoxes.xls",
+    "sha256": "8281c55a88a92644525c1fa45540897c15097cdfcca1176e5edae7618a0421ab",
+    "bytes": 16896
+  },
+  {
+    "path": "test-data/ole/xls/WithConditionalFormatting.xls",
+    "sha256": "acbf5ac10902a62df0ea1ccf3c270a82a32d6750e6b231f1538bf4a56322e7c4",
+    "bytes": 25600
+  },
+  {
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+    "bytes": 165888
+  },
+  {
+    "path": "test-data/ole/xls/WithEmbeddedObjects.xls",
+    "sha256": "da5ba0f448eaca147b23dd18f4020398555242b348b7ae0d917ed53240877aa7",
+    "bytes": 179712
+  },
+  {
+    "path": "test-data/ole/xls/WithExtendedStyles.xls",
+    "sha256": "010a884f646e7a9dfcd0d5045a9385a47b0d8ccaa9b3831b70a779653ddcd5be",
+    "bytes": 6656
+  },
+  {
+    "path": "test-data/ole/xls/WithFormattedGraphTitle.xls",
+    "sha256": "8201089ca9e8449867763467cd6ae5bd5520a511313aefb04773d3fd848361b7",
+    "bytes": 14336
+  },
+  {
+    "path": "test-data/ole/xls/WithHyperlink.xls",
+    "sha256": "c85cc593fc2fdb5bb4f0e35b0f150c7f79d9772b13dac2fa3f25ec162d2cfd5a",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/WithThreeCharts.xls",
+    "sha256": "94a8664fd81ec2c1c9d27df9175d971dc269c41584d3711c7c99a37b2ceb0d51",
+    "bytes": 32768
+  },
+  {
+    "path": "test-data/ole/xls/WithTwoCharts.xls",
+    "sha256": "1de9f7be0d5dbda7ca49eb68c4572163a7fe798c1141c6557e95f3aae5216d15",
+    "bytes": 25600
+  },
+  {
+    "path": "test-data/ole/xls/WithTwoHyperLinks.xls",
+    "sha256": "139a3ace5945fd0a1e498dd6482365b4f7f2281c879b8dcd15e10b5fb0963aa9",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/ole/xls/empty.xls",
+    "sha256": "93670866067fa703c5ffeea42129f5712af24d6bf8dc90aa3e2a7f3811494036",
+    "bytes": 24576
+  },
+  {
+    "path": "test-data/ole/xls/password.xls",
+    "sha256": "3ad12a829132d9c157d213c623af9c534b1449c42e93ab39b17ca53c909ac412",
+    "bytes": 22528
+  },
+  {
+    "path": "test-data/poi/test-data/hpsf/TestUnicode.xls",
+    "sha256": "d6e56522b14ff1be8c51270dfc612eebe5ee13b0588b189817ecd0f6193b6dc7",
+    "bytes": 7680
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/15228.xls",
+    "sha256": "ceb03c0228ad73cc382ea3d4e98223fcb6406887936f0e89b9acd2c8eb87d8fe",
+    "bytes": 692224
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/1900DateWindowing.xls",
+    "sha256": "7fe0d8901353b8846e8e0543b893eea4283008bc89ae971674b8a9b480fcd15c",
+    "bytes": 6144
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/1904DateWindowing.xls",
+    "sha256": "b83c02ab96f07c1ae86a1fbf7df6c24101db5e11fd27a9efbc9711a9b77ca079",
+    "bytes": 6144
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/24207.xls",
+    "sha256": "338ad54c025791a353b822649ceb0720067763b2b910c06c6dea0a43a36297d5",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/29942.xls",
+    "sha256": "653a49926c3aa25e330ef35d81af4559f82542a77ac56e100e8656629cbf9a0e",
+    "bytes": 109056
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/35897-type4.xls",
+    "sha256": "ec9a7eaf4969933fc8d71308e114e6504e40dcce4706fba1ea1a7be3131f325b",
+    "bytes": 19968
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/41139.xls",
+    "sha256": "8cc6e056986a32375efff353cd3a422921f5664dc0c05b75743d98c22edd4c76",
+    "bytes": 37376
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls",
+    "sha256": "e9186774ff6b1e50059238121f12270e92c83ca34e800dbe5416fc370d5b1da0",
+    "bytes": 29696
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+    "sha256": "8f34695f74d3cec8ef3826c71161b36bcdc2bc939763f346cf8347ac616a5ce0",
+    "bytes": 167424
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/45365.xls",
+    "sha256": "fe1b08f900dd236f10c6de7eb97e6089f781ce4c29c623984b81e1e8dac4c9ca",
+    "bytes": 51712
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/45492.xls",
+    "sha256": "645513d016ee4f2b3a3d953ad07c09eb4cb14ac3afda1446c58c3dce95d6d08e",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/45761.xls",
+    "sha256": "77fdc14fd7f75fec81aea79dcd2fefaa740e99fb8f372654a527b1aba4020c11",
+    "bytes": 15872
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls",
+    "sha256": "56b835b2c338dc1797cda1ca2a9b901d5c8f893189b57564daea69e7d83cf9f5",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/48968.xls",
+    "sha256": "fb06b936ded077150ab01b396978cfad508eab3380b83b87268fd539fda4a939",
+    "bytes": 22016
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/50939.xls",
+    "sha256": "bb12e76a6d982aeed8a94f8017d43316943fc41fc0b387b88c1baf7b98432409",
+    "bytes": 134144
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/53109.xls",
+    "sha256": "55f7125e8809907c22c35581fc2ff1adee411c4037654ceb190e6c495694701a",
+    "bytes": 19456
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "bytes": 984576
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls",
+    "sha256": "2c2180b8903e03fb2eda5b9d28c837001822240fd79d2f1ed7948c4744c8950c",
+    "bytes": 28160
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/57456.xls",
+    "sha256": "e09bf01066e5ca7e7d3a6d613d458b0c6ff398ad77c9c74d603f18943e3792a7",
+    "bytes": 66048
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/59858.xls",
+    "sha256": "e5b4513f628fc16088b79ef6ad019d479706111fd11da7fe41f93bd0458da43f",
+    "bytes": 1103360
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "bytes": 1402368
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/DBCSHeader.xls",
+    "sha256": "1200bbffeecf9916c83f23fdf4530a8b2632af055b7f6f7e195d569608e49d9a",
+    "bytes": 16384
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/DateFormats.xls",
+    "sha256": "f3ac7e6f0f23e638cfeb0d34543e18f3b07cd93edd1e7a71be907c73a767310c",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/DrawingAndComments.xls",
+    "sha256": "7090a0e8dcde4096621292e2a4c6a068695629491a668441269c252fcd5995d1",
+    "bytes": 43520
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/Formatting.xls",
+    "sha256": "807baef915bfa5ed0552617cfa944834fca732ed51a6c85797b1db4877ab9d80",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls",
+    "sha256": "e03ddd49d757af31b897ffcc394d733131dc28ab484f9cca484351810d0935af",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/MRExtraLines.xls",
+    "sha256": "6ed2e8bae8a8a43741180ba8d7456bce5aa61fed92750594e32bd92251b3fc10",
+    "bytes": 25088
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls",
+    "sha256": "899a29aa6ce35fee0268847ff8b5d9459e6ce34d5e2ff462fd42ee9b80837b87",
+    "bytes": 44544
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls",
+    "sha256": "a4452bc616c909ddb11626e64d618d70617a0c2f252d40f1f8aedd3092e59cdc",
+    "bytes": 31232
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/ShrinkToFit.xls",
+    "sha256": "2d5c87e0f8c56d13a85fe0cbfdfd13fadcbfc277b7454419190392e15e29dea5",
+    "bytes": 25088
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "sha256": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleMacro.xls",
+    "sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+    "bytes": 30720
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls",
+    "sha256": "514e82ceda320555fd8ecf7b72de55e4aeb3641f778c6447fb5073b50a691444",
+    "bytes": 43008
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleWithColours.xls",
+    "sha256": "350ea9306c60c4d4bf7949858e75f3277cf702f7b684a8b0597d7b2ec718070e",
+    "bytes": 6144
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleWithComments.xls",
+    "sha256": "e3f2cc5b39c78c27fc6ab9dcc7a68ab61c5d63e1f2d2bb7fa5bd41e466e34639",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls",
+    "sha256": "b0634993f101dcce02e368f733a98b86dd05b3e6e29e4c1fe119f5cf3344865f",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls",
+    "sha256": "576543ed6a61ca484b0cdec67c497a8bf42b5e4772c8d7cdf1daec1840eabacd",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls",
+    "sha256": "1fccc0922a322afff95176fb8781df10d07b5d537415f15a09b79bded7a71a0c",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/UncalcedRecord.xls",
+    "sha256": "efa16837af5bda3d7e28a4ae24a0d428a23e9393b6cff7657d31435dc51235f2",
+    "bytes": 18432
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls",
+    "sha256": "acbf5ac10902a62df0ea1ccf3c270a82a32d6750e6b231f1538bf4a56322e7c4",
+    "bytes": 25600
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls",
+    "sha256": "139a3ace5945fd0a1e498dd6482365b4f7f2281c879b8dcd15e10b5fb0963aa9",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/XRefCalc.xls",
+    "sha256": "4f125d55ebf1e9e0342ba17aa5b750bed3bb47583a29873f4daee7b3fbdda209",
+    "bytes": 18944
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/colwidth.xls",
+    "sha256": "2dc59393933b103690d1a894f959c30bcf426b61f4d90342b2ba2a0c6fd242ae",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/comments.xls",
+    "sha256": "85353e137ed884d4789fd81dee28ca60ad86238bb3a0c0587012e4c904ad8c51",
+    "bytes": 14336
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/duprich1.xls",
+    "sha256": "ef4e8ebf31bd1fb82737dda5fd9cb45c4e70d8a0c7af3836bdaa2c56257d91fe",
+    "bytes": 21504
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/duprich2.xls",
+    "sha256": "f387d8ca2a360574c7cc2ae9e3d64ea5b1cf9b769d6e02b561382e3129c61066",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/dvEmpty.xls",
+    "sha256": "ca1324e3a368f0d2fe3226974253463491d5a04d42608fdcfd0d10fa71932ad7",
+    "bytes": 16384
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/externalFunctionExample.xls",
+    "sha256": "db3a66ce1e8753b4b147bfd94d84d91e2afcef57b0a9dbc7fcf924267bc04bc9",
+    "bytes": 16896
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/external_name.xls",
+    "sha256": "571ad20771957c4f6af4b24daf7e1001782d035822879f8cd3e756948073340b",
+    "bytes": 173568
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls",
+    "sha256": "634f3f646dd532dea1f898db1cee93c022c0cc688ea8b5bb55de1d6ecfcc217a",
+    "bytes": 96768
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/named-cell-test.xls",
+    "sha256": "82e636399964e89332fb97c1630e3d521542e7d4d86670001e761a395a75a684",
+    "bytes": 96256
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/namedinput.xls",
+    "sha256": "0eb5bfa6befe5cef2b9687444ff4001ae901e9589ffcaf0af96a9a112c7f70e6",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/testNames.xls",
+    "sha256": "7f297a9d9ed53cc0745949f27cc14360f3a3f2820787a2b2c7a8754aee458b00",
+    "bytes": 31232
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls",
+    "sha256": "765b85f757704b89edfc6aa476c202685173a90a2b6a6b0d74519c924b4c5624",
+    "bytes": 13824
+  },
+  {
+    "path": "test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls",
+    "sha256": "c61c8714ae9cb77251235606cbfc84e5d289c7ce6bef940da57dd2518f3c90fa",
+    "bytes": 4096
+  }
+]

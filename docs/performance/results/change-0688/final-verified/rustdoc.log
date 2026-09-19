@@ -1,0 +1,8 @@
+HEAD 9df782b7c133a36eda339b9d45858142710cec73
+$ cargo doc -p litchi-cfb -p litchi-xls --all-features --no-deps --locked
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.62s
+   Generated /home/zhuhe/code/litchi/target/doc/litchi_cfb/index.html and 1 other file
+
+exit 0

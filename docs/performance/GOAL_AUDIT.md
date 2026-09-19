@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0688 — measured checked-chain inlining with preserved refusal semantics
+
+[0688](0688-cfb-checked-chain-hot-path.md) outlines shared CFB error formatting
+while retaining every sector/index/termination check. Two new differential
+boundary tests preserve exact typed errors and precedence. Six CFB/XLS/facade
+gates and DOC/PPT tests pass: 4,394 passed, 27 existing ignored. Real/generated
+XLS differentials, all 96 allocation groups and 12 counted I/O routes match.
+
+Matched assembly, profiles, paired latency, loop controls and counters support
+scoped long-chain query gains. Tiny-query/disabled-index costs, code growth,
+all tail triggers and process RSS remain disclosed. There is no physical
+cold-device, remote, concurrency, cross-platform or malformed-chain performance
+claim. OLE2/OOXML continue; iWork is excluded. The broader GOAL remains active,
+with no registered performance claim or CRUD coverage promotion.
+
 ## 0687 — measured shared CFB name construction with explicit tradeoffs
 
 [0687](0687-cfb-ascii-directory-keys.md) uses bounded inline ASCII directory
