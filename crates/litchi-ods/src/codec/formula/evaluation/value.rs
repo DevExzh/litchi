@@ -20,6 +20,13 @@
 //! and `TRANSPOSE`. Numeric matrix operations require finite numeric elements;
 //! `TRANSPOSE` preserves element types. `MUNIT` truncates its size toward zero.
 //! Singular inverses and non-finite arithmetic produce formula errors.
+//! The numeric aggregate family includes `SUM`, `PRODUCT`, `SUMSQ`,
+//! `SUMPRODUCT`, `SUMX2MY2`, `SUMX2PY2`, and `SUMXMY2`. `SUM` and `PRODUCT`
+//! consume `NumberSequenceList` arguments, while `SUMSQ` consumes a single
+//! `NumberSequence` shape and therefore rejects an explicit reference list.
+//! The four remaining reducers consume forced arrays with equal row and
+//! column counts; a scalar operand is a one-by-one array and is never
+//! broadcast across a larger matrix.
 //!
 //! Both profiles support all 26 complex-number functions through
 //! [`Value::Complex`]. `IMSUM` and `IMPRODUCT` consume arrays and ordered
@@ -128,6 +135,7 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // The scalar bridge is owned by the evaluator integration agent.  Keeping it
 // private here gives the future VM one place to preserve Empty until the
 // consuming operator/function chooses a target type.
+mod aggregate;
 mod complex;
 mod database;
 #[allow(dead_code)]
@@ -1221,6 +1229,13 @@ impl<'a> RuntimeAreaSet<'a> {
                 evaluator.limits.max_reference_cells,
             ))
         })?;
+        if cell_count > evaluator.limits.max_reference_cells {
+            return Err(EvaluationFailure::ResourceLimit(evaluator.local_limit(
+                Resource::Objects,
+                u64::try_from(cell_count).unwrap_or(u64::MAX),
+                evaluator.limits.max_reference_cells,
+            )));
+        }
         ensure_capacity(
             &mut self.areas,
             &mut self.area_reservation,
@@ -2513,6 +2528,7 @@ where
         let is_sequence = name.eq_ignore_ascii_case("AND")
             || name.eq_ignore_ascii_case("OR")
             || complex::is_complex_sequence_function(name)
+            || aggregate::is_aggregate_function(name)
             || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
             if let Some(value) = self.demand_cache_get(node)? {
@@ -2539,7 +2555,12 @@ where
                 } else {
                     ValueFrame::VisitMatrixArgument(child)
                 }
-            } else if self.projection.is_some() && complex::is_complex_sequence_function(name) {
+            } else if aggregate::is_matrix_aggregate_function(name) {
+                ValueFrame::VisitMatrixArgument(child)
+            } else if self.projection.is_some()
+                && (complex::is_complex_sequence_function(name)
+                    || aggregate::is_aggregate_function(name))
+            {
                 ValueFrame::VisitMatrixArgument(child)
             } else {
                 ValueFrame::VisitArgument(child)
@@ -3001,6 +3022,14 @@ where
             super::Kind::Function { .. } if Self::matrix_function_node(node) => {
                 self.cacheable_matrix_branch(node)
             },
+            // Aggregate subtrees are reduced to one value and can be
+            // invariant under an enclosing projected matrix demand when all
+            // of their descendants are source-independent.  Use the
+            // iterative matrix classifier here so deeply nested reductions
+            // cannot recurse through the Rust call stack.
+            super::Kind::Function { name } if aggregate::is_aggregate_function(name) => {
+                self.cacheable_matrix_branch(node)
+            },
             super::Kind::Function { name } if database::is_database_function(name) => {
                 for index in 0..node.child_count() {
                     self.scalar.charge_work(1)?;
@@ -3022,11 +3051,10 @@ where
             {
                 let mut cacheable = true;
                 for index in 0..node.child_count() {
-                    // Only a scalar literal or a reference consumed by the
-                    // sequence aggregate is safe to retain across matrix
-                    // demands. A direct reference remains projection-shaped:
-                    // caching it here would reuse the first cell for every
-                    // output position.
+                    // Only a scalar literal or a fixed local reference is
+                    // safe to retain across matrix demands. The sequence
+                    // aggregate consumes the complete reference descriptor,
+                    // rather than the projected cell at the current output.
                     self.scalar.charge_work(1)?;
                     let Some(child) = node.child(index) else {
                         return Ok(false);
@@ -3048,13 +3076,13 @@ where
 
     /// Check that a matrix-function branch has no source-dependent operand.
     ///
-    /// This is deliberately a small iterative prepass.  MatrixState owns the
+    /// This is deliberately a small iterative prepass. MatrixState owns the
     /// resulting value, so the cache is safe only when every descendant is a
-    /// literal or a deterministic operator/function over literals.  In
-    /// particular, references, names, labels, and automatic intersections
-    /// are rejected instead of caching the first projected cell.  The local
-    /// reservation is declared before the scratch vector so the vector is
-    /// dropped before its budget token on every return path.
+    /// literal or a deterministic operator/function over fixed local
+    /// references. Source references, names, labels, and automatic
+    /// intersections remain rejected. The local reservation is declared
+    /// before the scratch vector so the vector is dropped before its budget
+    /// token on every return path.
     fn cacheable_matrix_branch(&mut self, root: super::Node<'expr>) -> EvaluationResult<bool> {
         let mut reservation = None;
         let mut nodes = Vec::new();
@@ -3071,8 +3099,12 @@ where
         while let Some(node) = nodes.pop() {
             self.scalar.charge_work(1)?;
             match node.kind() {
-                super::Kind::Reference(_)
-                | super::Kind::NamedExpression { .. }
+                super::Kind::Reference(reference) => {
+                    if !Self::cacheable_reference(reference) {
+                        return Ok(false);
+                    }
+                },
+                super::Kind::NamedExpression { .. }
                 | super::Kind::AutomaticIntersection
                 | super::Kind::QuotedLabel { .. } => return Ok(false),
                 super::Kind::Number
@@ -3702,6 +3734,7 @@ where
                     }
                     if let super::Kind::Function { name } = node.kind() {
                         if complex::is_complex_sequence_function(name)
+                            || aggregate::is_aggregate_function(name)
                             || database::is_database_function(name)
                         {
                             // Database functions, IMSUM and IMPRODUCT reduce their complete
@@ -4610,6 +4643,7 @@ where
                         if name.eq_ignore_ascii_case("AND")
                             || name.eq_ignore_ascii_case("OR")
                             || complex::is_complex_sequence_function(name)
+                            || aggregate::is_aggregate_function(name)
                             || database::is_database_function(name)
                         {
                             continue;
@@ -5253,6 +5287,7 @@ where
             super::Kind::Function { name }
                 if name.eq_ignore_ascii_case("AND")
                     || name.eq_ignore_ascii_case("OR")
+                    || aggregate::is_aggregate_function(name)
                     || name.eq_ignore_ascii_case("TRUE")
                     || name.eq_ignore_ascii_case("FALSE") =>
             {
@@ -6064,6 +6099,20 @@ where
             arguments.push(self.pop_value()?);
         }
         arguments.reverse();
+
+        if aggregate::is_aggregate_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = aggregate::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
 
         if database::is_database_function(name) {
             let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;

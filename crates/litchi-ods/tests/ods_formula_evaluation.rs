@@ -302,7 +302,7 @@ fn context_dependent_features_are_explicit_capability_refusals() {
     assert_unsupported("={1;2|3}", UnsupportedKind::Array);
     assert_unsupported("=Named", UnsupportedKind::NamedExpression);
     assert_unsupported("='Column Label'", UnsupportedKind::Label);
-    assert_unsupported("=SUM(1)", UnsupportedKind::Function);
+    assert_unsupported("=SUMIF(1;1)", UnsupportedKind::Function);
 }
 
 #[test]

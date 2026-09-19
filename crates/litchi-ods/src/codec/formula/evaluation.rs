@@ -9,6 +9,10 @@
 //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
 //! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
 //! `ARABIC` and `ROMAN` conversions.  It also carries the complete section
+//! 6.16 scalar aggregate admission (`SUM`, `PRODUCT`, `SUMSQ`, `SUMPRODUCT`,
+//! `SUMX2MY2`, `SUMX2PY2`, and `SUMXMY2`); forced-array calls with scalar
+//! operands use their normative 1x1 shape, while multi-cell arrays and
+//! references remain in the value VM. It also carries the complete section
 //! 6.8 complex-number family as a distinguished scalar value, the complete
 //! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
 //! `ACOSH`, `ACOT`, `ACOTH`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `COS`,
@@ -126,8 +130,10 @@
 //! # }
 //! ```
 
+mod aggregate;
 pub mod complex;
 mod elementary;
+pub(super) mod numerics;
 mod radix;
 mod roman;
 mod rounding;
@@ -862,6 +868,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if aggregate::is_aggregate_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if radix::is_radix_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -961,6 +971,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             || name.eq_ignore_ascii_case("BITXOR")
         {
             return self.apply_bitwise(node, name);
+        }
+        if aggregate::is_aggregate_function(name) {
+            return aggregate::apply(self, node, name);
         }
         if radix::is_radix_function(name) {
             return radix::apply(self, node, name);
