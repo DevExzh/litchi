@@ -6692,6 +6692,74 @@ impl SourceBackedPackage {
         }))
     }
 
+    /// Read and retain the exact physical `[Content_Types].xml` member under
+    /// the caller's bounded payload policy. The returned handle keeps managed
+    /// memory/object reservations alive for the lifetime of the read-set
+    /// owner, matching [`Self::relationships_data_for_with_limit`].
+    pub fn content_types_data_with_limit(&self, maximum: usize) -> Result<PartData> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let Some(entry) = self.archive.entry_id(&self.content_types_member) else {
+            return Err(OpcError::PartNotFound(self.content_types_member.clone()));
+        };
+        let metadata = self.archive.metadata_for(entry)?;
+        let maximum = maximum.min(self.limits.max_content_types_bytes());
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.limits.check(
+            ReadResource::ContentTypesBytes,
+            metadata.uncompressed_size(),
+            maximum as u64,
+        )?;
+        self.limits.check(
+            ReadResource::PartBytes,
+            metadata.uncompressed_size(),
+            self.limits.max_part_bytes(),
+        )?;
+        let resources = self
+            .cache
+            .reserve_direct_payload(metadata.uncompressed_size())
+            .map_err(map_execution_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.source.monitor_publication();
+        let read_result = self
+            .archive
+            .read_entry(entry)
+            .map_err(map_preservation_error);
+        let source_result = self.source.ensure_current();
+        let execution_result = self.cache.check_context().map_err(map_execution_error);
+        let bytes = match (source_result, execution_result, read_result) {
+            (Err(error), _, _) => return Err(error),
+            (Ok(()), Err(error), _) => return Err(error),
+            (Ok(()), Ok(()), Err(error)) => return Err(error),
+            (Ok(()), Ok(()), Ok(bytes)) => bytes,
+        };
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if bytes.len() as u64 != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC content-types member declared {} uncompressed bytes but read {}",
+                metadata.uncompressed_size(),
+                bytes.len()
+            )));
+        }
+        self.limits.check(
+            ReadResource::ContentTypesBytes,
+            bytes.len() as u64,
+            maximum as u64,
+        )?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(PartData {
+            payload: CachedPayload {
+                bytes: Arc::new(bytes),
+                reservation: resources.reservation,
+                object_reservation: resources.payload_object_reservation,
+            },
+        })
+    }
+
     /// Whether any retained physical member declares traditional ZIP encryption.
     ///
     /// This is central-directory metadata captured during bounded open; it does
@@ -10784,7 +10852,17 @@ impl SourceBackedPackage {
         }
     }
 
-    fn has_signature_infrastructure(&self) -> bool {
+    /// Whether the package's physical inventory contains recognized signature
+    /// infrastructure.
+    ///
+    /// This is a conservative metadata query over the open-time central
+    /// directory, relationship declarations, and content-type declarations.
+    /// It does not read or decrypt member payloads and does not reserve managed
+    /// memory, object, or work budget. The result describes the package's
+    /// captured source snapshot; publication operations still perform their
+    /// own source-freshness checks before emitting bytes.
+    #[must_use]
+    pub fn has_signature_infrastructure(&self) -> bool {
         // The central-directory names are the authoritative physical-member
         // inventory. Scanning them does not materialize any payload and also
         // covers raw/non-Part members (including reserved relationship
@@ -14773,6 +14851,173 @@ mod tests {
             Err(OpcError::Cancelled)
         ));
         assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Work), work_before);
+    }
+
+    #[test]
+    fn source_content_types_handle_charges_work_and_releases_memory_on_drop() {
+        let source = archive_bytes(root_relationships(), b"<document/>", false);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let entry = package
+            .archive
+            .entry_id(&package.content_types_member)
+            .expect("the content-types member is present");
+        let expected = package.archive.read_entry(entry).unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+
+        let data = package
+            .content_types_data_with_limit(expected.len())
+            .unwrap();
+        assert_eq!(data.as_bytes(), expected.as_slice());
+        assert_eq!(
+            budget.used(Resource::Memory),
+            memory_before + expected.len() as u64
+        );
+        assert_eq!(budget.used(Resource::Objects), objects_before + 1);
+        assert_eq!(
+            budget.used(Resource::Work),
+            work_before + expected.len() as u64
+        );
+        drop(data);
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        // Work is cumulative by design and therefore remains charged after
+        // the source handle releases its retained decoded bytes.
+        assert_eq!(
+            budget.used(Resource::Work),
+            work_before + expected.len() as u64
+        );
+    }
+
+    #[test]
+    fn source_content_types_handle_checks_caller_limit_before_budget_charge() {
+        let source = archive_bytes(root_relationships(), b"<document/>", false);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let entry = package
+            .archive
+            .entry_id(&package.content_types_member)
+            .expect("the content-types member is present");
+        let declared = package
+            .archive
+            .metadata_for(entry)
+            .unwrap()
+            .uncompressed_size() as usize;
+        let maximum = declared - 1;
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+
+        let error = package.content_types_data_with_limit(maximum).unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::ReadLimit {
+                resource: ReadResource::ContentTypesBytes,
+                actual,
+                maximum: observed_maximum,
+            } if actual == declared as u64 && observed_maximum == maximum as u64
+        ));
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        assert_eq!(budget.used(Resource::Work), work_before);
+    }
+
+    #[test]
+    fn source_content_types_handle_checks_cancellation_before_read() {
+        let source = archive_bytes(root_relationships(), b"<document/>", false);
+        let (budget, cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            package.content_types_data_with_limit(usize::MAX),
+            Err(OpcError::Cancelled)
+        ));
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        assert_eq!(budget.used(Resource::Work), work_before);
+    }
+
+    #[test]
+    fn source_content_types_handle_releases_reservations_when_source_changes_during_read() {
+        let source_bytes = archive_bytes(root_relationships(), b"<document/>", false);
+        let marker =
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#;
+        let payload_offset = source_bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("content-types payload is present");
+        let source = Arc::new(ChangeDuringPayloadSource::new(source_bytes, payload_offset));
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+        source.armed.store(true, Ordering::SeqCst);
+
+        assert!(matches!(
+            package.content_types_data_with_limit(usize::MAX),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        // Work is charged for the attempted decode even though publication of
+        // the returned handle is rejected by the source-version fence.
+        assert!(budget.used(Resource::Work) > work_before);
+    }
+
+    #[test]
+    fn source_signature_query_is_metadata_only_and_conservative() {
+        let ordinary = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"<document/>", false),
+        )))
+        .unwrap();
+        assert!(!ordinary.has_signature_infrastructure());
+
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let signed = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(signed_archive(b"<document/>"))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+        assert!(signed.has_signature_infrastructure());
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
         assert_eq!(budget.used(Resource::Work), work_before);
     }
 

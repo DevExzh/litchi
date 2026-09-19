@@ -1,0 +1,3561 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "sample_count": 360,
+  "percentile_method": "linear interpolation over sorted raw samples using (n - 1) * fraction",
+  "groups": [
+    {
+      "fixture": "singlecontrol",
+      "lane": "eager_noop_save_reopen",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 1799019,
+          "p50": 1820179,
+          "p95": 1828960,
+          "p99": 1831911.2,
+          "max": 1832649
+        },
+        "alloc_calls": {
+          "min": 13983,
+          "p50": 13983,
+          "p95": 13983,
+          "p99": 13983,
+          "max": 13983
+        },
+        "alloc_bytes_requested": {
+          "min": 5225787,
+          "p50": 5225787,
+          "p95": 5225787,
+          "p99": 5225787,
+          "max": 5225787
+        },
+        "dealloc_calls": {
+          "min": 13983,
+          "p50": 13983,
+          "p95": 13983,
+          "p99": 13983,
+          "max": 13983
+        },
+        "dealloc_bytes_requested": {
+          "min": 5464238,
+          "p50": 5464238,
+          "p95": 5464238,
+          "p99": 5464238,
+          "max": 5464238
+        },
+        "realloc_calls": {
+          "min": 1451,
+          "p50": 1451,
+          "p95": 1451,
+          "p99": 1451,
+          "max": 1451
+        },
+        "realloc_bytes_requested": {
+          "min": 588651,
+          "p50": 588651,
+          "p95": 588651,
+          "p99": 588651,
+          "max": 588651
+        },
+        "requested_event_bytes": {
+          "min": 5814438,
+          "p50": 5814438,
+          "p95": 5814438,
+          "p99": 5814438,
+          "max": 5814438
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 234809,
+          "p50": 234809,
+          "p95": 234809,
+          "p99": 234809,
+          "max": 234809
+        },
+        "rss_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "rss_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "eager_read",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 748394,
+          "p50": 759994,
+          "p95": 770881,
+          "p99": 771827.4,
+          "max": 772064
+        },
+        "alloc_calls": {
+          "min": 6362,
+          "p50": 6362,
+          "p95": 6362,
+          "p99": 6362,
+          "max": 6362
+        },
+        "alloc_bytes_requested": {
+          "min": 2280221,
+          "p50": 2280221,
+          "p95": 2280221,
+          "p99": 2280221,
+          "max": 2280221
+        },
+        "dealloc_calls": {
+          "min": 6362,
+          "p50": 6362,
+          "p95": 6362,
+          "p99": 6362,
+          "max": 6362
+        },
+        "dealloc_bytes_requested": {
+          "min": 2398176,
+          "p50": 2398176,
+          "p95": 2398176,
+          "p99": 2398176,
+          "max": 2398176
+        },
+        "realloc_calls": {
+          "min": 650,
+          "p50": 650,
+          "p95": 650,
+          "p99": 650,
+          "max": 650
+        },
+        "realloc_bytes_requested": {
+          "min": 290571,
+          "p50": 290571,
+          "p95": 290571,
+          "p99": 290571,
+          "max": 290571
+        },
+        "requested_event_bytes": {
+          "min": 2570792,
+          "p50": 2570792,
+          "p95": 2570792,
+          "p99": 2570792,
+          "max": 2570792
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 66796,
+          "p50": 66796,
+          "p95": 66796,
+          "p99": 66796,
+          "max": 66796
+        },
+        "rss_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "rss_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "eager_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3968039,
+          "p50": 3985289,
+          "p95": 4000011.7,
+          "p99": 4005297.54,
+          "max": 4006619
+        },
+        "alloc_calls": {
+          "min": 30744,
+          "p50": 30744,
+          "p95": 30744,
+          "p99": 30744,
+          "max": 30744
+        },
+        "alloc_bytes_requested": {
+          "min": 19844958,
+          "p50": 19844958,
+          "p95": 19844958,
+          "p99": 19844958,
+          "max": 19844958
+        },
+        "dealloc_calls": {
+          "min": 30742,
+          "p50": 30742,
+          "p95": 30742,
+          "p99": 30742,
+          "max": 30742
+        },
+        "dealloc_bytes_requested": {
+          "min": 20431793,
+          "p50": 20431793,
+          "p95": 20431793,
+          "p99": 20431793,
+          "max": 20431793
+        },
+        "realloc_calls": {
+          "min": 3633,
+          "p50": 3633,
+          "p95": 3633,
+          "p99": 3633,
+          "max": 3633
+        },
+        "realloc_bytes_requested": {
+          "min": 1451545,
+          "p50": 1451545,
+          "p95": 1451545,
+          "p99": 1451545,
+          "max": 1451545
+        },
+        "requested_event_bytes": {
+          "min": 21296503,
+          "p50": 21296503,
+          "p95": 21296503,
+          "p99": 21296503,
+          "max": 21296503
+        },
+        "live_bytes_delta": {
+          "min": 856,
+          "p50": 856,
+          "p95": 856,
+          "p99": 856,
+          "max": 856
+        },
+        "peak_live_bytes": {
+          "min": 8411852,
+          "p50": 8411852,
+          "p95": 8411852,
+          "p99": 8411852,
+          "max": 8411852
+        },
+        "rss_before_bytes": {
+          "min": 9449472,
+          "p50": 9469952,
+          "p95": 9469952,
+          "p99": 9469952,
+          "max": 9469952
+        },
+        "rss_after_bytes": {
+          "min": 9449472,
+          "p50": 9469952,
+          "p95": 9469952,
+          "p99": 9469952,
+          "max": 9469952
+        },
+        "hwm_before_bytes": {
+          "min": 9449472,
+          "p50": 9469952,
+          "p95": 9469952,
+          "p99": 9469952,
+          "max": 9469952
+        },
+        "hwm_after_bytes": {
+          "min": 9449472,
+          "p50": 9469952,
+          "p95": 9469952,
+          "p99": 9469952,
+          "max": 9469952
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "source_forward_apply",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 890554,
+          "p50": 906304,
+          "p95": 917304.7,
+          "p99": 930520.14,
+          "max": 933824
+        },
+        "alloc_calls": {
+          "min": 7014,
+          "p50": 7014,
+          "p95": 7014,
+          "p99": 7014,
+          "max": 7014
+        },
+        "alloc_bytes_requested": {
+          "min": 2317866,
+          "p50": 2317866,
+          "p95": 2317866,
+          "p99": 2317866,
+          "max": 2317866
+        },
+        "dealloc_calls": {
+          "min": 7019,
+          "p50": 7019,
+          "p95": 7019,
+          "p99": 7019,
+          "max": 7019
+        },
+        "dealloc_bytes_requested": {
+          "min": 2441071,
+          "p50": 2441071,
+          "p95": 2441071,
+          "p99": 2441071,
+          "max": 2441071
+        },
+        "realloc_calls": {
+          "min": 742,
+          "p50": 742,
+          "p95": 742,
+          "p99": 742,
+          "max": 742
+        },
+        "realloc_bytes_requested": {
+          "min": 296149,
+          "p50": 296149,
+          "p95": 296149,
+          "p99": 296149,
+          "max": 296149
+        },
+        "requested_event_bytes": {
+          "min": 2614015,
+          "p50": 2614015,
+          "p95": 2614015,
+          "p99": 2614015,
+          "max": 2614015
+        },
+        "live_bytes_delta": {
+          "min": -2276,
+          "p50": -2276,
+          "p95": -2276,
+          "p99": -2276,
+          "max": -2276
+        },
+        "peak_live_bytes": {
+          "min": 78601,
+          "p50": 78601,
+          "p95": 78601,
+          "p99": 78601,
+          "max": 78601
+        },
+        "rss_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "rss_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "source_inverse_apply",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 862564,
+          "p50": 872915,
+          "p95": 899990,
+          "p99": 911330,
+          "max": 914165
+        },
+        "alloc_calls": {
+          "min": 7018,
+          "p50": 7018,
+          "p95": 7018,
+          "p99": 7018,
+          "max": 7018
+        },
+        "alloc_bytes_requested": {
+          "min": 2319550,
+          "p50": 2319550,
+          "p95": 2319550,
+          "p99": 2319550,
+          "max": 2319550
+        },
+        "dealloc_calls": {
+          "min": 7014,
+          "p50": 7014,
+          "p95": 7014,
+          "p99": 7014,
+          "max": 7014
+        },
+        "dealloc_bytes_requested": {
+          "min": 2438779,
+          "p50": 2438779,
+          "p95": 2438779,
+          "p99": 2438779,
+          "max": 2438779
+        },
+        "realloc_calls": {
+          "min": 742,
+          "p50": 742,
+          "p95": 742,
+          "p99": 742,
+          "max": 742
+        },
+        "realloc_bytes_requested": {
+          "min": 296147,
+          "p50": 296147,
+          "p95": 296147,
+          "p99": 296147,
+          "max": 296147
+        },
+        "requested_event_bytes": {
+          "min": 2615697,
+          "p50": 2615697,
+          "p95": 2615697,
+          "p99": 2615697,
+          "max": 2615697
+        },
+        "live_bytes_delta": {
+          "min": 1698,
+          "p50": 1698,
+          "p95": 1698,
+          "p99": 1698,
+          "max": 1698
+        },
+        "peak_live_bytes": {
+          "min": 80299,
+          "p50": 80299,
+          "p95": 80299,
+          "p99": 80299,
+          "max": 80299
+        },
+        "rss_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "rss_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "source_noop_save_reopen",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 2644413,
+          "p50": 2669123,
+          "p95": 2674861,
+          "p99": 2675286.6,
+          "max": 2675393
+        },
+        "alloc_calls": {
+          "min": 20775,
+          "p50": 20775,
+          "p95": 20775,
+          "p99": 20775,
+          "max": 20775
+        },
+        "alloc_bytes_requested": {
+          "min": 8648646,
+          "p50": 8648646,
+          "p95": 8648646,
+          "p99": 8648646,
+          "max": 8648646
+        },
+        "dealloc_calls": {
+          "min": 20999,
+          "p50": 20999,
+          "p95": 20999,
+          "p99": 20999,
+          "max": 20999
+        },
+        "dealloc_bytes_requested": {
+          "min": 9021663,
+          "p50": 9021663,
+          "p95": 9021663,
+          "p99": 9021663,
+          "max": 9021663
+        },
+        "realloc_calls": {
+          "min": 2070,
+          "p50": 2070,
+          "p95": 2070,
+          "p99": 2070,
+          "max": 2070
+        },
+        "realloc_bytes_requested": {
+          "min": 876137,
+          "p50": 876137,
+          "p95": 876137,
+          "p99": 876137,
+          "max": 876137
+        },
+        "requested_event_bytes": {
+          "min": 9524783,
+          "p50": 9524783,
+          "p95": 9524783,
+          "p99": 9524783,
+          "max": 9524783
+        },
+        "live_bytes_delta": {
+          "min": -18385,
+          "p50": -18385,
+          "p95": -18385,
+          "p99": -18385,
+          "max": -18385
+        },
+        "peak_live_bytes": {
+          "min": 268672,
+          "p50": 268672,
+          "p95": 268672,
+          "p99": 268672,
+          "max": 268672
+        },
+        "rss_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "rss_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "source_read_calls": {
+          "min": 40,
+          "p50": 40,
+          "p95": 40,
+          "p99": 40,
+          "max": 40
+        },
+        "source_read_bytes": {
+          "min": 23823,
+          "p50": 23823,
+          "p95": 23823,
+          "p99": 23823,
+          "max": 23823
+        },
+        "source_request_bytes": {
+          "min": 23823,
+          "p50": 23823,
+          "p95": 23823,
+          "p99": 23823,
+          "max": 23823
+        },
+        "source_max_request_bytes": {
+          "min": 17915,
+          "p50": 17915,
+          "p95": 17915,
+          "p99": 17915,
+          "max": 17915
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 216,
+          "p50": 216,
+          "p95": 216,
+          "p99": 216,
+          "max": 216
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "source_read",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 788714,
+          "p50": 803513,
+          "p95": 810102,
+          "p99": 811423.6,
+          "max": 811754
+        },
+        "alloc_calls": {
+          "min": 6558,
+          "p50": 6558,
+          "p95": 6558,
+          "p99": 6558,
+          "max": 6558
+        },
+        "alloc_bytes_requested": {
+          "min": 3026917,
+          "p50": 3026917,
+          "p95": 3026917,
+          "p99": 3026917,
+          "max": 3026917
+        },
+        "dealloc_calls": {
+          "min": 6545,
+          "p50": 6545,
+          "p95": 6545,
+          "p99": 6545,
+          "max": 6545
+        },
+        "dealloc_bytes_requested": {
+          "min": 3136030,
+          "p50": 3136030,
+          "p95": 3136030,
+          "p99": 3136030,
+          "max": 3136030
+        },
+        "realloc_calls": {
+          "min": 630,
+          "p50": 630,
+          "p95": 630,
+          "p99": 630,
+          "max": 630
+        },
+        "realloc_bytes_requested": {
+          "min": 288370,
+          "p50": 288370,
+          "p95": 288370,
+          "p99": 288370,
+          "max": 288370
+        },
+        "requested_event_bytes": {
+          "min": 3315287,
+          "p50": 3315287,
+          "p95": 3315287,
+          "p99": 3315287,
+          "max": 3315287
+        },
+        "live_bytes_delta": {
+          "min": 7660,
+          "p50": 7660,
+          "p95": 7660,
+          "p99": 7660,
+          "max": 7660
+        },
+        "peak_live_bytes": {
+          "min": 140705,
+          "p50": 140705,
+          "p95": 140705,
+          "p99": 140705,
+          "max": 140705
+        },
+        "rss_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "rss_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_before_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "hwm_after_bytes": {
+          "min": 9412608,
+          "p50": 9412608,
+          "p95": 9412608,
+          "p99": 9412608,
+          "max": 9412608
+        },
+        "source_read_calls": {
+          "min": 27,
+          "p50": 27,
+          "p95": 27,
+          "p99": 27,
+          "max": 27
+        },
+        "source_read_bytes": {
+          "min": 4563,
+          "p50": 4563,
+          "p95": 4563,
+          "p99": 4563,
+          "max": 4563
+        },
+        "source_request_bytes": {
+          "min": 4563,
+          "p50": 4563,
+          "p95": 4563,
+          "p99": 4563,
+          "max": 4563
+        },
+        "source_max_request_bytes": {
+          "min": 980,
+          "p50": 980,
+          "p95": 980,
+          "p99": 980,
+          "max": 980
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 119,
+          "p50": 119,
+          "p95": 119,
+          "p99": 119,
+          "max": 119
+        }
+      }
+    },
+    {
+      "fixture": "singlecontrol",
+      "lane": "source_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "Checked",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3570818,
+          "p50": 3591387,
+          "p95": 3616298.7,
+          "p99": 3617121.34,
+          "max": 3617327
+        },
+        "alloc_calls": {
+          "min": 27518,
+          "p50": 27518,
+          "p95": 27518,
+          "p99": 27518,
+          "max": 27518
+        },
+        "alloc_bytes_requested": {
+          "min": 11335146,
+          "p50": 11335146,
+          "p95": 11335146,
+          "p99": 11335146,
+          "max": 11335146
+        },
+        "dealloc_calls": {
+          "min": 27742,
+          "p50": 27742,
+          "p95": 27742,
+          "p99": 27742,
+          "max": 27742
+        },
+        "dealloc_bytes_requested": {
+          "min": 11858735,
+          "p50": 11858735,
+          "p95": 11858735,
+          "p99": 11858735,
+          "max": 11858735
+        },
+        "realloc_calls": {
+          "min": 2757,
+          "p50": 2757,
+          "p95": 2757,
+          "p99": 2757,
+          "max": 2757
+        },
+        "realloc_bytes_requested": {
+          "min": 1231946,
+          "p50": 1231946,
+          "p95": 1231946,
+          "p99": 1231946,
+          "max": 1231946
+        },
+        "requested_event_bytes": {
+          "min": 12567092,
+          "p50": 12567092,
+          "p95": 12567092,
+          "p99": 12567092,
+          "max": 12567092
+        },
+        "live_bytes_delta": {
+          "min": -18385,
+          "p50": -18385,
+          "p95": -18385,
+          "p99": -18385,
+          "max": -18385
+        },
+        "peak_live_bytes": {
+          "min": 571957,
+          "p50": 571957,
+          "p95": 571957,
+          "p99": 571957,
+          "max": 571957
+        },
+        "rss_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "rss_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_before_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "hwm_after_bytes": {
+          "min": 9474048,
+          "p50": 9474048,
+          "p95": 9474048,
+          "p99": 9474048,
+          "max": 9474048
+        },
+        "source_read_calls": {
+          "min": 112,
+          "p50": 112,
+          "p95": 112,
+          "p99": 112,
+          "max": 112
+        },
+        "source_read_bytes": {
+          "min": 28052,
+          "p50": 28052,
+          "p95": 28052,
+          "p99": 28052,
+          "max": 28052
+        },
+        "source_request_bytes": {
+          "min": 28052,
+          "p50": 28052,
+          "p95": 28052,
+          "p99": 28052,
+          "max": 28052
+        },
+        "source_max_request_bytes": {
+          "min": 3591,
+          "p50": 3591,
+          "p95": 3591,
+          "p99": 3591,
+          "max": 3591
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 664,
+          "p50": 664,
+          "p95": 664,
+          "p99": 664,
+          "max": 664
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "eager_noop_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 2487293,
+          "p50": 2510712,
+          "p95": 2533066.3,
+          "p99": 2535799.66,
+          "max": 2536483
+        },
+        "alloc_calls": {
+          "min": 19998,
+          "p50": 19998,
+          "p95": 19998,
+          "p99": 19998,
+          "max": 19998
+        },
+        "alloc_bytes_requested": {
+          "min": 8385825,
+          "p50": 8385825,
+          "p95": 8385825,
+          "p99": 8385825,
+          "max": 8385825
+        },
+        "dealloc_calls": {
+          "min": 19998,
+          "p50": 19998,
+          "p95": 19998,
+          "p99": 19998,
+          "max": 19998
+        },
+        "dealloc_bytes_requested": {
+          "min": 8679582,
+          "p50": 8679582,
+          "p95": 8679582,
+          "p99": 8679582,
+          "max": 8679582
+        },
+        "realloc_calls": {
+          "min": 1629,
+          "p50": 1629,
+          "p95": 1629,
+          "p99": 1629,
+          "max": 1629
+        },
+        "realloc_bytes_requested": {
+          "min": 750966,
+          "p50": 750966,
+          "p95": 750966,
+          "p99": 750966,
+          "max": 750966
+        },
+        "requested_event_bytes": {
+          "min": 9136791,
+          "p50": 9136791,
+          "p95": 9136791,
+          "p99": 9136791,
+          "max": 9136791
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 182378,
+          "p50": 182378,
+          "p95": 182378,
+          "p99": 182378,
+          "max": 182378
+        },
+        "rss_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "rss_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "eager_read",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 1114666,
+          "p50": 1121575,
+          "p95": 1136141.3,
+          "p99": 1150993.06,
+          "max": 1154706
+        },
+        "alloc_calls": {
+          "min": 9298,
+          "p50": 9298,
+          "p95": 9298,
+          "p99": 9298,
+          "max": 9298
+        },
+        "alloc_bytes_requested": {
+          "min": 3885852,
+          "p50": 3885852,
+          "p95": 3885852,
+          "p99": 3885852,
+          "max": 3885852
+        },
+        "dealloc_calls": {
+          "min": 9298,
+          "p50": 9298,
+          "p95": 9298,
+          "p99": 9298,
+          "max": 9298
+        },
+        "dealloc_bytes_requested": {
+          "min": 4028913,
+          "p50": 4028913,
+          "p95": 4028913,
+          "p99": 4028913,
+          "max": 4028913
+        },
+        "realloc_calls": {
+          "min": 727,
+          "p50": 727,
+          "p95": 727,
+          "p99": 727,
+          "max": 727
+        },
+        "realloc_bytes_requested": {
+          "min": 364884,
+          "p50": 364884,
+          "p95": 364884,
+          "p99": 364884,
+          "max": 364884
+        },
+        "requested_event_bytes": {
+          "min": 4250736,
+          "p50": 4250736,
+          "p95": 4250736,
+          "p99": 4250736,
+          "max": 4250736
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 115230,
+          "p50": 115230,
+          "p95": 115230,
+          "p99": 115230,
+          "max": 115230
+        },
+        "rss_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "rss_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "eager_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 5084335,
+          "p50": 5112055,
+          "p95": 5164444,
+          "p99": 5173980.8,
+          "max": 5176365
+        },
+        "alloc_calls": {
+          "min": 41309,
+          "p50": 41309,
+          "p95": 41309,
+          "p99": 41309,
+          "max": 41309
+        },
+        "alloc_bytes_requested": {
+          "min": 25155276,
+          "p50": 25155276,
+          "p95": 25155276,
+          "p99": 25155276,
+          "max": 25155276
+        },
+        "dealloc_calls": {
+          "min": 41309,
+          "p50": 41309,
+          "p95": 41309,
+          "p99": 41309,
+          "max": 41309
+        },
+        "dealloc_bytes_requested": {
+          "min": 25776479,
+          "p50": 25776479,
+          "p95": 25776479,
+          "p99": 25776479,
+          "max": 25776479
+        },
+        "realloc_calls": {
+          "min": 3436,
+          "p50": 3436,
+          "p95": 3436,
+          "p99": 3436,
+          "max": 3436
+        },
+        "realloc_bytes_requested": {
+          "min": 1596478,
+          "p50": 1596478,
+          "p95": 1596478,
+          "p99": 1596478,
+          "max": 1596478
+        },
+        "requested_event_bytes": {
+          "min": 26751754,
+          "p50": 26751754,
+          "p95": 26751754,
+          "p99": 26751754,
+          "max": 26751754
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 8415297,
+          "p50": 8415297,
+          "p95": 8415297,
+          "p99": 8415297,
+          "max": 8415297
+        },
+        "rss_before_bytes": {
+          "min": 9183232,
+          "p50": 9183232,
+          "p95": 9183232,
+          "p99": 9183232,
+          "max": 9183232
+        },
+        "rss_after_bytes": {
+          "min": 9183232,
+          "p50": 9183232,
+          "p95": 9183232,
+          "p99": 9183232,
+          "max": 9183232
+        },
+        "hwm_before_bytes": {
+          "min": 9183232,
+          "p50": 9183232,
+          "p95": 9183232,
+          "p99": 9183232,
+          "max": 9183232
+        },
+        "hwm_after_bytes": {
+          "min": 9183232,
+          "p50": 9183232,
+          "p95": 9183232,
+          "p99": 9183232,
+          "max": 9183232
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "source_forward_apply",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 1217066,
+          "p50": 1226956,
+          "p95": 1244415,
+          "p99": 1247007.8,
+          "max": 1247656
+        },
+        "alloc_calls": {
+          "min": 9896,
+          "p50": 9896,
+          "p95": 9896,
+          "p99": 9896,
+          "max": 9896
+        },
+        "alloc_bytes_requested": {
+          "min": 3920055,
+          "p50": 3920055,
+          "p95": 3920055,
+          "p99": 3920055,
+          "max": 3920055
+        },
+        "dealloc_calls": {
+          "min": 9901,
+          "p50": 9901,
+          "p95": 9901,
+          "p99": 9901,
+          "max": 9901
+        },
+        "dealloc_bytes_requested": {
+          "min": 4069353,
+          "p50": 4069353,
+          "p95": 4069353,
+          "p99": 4069353,
+          "max": 4069353
+        },
+        "realloc_calls": {
+          "min": 827,
+          "p50": 827,
+          "p95": 827,
+          "p99": 827,
+          "max": 827
+        },
+        "realloc_bytes_requested": {
+          "min": 370948,
+          "p50": 370948,
+          "p95": 370948,
+          "p99": 370948,
+          "max": 370948
+        },
+        "requested_event_bytes": {
+          "min": 4291003,
+          "p50": 4291003,
+          "p95": 4291003,
+          "p99": 4291003,
+          "max": 4291003
+        },
+        "live_bytes_delta": {
+          "min": -3013,
+          "p50": -3013,
+          "p95": -3013,
+          "p99": -3013,
+          "max": -3013
+        },
+        "peak_live_bytes": {
+          "min": 124463,
+          "p50": 124463,
+          "p95": 124463,
+          "p99": 124463,
+          "max": 124463
+        },
+        "rss_before_bytes": {
+          "min": 9220096,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "rss_after_bytes": {
+          "min": 9220096,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "hwm_before_bytes": {
+          "min": 9220096,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "hwm_after_bytes": {
+          "min": 9220096,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "source_inverse_apply",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 1183455,
+          "p50": 1195736,
+          "p95": 1206886,
+          "p99": 1207782,
+          "max": 1208006
+        },
+        "alloc_calls": {
+          "min": 9881,
+          "p50": 9881,
+          "p95": 9881,
+          "p99": 9881,
+          "max": 9881
+        },
+        "alloc_bytes_requested": {
+          "min": 3920401,
+          "p50": 3920401,
+          "p95": 3920401,
+          "p99": 3920401,
+          "max": 3920401
+        },
+        "dealloc_calls": {
+          "min": 9877,
+          "p50": 9877,
+          "p95": 9877,
+          "p99": 9877,
+          "max": 9877
+        },
+        "dealloc_bytes_requested": {
+          "min": 4064155,
+          "p50": 4064155,
+          "p95": 4064155,
+          "p99": 4064155,
+          "max": 4064155
+        },
+        "realloc_calls": {
+          "min": 827,
+          "p50": 827,
+          "p95": 827,
+          "p99": 827,
+          "max": 827
+        },
+        "realloc_bytes_requested": {
+          "min": 370948,
+          "p50": 370948,
+          "p95": 370948,
+          "p99": 370948,
+          "max": 370948
+        },
+        "requested_event_bytes": {
+          "min": 4291349,
+          "p50": 4291349,
+          "p95": 4291349,
+          "p99": 4291349,
+          "max": 4291349
+        },
+        "live_bytes_delta": {
+          "min": 2531,
+          "p50": 2531,
+          "p95": 2531,
+          "p99": 2531,
+          "max": 2531
+        },
+        "peak_live_bytes": {
+          "min": 126994,
+          "p50": 126994,
+          "p95": 126994,
+          "p99": 126994,
+          "max": 126994
+        },
+        "rss_before_bytes": {
+          "min": 9256960,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "rss_after_bytes": {
+          "min": 9256960,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "hwm_before_bytes": {
+          "min": 9256960,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "hwm_after_bytes": {
+          "min": 9256960,
+          "p50": 9256960,
+          "p95": 9256960,
+          "p99": 9256960,
+          "max": 9256960
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "source_noop_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3714708,
+          "p50": 3757488,
+          "p95": 3789792.3,
+          "p99": 3797677.66,
+          "max": 3799649
+        },
+        "alloc_calls": {
+          "min": 30133,
+          "p50": 30133,
+          "p95": 30133,
+          "p99": 30133,
+          "max": 30133
+        },
+        "alloc_bytes_requested": {
+          "min": 13529718,
+          "p50": 13529718,
+          "p95": 13529718,
+          "p99": 13529718,
+          "max": 13529718
+        },
+        "dealloc_calls": {
+          "min": 30336,
+          "p50": 30336,
+          "p95": 30336,
+          "p99": 30336,
+          "max": 30336
+        },
+        "dealloc_bytes_requested": {
+          "min": 13991989,
+          "p50": 13991989,
+          "p95": 13991989,
+          "p99": 13991989,
+          "max": 13991989
+        },
+        "realloc_calls": {
+          "min": 2387,
+          "p50": 2387,
+          "p95": 2387,
+          "p99": 2387,
+          "max": 2387
+        },
+        "realloc_bytes_requested": {
+          "min": 1139905,
+          "p50": 1139905,
+          "p95": 1139905,
+          "p99": 1139905,
+          "max": 1139905
+        },
+        "requested_event_bytes": {
+          "min": 14669623,
+          "p50": 14669623,
+          "p95": 14669623,
+          "p99": 14669623,
+          "max": 14669623
+        },
+        "live_bytes_delta": {
+          "min": -17157,
+          "p50": -17157,
+          "p95": -17157,
+          "p99": -17157,
+          "max": -17157
+        },
+        "peak_live_bytes": {
+          "min": 238764,
+          "p50": 238764,
+          "p95": 238764,
+          "p99": 238764,
+          "max": 238764
+        },
+        "rss_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "rss_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "source_read_calls": {
+          "min": 43,
+          "p50": 43,
+          "p95": 43,
+          "p99": 43,
+          "max": 43
+        },
+        "source_read_bytes": {
+          "min": 17559,
+          "p50": 17559,
+          "p95": 17559,
+          "p99": 17559,
+          "max": 17559
+        },
+        "source_request_bytes": {
+          "min": 17559,
+          "p50": 17559,
+          "p95": 17559,
+          "p99": 17559,
+          "max": 17559
+        },
+        "source_max_request_bytes": {
+          "min": 11538,
+          "p50": 11538,
+          "p95": 11538,
+          "p99": 11538,
+          "max": 11538
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 234,
+          "p50": 234,
+          "p95": 234,
+          "p99": 234,
+          "max": 234
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "source_read",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 1184886,
+          "p50": 1198566,
+          "p95": 1214415,
+          "p99": 1217231.8,
+          "max": 1217936
+        },
+        "alloc_calls": {
+          "min": 9706,
+          "p50": 9706,
+          "p95": 9706,
+          "p99": 9706,
+          "max": 9706
+        },
+        "alloc_bytes_requested": {
+          "min": 4733052,
+          "p50": 4733052,
+          "p95": 4733052,
+          "p99": 4733052,
+          "max": 4733052
+        },
+        "dealloc_calls": {
+          "min": 9691,
+          "p50": 9691,
+          "p95": 9691,
+          "p99": 9691,
+          "max": 9691
+        },
+        "dealloc_bytes_requested": {
+          "min": 4869363,
+          "p50": 4869363,
+          "p95": 4869363,
+          "p99": 4869363,
+          "max": 4869363
+        },
+        "realloc_calls": {
+          "min": 740,
+          "p50": 740,
+          "p95": 740,
+          "p99": 740,
+          "max": 740
+        },
+        "realloc_bytes_requested": {
+          "min": 377002,
+          "p50": 377002,
+          "p95": 377002,
+          "p99": 377002,
+          "max": 377002
+        },
+        "requested_event_bytes": {
+          "min": 5110054,
+          "p50": 5110054,
+          "p95": 5110054,
+          "p99": 5110054,
+          "max": 5110054
+        },
+        "live_bytes_delta": {
+          "min": 10973,
+          "p50": 10973,
+          "p95": 10973,
+          "p99": 10973,
+          "max": 10973
+        },
+        "peak_live_bytes": {
+          "min": 159453,
+          "p50": 159453,
+          "p95": 159453,
+          "p99": 159453,
+          "max": 159453
+        },
+        "rss_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "rss_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_before_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "hwm_after_bytes": {
+          "min": 9166848,
+          "p50": 9166848,
+          "p95": 9166848,
+          "p99": 9166848,
+          "max": 9166848
+        },
+        "source_read_calls": {
+          "min": 30,
+          "p50": 30,
+          "p95": 30,
+          "p99": 30,
+          "max": 30
+        },
+        "source_read_bytes": {
+          "min": 4805,
+          "p50": 4805,
+          "p95": 4805,
+          "p99": 4805,
+          "max": 4805
+        },
+        "source_request_bytes": {
+          "min": 4805,
+          "p50": 4805,
+          "p95": 4805,
+          "p99": 4805,
+          "max": 4805
+        },
+        "source_max_request_bytes": {
+          "min": 1040,
+          "p50": 1040,
+          "p95": 1040,
+          "p99": 1040,
+          "max": 1040
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 132,
+          "p50": 132,
+          "p95": 132,
+          "p99": 132,
+          "max": 132
+        }
+      }
+    },
+    {
+      "fixture": "tdf120301_xmlSpaceParsing",
+      "lane": "source_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 4968194,
+          "p50": 4995324,
+          "p95": 5054569.3,
+          "p99": 5096597.86,
+          "max": 5107105
+        },
+        "alloc_calls": {
+          "min": 39754,
+          "p50": 39754,
+          "p95": 39754,
+          "p99": 39754,
+          "max": 39754
+        },
+        "alloc_bytes_requested": {
+          "min": 17833226,
+          "p50": 17833226,
+          "p95": 17833226,
+          "p99": 17833226,
+          "max": 17833226
+        },
+        "dealloc_calls": {
+          "min": 39957,
+          "p50": 39957,
+          "p95": 39957,
+          "p99": 39957,
+          "max": 39957
+        },
+        "dealloc_bytes_requested": {
+          "min": 18454595,
+          "p50": 18454595,
+          "p95": 18454595,
+          "p99": 18454595,
+          "max": 18454595
+        },
+        "realloc_calls": {
+          "min": 3123,
+          "p50": 3123,
+          "p95": 3123,
+          "p99": 3123,
+          "max": 3123
+        },
+        "realloc_bytes_requested": {
+          "min": 1536639,
+          "p50": 1536639,
+          "p95": 1536639,
+          "p99": 1536639,
+          "max": 1536639
+        },
+        "requested_event_bytes": {
+          "min": 19369865,
+          "p50": 19369865,
+          "p95": 19369865,
+          "p99": 19369865,
+          "max": 19369865
+        },
+        "live_bytes_delta": {
+          "min": -17157,
+          "p50": -17157,
+          "p95": -17157,
+          "p99": -17157,
+          "max": -17157
+        },
+        "peak_live_bytes": {
+          "min": 617949,
+          "p50": 617949,
+          "p95": 617949,
+          "p99": 617949,
+          "max": 617949
+        },
+        "rss_before_bytes": {
+          "min": 9220096,
+          "p50": 9220096,
+          "p95": 9220096,
+          "p99": 9220096,
+          "max": 9220096
+        },
+        "rss_after_bytes": {
+          "min": 9220096,
+          "p50": 9220096,
+          "p95": 9220096,
+          "p99": 9220096,
+          "max": 9220096
+        },
+        "hwm_before_bytes": {
+          "min": 9220096,
+          "p50": 9220096,
+          "p95": 9220096,
+          "p99": 9220096,
+          "max": 9220096
+        },
+        "hwm_after_bytes": {
+          "min": 9220096,
+          "p50": 9220096,
+          "p95": 9220096,
+          "p99": 9220096,
+          "max": 9220096
+        },
+        "source_read_calls": {
+          "min": 143,
+          "p50": 143,
+          "p95": 143,
+          "p99": 143,
+          "max": 143
+        },
+        "source_read_bytes": {
+          "min": 22758,
+          "p50": 22758,
+          "p95": 22758,
+          "p99": 22758,
+          "max": 22758
+        },
+        "source_request_bytes": {
+          "min": 22758,
+          "p50": 22758,
+          "p95": 22758,
+          "p99": 22758,
+          "max": 22758
+        },
+        "source_max_request_bytes": {
+          "min": 2201,
+          "p50": 2201,
+          "p95": 2201,
+          "p99": 2201,
+          "max": 2201
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 825,
+          "p50": 825,
+          "p95": 825,
+          "p99": 825,
+          "max": 825
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "eager_noop_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 6840083,
+          "p50": 6875463,
+          "p95": 6916938,
+          "p99": 6923294,
+          "max": 6924883
+        },
+        "alloc_calls": {
+          "min": 57205,
+          "p50": 57205,
+          "p95": 57205,
+          "p99": 57205,
+          "max": 57205
+        },
+        "alloc_bytes_requested": {
+          "min": 23260156,
+          "p50": 23260156,
+          "p95": 23260156,
+          "p99": 23260156,
+          "max": 23260156
+        },
+        "dealloc_calls": {
+          "min": 57205,
+          "p50": 57205,
+          "p95": 57205,
+          "p99": 57205,
+          "max": 57205
+        },
+        "dealloc_bytes_requested": {
+          "min": 23941973,
+          "p50": 23941973,
+          "p95": 23941973,
+          "p99": 23941973,
+          "max": 23941973
+        },
+        "realloc_calls": {
+          "min": 2300,
+          "p50": 2300,
+          "p95": 2300,
+          "p99": 2300,
+          "max": 2300
+        },
+        "realloc_bytes_requested": {
+          "min": 1916284,
+          "p50": 1916284,
+          "p95": 1916284,
+          "p99": 1916284,
+          "max": 1916284
+        },
+        "requested_event_bytes": {
+          "min": 25176440,
+          "p50": 25176440,
+          "p95": 25176440,
+          "p99": 25176440,
+          "max": 25176440
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 586372,
+          "p50": 586372,
+          "p95": 586372,
+          "p99": 586372,
+          "max": 586372
+        },
+        "rss_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "rss_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "eager_read",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3245446,
+          "p50": 3269155,
+          "p95": 3281967,
+          "p99": 3288110.2,
+          "max": 3289646
+        },
+        "alloc_calls": {
+          "min": 27901,
+          "p50": 27901,
+          "p95": 27901,
+          "p99": 27901,
+          "max": 27901
+        },
+        "alloc_bytes_requested": {
+          "min": 11296402,
+          "p50": 11296402,
+          "p95": 11296402,
+          "p99": 11296402,
+          "max": 11296402
+        },
+        "dealloc_calls": {
+          "min": 27901,
+          "p50": 27901,
+          "p95": 27901,
+          "p99": 27901,
+          "max": 27901
+        },
+        "dealloc_bytes_requested": {
+          "min": 11635583,
+          "p50": 11635583,
+          "p95": 11635583,
+          "p99": 11635583,
+          "max": 11635583
+        },
+        "realloc_calls": {
+          "min": 1082,
+          "p50": 1082,
+          "p95": 1082,
+          "p99": 1082,
+          "max": 1082
+        },
+        "realloc_bytes_requested": {
+          "min": 953460,
+          "p50": 953460,
+          "p95": 953460,
+          "p99": 953460,
+          "max": 953460
+        },
+        "requested_event_bytes": {
+          "min": 12249862,
+          "p50": 12249862,
+          "p95": 12249862,
+          "p99": 12249862,
+          "max": 12249862
+        },
+        "live_bytes_delta": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "peak_live_bytes": {
+          "min": 466564,
+          "p50": 466564,
+          "p95": 466564,
+          "p99": 466564,
+          "max": 466564
+        },
+        "rss_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "rss_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "eager_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 17664705,
+          "p50": 17940287,
+          "p95": 18262226.3,
+          "p99": 18272396.46,
+          "max": 18274939
+        },
+        "alloc_calls": {
+          "min": 156546,
+          "p50": 156546,
+          "p95": 156546,
+          "p99": 156546,
+          "max": 156546
+        },
+        "alloc_bytes_requested": {
+          "min": 58417976,
+          "p50": 58417976,
+          "p95": 58417976,
+          "p99": 58417976,
+          "max": 58417976
+        },
+        "dealloc_calls": {
+          "min": 156538,
+          "p50": 156538,
+          "p95": 156538,
+          "p99": 156538,
+          "max": 156538
+        },
+        "dealloc_bytes_requested": {
+          "min": 60473463,
+          "p50": 60473463,
+          "p95": 60473463,
+          "p99": 60473463,
+          "max": 60473463
+        },
+        "realloc_calls": {
+          "min": 7906,
+          "p50": 7906,
+          "p95": 7906,
+          "p99": 7906,
+          "max": 7906
+        },
+        "realloc_bytes_requested": {
+          "min": 5953744,
+          "p50": 5953744,
+          "p95": 5953744,
+          "p99": 5953744,
+          "max": 5953744
+        },
+        "requested_event_bytes": {
+          "min": 64371720,
+          "p50": 64371720,
+          "p95": 64371720,
+          "p99": 64371720,
+          "max": 64371720
+        },
+        "live_bytes_delta": {
+          "min": 46607,
+          "p50": 46607,
+          "p95": 46607,
+          "p99": 46607,
+          "max": 46607
+        },
+        "peak_live_bytes": {
+          "min": 8418219,
+          "p50": 8418219,
+          "p95": 8418219,
+          "p99": 8418219,
+          "max": 8418219
+        },
+        "rss_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "rss_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "source_forward_apply",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3336676,
+          "p50": 3371316,
+          "p95": 3413083,
+          "p99": 3415429.4,
+          "max": 3416016
+        },
+        "alloc_calls": {
+          "min": 28509,
+          "p50": 28509,
+          "p95": 28509,
+          "p99": 28509,
+          "max": 28509
+        },
+        "alloc_bytes_requested": {
+          "min": 11332200,
+          "p50": 11332200,
+          "p95": 11332200,
+          "p99": 11332200,
+          "max": 11332200
+        },
+        "dealloc_calls": {
+          "min": 28514,
+          "p50": 28514,
+          "p95": 28514,
+          "p99": 28514,
+          "max": 28514
+        },
+        "dealloc_bytes_requested": {
+          "min": 11679683,
+          "p50": 11679683,
+          "p95": 11679683,
+          "p99": 11679683,
+          "max": 11679683
+        },
+        "realloc_calls": {
+          "min": 1173,
+          "p50": 1173,
+          "p95": 1173,
+          "p99": 1173,
+          "max": 1173
+        },
+        "realloc_bytes_requested": {
+          "min": 959043,
+          "p50": 959043,
+          "p95": 959043,
+          "p99": 959043,
+          "max": 959043
+        },
+        "requested_event_bytes": {
+          "min": 12291243,
+          "p50": 12291243,
+          "p95": 12291243,
+          "p99": 12291243,
+          "max": 12291243
+        },
+        "live_bytes_delta": {
+          "min": -5341,
+          "p50": -5341,
+          "p95": -5341,
+          "p99": -5341,
+          "max": -5341
+        },
+        "peak_live_bytes": {
+          "min": 476836,
+          "p50": 476836,
+          "p95": 476836,
+          "p99": 476836,
+          "max": 476836
+        },
+        "rss_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "rss_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "source_inverse_apply",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3298946,
+          "p50": 3357956,
+          "p95": 3393956,
+          "p99": 3405100,
+          "max": 3407886
+        },
+        "alloc_calls": {
+          "min": 28494,
+          "p50": 28494,
+          "p95": 28494,
+          "p99": 28494,
+          "max": 28494
+        },
+        "alloc_bytes_requested": {
+          "min": 11334842,
+          "p50": 11334842,
+          "p95": 11334842,
+          "p99": 11334842,
+          "max": 11334842
+        },
+        "dealloc_calls": {
+          "min": 28490,
+          "p50": 28490,
+          "p95": 28490,
+          "p99": 28490,
+          "max": 28490
+        },
+        "dealloc_bytes_requested": {
+          "min": 11672157,
+          "p50": 11672157,
+          "p95": 11672157,
+          "p99": 11672157,
+          "max": 11672157
+        },
+        "realloc_calls": {
+          "min": 1173,
+          "p50": 1173,
+          "p95": 1173,
+          "p99": 1173,
+          "max": 1173
+        },
+        "realloc_bytes_requested": {
+          "min": 959043,
+          "p50": 959043,
+          "p95": 959043,
+          "p99": 959043,
+          "max": 959043
+        },
+        "requested_event_bytes": {
+          "min": 12293885,
+          "p50": 12293885,
+          "p95": 12293885,
+          "p99": 12293885,
+          "max": 12293885
+        },
+        "live_bytes_delta": {
+          "min": 4827,
+          "p50": 4827,
+          "p95": 4827,
+          "p99": 4827,
+          "max": 4827
+        },
+        "peak_live_bytes": {
+          "min": 481663,
+          "p50": 481663,
+          "p95": 481663,
+          "p99": 481663,
+          "max": 481663
+        },
+        "rss_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "rss_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "source_read_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_read_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_max_request_bytes": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "source_noop_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 10270380,
+          "p50": 10294410,
+          "p95": 10343105,
+          "p99": 10349517,
+          "max": 10351120
+        },
+        "alloc_calls": {
+          "min": 85836,
+          "p50": 85836,
+          "p95": 85836,
+          "p99": 85836,
+          "max": 85836
+        },
+        "alloc_bytes_requested": {
+          "min": 35707466,
+          "p50": 35707466,
+          "p95": 35707466,
+          "p99": 35707466,
+          "max": 35707466
+        },
+        "dealloc_calls": {
+          "min": 86033,
+          "p50": 86033,
+          "p95": 86033,
+          "p99": 86033,
+          "max": 86033
+        },
+        "dealloc_bytes_requested": {
+          "min": 36744686,
+          "p50": 36744686,
+          "p95": 36744686,
+          "p99": 36744686,
+          "max": 36744686
+        },
+        "realloc_calls": {
+          "min": 3345,
+          "p50": 3345,
+          "p95": 3345,
+          "p99": 3345,
+          "max": 3345
+        },
+        "realloc_bytes_requested": {
+          "min": 2870074,
+          "p50": 2870074,
+          "p95": 2870074,
+          "p99": 2870074,
+          "max": 2870074
+        },
+        "requested_event_bytes": {
+          "min": 38577540,
+          "p50": 38577540,
+          "p95": 38577540,
+          "p99": 38577540,
+          "max": 38577540
+        },
+        "live_bytes_delta": {
+          "min": -16315,
+          "p50": -16315,
+          "p95": -16315,
+          "p99": -16315,
+          "max": -16315
+        },
+        "peak_live_bytes": {
+          "min": 800984,
+          "p50": 800984,
+          "p95": 800984,
+          "p99": 800984,
+          "max": 800984
+        },
+        "rss_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "rss_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "source_read_calls": {
+          "min": 40,
+          "p50": 40,
+          "p95": 40,
+          "p99": 40,
+          "max": 40
+        },
+        "source_read_bytes": {
+          "min": 25583,
+          "p50": 25583,
+          "p95": 25583,
+          "p99": 25583,
+          "max": 25583
+        },
+        "source_request_bytes": {
+          "min": 25583,
+          "p50": 25583,
+          "p95": 25583,
+          "p99": 25583,
+          "max": 25583
+        },
+        "source_max_request_bytes": {
+          "min": 16892,
+          "p50": 16892,
+          "p95": 16892,
+          "p99": 16892,
+          "max": 16892
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 212,
+          "p50": 212,
+          "p95": 212,
+          "p99": 212,
+          "max": 212
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "source_read",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 3318466,
+          "p50": 3334987,
+          "p95": 3375054,
+          "p99": 3407399.6,
+          "max": 3415486
+        },
+        "alloc_calls": {
+          "min": 28245,
+          "p50": 28245,
+          "p95": 28245,
+          "p99": 28245,
+          "max": 28245
+        },
+        "alloc_bytes_requested": {
+          "min": 12057689,
+          "p50": 12057689,
+          "p95": 12057689,
+          "p99": 12057689,
+          "max": 12057689
+        },
+        "dealloc_calls": {
+          "min": 28232,
+          "p50": 28232,
+          "p95": 28232,
+          "p99": 28232,
+          "max": 28232
+        },
+        "dealloc_bytes_requested": {
+          "min": 12374096,
+          "p50": 12374096,
+          "p95": 12374096,
+          "p99": 12374096,
+          "max": 12374096
+        },
+        "realloc_calls": {
+          "min": 1059,
+          "p50": 1059,
+          "p95": 1059,
+          "p99": 1059,
+          "max": 1059
+        },
+        "realloc_bytes_requested": {
+          "min": 952966,
+          "p50": 952966,
+          "p95": 952966,
+          "p99": 952966,
+          "max": 952966
+        },
+        "requested_event_bytes": {
+          "min": 13010655,
+          "p50": 13010655,
+          "p95": 13010655,
+          "p99": 13010655,
+          "max": 13010655
+        },
+        "live_bytes_delta": {
+          "min": 22432,
+          "p50": 22432,
+          "p95": 22432,
+          "p99": 22432,
+          "max": 22432
+        },
+        "peak_live_bytes": {
+          "min": 468734,
+          "p50": 468734,
+          "p95": 468734,
+          "p99": 468734,
+          "max": 468734
+        },
+        "rss_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "rss_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_before_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "hwm_after_bytes": {
+          "min": 10223616,
+          "p50": 10223616,
+          "p95": 10223616,
+          "p99": 10223616,
+          "max": 10223616
+        },
+        "source_read_calls": {
+          "min": 27,
+          "p50": 27,
+          "p95": 27,
+          "p99": 27,
+          "max": 27
+        },
+        "source_read_bytes": {
+          "min": 7371,
+          "p50": 7371,
+          "p95": 7371,
+          "p99": 7371,
+          "max": 7371
+        },
+        "source_request_bytes": {
+          "min": 7371,
+          "p50": 7371,
+          "p95": 7371,
+          "p99": 7371,
+          "max": 7371
+        },
+        "source_max_request_bytes": {
+          "min": 3622,
+          "p50": 3622,
+          "p95": 3622,
+          "p99": 3622,
+          "max": 3622
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 117,
+          "p50": 117,
+          "p95": 117,
+          "p99": 117,
+          "max": 117
+        }
+      }
+    },
+    {
+      "fixture": "tdf134769",
+      "lane": "source_scalar_save_reopen",
+      "sample_count": 15,
+      "field": "NoThreeD",
+      "metrics": {
+        "elapsed_ns": {
+          "min": 13640426,
+          "p50": 13752957,
+          "p95": 13842509.6,
+          "p99": 13935924.32,
+          "max": 13959278
+        },
+        "alloc_calls": {
+          "min": 114092,
+          "p50": 114092,
+          "p95": 114092,
+          "p99": 114092,
+          "max": 114092
+        },
+        "alloc_bytes_requested": {
+          "min": 47418291,
+          "p50": 47418291,
+          "p95": 47418291,
+          "p99": 47418291,
+          "max": 47418291
+        },
+        "dealloc_calls": {
+          "min": 114289,
+          "p50": 114289,
+          "p95": 114289,
+          "p99": 114289,
+          "max": 114289
+        },
+        "dealloc_bytes_requested": {
+          "min": 48827054,
+          "p50": 48827054,
+          "p95": 48827054,
+          "p99": 48827054,
+          "max": 48827054
+        },
+        "realloc_calls": {
+          "min": 4461,
+          "p50": 4461,
+          "p95": 4461,
+          "p99": 4461,
+          "max": 4461
+        },
+        "realloc_bytes_requested": {
+          "min": 3888354,
+          "p50": 3888354,
+          "p95": 3888354,
+          "p99": 3888354,
+          "max": 3888354
+        },
+        "requested_event_bytes": {
+          "min": 51306645,
+          "p50": 51306645,
+          "p95": 51306645,
+          "p99": 51306645,
+          "max": 51306645
+        },
+        "live_bytes_delta": {
+          "min": -16315,
+          "p50": -16315,
+          "p95": -16315,
+          "p99": -16315,
+          "max": -16315
+        },
+        "peak_live_bytes": {
+          "min": 922891,
+          "p50": 922891,
+          "p95": 922891,
+          "p99": 922891,
+          "max": 922891
+        },
+        "rss_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "rss_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_before_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "hwm_after_bytes": {
+          "min": 10227712,
+          "p50": 10227712,
+          "p95": 10227712,
+          "p99": 10227712,
+          "max": 10227712
+        },
+        "source_read_calls": {
+          "min": 104,
+          "p50": 104,
+          "p95": 104,
+          "p99": 104,
+          "max": 104
+        },
+        "source_read_bytes": {
+          "min": 29034,
+          "p50": 29034,
+          "p95": 29034,
+          "p99": 29034,
+          "max": 29034
+        },
+        "source_request_bytes": {
+          "min": 29034,
+          "p50": 29034,
+          "p95": 29034,
+          "p99": 29034,
+          "max": 29034
+        },
+        "source_max_request_bytes": {
+          "min": 3676,
+          "p50": 3676,
+          "p95": 3676,
+          "p99": 3676,
+          "max": 3676
+        },
+        "source_len_calls": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "source_version_calls": {
+          "min": 620,
+          "p50": 620,
+          "p95": 620,
+          "p99": 620,
+          "max": 620
+        }
+      }
+    }
+  ],
+  "errors": []
+}

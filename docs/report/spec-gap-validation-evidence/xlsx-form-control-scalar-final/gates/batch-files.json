@@ -1,0 +1,22 @@
+[
+  "crates/litchi-opc/src/source_backed.rs",
+  "crates/litchi-xlsx/src/edit.rs",
+  "crates/litchi-xlsx/src/lib.rs",
+  "crates/litchi-xlsx/src/workbook/mod.rs",
+  "crates/litchi-xlsx/tests/form_control_scalar_lifecycle.rs",
+  "crates/litchi-xlsx/src/form_control/mod.rs",
+  "crates/litchi-xlsx/src/form_control/owner.rs",
+  "crates/litchi-xlsx/src/form_control/mirror.rs",
+  "crates/litchi-xlsx/src/form_control/scalar_edit.rs",
+  "crates/litchi-xlsx/src/workbook/edit/codec.rs",
+  "crates/litchi-xlsx/src/workbook/edit/mod.rs",
+  "crates/litchi-xlsx/src/workbook/edit/model.rs",
+  "crates/litchi-xlsx/src/workbook/edit/validation.rs",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs",
+  "crates/litchi-xlsx/src/workbook/edit/planning.rs",
+  "crates/litchi-xlsx/src/form_control/budget.rs",
+  "crates/litchi-xlsx/src/form_control/model.rs",
+  "crates/litchi-xlsx/src/source_payload.rs"
+]

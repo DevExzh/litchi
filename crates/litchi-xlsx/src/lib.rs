@@ -360,8 +360,8 @@ pub use workbook::data_model::{
 };
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
-    DurablePatch, Edit, Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice,
-    MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
+    DurablePatch, Edit, Flavor, FormControlEdit, History, HistoryLimits, JoinError, JoinFailure,
+    MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
     SourceBackedMergeCommit, SourceBackedMergeDiagnostics, SourceBackedMergeEdit,
     SourceBackedMergeEditor, SourceBackedMergePatch, SourceBackedMergeSnapshot,
     SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,

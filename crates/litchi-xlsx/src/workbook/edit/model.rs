@@ -1403,6 +1403,11 @@ impl Change {
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    /// Both branches edit the bounded form-control owner on one worksheet.
+    FormControls {
+        sheet: Box<str>,
+        position: usize,
+    },
     Remove {
         sheet: Box<str>,
         position: usize,
@@ -1491,6 +1496,7 @@ impl Conflict {
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
             | Self::Defaults { sheet, .. }
+            | Self::FormControls { sheet, .. }
             | Self::Web { sheet, .. }
             | Self::Merges { sheet, .. }
             | Self::Cells { sheet, .. }
@@ -1514,6 +1520,7 @@ impl Conflict {
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
             | Self::Defaults { position, .. }
+            | Self::FormControls { position, .. }
             | Self::Web { position, .. }
             | Self::Merges { position, .. }
             | Self::Cells { position, .. }
@@ -1567,6 +1574,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
@@ -1578,6 +1586,12 @@ impl Conflict {
             | Self::PrintOptions { .. }
             | Self::Hyperlinks { .. } => None,
         }
+    }
+
+    /// Whether both edits target the bounded form-control owner on one worksheet.
+    #[must_use]
+    pub const fn is_form_controls(&self) -> bool {
+        matches!(self, Self::FormControls { .. })
     }
 
     /// Whether both edits replace bindings on the same worksheet.
@@ -1627,6 +1641,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
@@ -1650,6 +1665,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Cells { .. }
             | Self::Rows { .. }
@@ -1673,6 +1689,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Rows { .. }
@@ -1696,6 +1713,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
@@ -1720,6 +1738,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
@@ -1739,6 +1758,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
+            | Self::FormControls { .. }
             | Self::Web { .. }
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
@@ -1884,10 +1904,17 @@ impl fmt::Display for JoinError {
 
 impl std::error::Error for JoinError {}
 
-/// One workbook-scoped semantic change that has no worksheet identity.
+/// One package-owned semantic change, including worksheet-owned satellite parts.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum PackageChange {
+    /// One worksheet control's paired properties and VML scalar state changed.
+    FormControl {
+        sheet: Box<str>,
+        control: usize,
+        before: Box<crate::form_control::Properties>,
+        after: Box<crate::form_control::Properties>,
+    },
     /// Persisted Office Add-in task panes and their inert package graph changed.
     TaskPanes {
         before: Option<common_web::Panes>,
@@ -1920,7 +1947,8 @@ impl PackageChange {
     pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
         match self {
             Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
-            Self::DefinedNames { .. }
+            Self::FormControl { .. }
+            | Self::DefinedNames { .. }
             | Self::DrawingTransfer { .. }
             | Self::SvgLifecycle { .. } => (None, None),
         }
@@ -1933,14 +1961,26 @@ impl PackageChange {
     ) -> Option<(&[crate::raw::DefinedName], &[crate::raw::DefinedName])> {
         match self {
             Self::DefinedNames { before, after } => Some((before, after)),
-            Self::TaskPanes { .. } | Self::DrawingTransfer { .. } | Self::SvgLifecycle { .. } => {
-                None
-            },
+            Self::FormControl { .. }
+            | Self::TaskPanes { .. }
+            | Self::DrawingTransfer { .. }
+            | Self::SvgLifecycle { .. } => None,
         }
     }
 
     pub(super) fn inverse(&self) -> Self {
         match self {
+            Self::FormControl {
+                sheet,
+                control,
+                before,
+                after,
+            } => Self::FormControl {
+                sheet: sheet.clone(),
+                control: *control,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::TaskPanes { before, after } => Self::TaskPanes {
                 before: after.clone(),
                 after: before.clone(),
@@ -2539,7 +2579,7 @@ impl PatchAuthority {
         }
         if workbook.workbook_protection_metadata()?.is_some() {
             return Err(Error::Unsupported {
-                feature: "applying a cross-workbook scalar patch to a protected workbook",
+                feature: "applying a source-bound workbook patch to a protected workbook",
             });
         }
         Ok(())
@@ -2559,7 +2599,7 @@ impl Patch {
         &self.changes
     }
 
-    /// Workbook-scoped semantic changes, kept separate from sheet changes.
+    /// Package-owned semantic changes, including worksheet satellite parts.
     #[must_use]
     pub fn package_changes(&self) -> &[PackageChange] {
         &self.package_changes
@@ -2781,6 +2821,14 @@ impl Patch {
                     });
                 }
                 package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else if package.get_part(&change.uri)?.content_type()
+                == crate::form_control::CONTROL_PROPERTIES_CONTENT_TYPE
+            {
+                package.try_replace_owned_xml_part_bytes(
+                    &change.uri,
+                    change.before.as_slice(),
+                    Arc::clone(&change.after),
+                )?;
             } else {
                 package
                     .get_part_mut(&change.uri)?

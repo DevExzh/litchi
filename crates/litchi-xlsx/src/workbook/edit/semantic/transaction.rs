@@ -21,6 +21,7 @@ use crate::Style;
 use crate::cell::{Cell, Content};
 use crate::column::{OutlineAt, State as ColumnState, WidthAt};
 use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, allocation, invalid};
+use crate::form_control::OrdinaryFormControlOverlay;
 use crate::formula::{Formula, Kind as FormulaKind};
 use crate::layout;
 use crate::raw;
@@ -1151,6 +1152,7 @@ impl Edit {
                 .saturating_add(usize::from(added.actions.page_setup.is_some()))
                 .saturating_add(usize::from(added.actions.print_options.is_some()))
                 .saturating_add(added.actions.hyperlinks.len())
+                .saturating_add(added.actions.form_control_scalars.len())
         })
     }
 
@@ -1387,6 +1389,9 @@ impl Edit {
                         accepted.print_options = actions.print_options;
                     }
                     accepted.hyperlinks.extend(actions.hyperlinks);
+                    accepted
+                        .form_control_scalars
+                        .extend(actions.form_control_scalars);
                 },
             }
         }
@@ -1441,6 +1446,8 @@ impl Edit {
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
+        let mut form_control_validations: Vec<(litchi_opc::PackURI, OrdinaryFormControlOverlay)> =
+            Vec::new();
         let mut relationship_changes = Vec::new();
         let mut validated_worksheet_stores = Vec::new();
         let mut needs_recalculation = false;
@@ -1720,7 +1727,36 @@ impl Edit {
                 page_setup,
                 print_options,
                 hyperlinks,
+                form_control_scalars,
             } = requested;
+            if !form_control_scalars.is_empty() && data.kind != WorksheetKind::Worksheet {
+                return Err(Error::NotWorksheet {
+                    sheet: data.name.clone(),
+                });
+            }
+            let form_control_overlays = if form_control_scalars.is_empty() {
+                Vec::new()
+            } else {
+                crate::form_control::ordinary_form_control_overlays(
+                    &base.inner.package,
+                    &data.part_uri,
+                    &form_control_scalars,
+                )?
+            };
+            for overlay in &form_control_overlays {
+                package_changes.push(PackageChange::FormControl {
+                    sheet: data.name.as_str().into(),
+                    control: overlay.position,
+                    before: Box::new(crate::form_control::parse(&overlay.before_properties)?),
+                    after: Box::new(crate::form_control::parse(&overlay.after_properties)?),
+                });
+            }
+            form_control_validations.extend(
+                form_control_overlays
+                    .iter()
+                    .cloned()
+                    .map(|overlay| (data.part_uri.clone(), overlay)),
+            );
             if defaults.is_none()
                 && web.is_none()
                 && cells.is_empty()
@@ -1732,6 +1768,7 @@ impl Edit {
                 && page_setup.is_none()
                 && print_options.is_none()
                 && hyperlinks.is_empty()
+                && form_control_overlays.is_empty()
                 && drawing.is_none()
             {
                 continue;
@@ -1937,8 +1974,41 @@ impl Edit {
                 && effective_page_setup.is_none()
                 && effective_print_options.is_none()
                 && effective_hyperlinks.is_none()
+                && form_control_overlays.is_empty()
                 && drawing.is_none()
             {
+                continue;
+            }
+
+            let has_worksheet_edit = effective_defaults.is_some()
+                || effective_web.is_some()
+                || !effective_cells.is_empty()
+                || !effective_rows.is_empty()
+                || !effective_columns.is_empty()
+                || !merge_projection.plan.is_empty()
+                || effective_page_breaks.is_some()
+                || effective_page_margins.is_some()
+                || effective_page_setup.is_some()
+                || effective_print_options.is_some()
+                || effective_hyperlinks.is_some()
+                || drawing.is_some();
+            if !has_worksheet_edit {
+                for overlay in form_control_overlays {
+                    parts.push(PartChange {
+                        uri: overlay.property_uri,
+                        before: overlay.before_properties,
+                        after: overlay.after_properties,
+                        before_source: None,
+                        after_source: None,
+                    });
+                    parts.push(PartChange {
+                        uri: overlay.vml_uri,
+                        before: overlay.before_vml,
+                        after: overlay.after_vml,
+                        before_source: None,
+                        after_source: None,
+                    });
+                }
                 continue;
             }
 
@@ -2262,6 +2332,22 @@ impl Edit {
                 before_source: None,
                 after_source: None,
             });
+            for overlay in form_control_overlays {
+                parts.push(PartChange {
+                    uri: overlay.property_uri,
+                    before: overlay.before_properties,
+                    after: overlay.after_properties,
+                    before_source: None,
+                    after_source: None,
+                });
+                parts.push(PartChange {
+                    uri: overlay.vml_uri,
+                    before: overlay.before_vml,
+                    after: overlay.after_vml,
+                    before_source: None,
+                    after_source: None,
+                });
+            }
         }
         if !drawings.is_empty() {
             return Err(invalid("drawing transfer target disappeared during commit"));
@@ -2961,6 +3047,14 @@ impl Edit {
                     });
                 }
                 package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else if package.get_part(&change.uri)?.content_type()
+                == crate::form_control::CONTROL_PROPERTIES_CONTENT_TYPE
+            {
+                package.try_replace_owned_xml_part_bytes(
+                    &change.uri,
+                    change.before.as_slice(),
+                    Arc::clone(&change.after),
+                )?;
             } else {
                 package
                     .get_part_mut(&change.uri)?
@@ -3005,6 +3099,13 @@ impl Edit {
         if has_svg_lifecycle {
             validate_svg_final_removals(&package, &svg_parts)?;
         }
+        for (worksheet_uri, overlay) in &form_control_validations {
+            crate::form_control::validate_ordinary_form_control_candidate(
+                &package,
+                worksheet_uri,
+                overlay,
+            )?;
+        }
         let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
         if needs_recalculation {
             let metadata = workbook.calculation_metadata()?;
@@ -3040,8 +3141,11 @@ impl Edit {
         } else {
             Box::new([])
         };
-        let authority =
-            cross_workbook_scalar.then(|| PatchAuthority::new(base.clone(), workbook.clone()));
+        // A paired control edit depends on its complete owner graph, including
+        // incoming edges. Pin this bounded profile to the validated immutable
+        // source; matching only the two changed payloads is insufficient.
+        let authority = (cross_workbook_scalar || !form_control_validations.is_empty())
+            .then(|| PatchAuthority::new(base.clone(), workbook.clone()));
         Ok(Commit {
             workbook: workbook.clone(),
             patch: Patch {
@@ -3127,6 +3231,60 @@ impl Edit {
 
     pub(super) fn actions(&mut self, position: usize) -> &mut BTreeMap<Address, Action> {
         &mut self.sheets.entry(position).or_default().cells
+    }
+
+    pub(super) fn stage_form_control_scalar<'a>(
+        &mut self,
+        position: usize,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+        field: crate::form_control::ScalarField,
+        value: Option<crate::form_control::ScalarValue>,
+    ) -> Result<()> {
+        guard::no_removal(self, "form-control scalar edit")?;
+        let data = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .ok_or_else(|| invalid("form-control worksheet disappeared"))?;
+        if data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: data.name.clone(),
+            });
+        }
+        let operation_count = self
+            .sheets
+            .get(&position)
+            .map_or(0, |actions| actions.form_control_scalars.len())
+            .checked_add(1)
+            .ok_or_else(|| invalid("form-control scalar operation count overflow"))?;
+        crate::form_control::validate_scalar_operation_count(
+            operation_count,
+            crate::form_control::OwnerLimits::from_read_limits(
+                self.base.inner.package.read_limits(),
+            ),
+        )?;
+        let action = crate::form_control::FormControlScalarAction::new(selector, field, value);
+        let mut combined = self
+            .sheets
+            .get(&position)
+            .map_or_else(Vec::new, |actions| actions.form_control_scalars.clone());
+        combined
+            .try_reserve(1)
+            .map_err(|source| allocation("form-control scalar edit plan", source))?;
+        combined.push(action);
+        let overlays = crate::form_control::ordinary_form_control_overlays(
+            &self.base.inner.package,
+            &data.part_uri,
+            &combined,
+        )?;
+        let actions = self.sheets.entry(position).or_default();
+        if overlays.is_empty() {
+            actions.form_control_scalars.clear();
+        } else {
+            actions.form_control_scalars = combined;
+        }
+        Ok(())
     }
 
     pub(super) fn web_bindings(&mut self, position: usize) -> Result<&mut WebBindings> {
@@ -3478,6 +3636,12 @@ impl Edit {
             }
             if left.visibility.is_some() && right.visibility.is_some() {
                 conflicts.push(Conflict::Tab {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
+            if !left.form_control_scalars.is_empty() && !right.form_control_scalars.is_empty() {
+                conflicts.push(Conflict::FormControls {
                     sheet: sheet.into(),
                     position: *position,
                 });

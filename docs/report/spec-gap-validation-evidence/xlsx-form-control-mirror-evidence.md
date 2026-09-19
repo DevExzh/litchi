@@ -57,13 +57,19 @@ Relevant exact MS-OI29500 entries are:
   describes `DropStyle`/`Dx` usage;
 * §2.1.1871 (`FmlaGroup`), lines 30998–31002: Excel may move the value to the
   first radio button's `FmlaLink`;
+* §§2.1.1875–2.1.1876, lines 31030–31036: Excel narrows `Horiz` use and
+  bounds `Inc`;
 * §2.1.1878 (`ListItem`), lines 31044–31048: Excel ignores `ListItem` when
   `FmlaRange` is present;
+* §§2.1.1879–2.1.1880 and §2.1.1883, lines 31050–31060 and 31074–31078:
+  Excel bounds `Max`, `Min`, and `Page`;
 * §2.1.1882 (`NoThreeD`), lines 31068–31072: Excel also uses it for spinners;
 * §2.1.1887 (`TextVAlign`), lines 31098–31102: Excel treats it as vertical
   alignment; and
 * §2.1.1889 (`Val`), lines 31110–31118: Excel bounds it and uses it for more
-  list-like controls.
+  list-like controls; and
+* §2.1.1891 (`WidthMin`), lines 31126–31130: Excel uses it for dropdowns
+  only.
 
 The local MS-OI29500 text has no `editVal`, `VTEdit`, `checked`,
 `firstButton`, or `lockText` bridge statement. Those mappings below come from
@@ -84,14 +90,56 @@ be true,” an empty element is therefore a proven true occurrence. That prose
 does not, by itself, establish that absence is false; absence is recorded
 separately in the matrix.
 
+These are the only VML Boolean lexicals admitted by the cited schema. The
+type is a restricted `xsd:string`: do not add numeric `0`/`1`, `on`/`off`,
+whitespace variants, or case-folded spellings. Numeric `0`/`1` belong to
+integer-valued VML fields such as `Checked`, not to VML Boolean elements. The
+x14 attributes use `xsd:boolean` where the CT schema says so; that does not
+authorize copying an x14 Boolean lexical directly into a VML element. VML
+string tokens are likewise case-sensitive prose values: `DropStyle` is
+`Combo`, `ComboEdit`, or `Simple` (§19.4.2.22); `SelType` is `Single`,
+`Multi`, or `Extend` (§19.4.2.58); `TextHAlign` is `Left`, `Justify`,
+`Center`, `Right`, or `Distributed` (§19.4.2.60); and `TextVAlign` is
+`Top`, `Justify`, `Center`, `Bottom`, or `Distributed` (§19.4.2.61). The
+nested VML schema types those fields as `xsd:string`, and MS-OI29500
+§2.1.1869 notes that Office permits arbitrary `DropStyle` strings at schema
+level; unknown strings therefore remain read-only rather than being
+case-folded or normalized. The nested schema types numeric fields such as
+`Checked`, `VTEdit`, `Min`, and `Val` as `xsd:integer` (lines 39, 54, and
+60–62); their permitted values and Office bounds are separate from Boolean
+lexical handling.
+
+`objectType` has no normative cross-part bridge in the local material.
+MS-XLSX `ST_ObjectType` (§2.7.14, lines 550–566) lists `Button`, `CheckBox`,
+`Drop`, `GBox`, `Label`, `List`, `Radio`, `Scroll`, `Spin`, `EditBox`, and
+`Dialog` with x14 form-control meanings. ECMA VML `ST_ObjectType`
+§19.4.3.2 (printed page 859), together with the nested XSD (lines 85–107),
+lists `Button`, `Checkbox`, `Dialog`, `Drop`, `Edit`, `GBox`, `Label`,
+`List`, `Radio`, `Scroll`, and `Spin` among other VML objects. The exact-token
+overlap (`Button`, `Dialog`, `Drop`, `GBox`, `Label`, `List`, `Radio`,
+`Scroll`, `Spin`) and the matching prose meanings are candidate evidence, but
+neither specification says that `formControlPr/@objectType` must equal
+`ClientData/@ObjectType`. ECMA §19.4.2.7 (printed page 834) confirms VML
+attached-text meanings for `Button`, `Checkbox`, `Dialog`, `Edit`, `GBox`,
+`Label`, and `Radio`, but still supplies no x14 bridge. `CheckBox ↔ Checkbox`,
+`Button ↔ Button`, and `Radio ↔ Radio` remain the only admitted pairs because
+the retained fixtures exercise them; `EditBox ↔ Edit` and every other
+additional pair remain unresolved/read-only. MS-OI29500's local object-type
+entries only reject unsupported VML `Movie`, `LineA`, and `RectA` values
+(§2.1.1863, lines 30946–30954); they do not add the missing bridge.
+The x14 enum is based on `xsd:token` (schema fragment lines 568–598), while
+the VML enum is based on `xsd:string`; the differing `CheckBox`/`Checkbox`
+spelling is therefore a fixture-backed rule, not a case-conversion rule.
+
 The `checked` mapping is exact. MS-XLSX `ST_Checked` gives `Unchecked`,
 `Checked`, and `Mixed`, with their checkbox/radio meanings (§2.7.15, lines
 606–624). ECMA VML §19.4.2.11 (printed page 836) gives VML `Checked` values
 `0` = unchecked/unselected, `1` = checked/selected, and `2` = mixed, and
 declares the content an XML Schema integer. Thus the proven present-value
 map is `Unchecked ↔ 0`, `Checked ↔ 1`, and `Mixed ↔ 2`. Other integer
-lexicals are schema integers but are outside the VML permitted-value table;
-retain them as unknown/read-only rather than coercing them.
+values are outside the VML permitted-value table; alternate schema-valid
+integer spellings also have no local lexical-normalization rule, so preserve
+them as read-only rather than coercing them.
 
 The `editVal`/`VTEdit` mapping is also exact in the local material, despite
 the owner-design note having left it unresolved. MS-XLSX §2.7.18 (lines
@@ -108,10 +156,13 @@ an end-to-end fixture before enabling a writer row.
 declares `lockText` optional with default `false` (lines 3054–3059). ECMA
 VML §19.4.2.38 (printed page 847) says that omitted `LockText` means the
 object text is locked, and an empty `LockText` is true. Consequently, VML
-absence cannot be treated as x14 false. An explicit VML false lexical value
-must remain explicit if the x14 effective value is false. The retained
-fixtures contain x14 `lockText="1"` with no VML `LockText` in several shapes,
-and `LockText>False</LockText>` in `tdf161365.xlsx`; this is evidence of
+absence cannot be treated as x14 false. The mismatch is specifically x14
+effective false paired with VML absence (effective true); authored x14
+`lockText="1"` paired with VML absence is an effective-true match. An
+explicit VML false lexical value must remain explicit if the x14 effective
+value is false. The retained fixtures show both cases: several shapes have
+x14 `lockText="1"` with no VML `LockText`, while both `tdf161365.xlsx`
+shapes have x14 lockText absent and `<LockText>False</LockText>`; this is
 source variation, not permission to normalize absence.
 
 `firstButton` and `noThreeD` each have an x14 default of false in the
@@ -143,6 +194,23 @@ MS-OI29500 §2.1.1871 also warns that Office may relocate `FmlaGroup` to the
 first radio button's `FmlaLink`, so a host writer must not treat that field as
 a detached one-control scalar without a graph policy.
 
+## Effective-default review
+
+The following are effective-value comparisons from the local prose/schema.
+They do not erase authored presence: a source-preserving writer still needs a
+field-specific insertion/removal rule.
+
+| x14 field ↔ VML field | x14 when absent | VML when absent | Result |
+| --- | --- | --- | --- |
+| `horiz` ↔ `Horiz` | schema default `false` (vertical) (`CT_FormControlPr`, line 3052) | vertical (§19.4.2.32, printed page 845) | **Effective default matches** for the scroll-bar overlap |
+| `min` ↔ `Min` | schema default `0` (line 3062) | `0` (§19.4.2.41, printed page 848) | **Effective default matches** |
+| `seltype` ↔ `SelType` | schema default `single` (line 3074) | `Single` (§19.4.2.58, printed page 854) | **Effective default matches**; lexical case differs by field |
+| `textHAlign` ↔ `TextHAlign` | schema default `left` (line 3076) | `Left` (§19.4.2.60, printed page 855) | **Effective default matches**; lexical case differs by field |
+| `textVAlign` ↔ `TextVAlign` | schema default `top` (line 3078) | `Top` (§19.4.2.61, printed page 855) | **Effective default matches**; lexical case differs by field |
+| `val` ↔ `Val` | prose assumes `0` when omitted (§2.6.65, line 2991) | `0` (§19.4.2.63, printed page 856) | **Effective default matches** in the documented overlap; MS-OI29500 extends VML use to combo/list scroll bars (§2.1.1889) |
+| `verticalBar` ↔ `VScroll` | schema default `false` (no vertical scroll) (line 3088) | no vertical scroll (§19.4.2.66, printed page 857) | **Effective default matches** for edit-control semantics |
+| `lockText` ↔ `LockText` | schema default `false` (text unlocked) (line 3058) | text locked (§19.4.2.38, printed page 847) | **Default mismatch only for x14 effective false + VML absence**; authored x14 true + VML absence is an effective-true match |
+
 ## Retained fixture token evidence
 
 The retained package files are under
@@ -159,13 +227,13 @@ are from the named `xl/ctrlProps/ctrlPropN.xml` member.
 
 | Fixture and member | `formControlPr` tokens | Matching VML `ClientData` tokens | Evidence use |
 | --- | --- | --- | --- |
-| `singlecontrol.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" checked="Checked" lockText="1" noThreeD="1"` | `ObjectType="Checkbox"`, `<Checked>1</Checked>`, `<NoThreeD/>`; no `LockText` | exact `CheckBox ↔ Checkbox`, `Checked ↔ 1`, and `1 ↔ empty` observations |
-| `tdf120301_xmlSpaceParsing.xlsx!xl/ctrlProps/ctrlProp2.xml` | `objectType="Radio" firstButton="1" lockText="1" noThreeD="1"` | `ObjectType="Radio"`, `<FirstButton/>`, `<NoThreeD/>`; no `LockText` | exact Radio mapping and empty true occurrences |
-| `tdf134769.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" fmlaLink="#REF!" lockText="1" noThreeD="1"` | `ObjectType="Checkbox"`, `<FmlaLink>#REF!</FmlaLink>`, `<NoThreeD/>`; no `LockText` | same inert formula bytes; source-error token is preservation-only |
-| `tdf161365.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" noThreeD="1"` (no `checked`, no `lockText`) | `ObjectType="Checkbox"`, `<NoThreeD/>`; no `Checked` or `LockText` | observed omissions; does not establish omission defaults |
-| `tdf161365.xlsx!xl/ctrlProps/ctrlProp2.xml` | `objectType="CheckBox" checked="Checked" noThreeD="1"` (no `lockText`) | `ObjectType="Checkbox"`, `<Checked>1</Checked>`, `<LockText>False</LockText>`, `<NoThreeD/>` | explicit VML false and the checked/noThreeD pairs |
-| `button-form-control.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="Button" lockText="1"` | `ObjectType="Button"`; no `LockText` | exact Button mapping; lockText absence mismatch is visible |
-| `tdf60673.xlsx!xl/ctrlProps/ctrlProp1.xml` and `xl/ctrlProps/ctrlProp2.xml` | both `objectType="Button" lockText="1"` | both `ObjectType="Button"`; neither has `LockText` | repeated owner instances do not add a new lexical rule |
+| `singlecontrol.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" checked="Checked" lockText="1" noThreeD="1"` | `ObjectType="Checkbox"`, `<Checked>1</Checked>`, `<NoThreeD/>`; no `LockText` | exact `CheckBox ↔ Checkbox`, `Checked ↔ 1`, and effective-true `1 ↔ omitted` lockText observations |
+| `tdf120301_xmlSpaceParsing.xlsx!xl/ctrlProps/ctrlProp2.xml` | `objectType="Radio" firstButton="1" lockText="1" noThreeD="1"` | `ObjectType="Radio"`, `<FirstButton/>`, `<NoThreeD/>`; no `LockText` | exact Radio mapping, empty true occurrences, and effective-true `1 ↔ omitted` lockText |
+| `tdf134769.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" fmlaLink="#REF!" lockText="1" noThreeD="1"` | `ObjectType="Checkbox"`, `<FmlaLink>#REF!</FmlaLink>`, `<NoThreeD/>`; no `LockText` | same inert formula bytes; source-error token is preservation-only; authored `1` and VML omission are effective-true lockText matches |
+| `tdf161365.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="CheckBox" noThreeD="1"` (no `checked`, no `lockText`) | `ObjectType="Checkbox"`, `<LockText>False</LockText>`, `<NoThreeD/>`; no `Checked` | x14 lockText omission (effective false) paired with explicit VML false; observed omission/default distinction |
+| `tdf161365.xlsx!xl/ctrlProps/ctrlProp2.xml` | `objectType="CheckBox" checked="Checked" noThreeD="1"` (no `lockText`) | `ObjectType="Checkbox"`, `<Checked>1</Checked>`, `<LockText>False</LockText>`, `<NoThreeD/>` | explicit VML false for x14 effective false plus the checked/noThreeD pairs |
+| `button-form-control.xlsx!xl/ctrlProps/ctrlProp1.xml` | `objectType="Button" lockText="1"` | `ObjectType="Button"`; no `LockText` | exact Button mapping; authored `1` and VML omission are effective-true lockText matches |
+| `tdf60673.xlsx!xl/ctrlProps/ctrlProp1.xml` and `xl/ctrlProps/ctrlProp2.xml` | both `objectType="Button" lockText="1"` | both `ObjectType="Button"`; neither has `LockText` | repeated owner instances confirm effective-true `1 ↔ omitted` lockText; no new lexical rule |
 
 No retained properties part contains `itemLst`, `editVal`, `dropLines`,
 `dropStyle`, `dx`, `fmlaGroup`, `fmlaRange`, `fmlaTxbx`, `horiz`, `inc`,
@@ -194,11 +262,11 @@ profile gates.
 
 | x14 `formControlPr` field | VML `ClientData` field | Proven local mapping | Absence/default and profile status | Fixture/profile token |
 | --- | --- | --- | --- | --- |
-| `objectType` | `@ObjectType` | `CheckBox ↔ Checkbox`, `Button ↔ Button`, `Radio ↔ Radio` are fixture-backed; ECMA §19.4.3.2 gives VML meanings and MS-XLSX §2.7.14 gives x14 meanings | Other x14 tokens (`Drop`, `GBox`, `EditBox`, etc.) have no admitted cross-token map; do not infer `EditBox ↔ Edit` or case mappings | **Proven only for the three fixture pairs; unresolved/read-only otherwise** |
+| `objectType` | `@ObjectType` | `CheckBox ↔ Checkbox`, `Button ↔ Button`, `Radio ↔ Radio` are fixture-backed; ECMA §19.4.3.2 gives VML meanings and MS-XLSX §2.7.14 gives x14 meanings | Exact-token overlaps (`Dialog`, `Drop`, `GBox`, `Label`, `List`, `Scroll`, `Spin`) are candidate evidence only: no local cross-part bridge requires equality. Do not infer `EditBox ↔ Edit` or case mappings | **Proven only for the three fixture pairs; all additional pairs unresolved/read-only** |
 | `checked` | `Checked` | `Unchecked ↔ 0`, `Checked ↔ 1`, `Mixed ↔ 2`; ECMA §19.4.2.11 explicitly supplies all three VML meanings | Neither side supplies an omitted-value default for this pair; absence is not equivalent to `Unchecked` without a profile rule | **Proven present; absence read-only**; `Checked`/`1` in `singlecontrol`, `tdf161365` |
 | `colored` | `Colored` | Boolean semantic match; ECMA §19.4.2.14 says the empty element is true | x14 default false; VML section gives no omitted default | **Proven present; absence read-only** |
 | `dropLines` | `DropLines` | Direct decimal count; x14 bounds 0–30000 (§2.6.65); VML §19.4.2.21 uses the same dropdown count | x14 default is 8; VML omission is one line, so defaults differ | **Proven present; absence read-only** |
-| `dropStyle` | `DropStyle` | `combo ↔ Combo`, `comboedit ↔ ComboEdit`, `simple ↔ Simple`; both tables give the same three meanings (§2.7.16; ECMA §19.4.2.22) | No admitted omitted-value default | **Proven present; absence read-only** |
+| `dropStyle` | `DropStyle` | Exact prose tokens `combo ↔ Combo`, `comboedit ↔ ComboEdit`, `simple ↔ Simple`; both tables give the same three meanings (§2.7.16; ECMA §19.4.2.22) | No admitted omitted-value default; Office permits arbitrary `DropStyle` strings at schema level (§2.1.1869), so unknown strings stay read-only and case is preserved | **Proven present for the three tokens; unknown/absence read-only** |
 | `dx` | `Dx` | Direct nonnegative width/count value for the permitted control families; ECMA §19.4.2.23 | x14 default 80; VML omission has no local default | **Proven present; absence read-only** |
 | `firstButton` | `FirstButton` | An authored x14 Boolean ↔ authored VML element; empty/recognized true lexical means true and recognized false lexical means false; ECMA §19.4.2.24 says empty means true | x14 default false; VML omission has no local default | **Proven authored value; absence read-only**; only `1`/empty occurs in `tdf120301` |
 | `fmlaGroup` | `FmlaGroup` | Both are inert group-box linked-cell strings; ECMA §19.4.2.25 describes the same group-box link | MS-OI29500 §2.1.1871 permits Office relocation into the first radio's `FmlaLink`; cross-control rewrite is not proven | **Read-only host field** until relocation policy is explicit |
@@ -208,7 +276,7 @@ profile gates.
 | `horiz` | `Horiz` | Boolean; ECMA §19.4.2.32 says empty means true and omission means vertical | x14 default false (vertical), matching VML omission | **Proven including absence/default** |
 | `inc` | `Inc` | Direct decimal increment, with x14/MS-OI29500 0–30000 bound | x14 default 1; VML omission is 0 (§19.4.2.33) | **Proven present; absence read-only** |
 | `justLastX` | `JustLastX` | Boolean semantic match; ECMA §19.4.2.34 says empty means true | x14 default false; VML omission has no local default | **Proven present; absence read-only** |
-| `lockText` | `LockText` | Explicit boolean semantic match; ECMA §19.4.2.38 supplies empty=true and explicit false is schema-valid | x14 default false; VML omission means true. Never equate VML absence with x14 false | **Proven explicit; absence/default mismatch is read-only** |
+| `lockText` | `LockText` | Explicit boolean semantic match; ECMA §19.4.2.38 supplies empty=true and explicit false is schema-valid | x14 default false; VML omission means true. Label a mismatch only for x14 effective false + VML absence; authored x14 true + VML absence is an effective-true match | **Proven explicit; effective-false/absence transition is read-only** |
 | `max` | `Max` | Direct scroll/spin maximum; x14/MS-OI29500 bounds 0–30000; ECMA §19.4.2.40 | x14 has no default; VML omission is computed from the last visible item | **Proven present; absence read-only** |
 | `min` | `Min` | Direct nonnegative scroll/spin minimum; x14/MS-OI29500 bounds 0–30000; ECMA §19.4.2.41 | Both x14 and VML omission are 0 | **Proven including absence/default** |
 | `multiSel` | `MultiSel` | Both are comma-delimited selected-item indices; x14 §2.6.65 and ECMA §19.4.2.44 | No default; preserve exact commas/whitespace and do not normalize or sort | **Proven present semantic; list edit read-only** |
@@ -216,9 +284,9 @@ profile gates.
 | `noThreeD2` | `NoThreeD2` | Boolean semantic match for dropdown/list controls; ECMA §19.4.2.46 says empty means true | x14 default false; x14 also has `noThreeD` for these families and local material does not state precedence; VML omission has no local default | **Proven present when the profile selects this field; field-choice/absence read-only** |
 | `page` | `Page` | Direct decimal page increment; x14/MS-OI29500 bounds 0–30000; ECMA §19.4.2.47 | No default in either cited field description | **Proven present; absence read-only** |
 | `sel` | `Sel` | Direct one-based selected-item index for the list-box overlap; x14 value 0 means none and ECMA §19.4.2.57 says VML 0 means none | VML omission means 0; x14 also allows dropdowns, but the local VML section documents `Sel` for list boxes only; x14 absence is not silently converted | **Proven list-box present/zero; dropdown/absence read-only** |
-| `seltype` | `SelType` | `single ↔ Single`, `multi ↔ Multi`, `extended ↔ Extend`; tables give the same selection meanings (§2.7.17; ECMA §19.4.2.58) | x14 default `single`; VML omission defaults Single | **Proven including absence/default** |
-| `textHAlign` | `TextHAlign` | Lowercase-to-title-case mapping for left/center/right/justify/distributed; §2.7.22 and ECMA §19.4.2.60 list the same meanings | x14 default `left`; VML omission defaults Left | **Proven including absence/default** |
-| `textVAlign` | `TextVAlign` | Lowercase-to-title-case mapping for top/center/bottom/justify/distributed; §2.7.23 and ECMA §19.4.2.61 list the same meanings | x14 default `top`; VML omission defaults Top | **Proven including absence/default** |
+| `seltype` | `SelType` | Exact prose tokens `single ↔ Single`, `multi ↔ Multi`, `extended ↔ Extend`; tables give the same selection meanings (§2.7.17; ECMA §19.4.2.58) | x14 default `single`; VML omission defaults `Single`; do not case-fold arbitrary strings | **Proven including absence/default for listed tokens** |
+| `textHAlign` | `TextHAlign` | Exact prose token mapping `left ↔ Left`, `center ↔ Center`, `right ↔ Right`, `justify ↔ Justify`, `distributed ↔ Distributed`; §2.7.22 and ECMA §19.4.2.60 list the same meanings for the attached-text overlap | x14 default `left`; VML omission defaults `Left`; do not case-fold arbitrary strings | **Proven including absence/default for listed tokens in the attached-text overlap** |
+| `textVAlign` | `TextVAlign` | Exact prose token mapping `top ↔ Top`, `center ↔ Center`, `bottom ↔ Bottom`, `justify ↔ Justify`, `distributed ↔ Distributed`; §2.7.23 and ECMA §19.4.2.61 list the same meanings for the attached-text overlap | x14 default `top`; VML omission defaults `Top`; do not case-fold arbitrary strings | **Proven including absence/default for listed tokens in the attached-text overlap** |
 | `val` | `Val` | Direct scroll/spin position; MS-OI29500 §2.1.1889 extends VML use to combo/list scroll bars; x14 also allows list boxes/dropdowns | Both cited fields omit to 0; preserve one-based positions and 0, while refusing an unsupported control-family transition | **Proven including absence/default in the documented overlap; family transition read-only** |
 | `widthMin` | `WidthMin` | Direct minimum dropdown width; ECMA §19.4.2.68 | No default in either cited field description | **Proven present; absence read-only** |
 | `editVal` | `VTEdit` | `text ↔ 0`, `integer ↔ 1`, `number ↔ 2`, `reference ↔ 3`, `formula ↔ 4`; MS-XLSX §2.7.18 and ECMA §19.4.2.67 | Both omissions mean Text | **Spec-proven including absence/default; fixture still required** |
@@ -241,9 +309,12 @@ profile gates.
    specification semantics; it is blocked only by the current corpus lacking
    an edit-control fixture.
 3. `lockText` needs an explicit profile branch for VML absence because its
-   effective default is true while x14 `lockText` defaults false. A writer
-   changing an effective false value must emit an explicit VML false token;
-   it must not remove `LockText`.
+   effective default is true while x14 `lockText` defaults false. Compare
+   effective values before labeling a mismatch: authored x14 true plus VML
+   absence is an effective-true match. A writer changing an effective false
+   value must emit an explicit VML false token (`f`, `false`, or `False`)
+   selected by the lexical profile; it must not use `0`/`1` or remove
+   `LockText`.
 4. `firstButton` and the applicable `noThreeD`/`noThreeD2` field may compare
    authored true to an empty VML element and authored false to a recognized
    false lexical value. They must refuse an absent transition until the

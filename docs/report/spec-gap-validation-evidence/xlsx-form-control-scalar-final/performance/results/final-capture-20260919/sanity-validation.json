@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "raw_records": 366,
+  "sample_records": 360,
+  "correctness_records": 3,
+  "errors": []
+}

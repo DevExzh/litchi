@@ -1,0 +1,12 @@
+[package]
+name = "xlsx-form-control-scalar-perf"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "../source/crates/litchi-core" }
+litchi-opc = { path = "../source/crates/litchi-opc" }
+litchi-xlsx = { path = "../source/crates/litchi-xlsx" }

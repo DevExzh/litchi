@@ -1,13 +1,19 @@
 //! Bounded, inert SpreadsheetML 2009/9 form-control properties.
 //!
 //! This module owns the XML payload of an Office 2010 `ctrlProp` part and a
-//! bounded read-only worksheet owner that composes that leaf with its admitted
-//! DrawingML/VML identity closure.  Package mutation, ActiveX ownership,
-//! workbook transactions, and mirror-writing lifecycle remain outside this
-//! batch.  Parsing and detached writing are source preserving and bounded so
-//! the package owner can compose them without a second XML safety policy.
+//! bounded worksheet owner that composes that leaf with its admitted
+//! DrawingML/VML identity closure.  The source-backed scalar transaction
+//! composes a checked x14/VML pair and publishes only after complete owner
+//! readback; broader control graph authoring, package activation, and ActiveX
+//! ownership remain outside this module. Parsing and detached writing are
+//! source preserving and bounded so the package owner can compose them
+//! without a second XML safety policy.
 
+pub(crate) mod budget;
 mod codec;
+#[path = "scalar_edit.rs"]
+mod edit;
+mod mirror;
 mod model;
 mod owner;
 
@@ -16,6 +22,20 @@ pub use codec::{
     parse_with_limits, remove_item, replace_items, replace_scalar, set_scalar, write,
     write_with_limits,
 };
+pub use edit::{
+    FormControlCommit, FormControlPatch, FormControlSnapshot, FormControlSourceEdit,
+    SourceBackedFormControlEditor,
+};
+#[allow(
+    unused_imports,
+    reason = "ordinary worksheet staging consumes this preflight hook"
+)]
+pub(crate) use edit::{
+    FormControlScalarAction, OrdinaryFormControlOverlay, OwnedSelector,
+    ordinary_form_control_overlays, owned_selector, validate_ordinary_form_control_candidate,
+    validate_ordinary_form_control_selector, validate_scalar_operation_count,
+};
+pub(crate) use mirror::{ClientDataSource, MirrorLimits, replace_scalar_pair_with_limits};
 pub use model::{
     Checked, ControlSelector, DropStyle, EditValidation, FormControl, FormControlDraft,
     FormControlFormula, Item, ItemList, KnownOrUnknown, NamespaceBinding, ObjectType,
@@ -28,10 +48,11 @@ pub use owner::{
     OwnerProfile, OwnerResult, RelationshipFingerprint, ShapeClosure, SourceBackedFormControlOwner,
 };
 pub(crate) use owner::{
-    eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
+    eager_form_controls_for_effective_topology, eager_form_controls_for_sheet_with_limits,
+    read_set_matches_package_except, source_form_controls_for_sheet_with_limits,
 };
 pub(crate) use owner::{
-    eager_form_controls_for_sheet_with_limits, source_form_controls_for_sheet_with_limits,
+    eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
 };
 
 /// The Office 2010 SpreadsheetML form-control-properties namespace.

@@ -206,6 +206,9 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
         if actions.web.is_some() {
             writes.push(format!("sheet/{position}/web-bindings"));
         }
+        if !actions.form_control_scalars.is_empty() {
+            writes.push(format!("sheet/{position}/form-controls"));
+        }
         if !actions.merges.is_empty() {
             writes.push(format!("sheet/{position}/merges"));
         }
