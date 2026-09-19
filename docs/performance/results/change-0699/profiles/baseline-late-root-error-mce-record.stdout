@@ -1,0 +1,10 @@
+probe	0699-refusal
+case	late-root-error-mce
+mode	profile
+iterations	20000
+prepared_input_graph_sha256	98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92
+expected_error_debug	Invalid("slide part does not have a p:sld root")
+successful_captures	0
+refused_captures	20000
+assertion_checksum_sha256	78772a1a07a7d88820808072586b8ec7f7837795534cb339ce4b4cecace228bd
+all_iterations_passed	true

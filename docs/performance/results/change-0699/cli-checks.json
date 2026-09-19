@@ -1,0 +1,294 @@
+[
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "early-name-error",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "expected_exit_code": 0,
+    "stdout": "probe\t0699-refusal\nmode\tcase\nsamples\t1\nwarmups\t1\ncase\tearly-name-error\nauthoring_base_archive_bytes\t32713\nauthoring_base_archive_sha256\tceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97\nprepared_input_graph_sha256\ta76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce\nexpected_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nobserved_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nsample_ns\n0\t36311\nall_iterations_passed\ttrue\n",
+    "stderr": "",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "profile",
+      "early-name-error",
+      "1"
+    ],
+    "exit_code": 0,
+    "expected_exit_code": 0,
+    "stdout": "probe\t0699-refusal\ncase\tearly-name-error\nmode\tprofile\niterations\t1\nprepared_input_graph_sha256\ta76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce\nexpected_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nsuccessful_captures\t0\nrefused_captures\t1\nassertion_checksum_sha256\t35f8f568d5c75a66b4c4c4f0fc438ded1132e9d6cb90d29f7079bac65f245e65\nall_iterations_passed\ttrue\n",
+    "stderr": "",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "unknown",
+      "1",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"unknown case \\\"unknown\\\"; available cases: small-valid, generated-12x8-valid, early-name-error, late-root-error, late-root-error-mce, late-missing-relationship, late-missing-relationship-mce, notes-invalid-tail, mixed-conformance, slide-raw-overlimit-16m-to-64m\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "early-name-error",
+      "0",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"samples must be between 1 and 100000, got 0\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "early-name-error",
+      "100001",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"samples must be between 1 and 100000, got 100001\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "early-name-error",
+      "1",
+      "0"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"warmups must be between 1 and 10000, got 0\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "case",
+      "early-name-error",
+      "1",
+      "10001"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"warmups must be between 1 and 10000, got 10001\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "profile",
+      "early-name-error",
+      "0"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"iterations must be between 1 and 100000, got 0\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "profile",
+      "early-name-error",
+      "100001"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"iterations must be between 1 and 100000, got 100001\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "baseline",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/baseline",
+      "profile",
+      "unknown",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"unknown case \\\"unknown\\\"; available cases: small-valid, generated-12x8-valid, early-name-error, late-root-error, late-root-error-mce, late-missing-relationship, late-missing-relationship-mce, notes-invalid-tail, mixed-conformance, slide-raw-overlimit-16m-to-64m\"\n",
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "early-name-error",
+      "1",
+      "1"
+    ],
+    "exit_code": 0,
+    "expected_exit_code": 0,
+    "stdout": "probe\t0699-refusal\nmode\tcase\nsamples\t1\nwarmups\t1\ncase\tearly-name-error\nauthoring_base_archive_bytes\t32713\nauthoring_base_archive_sha256\tceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97\nprepared_input_graph_sha256\ta76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce\nexpected_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nobserved_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nsample_ns\n0\t41880\nall_iterations_passed\ttrue\n",
+    "stderr": "",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "profile",
+      "early-name-error",
+      "1"
+    ],
+    "exit_code": 0,
+    "expected_exit_code": 0,
+    "stdout": "probe\t0699-refusal\ncase\tearly-name-error\nmode\tprofile\niterations\t1\nprepared_input_graph_sha256\ta76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce\nexpected_error_debug\tDecode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))\nsuccessful_captures\t0\nrefused_captures\t1\nassertion_checksum_sha256\t35f8f568d5c75a66b4c4c4f0fc438ded1132e9d6cb90d29f7079bac65f245e65\nall_iterations_passed\ttrue\n",
+    "stderr": "",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "unknown",
+      "1",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"unknown case \\\"unknown\\\"; available cases: small-valid, generated-12x8-valid, early-name-error, late-root-error, late-root-error-mce, late-missing-relationship, late-missing-relationship-mce, notes-invalid-tail, mixed-conformance, slide-raw-overlimit-16m-to-64m\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "early-name-error",
+      "0",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"samples must be between 1 and 100000, got 0\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "early-name-error",
+      "100001",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"samples must be between 1 and 100000, got 100001\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "early-name-error",
+      "1",
+      "0"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"warmups must be between 1 and 10000, got 0\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "case",
+      "early-name-error",
+      "1",
+      "10001"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"warmups must be between 1 and 10000, got 10001\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "profile",
+      "early-name-error",
+      "0"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"iterations must be between 1 and 100000, got 0\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "profile",
+      "early-name-error",
+      "100001"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"iterations must be between 1 and 100000, got 100001\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "/home/zhuhe/code/litchi-0699-bin/candidate",
+      "profile",
+      "unknown",
+      "1"
+    ],
+    "exit_code": 1,
+    "expected_exit_code": 1,
+    "stdout": "",
+    "stderr": "Error: \"unknown case \\\"unknown\\\"; available cases: small-valid, generated-12x8-valid, early-name-error, late-root-error, late-root-error-mce, late-missing-relationship, late-missing-relationship-mce, notes-invalid-tail, mixed-conformance, slide-raw-overlimit-16m-to-64m\"\n",
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610"
+  }
+]

@@ -1,0 +1,888 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cpu/cycles/P'
+# Event count (approx.): 14241716370
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                
+# ........  .........  ................  ......................................................................................................................
+#
+    13.34%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::start
+            |          
+            |--0.09%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |          clone (inlined)
+            |          clone (inlined)
+            |          {closure#0} (inlined)
+            |          map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+            |          start (inlined)
+            |          0x5
+            |          
+            |--0.06%--after (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          |          
+            |          |--0.03%--0x7
+            |          |          
+            |           --0.03%--0x3
+            |          
+            |--0.03%--clone<litchi_ooxml_common::mce::codec::DirectiveLayer, alloc::alloc::Global> (inlined)
+            |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::DirectiveLayer, alloc::alloc::Global>> (inlined)
+            |          clone (inlined)
+            |          {closure#0} (inlined)
+            |          map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+            |          start (inlined)
+            |          0x5
+            |          
+            |--0.03%--default<litchi_ooxml_common::mce::codec::NamePattern, std::hash::random::RandomState> (inlined)
+            |          new<litchi_ooxml_common::mce::codec::NamePattern> (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          0x3
+            |          
+            |--0.03%--default<alloc::string::String, std::hash::random::RandomState> (inlined)
+            |          new<alloc::string::String> (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          0x5
+            |          
+            |--0.03%--is_ignorable (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          
+             --0.03%--drop_in_place<core::option::Option<std::collections::hash::set::HashSet<u64, core::hash::BuildHasherDefault<quick_xml::events::attributes::IdentityHasher>, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<quick_xml::events::attributes::IterState> (inlined)
+                       drop_in_place<quick_xml::events::attributes::Attributes> (inlined)
+                       start (inlined)
+                       0x5
+
+    10.92%  candidate  libc.so.6         [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |          
+                --0.37%--equal_same_length<u8, u8> (inlined)
+                          eq<u8, u8> (inlined)
+                          |          
+                          |--0.28%--eq<[u8], [u8]> (inlined)
+                          |          |          
+                          |          |--0.12%--{closure#0} (inlined)
+                          |          |          {closure#0}<&[u8], litchi_ooxml_common::mce::codec::process_markup_compatibility::{closure_env#0}> (inlined)
+                          |          |          try_fold<core::slice::iter::Windows<u8>, (), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&[u8], litchi_ooxml_common::mce::codec::process_markup_compatibility::{closure_env#0}>, core::ops::control_flow::ControlFlow<(), ()>> (inlined)
+                          |          |          any<core::slice::iter::Windows<u8>, litchi_ooxml_common::mce::codec::process_markup_compatibility::{closure_env#0}> (inlined)
+                          |          |          process_markup_compatibility (inlined)
+                          |          |          0x23
+                          |          |          
+                          |          |--0.09%--next_match (inlined)
+                          |          |          
+                          |           --0.06%--eq (inlined)
+                          |                     eq (inlined)
+                          |                     eq<alloc::string::String, str> (inlined)
+                          |                     {closure#0} (inlined)
+                          |                     {closure#0}<&(alloc::string::String, alloc::string::String), litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                          |                     try_rfold<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, (), core::iter::traits::double_ended::DoubleEndedIterator::rfind::check::{closure_env#0}<&(alloc::string::String, alloc::string::String), litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}>, core::ops::control_flow::ControlFlow<&(alloc::string::String, alloc::string::String), ()>> (inlined)
+                          |                     rfind<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                          |                     find<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                          |                     get (inlined)
+                          |                     expand_parts (inlined)
+                          |          
+                           --0.09%--ne<[u8], [u8]> (inlined)
+                                     ne<[u8], [u8]> (inlined)
+                                     emit_end (inlined)
+
+     4.59%  candidate  libc.so.6         [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+               |--0.19%--memcpy (inlined)
+               |          _int_realloc
+               |          __libc_realloc (inlined)
+               |          
+                --0.12%--copy_nonoverlapping<u8> (inlined)
+                          append_elements<u8, alloc::alloc::Global> (inlined)
+                          spec_extend<u8, alloc::alloc::Global> (inlined)
+                          |          
+                          |--0.06%--extend<u8, alloc::alloc::Global, &[u8]> (inlined)
+                          |          emit_start (inlined)
+                          |          
+                           --0.06%--extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                                     |          
+                                     |--0.03%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                                     |          0x7
+                                     |          
+                                      --0.03%--extend_from_slice (inlined)
+                                                0x11f
+
+     4.59%  candidate  candidate         [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+            |          
+             --0.09%--process_event<&[u8]> (inlined)
+                       |          
+                       |--0.06%--0x800000000000000e
+                       |          
+                        --0.03%--0x2b2
+
+     3.97%  candidate  candidate         [.] litchi_pptx::notes::codec::scan_processed_xml
+     3.91%  candidate  candidate         [.] quick_xml::events::attributes::IterState::next
+            |          
+             --0.03%--next (inlined)
+
+     3.01%  candidate  candidate         [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+            |          
+             --0.06%--decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+
+     2.85%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::close
+            |          
+             --0.03%--drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+                       close (inlined)
+                       0x7
+
+     2.64%  candidate  candidate         [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+            |          
+            |--0.03%--rotate_left<u64> (inlined)
+            |          rotate_left (inlined)
+            |          c_rounds (inlined)
+            |          write<core::hash::sip::Sip13Rounds> (inlined)
+            |          0xe
+            |          0x15
+            |          
+             --0.03%--write<core::hash::sip::Sip13Rounds> (inlined)
+
+     2.58%  candidate  candidate         [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+     2.51%  candidate  candidate         [.] litchi_pptx::notes::codec::inspect_element
+            |          
+             --0.03%--branch<alloc::string::String, litchi_pptx::error::Error> (inlined)
+                       inspect_element (inlined)
+                       _int_realloc
+                       0x6
+
+     2.23%  candidate  libc.so.6         [.] malloc
+            |          
+            |--1.12%--tcache_get_n (inlined)
+            |          tcache_get (inlined)
+            |          __libc_malloc (inlined)
+            |          
+             --1.12%--__libc_malloc (inlined)
+
+     1.86%  candidate  candidate         [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+            |          
+             --0.03%--feed (inlined)
+                       read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                       0x4
+
+     1.77%  candidate  candidate         [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     1.71%  candidate  candidate         [.] litchi_ooxml_common::xml_name::validation::is_ncname
+            |          
+             --0.03%--is_name_start (inlined)
+                       is_ncname_start (inlined)
+                       call_once<fn(char) -> bool, (char)> (inlined)
+                       is_some_and<char, fn(char) -> bool> (inlined)
+                       is_ncname (inlined)
+                       0x5
+
+     1.52%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+     1.49%  candidate  candidate         [.] quick_xml::reader::state::ReaderState::emit_start
+            |          
+             --0.03%--strip_suffix<u8, [u8; 2]> (inlined)
+                       emit_start (inlined)
+
+     1.49%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+     1.46%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::write_start
+            |          
+             --0.03%--write_start (inlined)
+                       0x5f
+
+     1.27%  candidate  candidate         [.] core::str::converts::from_utf8
+     1.24%  candidate  candidate         [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+            |          
+             --0.03%--new_unchecked (inlined)
+                       find_avx2 (inlined)
+                       find_raw (inlined)
+                       0x3e3e3e3e3e3e3e3d
+
+     1.15%  candidate  candidate         [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     1.12%  candidate  candidate         [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+            |          
+             --0.03%--finish_grow<alloc::alloc::Global> (inlined)
+                       push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       push<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       check_for_duplicates (inlined)
+
+     0.99%  candidate  libc.so.6         [.] _int_malloc
+            |          
+            |--0.93%--_int_malloc
+            |          |          
+            |          |--0.68%--__libc_malloc2
+            |          |          
+            |           --0.25%--_int_realloc
+            |                     __libc_realloc (inlined)
+            |          
+             --0.06%--tcache_put_n (inlined)
+                       tcache_put (inlined)
+                       _int_malloc
+                       _int_realloc
+                       __libc_realloc (inlined)
+
+     0.99%  candidate  candidate         [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.96%  candidate  candidate         [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+            |          
+             --0.03%--find_raw_avx2 (inlined)
+                       0x5efa29aa97bf
+                       0x717ecc22273d
+
+     0.93%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::BoundedOutput::push
+            |          
+             --0.03%--push (inlined)
+                       0x7
+
+     0.93%  candidate  candidate         [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     0.87%  candidate  candidate         [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+            |          
+            |--0.06%--next (inlined)
+            |          0x8000000000000002
+            |          
+             --0.03%--map<core::ops::range::Range<usize>, &[u8], quick_xml::events::attributes::{impl#8}::next::{closure_env#0}> (inlined)
+                       next (inlined)
+
+     0.84%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice
+     0.81%  candidate  candidate         [.] quick_xml::reader::Reader<R>::read_event_impl
+            |          
+            |--0.03%--read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          
+             --0.03%--read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+                       0x800000000000000e
+
+     0.74%  candidate  libc.so.6         [.] cfree@GLIBC_2.2.5
+            |          
+            |--0.53%--__libc_free (inlined)
+            |          
+             --0.22%--tcache_put_n (inlined)
+                       tcache_put (inlined)
+                       __libc_free (inlined)
+
+     0.74%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::expand_parts
+            |          
+             --0.03%--equal_same_length<u8, u8> (inlined)
+                       eq<u8, u8> (inlined)
+                       eq<[u8], [u8]> (inlined)
+                       eq (inlined)
+                       eq (inlined)
+                       eq<alloc::string::String, str> (inlined)
+                       {closure#0} (inlined)
+                       {closure#0}<&(alloc::string::String, alloc::string::String), litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                       try_rfold<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, (), core::iter::traits::double_ended::DoubleEndedIterator::rfind::check::{closure_env#0}<&(alloc::string::String, alloc::string::String), litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}>, core::ops::control_flow::ControlFlow<&(alloc::string::String, alloc::string::String), ()>> (inlined)
+                       rfind<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                       find<core::slice::iter::Iter<(alloc::string::String, alloc::string::String)>, litchi_ooxml_common::mce::codec::{impl#0}::get::{closure_env#0}> (inlined)
+                       get (inlined)
+                       expand_parts (inlined)
+                       0x7fffffffffffffff
+
+     0.65%  candidate  libc.so.6         [.] _int_free_merge_chunk
+            |          
+            |--0.43%--_int_free_create_chunk (inlined)
+            |          _int_free_merge_chunk
+            |          _int_free_chunk
+            |          |          
+            |           --0.19%--_int_realloc
+            |                     __libc_realloc (inlined)
+            |          
+             --0.22%--_int_free_merge_chunk
+                       _int_free_chunk
+                       |          
+                        --0.09%--_int_realloc
+                                  __libc_realloc (inlined)
+
+     0.65%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+            |          
+            |--0.03%--wrapping_add (inlined)
+            |          d_rounds (inlined)
+            |          finish<core::hash::sip::Sip13Rounds> (inlined)
+            |          finish (inlined)
+            |          finish (inlined)
+            |          hash_one<std::hash::random::RandomState, &alloc::string::String> (inlined)
+            |          0x17
+            |          0x493fc93fb7bac5fa
+            |          
+             --0.03%--d_rounds (inlined)
+                       finish<core::hash::sip::Sip13Rounds> (inlined)
+                       finish (inlined)
+                       finish (inlined)
+                       hash_one<std::hash::random::RandomState, &alloc::string::String> (inlined)
+                       0x17
+                       0x493fc93fb7bac5fa
+
+     0.62%  candidate  candidate         [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.59%  candidate  candidate         [.] quick_xml::reader::state::ReaderState::emit_end
+            |          
+             --0.03%--emit_end (inlined)
+
+     0.56%  candidate  candidate         [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+     0.56%  candidate  candidate         [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.50%  candidate  candidate         [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.47%  candidate  candidate         [.] litchi_ooxml_common::xml_name::validation::is_qualified_name
+     0.47%  candidate  candidate         [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     0.47%  candidate  candidate         [.] std::thread::local::LocalKey<T>::with
+     0.47%  candidate  candidate         [.] litchi_pptx::notes::resolved
+            |          
+             --0.06%--resolved (inlined)
+                       |          
+                        --0.03%--0x5
+
+     0.37%  candidate  candidate         [.] litchi_pptx::parts::presentation::PresentationPart::slide_references
+     0.37%  candidate  candidate         [.] quick_xml::name::NamespaceResolver::resolve_prefix
+            |          
+             --0.03%--resolve_prefix (inlined)
+
+     0.37%  candidate  candidate         [.] hashbrown::raw::RawTable<T,A>::reserve_rehash
+     0.37%  candidate  candidate         [.] quick_xml::name::NamespaceResolver::resolve_event
+            |          
+             --0.03%--resolve_event (inlined)
+
+     0.37%  candidate  candidate         [.] alloc::raw_vec::RawVecInner<A>::try_allocate_in
+            |          
+             --0.03%--try_allocate_in<alloc::alloc::Global> (inlined)
+
+     0.37%  candidate  candidate         [.] quick_xml::escape::normalize_attribute_value
+     0.34%  candidate  candidate         [.] __rustc::__rdl_alloc
+            |          
+             --0.03%--__rdl_alloc (inlined)
+                       0x636c636f2e6c7274
+
+     0.34%  candidate  candidate         [.] core::ops::function::FnOnce::call_once
+     0.34%  candidate  candidate         [.] quick_xml::reader::Reader<R>::read_event_impl
+            |          
+            |--0.03%--read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          0x5
+            |          0x3
+            |          
+             --0.03%--remove_utf8_bom<&[u8]> (inlined)
+                       read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+                       0x493fc93fb7bac5fa
+
+     0.31%  candidate  candidate         [.] quick_xml::name::NamespaceResolver::push
+     0.31%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::esc
+     0.31%  candidate  candidate         [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.28%  candidate  libc.so.6         [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk (inlined)
+               |          
+               |--0.25%--_int_malloc
+               |          |          
+               |           --0.19%--__libc_malloc2
+               |          
+                --0.03%--_int_free_merge_chunk
+                          _int_free_chunk
+                          _int_realloc
+                          __libc_realloc (inlined)
+
+     0.28%  candidate  candidate         [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     0.25%  candidate  candidate         [.] sha2::sha256::x86_sha::compress
+            |          
+            |--0.13%--_mm_add_epi32 (inlined)
+            |          |          
+            |          |--0.09%--compress (inlined)
+            |          |          0x7
+            |          |          
+            |           --0.03%--schedule (inlined)
+            |                     compress (inlined)
+            |                     0x7
+            |          
+            |--0.06%--_mm_sha256rnds2_epu32 (inlined)
+            |          compress (inlined)
+            |          0x7
+            |          
+            |--0.03%--_mm_sha256msg1_epu32 (inlined)
+            |          schedule (inlined)
+            |          compress (inlined)
+            |          0x7
+            |          
+             --0.03%--_mm_alignr_epi8<4> (inlined)
+                       schedule (inlined)
+                       compress (inlined)
+                       0x7
+
+     0.25%  candidate  candidate         [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.25%  candidate  candidate         [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+     0.25%  candidate  candidate         [.] __rustc::__rdl_dealloc
+     0.22%  candidate  candidate         [.] litchi_ooxml_common::mce::codec::process_ooxml
+     0.22%  candidate  libc.so.6         [.] __libc_malloc2
+            |
+            ---__libc_malloc2
+
+     0.22%  candidate  candidate         [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.22%  candidate  candidate         [.] hashbrown::map::HashMap<K,V,S,A>::contains_key
+     0.19%  candidate  [unknown]         [k] 0xffffffff9e800ef0
+            |
+            ---0xffffffff9e800ef0
+               |          
+               |--0.03%--__libc_malloc (inlined)
+               |          0x11
+               |          
+                --0.03%--__memcmp_evex_movbe
+
+     0.19%  candidate  libc.so.6         [.] realloc
+            |          
+            |--0.12%--musable (inlined)
+            |          __libc_realloc (inlined)
+            |          
+             --0.06%--__libc_realloc (inlined)
+
+     0.19%  candidate  libc.so.6         [.] _int_realloc
+            |          
+            |--0.16%--_int_realloc
+            |          __libc_realloc (inlined)
+            |          
+             --0.03%--memcpy (inlined)
+                       _int_realloc
+                       __libc_realloc (inlined)
+
+     0.19%  candidate  candidate         [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+     0.19%  candidate  candidate         [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+     0.19%  candidate  candidate         [.] __rustc::__rust_alloc
+            |          
+             --0.03%--__rustc::__rust_alloc
+
+     0.16%  candidate  candidate         [.] quick_xml::escape::unescape
+     0.16%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+     0.16%  candidate  libc.so.6         [.] _int_free_maybe_trim
+            |
+            ---_int_free_maybe_trim
+               _int_free_chunk
+               |          
+                --0.03%--_int_realloc
+                          __libc_realloc (inlined)
+
+     0.16%  candidate  candidate         [.] litchi_opc::packuri::PackURI::new
+            |          
+             --0.03%--new<core::str::iter::Split<char>> (inlined)
+                       skip<core::str::iter::Split<char>> (inlined)
+                       new<alloc::string::String> (inlined)
+                       0x5efa298ec021
+
+     0.16%  candidate  candidate         [.] <quick_xml::name::NamespaceResolver as core::default::Default>::default
+     0.16%  candidate  candidate         [.] alloc::raw_vec::RawVec<T,A>::grow_one
+            |          
+             --0.03%--grow_one<quick_xml::name::NamespaceBinding, alloc::alloc::Global> (inlined)
+
+     0.12%  candidate  candidate         [.] core::iter::traits::iterator::Iterator::try_fold
+     0.12%  candidate  candidate         [.] litchi_pptx::presentation::package::capture_slides
+     0.12%  candidate  candidate         [.] litchi_opc::packuri::PackURI::from_rel_ref
+     0.12%  candidate  candidate         [.] core::slice::memchr::memchr_aligned
+            |          
+             --0.03%--memchr_aligned (inlined)
+
+     0.12%  candidate  candidate         [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.12%  candidate  candidate         [.] alloc::vec::Vec<T,A>::push_mut
+     0.12%  candidate  candidate         [.] quick_xml::name::NamespaceResolver::add
+     0.12%  candidate  candidate         [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.12%  candidate  candidate         [.] alloc::str::join_generic_copy
+     0.09%  candidate  candidate         [.] litchi_opc::packuri::PackURI::validate_percent_encoding
+     0.09%  candidate  candidate         [.] alloc::raw_vec::RawVec<T,A>::grow_one
+     0.09%  candidate  candidate         [.] litchi_pptx::parts::presentation::PresentationPart::from_part
+     0.09%  candidate  candidate         [.] alloc::sync::Arc<T,A>::drop_slow
+     0.09%  candidate  candidate         [.] alloc::fmt::format::format_inner
+     0.09%  candidate  candidate         [.] quick_xml::name::QName::decompose
+     0.09%  candidate  candidate         [.] <alloc::string::String as core::fmt::Write>::write_str
+     0.09%  candidate  candidate         [.] litchi_pptx::parts::presentation::append_slide_reference
+     0.06%  candidate  candidate         [.] litchi_ooxml_common::xml::unqualified_attribute_value
+     0.06%  candidate  candidate         [.] hashbrown::map::HashMap<K,V,S,A>::get
+            |          
+             --0.03%--eq<u8, u8> (inlined)
+                       eq<[u8], [u8]> (inlined)
+                       eq (inlined)
+                       eq<str, str> (inlined)
+                       equivalent<str, alloc::string::String> (inlined)
+                       {closure#0}<str, alloc::string::String, litchi_opc::rel::Relationship> (inlined)
+                       {closure#0}<(alloc::string::String, litchi_opc::rel::Relationship), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, litchi_opc::rel::Relationship>> (inlined)
+                       find_inner (inlined)
+                       find<(alloc::string::String, litchi_opc::rel::Relationship), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, litchi_opc::rel::Relationship>> (inlined)
+                       get<(alloc::string::String, litchi_opc::rel::Relationship), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, litchi_opc::rel::Relationship>> (inlined)
+                       get<alloc::string::String, litchi_opc::rel::Relationship, std::hash::random::RandomState, alloc::alloc::Global, str> (inlined)
+                       0x3
+
+     0.06%  candidate  candidate         [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.06%  candidate  candidate         [.] litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline
+     0.06%  candidate  candidate         [.] <alloc::raw_vec::RawVecInner>::finish_grow
+     0.06%  candidate  candidate         [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.06%  candidate  candidate         [.] __rustc::__rust_dealloc
+     0.04%  candidate  candidate         [.] core::ptr::drop_in_place<litchi_opc::part::BlobPart>
+            |
+            ---drop<alloc::vec::Vec<u8, alloc::alloc::Global>, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::sync::Arc<alloc::vec::Vec<u8, alloc::alloc::Global>, alloc::alloc::Global>> (inlined)
+               drop_in_place<litchi_opc::payload::PartPayload> (inlined)
+               drop_in_place<litchi_opc::part::BlobPart> (inlined)
+
+     0.04%  candidate  candidate         [.] zlib_rs::deflate::gen_codes
+            |
+            ---reverse_bits (inlined)
+               gen_codes (inlined)
+               0x47c3d32f
+
+     0.04%  candidate  [unknown]         [k] 0xffffffff9efed5c8
+            |
+            ---0xffffffff9efed5c8
+               0xffffffff9ec1a367
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               __memset_avx512_unaligned_erms
+               write_bytes<[u16; 65536]> (inlined)
+               write_bytes<[u16; 65536]> (inlined)
+               init (inlined)
+               0x8b86bf
+
+     0.04%  candidate  candidate         [.] zlib_rs::inflate::inflate_fast_help
+            |
+            ---drop_bits (inlined)
+               inflate_fast_help_impl<0> (inlined)
+               inflate_fast_help_vanilla (inlined)
+               inflate_fast_help (inlined)
+               0x47cdf911
+
+     0.03%  candidate  candidate         [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---deflate_medium (inlined)
+
+     0.03%  candidate  [unknown]         [k] 0xffffffff9fee6c00
+            |
+            ---0xffffffff9fee6c00
+               0xffffffff9efed5ef
+               0xffffffff9ec1a367
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               __memset_avx512_unaligned_erms
+               write<u8> (inlined)
+               extend_with<u8, alloc::alloc::Global> (inlined)
+               resize<u8, alloc::alloc::Global> (inlined)
+               {closure#5} (inlined)
+               rewrite_part<probe0699_refusal::build_cases::{closure_env#5}> (inlined)
+               _dl_map_object_deps
+
+     0.03%  candidate  [unknown]         [k] 0xffffffff9ff30da0
+            |
+            ---0xffffffff9ff30da0
+               0xffffffff9ff30cae
+               0xffffffff9f036dcd
+               0xffffffff9f03802d
+               0xffffffff9f03a042
+               0xffffffff9f03b6cc
+               0xffffffff9f07d258
+               0xffffffff9f080adb
+               0xffffffff9effe7a9
+               0xffffffff9effec02
+               0xffffffff9f000000
+               0xffffffff9f0004d3
+               0xffffffff9f00085e
+               0xffffffff9ec1a3ee
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               __memset_avx512_unaligned_erms
+               write<u8> (inlined)
+               extend_with<u8, alloc::alloc::Global> (inlined)
+               resize<u8, alloc::alloc::Global> (inlined)
+               {closure#5} (inlined)
+               rewrite_part<probe0699_refusal::build_cases::{closure_env#5}> (inlined)
+               _dl_map_object_deps
+
+     0.03%  candidate  [unknown]         [k] 0xffffffff9f02e7ca
+            |
+            ---0xffffffff9f02e7ca
+               0xffffffff9f034a28
+               0xffffffff9f03a2d9
+               0xffffffff9f03b6cc
+               0xffffffff9f07d258
+               0xffffffff9f080adb
+               0xffffffff9effe7a9
+               0xffffffff9effec02
+               0xffffffff9f000000
+               0xffffffff9f0004d3
+               0xffffffff9f00085e
+               0xffffffff9ec1a3ee
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               __memset_avx512_unaligned_erms
+               write<u8> (inlined)
+               extend_with<u8, alloc::alloc::Global> (inlined)
+               resize<u8, alloc::alloc::Global> (inlined)
+               {closure#5} (inlined)
+               rewrite_part<probe0699_refusal::build_cases::{closure_env#5}> (inlined)
+               _dl_map_object_deps
+
+     0.03%  candidate  [unknown]         [k] 0xffffffff9ed0504b
+            |
+            ---0xffffffff9ed0504b
+               0xffffffff9ff3033e
+               0xffffffff9ed7cb3c
+               0xffffffff9ed90257
+               0xffffffff9ed904a5
+               0xffffffff9ed7690c
+               0xffffffff9ed777d4
+               0xffffffff9ebf0f48
+               0xffffffff9ff1d894
+               0xffffffff9e800f0b
+
+     0.03%  candidate  candidate         [.] <str>::to_ascii_lowercase
+     0.03%  candidate  candidate         [.] <str as core::fmt::Debug>::fmt
+     0.03%  candidate  [unknown]         [k] 0xffffffff9ed42d78
+            |
+            ---0xffffffff9ed42d78
+               0xffffffff9ed4770a
+               0xffffffff9ed75571
+               0xffffffff9ed903d6
+               0xffffffff9ed7690c
+               0xffffffff9ed777d4
+               0xffffffff9ebf0f48
+               0xffffffff9ff1d894
+               0xffffffff9e800f0b
+               tcache_put_n (inlined)
+               tcache_put (inlined)
+               __libc_free (inlined)
+
+     0.03%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+     0.03%  candidate  [unknown]         [k] 0xffffffff9eda1ad1
+            |
+            ---0xffffffff9eda1ad1
+               0xffffffff9eda1cba
+               0xffffffff9eda20b2
+               0xffffffff9ecadd7f
+               0xffffffff9ecc602b
+               0xffffffff9ecc649c
+               0xffffffff9eca8167
+               0xffffffff9ed75580
+               0xffffffff9ed903d6
+               0xffffffff9ed7690c
+               0xffffffff9ed777d4
+               0xffffffff9ebf0f48
+               0xffffffff9ff1d894
+               0xffffffff9e800f0b
+
+     0.03%  candidate  candidate         [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.03%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+     0.03%  candidate  candidate         [.] core::hash::BuildHasher::hash_one
+     0.03%  candidate  [unknown]         [k] 0xffffffff9ff08ded
+            |
+            ---0xffffffff9ff08ded
+               0xffffffff9fcbb877
+               0xffffffffc04b4636
+               0xffffffffc04b4b4b
+               0xffffffffc04b4c93
+               0xffffffffc04a7642
+               0xffffffff9ed730f0
+               0xffffffff9ed73e0e
+               0xffffffff9ed75312
+               0xffffffff9ed95a04
+               0xffffffff9ed95c85
+               0xffffffff9ed95e55
+               0xffffffff9ed742cb
+               0xffffffff9ec50d21
+               0xffffffff9ec510b0
+               0xffffffff9ec514ae
+               0xffffffff9ff1d899
+               0xffffffff9e800f0b
+               __memmove_avx512_unaligned_erms
+
+     0.03%  candidate  libc.so.6         [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+
+     0.03%  candidate  candidate         [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.03%  candidate  candidate         [.] litchi_pptx::parts::slide::root_name_from_xml
+     0.03%  candidate  candidate         [.] __rustc::__rdl_realloc
+     0.03%  candidate  [unknown]         [k] 0xffffffff9eff6511
+            |
+            ---0xffffffff9eff6511
+               0xffffffff9eff6d75
+               0xffffffff9eff740e
+               0xffffffff9eff7bde
+               0xffffffff9eff7e16
+               0xffffffff9eff7f3c
+               0xffffffff9f027f24
+               0xffffffff9f0285c7
+               0xffffffff9f029995
+               0xffffffff9f029b01
+               0xffffffff9f02bb31
+               0xffffffff9f005a8b
+               0xffffffff9eb4aea3
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __munmap
+               _int_free_chunk
+
+     0.03%  candidate  candidate         [.] <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find
+     0.03%  candidate  candidate         [.] litchi_pptx::opened::model::capture_internal
+     0.03%  candidate  candidate         [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw
+     0.03%  candidate  candidate         [.] hashbrown::raw::RawTableInner::fallible_with_capacity
+     0.03%  candidate  candidate         [.] litchi_ooxml_common::relationships::codec::attribute_value
+     0.03%  candidate  candidate         [.] quick_xml::name::NamespaceResolver::set_level
+     0.03%  candidate  candidate         [.] <core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold
+     0.03%  candidate  candidate         [.] litchi_pptx::namespace::presentation_name
+     0.01%  taskset    [unknown]         [k] 0xffffffff9ecbc18c
+            |
+            ---0xffffffff9ecbc18c
+               0xffffffff9ecbd03a
+               0xffffffff9eca44e9
+               0xffffffff9ecaa01e
+               0xffffffff9ecac7a8
+               0xffffffff9ecac894
+               0xffffffff9ecec863
+               0xffffffff9ececbbe
+               0xffffffff9ececdbd
+               0xffffffff9eb49611
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __sched_setaffinity_new (inlined)
+               0x567aaa19046c
+               0x567aaa18f04d
+               __libc_start_call_main
+               __libc_start_main_impl (inlined)
+               0x567aaa18f314
+
+     0.01%  taskset    [unknown]         [k] 0xffffffff9f0306d1
+            |
+            ---0xffffffff9f0306d1
+               0xffffffff9f030dc8
+               0xffffffff9f038e37
+               0xffffffff9ef9a5f0
+               0xffffffff9f05eaae
+               0xffffffff9f009569
+               0xffffffff9f009f27
+               0xffffffff9f008444
+               0xffffffff9ec428b5
+               0xffffffff9ec42a0e
+               0xffffffff9f0f1d33
+               0xffffffff9f0f49b4
+               0xffffffff9f19c8f5
+               0xffffffff9f0f2446
+               0xffffffff9f0f27b0
+               0xffffffff9f0f28aa
+               0xffffffff9f0f436b
+               0xffffffff9f0f467e
+               0xffffffff9eb49863
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+
+     0.00%  taskset    [unknown]         [k] 0xffffffff9efe253e
+            |
+            ---0xffffffff9efe253e
+               0xffffffff9f02634f
+               0xffffffff9f0281d8
+               0xffffffff9f0295ae
+               0xffffffff9f02aed2
+               0xffffffff9f0072b8
+               0xffffffff9efc4439
+               0xffffffff9efc455d
+               0xffffffff9f19c133
+               0xffffffff9f19c404
+               0xffffffff9f19d005
+               0xffffffff9f0f2446
+               0xffffffff9f0f27b0
+               0xffffffff9f0f28aa
+               0xffffffff9f0f436b
+               0xffffffff9f0f467e
+               0xffffffff9eb49863
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+
+     0.00%  taskset    [unknown]         [k] 0xffffffff9f0bf300
+            |
+            ---0xffffffff9f0bf300
+               0xffffffff9f05001c
+               0xffffffff9ec4362a
+               0xffffffff9f0f4079
+               0xffffffff9f0f4263
+               0xffffffff9f0f467e
+               0xffffffff9eb49863
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __execve (inlined)
+               __execvpe_common (inlined)
+               __execvpe
+               0x567aaa18f093
+               __libc_start_call_main
+               __libc_start_main_impl (inlined)
+               0x567aaa18f314
+
+     0.00%  perf-exec  [unknown]         [k] 0xffffffff9ec7baea
+            |
+            ---0xffffffff9ec7baea
+               0xffffffff9ef5ddd4
+               0xffffffff9ef5f86d
+               0xffffffff9ef56d76
+               0xffffffff9ef579ec
+               0xffffffff9ef57adc
+               0xffffffff9ef6dd1e
+               0xffffffff9f0f4758
+               0xffffffff9f0f4cbe
+               0xffffffff9f19c8f5
+               0xffffffff9f0f2446
+               0xffffffff9f0f27b0
+               0xffffffff9f0f28aa
+               0xffffffff9f0f436b
+               0xffffffff9f0f467e
+               0xffffffff9eb49863
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+
+     0.00%  taskset    [unknown]         [k] 0xffffffff9ed60565
+            |
+            ---0xffffffff9ed60565
+               0xffffffff9ff15c8f
+               0xffffffff9e80012b
+               __sched_setaffinity_new (inlined)
+               0x567aaa19046c
+               0x567aaa18f04d
+               __libc_start_call_main
+               __libc_start_main_impl (inlined)
+               0x567aaa18f314
+
+     0.00%  perf-exec  [unknown]         [k] 0xffffffff9ef64d05
+            |
+            ---0xffffffff9ef64d05
+               0xffffffff9ef6536f
+               0xffffffff9ef6d8e5
+               0xffffffff9f0f4b8d
+               0xffffffff9f19c8f5
+               0xffffffff9f0f2446
+               0xffffffff9f0f27b0
+               0xffffffff9f0f28aa
+               0xffffffff9f0f436b
+               0xffffffff9f0f467e
+               0xffffffff9eb49863
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+
+     0.00%  taskset    [unknown]         [k] 0xffffffff9ef5a0a0
+            |
+            ---0xffffffff9ef5a0a0
+               0xffffffff9ef65875
+               0xffffffff9ef6592a
+               0xffffffff9eca1078
+               0xffffffff9ff256c3
+               0xffffffff9ff25c8c
+               0xffffffff9eb4c0f6
+               0xffffffff9ecaa842
+               0xffffffff9ecac7bd
+               0xffffffff9ecac894
+               0xffffffff9ecec863
+               0xffffffff9ececbbe
+               0xffffffff9ececdbd
+               0xffffffff9eb49611
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __sched_setaffinity_new (inlined)
+               0x567aaa19046c
+               0x567aaa18f04d
+               __libc_start_call_main
+               __libc_start_main_impl (inlined)
+               0x567aaa18f314
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1,0 +1,1180 @@
+ Samples |	Source code & Disassembly of candidate for cpu/cycles/P (290 samples, percent: local period)
+------------------------------------------------------------------------------------------------------------
+         : 0      0x13d080 <litchi_ooxml_common::mce::codec::process_markup_compatibility>:
+       0 :   13d080:        pushq   %rbp
+       0 :   13d081:        pushq   %r15
+       0 :   13d083:        pushq   %r14
+       0 :   13d085:        pushq   %r13
+       0 :   13d087:        pushq   %r12
+       0 :   13d089:        pushq   %rbx
+       0 :   13d08a:        subq    $0x248, %rsp
+       0 :   13d091:        movq    %rdi, %r12
+       0 :   13d094:        cmpq    (%r8), %rdx
+       0 :   13d097:        jbe     0x13d0fb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7b>
+       0 :   13d099:        callq   *0x110849(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13d09f:        movl    $0xb, %edi
+       0 :   13d0a4:        movl    $0x1, %esi
+       0 :   13d0a9:        callq   *0x110841(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13d0af:        testq   %rax, %rax
+       0 :   13d0b2:        je      0x13e52e <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x14ae>
+       0 :   13d0b8:        movabsq $0x7962207475706e69, %rcx
+       0 :   13d0c2:        movq    %rcx, (%rax)
+       0 :   13d0c5:        movl    $0x73657479, 0x7(%rax)
+       0 :   13d0cc:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13d0d6:        leaq    0x2(%rcx), %rdx
+       0 :   13d0da:        movq    %rdx, 0x8(%r12)
+       0 :   13d0df:        movq    $0xb, 0x10(%r12)
+       0 :   13d0e8:        movq    %rax, 0x18(%r12)
+       0 :   13d0ed:        movq    $0xb, 0x20(%r12)
+       0 :   13d0f6:        jmp     0x13d1d4 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x154>
+       0 :   13d0fb:        movq    %rdx, %r14
+       0 :   13d0fe:        movq    %rsi, %r13
+       0 :   13d101:        movq    %rcx, 0x158(%rsp)
+       0 :   13d109:        movq    %r8, 0x128(%rsp)
+       0 :   13d111:        movq    %r12, 0x130(%rsp)
+       0 :   13d119:        cmpq    $0x3b, %rdx
+       0 :   13d11d:        jb      0x13d161 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe1>
+       0 :   13d11f:        leaq    0x1(%r14), %r12
+       0 :   13d123:        leaq    -0x104fd8(%rip), %rbp  # 0x38152
+       0 :   13d12a:        movq    0x11081f(%rip), %rbx  # 0x24d950 <_DYNAMIC+0x298>
+       0 :   13d131:        movq    %r13, %r15
+       0 :   13d134:        nopw    %cs:(%rax,%rax)
+       0 :   13d140:        movl    $0x3b, %edx
+      91 :   13d145:        movq    %r15, %rdi
+       1 :   13d148:        movq    %rbp, %rsi
+       5 :   13d14b:        callq   *%rbx
+      76 :   13d14d:        testl   %eax, %eax
+      45 :   13d14f:        je      0x13d222 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1a2>
+       0 :   13d155:        incq    %r15
+      70 :   13d158:        decq    %r12
+       0 :   13d15b:        cmpq    $0x3c, %r12
+       0 :   13d15f:        jae     0x13d140 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xc0>
+       0 :   13d161:        movq    0x128(%rsp), %rax
+       0 :   13d169:        cmpq    0x8(%rax), %r14
+       1 :   13d16d:        jbe     0x13d1ed <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x16d>
+       0 :   13d16f:        callq   *0x110773(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13d175:        movl    $0xc, %edi
+       0 :   13d17a:        movl    $0x1, %esi
+       0 :   13d17f:        callq   *0x11076b(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13d185:        testq   %rax, %rax
+       0 :   13d188:        movq    0x130(%rsp), %r12
+       0 :   13d190:        je      0x13e53e <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x14be>
+       0 :   13d196:        movabsq $0x622074757074756f, %rcx
+       0 :   13d1a0:        movq    %rcx, (%rax)
+       0 :   13d1a3:        movl    $0x73657479, 0x8(%rax)
+       0 :   13d1aa:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13d1b4:        leaq    0x2(%rcx), %rdx
+       0 :   13d1b8:        movq    %rdx, 0x8(%r12)
+       0 :   13d1bd:        movq    $0xc, 0x10(%r12)
+       0 :   13d1c6:        movq    %rax, 0x18(%r12)
+       0 :   13d1cb:        movq    $0xc, 0x20(%r12)
+       0 :   13d1d4:        movq    %rcx, (%r12)
+       0 :   13d1d8:        movq    %r12, %rax
+       0 :   13d1db:        addq    $0x248, %rsp
+       0 :   13d1e2:        popq    %rbx
+       0 :   13d1e3:        popq    %r12
+       0 :   13d1e5:        popq    %r13
+       0 :   13d1e7:        popq    %r14
+       0 :   13d1e9:        popq    %r15
+       0 :   13d1eb:        popq    %rbp
+       0 :   13d1ec:        retq
+       0 :   13d1ed:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13d1f7:        decq    %rcx
+       0 :   13d1fa:        movq    0x130(%rsp), %rax
+       1 :   13d202:        movq    %rcx, (%rax)
+       0 :   13d205:        movq    %r13, 0x8(%rax)
+       0 :   13d209:        movq    %r14, 0x10(%rax)
+       0 :   13d20d:        xorps   %xmm0, %xmm0
+       0 :   13d210:        movups  %xmm0, 0x18(%rax)
+       0 :   13d214:        movups  %xmm0, 0x28(%rax)
+       0 :   13d218:        movups  %xmm0, 0x38(%rax)
+       0 :   13d21c:        movups  %xmm0, 0x48(%rax)
+       0 :   13d220:        jmp     0x13d1db <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x15b>
+       0 :   13d222:        movq    %r13, 0x1b0(%rsp)
+       0 :   13d22a:        movq    %r14, 0x1b8(%rsp)
+       0 :   13d232:        movq    $0x0, 0x160(%rsp)
+       0 :   13d23e:        movq    $0x1, 0x168(%rsp)
+       0 :   13d24a:        xorps   %xmm0, %xmm0
+       0 :   13d24d:        movups  %xmm0, 0x170(%rsp)
+       0 :   13d255:        movq    $0x8, 0x180(%rsp)
+       0 :   13d261:        movq    $0x0, 0x188(%rsp)
+       0 :   13d26d:        movl    $0x0, 0x18f(%rsp)
+       0 :   13d278:        movw    $0x1, 0x193(%rsp)
+       0 :   13d282:        movb    $0x1, 0x195(%rsp)
+       0 :   13d28a:        movups  %xmm0, 0x196(%rsp)
+       0 :   13d292:        movl    $0x0, 0x1a5(%rsp)
+       0 :   13d29d:        movq    $0x0, 0x70(%rsp)
+       0 :   13d2a6:        movq    $0x8, 0x78(%rsp)
+       0 :   13d2af:        movq    $0x0, 0x80(%rsp)
+       0 :   13d2bb:        movq    0x128(%rsp), %rax
+       0 :   13d2c3:        movq    0x8(%rax), %r15
+       0 :   13d2c7:        cmpq    %r14, %r15
+       0 :   13d2ca:        cmovbq  %r15, %r14
+       0 :   13d2ce:        movl    $0x1, %eax
+       0 :   13d2d3:        testq   %r15, %r15
+       0 :   13d2d6:        movq    0x130(%rsp), %r12
+       0 :   13d2de:        jne     0x13ddc2 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xd42>
+       0 :   13d2e4:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13d2ee:        movq    %r14, 0xb0(%rsp)
+       0 :   13d2f6:        movq    %rax, 0xb8(%rsp)
+       0 :   13d2fe:        movq    $0x0, 0xc0(%rsp)
+       0 :   13d30a:        movq    %r15, 0xc8(%rsp)
+       0 :   13d312:        movaps  %xmm0, 0x1f0(%rsp)
+       0 :   13d31a:        movaps  %xmm0, 0x1e0(%rsp)
+       0 :   13d322:        movaps  %xmm0, 0x1d0(%rsp)
+       0 :   13d32a:        movaps  %xmm0, 0x1c0(%rsp)
+       0 :   13d332:        movb    $0x0, 0x7(%rsp)
+       0 :   13d337:        movq    $0x0, 0x138(%rsp)
+       0 :   13d343:        movq    $0x1, 0x140(%rsp)
+       0 :   13d34f:        leaq    0xd8(%rsp), %rbx
+       0 :   13d357:        leaq    0xe(%rcx), %rax
+       0 :   13d35b:        movq    %rax, 0x150(%rsp)
+       0 :   13d363:        leaq    -0x105436(%rip), %r15  # 0x37f34
+       0 :   13d36a:        leaq    0x4(%rcx), %rax
+       0 :   13d36e:        movq    %rax, 0x8(%rsp)
+       0 :   13d373:        leaq    -0x1(%rcx), %rax
+       0 :   13d377:        movq    %rax, 0x120(%rsp)
+       0 :   13d37f:        nop
+       0 :   13d380:        movq    $0x0, 0x148(%rsp)
+       0 :   13d38c:        leaq    0xd0(%rsp), %rdi
+       0 :   13d394:        leaq    0x160(%rsp), %rsi
+       0 :   13d39c:        leaq    0x138(%rsp), %rdx
+       0 :   13d3a4:        callq   0x147590 <quick_xml::reader::Reader<R>::read_event_impl>
+       0 :   13d3a9:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13d3b3:        addq    $0xe, %rax
+       0 :   13d3b7:        cmpq    %rax, 0xd0(%rsp)
+       0 :   13d3bf:        jne     0x13dc67 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xbe7>
+       0 :   13d3c5:        movq    0xd8(%rsp), %rax
+       0 :   13d3cd:        movslq  (%r15,%rax,4), %rax
+       0 :   13d3d1:        addq    %r15, %rax
+       0 :   13d3d4:        jmpq    *%rax
+       0 :   13d3d6:        movq    0xe0(%rsp), %r14
+       0 :   13d3de:        movq    0xe8(%rsp), %rbp
+       0 :   13d3e6:        subq    $0x8, %rsp
+       0 :   13d3ea:        leaq    0x18(%rsp), %rdi
+       0 :   13d3ef:        leaq    0xe8(%rsp), %rsi
+       0 :   13d3f7:        xorl    %edx, %edx
+       0 :   13d3f9:        movq    0x160(%rsp), %rcx
+       0 :   13d401:        movq    0x130(%rsp), %r8
+       0 :   13d409:        leaq    0x78(%rsp), %r9
+       0 :   13d40e:        leaq    0xf(%rsp), %rax
+       0 :   13d413:        pushq   %rax
+       0 :   13d414:        leaq    0x1d0(%rsp), %rax
+       0 :   13d41c:        pushq   %rax
+       0 :   13d41d:        leaq    0xc8(%rsp), %rax
+       0 :   13d425:        pushq   %rax
+       0 :   13d426:        callq   0x13ff90 <litchi_ooxml_common::mce::codec::start>
+       0 :   13d42b:        addq    $0x20, %rsp
+       0 :   13d42f:        movq    0x8(%rsp), %rax
+       0 :   13d434:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d439:        jne     0x13df77 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xef7>
+       0 :   13d43f:        leaq    (,%r14,2), %rax
+       0 :   13d447:        testq   %rax, %rax
+       0 :   13d44a:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d450:        jmp     0x13d86c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7ec>
+       0 :   13d455:        movq    0xe0(%rsp), %r14
+       0 :   13d45d:        movq    0xe8(%rsp), %rbp
+       0 :   13d465:        movq    0x80(%rsp), %rax
+       0 :   13d46d:        testq   %rax, %rax
+       0 :   13d470:        je      0x13d516 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x496>
+       0 :   13d476:        movq    0x78(%rsp), %rcx
+       0 :   13d47b:        leaq    (%rax,%rax,8), %rax
+       0 :   13d47f:        cmpb    $0x0, -0x8(%rcx,%rax,8)
+       0 :   13d484:        je      0x13d516 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x496>
+       0 :   13d48a:        movq    0xf0(%rsp), %r13
+       0 :   13d492:        movl    $0x9, %ecx
+       0 :   13d497:        leaq    0x10(%rsp), %rdi
+       0 :   13d49c:        leaq    0xb0(%rsp), %rsi
+       0 :   13d4a4:        leaq    -0x105272(%rip), %rdx  # 0x38239
+       0 :   13d4ab:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d4b0:        movq    0x8(%rsp), %rax
+       0 :   13d4b5:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d4ba:        jne     0x13dfdb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf5b>
+       0 :   13d4c0:        leaq    0x10(%rsp), %rdi
+       0 :   13d4c5:        leaq    0xb0(%rsp), %rsi
+       0 :   13d4cd:        movq    %rbp, %rdx
+       0 :   13d4d0:        movq    %r13, %rcx
+       0 :   13d4d3:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d4d8:        movq    0x8(%rsp), %rax
+       0 :   13d4dd:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d4e2:        jne     0x13dfdb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf5b>
+       0 :   13d4e8:        movl    $0x3, %ecx
+       0 :   13d4ed:        leaq    0x10(%rsp), %rdi
+       0 :   13d4f2:        leaq    0xb0(%rsp), %rsi
+       0 :   13d4fa:        leaq    -0x1052bf(%rip), %rdx  # 0x38242
+       0 :   13d501:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d506:        movq    0x8(%rsp), %rax
+       0 :   13d50b:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d510:        jne     0x13dfdb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf5b>
+       0 :   13d516:        leaq    (,%r14,2), %rax
+       0 :   13d51e:        testq   %rax, %rax
+       0 :   13d521:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d527:        jmp     0x13d86c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7ec>
+       0 :   13d52c:        movq    0xe0(%rsp), %r14
+       0 :   13d534:        movq    0xe8(%rsp), %rbp
+       0 :   13d53c:        subq    $0x8, %rsp
+       0 :   13d540:        leaq    0x18(%rsp), %rdi
+       0 :   13d545:        leaq    0xe8(%rsp), %rsi
+       0 :   13d54d:        movl    $0x1, %edx
+       0 :   13d552:        movq    0x160(%rsp), %rcx
+       0 :   13d55a:        movq    0x130(%rsp), %r8
+       0 :   13d562:        leaq    0x78(%rsp), %r9
+       0 :   13d567:        leaq    0xf(%rsp), %rax
+       0 :   13d56c:        pushq   %rax
+       0 :   13d56d:        leaq    0x1d0(%rsp), %rax
+       0 :   13d575:        pushq   %rax
+       0 :   13d576:        leaq    0xc8(%rsp), %rax
+       0 :   13d57e:        pushq   %rax
+       0 :   13d57f:        callq   0x13ff90 <litchi_ooxml_common::mce::codec::start>
+       0 :   13d584:        addq    $0x20, %rsp
+       0 :   13d588:        movq    0x8(%rsp), %rax
+       0 :   13d58d:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d592:        jne     0x13dfa9 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf29>
+       0 :   13d598:        leaq    (,%r14,2), %rax
+       0 :   13d5a0:        testq   %rax, %rax
+       0 :   13d5a3:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d5a9:        jmp     0x13d86c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7ec>
+       0 :   13d5ae:        movq    0xe0(%rsp), %r14
+       0 :   13d5b6:        movq    0xe8(%rsp), %rbp
+       0 :   13d5be:        movq    0x80(%rsp), %rax
+       0 :   13d5c6:        testq   %rax, %rax
+       0 :   13d5c9:        je      0x13d608 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x588>
+       0 :   13d5cb:        movq    0x78(%rsp), %rcx
+       0 :   13d5d0:        leaq    (%rax,%rax,8), %rax
+       0 :   13d5d4:        cmpb    $0x0, -0x8(%rcx,%rax,8)
+       0 :   13d5d9:        je      0x13d608 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x588>
+       0 :   13d5db:        movq    0xf0(%rsp), %rcx
+       0 :   13d5e3:        leaq    0x10(%rsp), %rdi
+       0 :   13d5e8:        leaq    0xb0(%rsp), %rsi
+       0 :   13d5f0:        movq    %rbp, %rdx
+       0 :   13d5f3:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d5f8:        movq    0x8(%rsp), %rax
+       0 :   13d5fd:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d602:        jne     0x13e18a <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x110a>
+       0 :   13d608:        leaq    (,%r14,2), %rax
+       0 :   13d610:        testq   %rax, %rax
+       0 :   13d613:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d619:        jmp     0x13d86c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7ec>
+       0 :   13d61e:        movq    0x80(%rsp), %rax
+       0 :   13d626:        testq   %rax, %rax
+       0 :   13d629:        je      0x13dea0 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe20>
+       0 :   13d62f:        decq    %rax
+       0 :   13d632:        movq    %rax, 0x80(%rsp)
+       0 :   13d63a:        movq    0x78(%rsp), %rcx
+       0 :   13d63f:        leaq    (%rax,%rax,8), %rax
+       0 :   13d643:        movq    (%rcx,%rax,8), %r14
+       0 :   13d647:        movups  0x28(%rcx,%rax,8), %xmm0
+       0 :   13d64c:        movups  0x38(%rcx,%rax,8), %xmm1
+       0 :   13d651:        movaps  %xmm1, 0x110(%rsp)
+       0 :   13d659:        movaps  %xmm0, 0x100(%rsp)
+       0 :   13d661:        movups  0x8(%rcx,%rax,8), %xmm0
+       0 :   13d666:        movups  0x18(%rcx,%rax,8), %xmm1
+       0 :   13d66b:        movaps  %xmm1, 0xa0(%rsp)
+       0 :   13d673:        movaps  %xmm0, 0x90(%rsp)
+       0 :   13d67b:        movq    %r14, 0x10(%rsp)
+       0 :   13d680:        leaq    0x18(%rsp), %rax
+       0 :   13d685:        movups  %xmm1, 0x10(%rax)
+       0 :   13d689:        movups  %xmm0, (%rax)
+       0 :   13d68c:        movaps  0x100(%rsp), %xmm0
+       0 :   13d694:        movaps  0x110(%rsp), %xmm1
+       0 :   13d69c:        leaq    0x38(%rsp), %rax
+       0 :   13d6a1:        movups  %xmm1, 0x10(%rax)
+       0 :   13d6a5:        movups  %xmm0, (%rax)
+       0 :   13d6a8:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13d6b2:        addq    %r14, %rax
+       0 :   13d6b5:        movq    %r14, %rcx
+       0 :   13d6b8:        sarq    $0x3f, %rcx
+       0 :   13d6bc:        andq    %rax, %rcx
+       0 :   13d6bf:        leaq    -0x105766(%rip), %rdx  # 0x37f60
+       0 :   13d6c6:        movslq  (%rdx,%rcx,4), %rax
+       0 :   13d6ca:        addq    %rdx, %rax
+       0 :   13d6cd:        jmpq    *%rax
+       0 :   13d6cf:        cmpb    $0x0, 0x50(%rsp)
+       0 :   13d6d4:        je      0x13da66 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x9e6>
+       0 :   13d6da:        movq    0x18(%rsp), %rbp
+       0 :   13d6df:        movq    0x20(%rsp), %r13
+       0 :   13d6e4:        movl    $0x2, %ecx
+       0 :   13d6e9:        leaq    0x90(%rsp), %rdi
+       0 :   13d6f1:        leaq    0xb0(%rsp), %rsi
+       0 :   13d6f9:        leaq    -0x1054c9(%rip), %rdx  # 0x38237
+       0 :   13d700:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d705:        movq    0x8(%rsp), %rax
+       0 :   13d70a:        cmpq    %rax, 0x90(%rsp)
+       0 :   13d712:        jne     0x13e246 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x11c6>
+       0 :   13d718:        leaq    0x90(%rsp), %rdi
+       0 :   13d720:        leaq    0xb0(%rsp), %rsi
+       0 :   13d728:        movq    %rbp, %rdx
+       0 :   13d72b:        movq    %r13, %rcx
+       0 :   13d72e:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d733:        movq    0x8(%rsp), %rax
+       0 :   13d738:        cmpq    %rax, 0x90(%rsp)
+       0 :   13d740:        jne     0x13e246 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x11c6>
+       0 :   13d746:        leaq    0x90(%rsp), %rdi
+       0 :   13d74e:        leaq    0xb0(%rsp), %rsi
+       0 :   13d756:        movl    $0x3e, %edx
+       0 :   13d75b:        callq   0x13c650 <litchi_ooxml_common::mce::codec::BoundedOutput::push>
+       0 :   13d760:        movq    0x8(%rsp), %rax
+       0 :   13d765:        cmpq    %rax, 0x90(%rsp)
+       0 :   13d76d:        jne     0x13e246 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x11c6>
+       0 :   13d773:        testq   %r14, %r14
+       0 :   13d776:        je      0x13d789 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x709>
+       0 :   13d778:        movl    $0x1, %edx
+       0 :   13d77d:        movq    %rbp, %rdi
+       0 :   13d780:        movq    %r14, %rsi
+       0 :   13d783:        callq   *0x11022f(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13d789:        xorl    %ebp, %ebp
+       0 :   13d78b:        leaq    0x28(%rsp), %rdi
+       0 :   13d790:        callq   0x1448b0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>>
+       0 :   13d795:        jmp     0x13dabb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa3b>
+       0 :   13d79a:        movq    0xe0(%rsp), %r14
+       0 :   13d7a2:        movq    0xe8(%rsp), %rbp
+       0 :   13d7aa:        movq    0x80(%rsp), %rax
+       0 :   13d7b2:        testq   %rax, %rax
+       0 :   13d7b5:        je      0x13d85b <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7db>
+       0 :   13d7bb:        movq    0x78(%rsp), %rcx
+       0 :   13d7c0:        leaq    (%rax,%rax,8), %rax
+       0 :   13d7c4:        cmpb    $0x0, -0x8(%rcx,%rax,8)
+       0 :   13d7c9:        je      0x13d85b <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7db>
+       0 :   13d7cf:        movq    0xf0(%rsp), %r13
+       0 :   13d7d7:        movl    $0x4, %ecx
+       0 :   13d7dc:        leaq    0x10(%rsp), %rdi
+       0 :   13d7e1:        leaq    0xb0(%rsp), %rsi
+       0 :   13d7e9:        leaq    -0x122578(%rip), %rdx  # 0x1b278
+       0 :   13d7f0:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d7f5:        movq    0x8(%rsp), %rax
+       0 :   13d7fa:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d7ff:        jne     0x13e015 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf95>
+       0 :   13d805:        leaq    0x10(%rsp), %rdi
+       0 :   13d80a:        leaq    0xb0(%rsp), %rsi
+       0 :   13d812:        movq    %rbp, %rdx
+       0 :   13d815:        movq    %r13, %rcx
+       0 :   13d818:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d81d:        movq    0x8(%rsp), %rax
+       0 :   13d822:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d827:        jne     0x13e015 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf95>
+       0 :   13d82d:        movl    $0x3, %ecx
+       0 :   13d832:        leaq    0x10(%rsp), %rdi
+       0 :   13d837:        leaq    0xb0(%rsp), %rsi
+       0 :   13d83f:        leaq    -0x1056a0(%rip), %rdx  # 0x381a6
+       0 :   13d846:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d84b:        movq    0x8(%rsp), %rax
+       0 :   13d850:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d855:        jne     0x13e015 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xf95>
+       0 :   13d85b:        leaq    (,%r14,2), %rax
+       0 :   13d863:        testq   %rax, %rax
+       0 :   13d866:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d86c:        movl    $0x1, %edx
+       0 :   13d871:        movq    %rbp, %rdi
+       0 :   13d874:        movq    %r14, %rsi
+       0 :   13d877:        callq   *0x11013b(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13d87d:        jmp     0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d882:        movq    0xe0(%rsp), %rbp
+       0 :   13d88a:        movq    0xe8(%rsp), %r14
+       0 :   13d892:        cmpq    $0x0, 0x80(%rsp)
+       0 :   13d89b:        jne     0x13def2 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe72>
+       0 :   13d8a1:        cmpb    $0x0, 0x7(%rsp)
+       0 :   13d8a6:        jne     0x13def2 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe72>
+       0 :   13d8ac:        movq    0xf0(%rsp), %r13
+       0 :   13d8b4:        movl    $0x2, %ecx
+       0 :   13d8b9:        leaq    0x10(%rsp), %rdi
+       0 :   13d8be:        leaq    0xb0(%rsp), %rsi
+       0 :   13d8c6:        leaq    -0x105688(%rip), %rdx  # 0x38245
+       0 :   13d8cd:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d8d2:        movq    0x8(%rsp), %rax
+       0 :   13d8d7:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d8dc:        jne     0x13dd39 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xcb9>
+       0 :   13d8e2:        leaq    0x10(%rsp), %rdi
+       0 :   13d8e7:        leaq    0xb0(%rsp), %rsi
+       0 :   13d8ef:        movq    %r14, %rdx
+       0 :   13d8f2:        movq    %r13, %rcx
+       0 :   13d8f5:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d8fa:        movq    0x8(%rsp), %rax
+       0 :   13d8ff:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d904:        jne     0x13dd39 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xcb9>
+       0 :   13d90a:        movl    $0x2, %ecx
+       0 :   13d90f:        leaq    0x10(%rsp), %rdi
+       0 :   13d914:        leaq    0xb0(%rsp), %rsi
+       0 :   13d91c:        leaq    -0x1056dc(%rip), %rdx  # 0x38247
+       0 :   13d923:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13d928:        movq    0x8(%rsp), %rax
+       0 :   13d92d:        cmpq    %rax, 0x10(%rsp)
+       0 :   13d932:        jne     0x13dd39 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xcb9>
+       0 :   13d938:        leaq    (,%rbp,2), %rax
+       0 :   13d940:        testq   %rax, %rax
+       0 :   13d943:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13d949:        movl    $0x1, %edx
+       0 :   13d94e:        movq    %r14, %rdi
+       0 :   13d951:        movq    %rbp, %rsi
+       0 :   13d954:        jmp     0x13d877 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7f7>
+       0 :   13d959:        leaq    0xe0(%rsp), %rcx
+       0 :   13d961:        movq    0x10(%rcx), %rax
+       0 :   13d965:        movq    %rax, 0x110(%rsp)
+       0 :   13d96d:        movups  (%rcx), %xmm0
+       0 :   13d970:        movaps  %xmm0, 0x100(%rsp)
+       0 :   13d978:        movq    0x80(%rsp), %rax
+       0 :   13d980:        testq   %rax, %rax
+       0 :   13d983:        je      0x13dbca <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb4a>
+       0 :   13d989:        movq    0x78(%rsp), %rcx
+       0 :   13d98e:        leaq    (%rax,%rax,8), %rax
+       0 :   13d992:        cmpb    $0x0, -0x8(%rcx,%rax,8)
+       0 :   13d997:        je      0x13dbca <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb4a>
+       0 :   13d99d:        leaq    0x90(%rsp), %rdi
+       0 :   13d9a5:        leaq    0x100(%rsp), %rsi
+       0 :   13d9ad:        callq   *0x11095d(%rip)  # 0x24e310 <_DYNAMIC+0xc58>
+       0 :   13d9b3:        movq    0x90(%rsp), %rbp
+       0 :   13d9bb:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13d9c5:        cmpq    %rax, %rbp
+       0 :   13d9c8:        je      0x13e13c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x10bc>
+       0 :   13d9ce:        movq    %rbx, %r14
+       0 :   13d9d1:        movq    0x98(%rsp), %r13
+       0 :   13d9d9:        movq    0xa0(%rsp), %rbx
+       0 :   13d9e1:        leaq    0x10(%rsp), %rdi
+       0 :   13d9e6:        leaq    0x100(%rsp), %rsi
+       0 :   13d9ee:        callq   *0x110794(%rip)  # 0x24e188 <_DYNAMIC+0xad0>
+       0 :   13d9f4:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13d9fe:        addq    $0xe, %rax
+       0 :   13da02:        cmpq    %rax, 0x10(%rsp)
+       0 :   13da07:        jne     0x13e1cf <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x114f>
+       0 :   13da0d:        cmpl    $0x110000, 0x18(%rsp)
+       0 :   13da15:        jne     0x13db29 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xaa9>
+       0 :   13da1b:        cmpq    $0x2, %rbx
+       0 :   13da1f:        je      0x13db13 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa93>
+       0 :   13da25:        cmpq    $0x3, %rbx
+       0 :   13da29:        je      0x13daf7 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa77>
+       0 :   13da2f:        cmpq    $0x4, %rbx
+       0 :   13da33:        jne     0x13e337 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x12b7>
+       0 :   13da39:        cmpl    $0x736f7061, (%r13)
+       0 :   13da41:        je      0x13db29 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xaa9>
+       0 :   13da47:        cmpl    $0x746f7571, (%r13)
+       0 :   13da4f:        je      0x13db29 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xaa9>
+       0 :   13da55:        jmp     0x13e337 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x12b7>
+       0 :   13da5a:        cmpq    $0x0, 0x18(%rsp)
+       0 :   13da60:        je      0x13e2a7 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1227>
+       0 :   13da66:        movq    0x28(%rsp), %rax
+       0 :   13da6b:        testq   %rax, %rax
+       0 :   13da6e:        je      0x13da81 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa01>
+       0 :   13da70:        lock
+       0 :   13da71:        decq    (%rax)
+       0 :   13da74:        jne     0x13da81 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa01>
+       0 :   13da76:        leaq    0x28(%rsp), %rdi
+       0 :   13da7b:        callq   *0x1109e7(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13da81:        movq    0x38(%rsp), %rax
+       0 :   13da86:        testq   %rax, %rax
+       0 :   13da89:        je      0x13da9f <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa1f>
+       0 :   13da8b:        lock
+       0 :   13da8c:        decq    (%rax)
+       0 :   13da8f:        jne     0x13da9f <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa1f>
+       0 :   13da91:        movb    $0x1, %bpl
+       0 :   13da94:        leaq    0x38(%rsp), %rdi
+       0 :   13da99:        callq   *0x1109d1(%rip)  # 0x24e470 <_DYNAMIC+0xdb8>
+       0 :   13da9f:        movq    0x10(%rsp), %rsi
+       0 :   13daa4:        testq   %rsi, %rsi
+       0 :   13daa7:        js      0x13dabb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa3b>
+       0 :   13daa9:        je      0x13dabb <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa3b>
+       0 :   13daab:        movq    0x18(%rsp), %rdi
+       0 :   13dab0:        movl    $0x1, %edx
+       0 :   13dab5:        callq   *0x10fefd(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13dabb:        movq    0x48(%rsp), %rax
+       0 :   13dac0:        testq   %rax, %rax
+       0 :   13dac3:        je      0x13dad6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa56>
+       0 :   13dac5:        lock
+       0 :   13dac6:        decq    (%rax)
+       0 :   13dac9:        jne     0x13dad6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xa56>
+       0 :   13dacb:        leaq    0x48(%rsp), %rdi
+       0 :   13dad0:        callq   *0x110992(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13dad6:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13dae0:        addq    $0xe, %rax
+       0 :   13dae4:        cmpq    %rax, 0xd0(%rsp)
+       0 :   13daec:        jne     0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13daf2:        jmp     0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13daf7:        movzwl  (%r13), %eax
+       0 :   13dafc:        xorl    $0x6d61, %eax
+       0 :   13db01:        movzbl  0x2(%r13), %ecx
+       0 :   13db06:        xorl    $0x70, %ecx
+       0 :   13db09:        orw     %ax, %cx
+       0 :   13db0c:        je      0x13db29 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xaa9>
+       0 :   13db0e:        jmp     0x13e337 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x12b7>
+       0 :   13db13:        cmpw    $0x746c, (%r13)
+       0 :   13db1a:        je      0x13db29 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xaa9>
+       0 :   13db1c:        cmpw    $0x7467, (%r13)
+       0 :   13db23:        jne     0x13e337 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x12b7>
+       0 :   13db29:        leaq    0x10(%rsp), %rdi
+       0 :   13db2e:        leaq    0xb0(%rsp), %rsi
+       0 :   13db36:        movl    $0x26, %edx
+       0 :   13db3b:        callq   0x13c650 <litchi_ooxml_common::mce::codec::BoundedOutput::push>
+       0 :   13db40:        movq    0x8(%rsp), %rax
+       0 :   13db45:        cmpq    %rax, 0x10(%rsp)
+       0 :   13db4a:        jne     0x13e05c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xfdc>
+       0 :   13db50:        movq    0x108(%rsp), %rdx
+       0 :   13db58:        movq    0x110(%rsp), %rcx
+       0 :   13db60:        leaq    0x10(%rsp), %rdi
+       0 :   13db65:        leaq    0xb0(%rsp), %rsi
+       0 :   13db6d:        callq   0x13c490 <litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice>
+       0 :   13db72:        movq    0x8(%rsp), %rax
+       0 :   13db77:        cmpq    %rax, 0x10(%rsp)
+       0 :   13db7c:        jne     0x13e05c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xfdc>
+       0 :   13db82:        leaq    0x10(%rsp), %rdi
+       0 :   13db87:        leaq    0xb0(%rsp), %rsi
+       0 :   13db8f:        movl    $0x3b, %edx
+       0 :   13db94:        callq   0x13c650 <litchi_ooxml_common::mce::codec::BoundedOutput::push>
+       0 :   13db99:        movq    0x8(%rsp), %rax
+       0 :   13db9e:        cmpq    %rax, 0x10(%rsp)
+       0 :   13dba3:        movq    %r14, %rbx
+       0 :   13dba6:        jne     0x13e28c <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x120c>
+       0 :   13dbac:        leaq    (,%rbp,2), %rax
+       0 :   13dbb4:        testq   %rax, %rax
+       0 :   13dbb7:        je      0x13dbca <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb4a>
+       0 :   13dbb9:        movl    $0x1, %edx
+       0 :   13dbbe:        movq    %r13, %rdi
+       0 :   13dbc1:        movq    %rbp, %rsi
+       0 :   13dbc4:        callq   *0x10fdee(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13dbca:        movq    0x100(%rsp), %rsi
+       0 :   13dbd2:        cmpq    0x120(%rsp), %rsi
+       0 :   13dbda:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13dbdc:        testq   %rsi, %rsi
+       0 :   13dbdf:        je      0x13dc00 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb80>
+       0 :   13dbe1:        movq    0x108(%rsp), %rdi
+       0 :   13dbe9:        movl    $0x1, %edx
+       0 :   13dbee:        jmp     0x13d877 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x7f7>
+       0 :   13dbf3:        nopw    %cs:(%rax,%rax)
+       0 :   13dc00:        movq    0xd8(%rsp), %rax
+       0 :   13dc08:        cmpq    $0x9, %rax
+       0 :   13dc0c:        ja      0x13dc1d <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xb9d>
+       0 :   13dc0e:        movl    $0x27d, %ecx
+       0 :   13dc13:        btq     %rax, %rcx
+       0 :   13dc17:        jb      0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13dc1d:        cmpl    $0x1, %eax
+       0 :   13dc20:        je      0x13dc30 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xbb0>
+       0 :   13dc22:        cmpl    $0x7, %eax
+       0 :   13dc25:        je      0x13dc30 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xbb0>
+       0 :   13dc27:        cmpl    $0x8, %eax
+       0 :   13dc2a:        jne     0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13dc30:        movq    0xe0(%rsp), %rsi
+       0 :   13dc38:        cmpq    0x120(%rsp), %rsi
+       0 :   13dc40:        je      0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13dc46:        testq   %rsi, %rsi
+       0 :   13dc49:        je      0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13dc4f:        movq    0xe8(%rsp), %rdi
+       0 :   13dc57:        movl    $0x1, %edx
+       0 :   13dc5c:        callq   *0x10fd56(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13dc62:        jmp     0x13d380 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x300>
+       0 :   13dc67:        movups  0xd0(%rsp), %xmm0
+       0 :   13dc6f:        movups  0xe0(%rsp), %xmm1
+       0 :   13dc77:        movups  0xf0(%rsp), %xmm2
+       0 :   13dc7f:        movaps  %xmm2, 0x30(%rsp)
+       0 :   13dc84:        movaps  %xmm1, 0x20(%rsp)
+       0 :   13dc89:        movaps  %xmm0, 0x10(%rsp)
+       0 :   13dc8e:        movq    $0x0, 0x100(%rsp)
+       0 :   13dc9a:        movq    $0x1, 0x108(%rsp)
+       0 :   13dca6:        movq    $0x0, 0x110(%rsp)
+       0 :   13dcb2:        movq    $0x60000020, 0xa0(%rsp)
+       0 :   13dcbe:        leaq    0x100(%rsp), %rax
+       0 :   13dcc6:        movq    %rax, 0x90(%rsp)
+       0 :   13dcce:        leaq    0x106853(%rip), %rax  # 0x244528 <anon.49b9e319b3902427582e563a7473b4d8.177.llvm.12340532386441632810>
+       0 :   13dcd5:        movq    %rax, 0x98(%rsp)
+       0 :   13dcdd:        leaq    0x10(%rsp), %rdi
+       0 :   13dce2:        leaq    0x90(%rsp), %rsi
+       0 :   13dcea:        callq   *0x10ffc8(%rip)  # 0x24dcb8 <_DYNAMIC+0x600>
+       0 :   13dcf0:        testb   %al, %al
+       0 :   13dcf2:        jne     0x13e504 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1484>
+       0 :   13dcf8:        movq    0x110(%rsp), %rax
+       0 :   13dd00:        movq    %rax, 0x20(%r12)
+       0 :   13dd05:        movups  0x100(%rsp), %xmm0
+       0 :   13dd0d:        movups  %xmm0, 0x10(%r12)
+       0 :   13dd13:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13dd1d:        leaq    0x3(%rcx), %rax
+       0 :   13dd21:        movq    %rax, 0x8(%r12)
+       0 :   13dd26:        movq    %rcx, (%r12)
+       0 :   13dd2a:        leaq    0x10(%rsp), %rdi
+       0 :   13dd2f:        callq   0x144760 <core::ptr::drop_in_place<quick_xml::errors::Error>>
+       0 :   13dd34:        jmp     0x13e407 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1387>
+       0 :   13dd39:        movups  0x10(%rsp), %xmm0
+       0 :   13dd3e:        movups  0x20(%rsp), %xmm1
+       0 :   13dd43:        movups  %xmm1, 0x18(%r12)
+       0 :   13dd49:        movups  %xmm0, 0x8(%r12)
+       0 :   13dd4f:        jmp     0x13df48 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xec8>
+       0 :   13dd54:        callq   *0x10fb8e(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13dd5a:        movl    $0x2c, %edi
+       0 :   13dd5f:        movl    $0x1, %esi
+       0 :   13dd64:        callq   *0x10fb86(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13dd6a:        testq   %rax, %rax
+       0 :   13dd6d:        je      0x13e54e <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x14ce>
+       0 :   13dd73:        movups  -0x105b01(%rip), %xmm0  # 0x38279
+       0 :   13dd7a:        movups  %xmm0, 0x1c(%rax)
+       0 :   13dd7e:        movups  -0x105b18(%rip), %xmm0  # 0x3826d
+       0 :   13dd85:        movups  %xmm0, 0x10(%rax)
+       0 :   13dd89:        movups  -0x105b33(%rip), %xmm0  # 0x3825d
+       0 :   13dd90:        movups  %xmm0, (%rax)
+       0 :   13dd93:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13dd9d:        movq    %rcx, 0x8(%r12)
+       0 :   13dda2:        movq    $0x2c, 0x10(%r12)
+       0 :   13ddab:        movq    %rax, 0x18(%r12)
+       0 :   13ddb0:        movq    $0x2c, 0x20(%r12)
+       0 :   13ddb9:        movq    %rcx, (%r12)
+       0 :   13ddbd:        jmp     0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13ddc2:        leaq    0x10(%rsp), %rdi
+       0 :   13ddc7:        movl    $0x1, %edx
+       0 :   13ddcc:        movl    $0x1, %r8d
+       0 :   13ddd2:        movl    $0x1, %r9d
+       0 :   13ddd8:        xorl    %esi, %esi
+       0 :   13ddda:        movq    %r14, %rcx
+       0 :   13dddd:        callq   0x137620 <alloc::raw_vec::RawVecInner<A>::finish_grow>
+       0 :   13dde2:        cmpb    $0x0, 0x10(%rsp)
+       0 :   13dde7:        je      0x13e04f <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xfcf>
+       0 :   13dded:        movups  0x18(%rsp), %xmm0
+       0 :   13ddf2:        movups  %xmm0, 0x8(%r12)
+       0 :   13ddf8:        leaq    -0x105c63(%rip), %rax  # 0x3819c
+       0 :   13ddff:        movq    %rax, 0x18(%r12)
+       0 :   13de04:        movq    $0xa, 0x20(%r12)
+       0 :   13de0d:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13de17:        movq    %rax, (%r12)
+       0 :   13de1b:        jmp     0x13e447 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13c7>
+       0 :   13de20:        movq    %rbx, %rdi
+       0 :   13de23:        callq   0x144870 <core::ptr::drop_in_place<quick_xml::events::Event>>
+       0 :   13de28:        cmpq    $0x0, 0x80(%rsp)
+       0 :   13de31:        je      0x13e077 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xff7>
+       0 :   13de37:        callq   *0x10faab(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13de3d:        movl    $0x10, %edi
+       0 :   13de42:        movl    $0x1, %esi
+       0 :   13de47:        callq   *0x10faa3(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13de4d:        testq   %rax, %rax
+       0 :   13de50:        je      0x13e572 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x14f2>
+       0 :   13de56:        movups  -0x12920d(%rip), %xmm0  # 0x14c50
+       0 :   13de5d:        movups  %xmm0, (%rax)
+       0 :   13de60:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13de6a:        movq    %rcx, 0x8(%r12)
+       0 :   13de6f:        movq    $0x10, 0x10(%r12)
+       0 :   13de78:        movq    %rax, 0x18(%r12)
+       0 :   13de7d:        movq    $0x10, 0x20(%r12)
+       0 :   13de86:        movq    %rcx, (%r12)
+       0 :   13de8a:        movq    0x138(%rsp), %rsi
+       0 :   13de92:        testq   %rsi, %rsi
+       0 :   13de95:        jne     0x13e414 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1394>
+       0 :   13de9b:        jmp     0x13e427 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13a7>
+       0 :   13dea0:        leaq    0x90(%rsp), %rdi
+       0 :   13dea8:        callq   0x13e930 <litchi_ooxml_common::mce::codec::process_markup_compatibility::{{closure}}>
+       0 :   13dead:        movups  0x90(%rsp), %xmm0
+       0 :   13deb5:        movups  0xa0(%rsp), %xmm1
+       0 :   13debd:        movups  %xmm1, 0x18(%r12)
+       0 :   13dec3:        movups  %xmm0, 0x8(%r12)
+       0 :   13dec9:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13ded3:        movq    %rax, (%r12)
+       0 :   13ded7:        movq    0x150(%rsp), %rax
+       0 :   13dedf:        cmpq    %rax, 0xd0(%rsp)
+       0 :   13dee7:        je      0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13deed:        jmp     0x13e407 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1387>
+       0 :   13def2:        callq   *0x10f9f0(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13def8:        movl    $0x14, %edi
+       0 :   13defd:        movl    $0x1, %esi
+       0 :   13df02:        callq   *0x10f9e8(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13df08:        testq   %rax, %rax
+       0 :   13df0b:        je      0x13e560 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x14e0>
+       0 :   13df11:        movups  -0x105ccf(%rip), %xmm0  # 0x38249
+       0 :   13df18:        movups  %xmm0, (%rax)
+       0 :   13df1b:        movl    $0x6e6f6974, 0x10(%rax)
+       0 :   13df22:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13df2c:        movq    %rcx, 0x8(%r12)
+       0 :   13df31:        movq    $0x14, 0x10(%r12)
+       0 :   13df3a:        movq    %rax, 0x18(%r12)
+       0 :   13df3f:        movq    $0x14, 0x20(%r12)
+       0 :   13df48:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13df52:        movq    %rax, (%r12)
+       0 :   13df56:        leaq    (,%rbp,2), %rax
+       0 :   13df5e:        testq   %rax, %rax
+       0 :   13df61:        je      0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13df67:        movl    $0x1, %edx
+       0 :   13df6c:        movq    %r14, %rdi
+       0 :   13df6f:        movq    %rbp, %rsi
+       0 :   13df72:        jmp     0x13e3e0 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1360>
+       0 :   13df77:        movups  0x10(%rsp), %xmm0
+       0 :   13df7c:        movups  0x20(%rsp), %xmm1
+       0 :   13df81:        movups  %xmm1, 0x18(%r12)
+       0 :   13df87:        movups  %xmm0, 0x8(%r12)
+       0 :   13df8d:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13df97:        movq    %rax, (%r12)
+       0 :   13df9b:        testq   %r14, %r14
+       0 :   13df9e:        jle     0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13dfa4:        jmp     0x13e1bf <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x113f>
+       0 :   13dfa9:        movups  0x10(%rsp), %xmm0
+       0 :   13dfae:        movups  0x20(%rsp), %xmm1
+       0 :   13dfb3:        movups  %xmm1, 0x18(%r12)
+       0 :   13dfb9:        movups  %xmm0, 0x8(%r12)
+       0 :   13dfbf:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13dfc9:        movq    %rax, (%r12)
+       0 :   13dfcd:        testq   %r14, %r14
+       0 :   13dfd0:        jle     0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13dfd6:        jmp     0x13e1bf <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x113f>
+       0 :   13dfdb:        movups  0x10(%rsp), %xmm0
+       0 :   13dfe0:        movups  0x20(%rsp), %xmm1
+       0 :   13dfe5:        movups  %xmm1, 0x18(%r12)
+       0 :   13dfeb:        movups  %xmm0, 0x8(%r12)
+       0 :   13dff1:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13dffb:        movq    %rax, (%r12)
+       0 :   13dfff:        leaq    (,%r14,2), %rax
+       0 :   13e007:        testq   %rax, %rax
+       0 :   13e00a:        je      0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13e010:        jmp     0x13e1bf <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x113f>
+       0 :   13e015:        movups  0x10(%rsp), %xmm0
+       0 :   13e01a:        movups  0x20(%rsp), %xmm1
+       0 :   13e01f:        movups  %xmm1, 0x18(%r12)
+       0 :   13e025:        movups  %xmm0, 0x8(%r12)
+       0 :   13e02b:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13e035:        movq    %rax, (%r12)
+       0 :   13e039:        leaq    (,%r14,2), %rax
+       0 :   13e041:        testq   %rax, %rax
+       0 :   13e044:        je      0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13e04a:        jmp     0x13e1bf <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x113f>
+       0 :   13e04f:        movq    0x18(%rsp), %rax
+       0 :   13e054:        xorps   %xmm0, %xmm0
+       0 :   13e057:        jmp     0x13d2e4 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x264>
+       0 :   13e05c:        movups  0x10(%rsp), %xmm0
+       0 :   13e061:        movups  0x20(%rsp), %xmm1
+       0 :   13e066:        movups  %xmm1, 0x18(%r12)
+       0 :   13e06c:        movups  %xmm0, 0x8(%r12)
+       0 :   13e072:        jmp     0x13e397 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1317>
+       0 :   13e077:        movq    0xc0(%rsp), %rax
+       0 :   13e07f:        movq    %rax, 0x20(%rsp)
+       0 :   13e084:        movups  0xb0(%rsp), %xmm0
+       0 :   13e08c:        movaps  %xmm0, 0x10(%rsp)
+       0 :   13e091:        movaps  0x1c0(%rsp), %xmm1
+       0 :   13e099:        movaps  0x1d0(%rsp), %xmm2
+       0 :   13e0a1:        movaps  0x1e0(%rsp), %xmm3
+       0 :   13e0a9:        movaps  0x1f0(%rsp), %xmm4
+       0 :   13e0b1:        movups  %xmm4, 0x58(%rsp)
+       0 :   13e0b6:        movups  %xmm3, 0x48(%rsp)
+       0 :   13e0bb:        movups  %xmm2, 0x38(%rsp)
+       0 :   13e0c0:        movups  %xmm1, 0x28(%rsp)
+       0 :   13e0c5:        movups  %xmm0, (%r12)
+       0 :   13e0ca:        movq    0x60(%rsp), %rax
+       0 :   13e0cf:        movq    %rax, 0x50(%r12)
+       0 :   13e0d4:        movaps  0x50(%rsp), %xmm0
+       0 :   13e0d9:        movups  %xmm0, 0x40(%r12)
+       0 :   13e0df:        movaps  0x40(%rsp), %xmm0
+       0 :   13e0e4:        movups  %xmm0, 0x30(%r12)
+       0 :   13e0ea:        movaps  0x30(%rsp), %xmm0
+       0 :   13e0ef:        movups  %xmm0, 0x20(%r12)
+       0 :   13e0f5:        movaps  0x20(%rsp), %xmm0
+       0 :   13e0fa:        movups  %xmm0, 0x10(%r12)
+       0 :   13e100:        movq    0x138(%rsp), %rsi
+       0 :   13e108:        testq   %rsi, %rsi
+       0 :   13e10b:        je      0x13e120 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x10a0>
+       0 :   13e10d:        movq    0x140(%rsp), %rdi
+       0 :   13e115:        movl    $0x1, %edx
+       0 :   13e11a:        callq   *0x10f898(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e120:        leaq    0x70(%rsp), %rdi
+       0 :   13e125:        callq   0x144cf0 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Frame>>>
+       0 :   13e12a:        leaq    0x160(%rsp), %rdi
+       0 :   13e132:        callq   0x144c20 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+       0 :   13e137:        jmp     0x13d1d8 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x158>
+       0 :   13e13c:        leaq    0x98(%rsp), %rax
+       0 :   13e144:        movups  (%rax), %xmm0
+       0 :   13e147:        movaps  %xmm0, 0x200(%rsp)
+       0 :   13e14f:        leaq    0x10(%rsp), %rdi
+       0 :   13e154:        leaq    0x200(%rsp), %rsi
+       0 :   13e15c:        callq   0x13f8e0 <litchi_ooxml_common::mce::codec::xerr>
+       0 :   13e161:        movaps  0x10(%rsp), %xmm0
+       0 :   13e166:        movaps  0x20(%rsp), %xmm1
+       0 :   13e16b:        movups  %xmm1, 0x18(%r12)
+       0 :   13e171:        movups  %xmm0, 0x8(%r12)
+       0 :   13e177:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13e181:        movq    %rax, (%r12)
+       0 :   13e185:        jmp     0x13e3c6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1346>
+       0 :   13e18a:        movups  0x10(%rsp), %xmm0
+       0 :   13e18f:        movups  0x20(%rsp), %xmm1
+       0 :   13e194:        movups  %xmm1, 0x18(%r12)
+       0 :   13e19a:        movups  %xmm0, 0x8(%r12)
+       0 :   13e1a0:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13e1aa:        movq    %rax, (%r12)
+       0 :   13e1ae:        leaq    (,%r14,2), %rax
+       0 :   13e1b6:        testq   %rax, %rax
+       0 :   13e1b9:        je      0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13e1bf:        movl    $0x1, %edx
+       0 :   13e1c4:        movq    %rbp, %rdi
+       0 :   13e1c7:        movq    %r14, %rsi
+       0 :   13e1ca:        jmp     0x13e3e0 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1360>
+       0 :   13e1cf:        movups  0x10(%rsp), %xmm0
+       0 :   13e1d4:        movups  0x20(%rsp), %xmm1
+       0 :   13e1d9:        movups  0x30(%rsp), %xmm2
+       0 :   13e1de:        movaps  %xmm2, 0x230(%rsp)
+       0 :   13e1e6:        movaps  %xmm1, 0x220(%rsp)
+       0 :   13e1ee:        movaps  %xmm0, 0x210(%rsp)
+       0 :   13e1f6:        leaq    0x90(%rsp), %rdi
+       0 :   13e1fe:        leaq    0x210(%rsp), %rsi
+       0 :   13e206:        callq   0x13f7f0 <litchi_ooxml_common::mce::codec::xerr>
+       0 :   13e20b:        movq    %r14, %rbx
+       0 :   13e20e:        movq    0x90(%rsp), %rax
+       0 :   13e216:        movl    0x98(%rsp), %ecx
+       0 :   13e21d:        movl    0xac(%rsp), %edx
+       0 :   13e224:        movl    %edx, 0x24(%r12)
+       0 :   13e229:        movups  0x9c(%rsp), %xmm0
+       0 :   13e231:        movups  %xmm0, 0x14(%r12)
+       0 :   13e237:        movq    %rax, 0x8(%r12)
+       0 :   13e23c:        movl    %ecx, 0x10(%r12)
+       0 :   13e241:        jmp     0x13e39a <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x131a>
+       0 :   13e246:        movups  0x90(%rsp), %xmm0
+       0 :   13e24e:        movups  0xa0(%rsp), %xmm1
+       0 :   13e256:        movups  %xmm1, 0x18(%r12)
+       0 :   13e25c:        movups  %xmm0, 0x8(%r12)
+       0 :   13e262:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13e26c:        movq    %rax, (%r12)
+       0 :   13e270:        testq   %r14, %r14
+       0 :   13e273:        je      0x13e305 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1285>
+       0 :   13e279:        movl    $0x1, %edx
+       0 :   13e27e:        movq    %rbp, %rdi
+       0 :   13e281:        movq    %r14, %rsi
+       0 :   13e284:        callq   *0x10f72e(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e28a:        jmp     0x13e305 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1285>
+       0 :   13e28c:        movups  0x10(%rsp), %xmm0
+       0 :   13e291:        movups  0x20(%rsp), %xmm1
+       0 :   13e296:        movups  %xmm1, 0x18(%r12)
+       0 :   13e29c:        movups  %xmm0, 0x8(%r12)
+       0 :   13e2a2:        jmp     0x13e39a <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x131a>
+       0 :   13e2a7:        callq   *0x10f63b(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13e2ad:        movl    $0x20, %edi
+       0 :   13e2b2:        movl    $0x1, %esi
+       0 :   13e2b7:        callq   *0x10f633(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13e2bd:        testq   %rax, %rax
+       0 :   13e2c0:        je      0x13e584 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1504>
+       0 :   13e2c6:        movups  -0x122c55(%rip), %xmm0  # 0x1b678
+       0 :   13e2cd:        movups  %xmm0, 0x10(%rax)
+       0 :   13e2d1:        movups  -0x122c70(%rip), %xmm0  # 0x1b668
+       0 :   13e2d8:        movups  %xmm0, (%rax)
+       0 :   13e2db:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13e2e5:        movq    %rcx, 0x8(%r12)
+       0 :   13e2ea:        movq    $0x20, 0x10(%r12)
+       0 :   13e2f3:        movq    %rax, 0x18(%r12)
+       0 :   13e2f8:        movq    $0x20, 0x20(%r12)
+       0 :   13e301:        movq    %rcx, (%r12)
+       0 :   13e305:        leaq    0x28(%rsp), %rdi
+       0 :   13e30a:        callq   0x1448b0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>>
+       0 :   13e30f:        movq    0x48(%rsp), %rax
+       0 :   13e314:        testq   %rax, %rax
+       0 :   13e317:        je      0x13ded7 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe57>
+       0 :   13e31d:        lock
+       0 :   13e31e:        decq    (%rax)
+       0 :   13e321:        jne     0x13ded7 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe57>
+       0 :   13e327:        leaq    0x48(%rsp), %rdi
+       0 :   13e32c:        callq   *0x110136(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13e332:        jmp     0x13ded7 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0xe57>
+       0 :   13e337:        callq   *0x10f5ab(%rip)  # 0x24d8e8 <_DYNAMIC+0x230>
+       0 :   13e33d:        movl    $0xd, %edi
+       0 :   13e342:        movl    $0x1, %esi
+       0 :   13e347:        callq   *0x10f5a3(%rip)  # 0x24d8f0 <_DYNAMIC+0x238>
+       0 :   13e34d:        testq   %rax, %rax
+       0 :   13e350:        je      0x13e596 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1516>
+       0 :   13e356:        movabsq $0x797469746e65206d, %rcx
+       0 :   13e360:        movq    %rcx, 0x5(%rax)
+       0 :   13e364:        movabsq $0x65206d6f74737563, %rcx
+       0 :   13e36e:        movq    %rcx, (%rax)
+       0 :   13e371:        movabsq $-0x7fffffffffffffff, %rcx
+       0 :   13e37b:        movq    %rcx, 0x8(%r12)
+       0 :   13e380:        movq    $0xd, 0x10(%r12)
+       0 :   13e389:        movq    %rax, 0x18(%r12)
+       0 :   13e38e:        movq    $0xd, 0x20(%r12)
+       0 :   13e397:        movq    %r14, %rbx
+       0 :   13e39a:        movabsq $-0x7fffffffffffffff, %rax
+       0 :   13e3a4:        movq    %rax, (%r12)
+       0 :   13e3a8:        leaq    (,%rbp,2), %rax
+       0 :   13e3b0:        testq   %rax, %rax
+       0 :   13e3b3:        je      0x13e3c6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1346>
+       0 :   13e3b5:        movl    $0x1, %edx
+       0 :   13e3ba:        movq    %r13, %rdi
+       0 :   13e3bd:        movq    %rbp, %rsi
+       0 :   13e3c0:        callq   *0x10f5f2(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e3c6:        movq    0x100(%rsp), %rsi
+       0 :   13e3ce:        testq   %rsi, %rsi
+       0 :   13e3d1:        jle     0x13e3e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1366>
+       0 :   13e3d3:        movq    0x108(%rsp), %rdi
+       0 :   13e3db:        movl    $0x1, %edx
+       0 :   13e3e0:        callq   *0x10f5d2(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e3e6:        movq    0xd8(%rsp), %rax
+       0 :   13e3ee:        cmpq    $0x9, %rax
+       0 :   13e3f2:        ja      0x13e4e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1466>
+       0 :   13e3f8:        movl    $0x27d, %ecx
+       0 :   13e3fd:        btq     %rax, %rcx
+       0 :   13e401:        jae     0x13e4e6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1466>
+       0 :   13e407:        movq    0x138(%rsp), %rsi
+       0 :   13e40f:        testq   %rsi, %rsi
+       0 :   13e412:        je      0x13e427 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13a7>
+       0 :   13e414:        movq    0x140(%rsp), %rdi
+       0 :   13e41c:        movl    $0x1, %edx
+       0 :   13e421:        callq   *0x10f591(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e427:        movq    0xb0(%rsp), %rsi
+       0 :   13e42f:        testq   %rsi, %rsi
+       0 :   13e432:        je      0x13e447 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13c7>
+       0 :   13e434:        movq    0xb8(%rsp), %rdi
+       0 :   13e43c:        movl    $0x1, %edx
+       0 :   13e441:        callq   *0x10f571(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e447:        movq    0x78(%rsp), %rdi
+       0 :   13e44c:        movq    0x80(%rsp), %r15
+       0 :   13e454:        incq    %r15
+       0 :   13e457:        nopw    (%rax,%rax)
+       0 :   13e460:        cmpq    $0x1, %r15
+       0 :   13e464:        je      0x13e477 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13f7>
+       0 :   13e466:        leaq    0x48(%rdi), %r14
+       0 :   13e46a:        decq    %r15
+       0 :   13e46d:        callq   0x146890 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Frame>>
+       0 :   13e472:        movq    %r14, %rdi
+       0 :   13e475:        jmp     0x13e460 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13e0>
+       0 :   13e477:        movq    0x70(%rsp), %rax
+       0 :   13e47c:        testq   %rax, %rax
+       0 :   13e47f:        je      0x13e499 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1419>
+       0 :   13e481:        movq    0x78(%rsp), %rdi
+       0 :   13e486:        shlq    $0x3, %rax
+       0 :   13e48a:        leaq    (%rax,%rax,8), %rsi
+       0 :   13e48e:        movl    $0x8, %edx
+       0 :   13e493:        callq   *0x10f51f(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e499:        movq    0x160(%rsp), %rsi
+       0 :   13e4a1:        testq   %rsi, %rsi
+       0 :   13e4a4:        je      0x13e4b9 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1439>
+       0 :   13e4a6:        movq    0x168(%rsp), %rdi
+       0 :   13e4ae:        movl    $0x1, %edx
+       0 :   13e4b3:        callq   *0x10f4ff(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e4b9:        movq    0x178(%rsp), %rsi
+       0 :   13e4c1:        testq   %rsi, %rsi
+       0 :   13e4c4:        je      0x13d1d8 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x158>
+       0 :   13e4ca:        movq    0x180(%rsp), %rdi
+       0 :   13e4d2:        shlq    $0x3, %rsi
+       0 :   13e4d6:        movl    $0x8, %edx
+       0 :   13e4db:        callq   *0x10f4d7(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e4e1:        jmp     0x13d1d8 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x158>
+       0 :   13e4e6:        movq    %rbx, %rdi
+       0 :   13e4e9:        callq   0x144870 <core::ptr::drop_in_place<quick_xml::events::Event>>
+       0 :   13e4ee:        movq    0x138(%rsp), %rsi
+       0 :   13e4f6:        testq   %rsi, %rsi
+       0 :   13e4f9:        jne     0x13e414 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1394>
+       0 :   13e4ff:        jmp     0x13e427 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x13a7>
+       0 :   13e504:        leaq    -0x105e11(%rip), %rdi  # 0x386fa
+       0 :   13e50b:        leaq    0x10605e(%rip), %rcx  # 0x244570
+       0 :   13e512:        leaq    0x10603f(%rip), %r8  # 0x244558
+       0 :   13e519:        leaq    0x8f(%rsp), %rdx
+       0 :   13e521:        movl    $0x37, %esi
+       0 :   13e526:        callq   *0x10f794(%rip)  # 0x24dcc0 <_DYNAMIC+0x608>
+       0 :   13e52c:        jmp     0x13e5a6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1526>
+       0 :   13e52e:        movl    $0x1, %edi
+       0 :   13e533:        movl    $0xb, %esi
+       0 :   13e538:        callq   *0x10f48a(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e53e:        movl    $0x1, %edi
+       0 :   13e543:        movl    $0xc, %esi
+       0 :   13e548:        callq   *0x10f47a(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e54e:        movl    $0x1, %edi
+       0 :   13e553:        movl    $0x2c, %esi
+       0 :   13e558:        callq   *0x10f46a(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e55e:        jmp     0x13e5a6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1526>
+       0 :   13e560:        movl    $0x1, %edi
+       0 :   13e565:        movl    $0x14, %esi
+       0 :   13e56a:        callq   *0x10f458(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e570:        jmp     0x13e5a6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1526>
+       0 :   13e572:        movl    $0x1, %edi
+       0 :   13e577:        movl    $0x10, %esi
+       0 :   13e57c:        callq   *0x10f446(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e582:        jmp     0x13e5a6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1526>
+       0 :   13e584:        movl    $0x1, %edi
+       0 :   13e589:        movl    $0x20, %esi
+       0 :   13e58e:        callq   *0x10f434(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e594:        jmp     0x13e5a6 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1526>
+       0 :   13e596:        movl    $0x1, %edi
+       0 :   13e59b:        movl    $0xd, %esi
+       0 :   13e5a0:        callq   *0x10f422(%rip)  # 0x24d9c8 <_DYNAMIC+0x310>
+       0 :   13e5a6:        ud2
+       0 :   13e5a8:        movq    %rax, %rbx
+       0 :   13e5ab:        movb    $0x1, %bpl
+       0 :   13e5ae:        jmp     0x13e659 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x15d9>
+       0 :   13e5b3:        jmp     0x13e6d1 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1651>
+       0 :   13e5b8:        movq    %rax, %rbx
+       0 :   13e5bb:        leaq    0x160(%rsp), %rdi
+       0 :   13e5c3:        callq   0x144c20 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+       0 :   13e5c8:        movq    %rbx, %rdi
+       0 :   13e5cb:        callq   0x2400b0 <_fini+0x30>
+       0 :   13e5d0:        jmp     0x13e784 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1704>
+       0 :   13e5d5:        movq    %rax, %rbx
+       0 :   13e5d8:        movq    0x48(%rsp), %rax
+       0 :   13e5dd:        testq   %rax, %rax
+       0 :   13e5e0:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e5e6:        lock
+       0 :   13e5e7:        decq    (%rax)
+       0 :   13e5ea:        jne     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e5f0:        leaq    0x48(%rsp), %rdi
+       0 :   13e5f5:        callq   *0x10fe6d(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13e5fb:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e600:        jmp     0x13e7ef <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x176f>
+       0 :   13e605:        jmp     0x13e7c5 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1745>
+       0 :   13e60a:        movq    %rax, %rbx
+       0 :   13e60d:        movq    0x38(%rsp), %rax
+       0 :   13e612:        movb    $0x1, %bpl
+       0 :   13e615:        testq   %rax, %rax
+       0 :   13e618:        je      0x13e6dc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x165c>
+       0 :   13e61e:        lock
+       0 :   13e61f:        decq    (%rax)
+       0 :   13e622:        jne     0x13e6dc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x165c>
+       0 :   13e628:        leaq    0x38(%rsp), %rdi
+       0 :   13e62d:        callq   *0x10fe3d(%rip)  # 0x24e470 <_DYNAMIC+0xdb8>
+       0 :   13e633:        jmp     0x13e6dc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x165c>
+       0 :   13e638:        callq   *0x10f392(%rip)  # 0x24d9d0 <_DYNAMIC+0x318>
+       0 :   13e63e:        movq    %rax, %rbx
+       0 :   13e641:        testq   %r14, %r14
+       0 :   13e644:        je      0x13e657 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x15d7>
+       0 :   13e646:        movl    $0x1, %edx
+       0 :   13e64b:        movq    %rbp, %rdi
+       0 :   13e64e:        movq    %r14, %rsi
+       0 :   13e651:        callq   *0x10f361(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e657:        xorl    %ebp, %ebp
+       0 :   13e659:        leaq    0x28(%rsp), %rdi
+       0 :   13e65e:        callq   0x1448b0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>>
+       0 :   13e663:        movq    0x10(%rsp), %rsi
+       0 :   13e668:        testq   %rsi, %rsi
+       0 :   13e66b:        setns   %al
+       0 :   13e66e:        testb   %al, %bpl
+       0 :   13e671:        je      0x13e688 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1608>
+       0 :   13e673:        testq   %rsi, %rsi
+       0 :   13e676:        je      0x13e688 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1608>
+       0 :   13e678:        movq    0x18(%rsp), %rdi
+       0 :   13e67d:        movl    $0x1, %edx
+       0 :   13e682:        callq   *0x10f330(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e688:        movq    0x48(%rsp), %rax
+       0 :   13e68d:        testq   %rax, %rax
+       0 :   13e690:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e696:        lock
+       0 :   13e697:        decq    (%rax)
+       0 :   13e69a:        jne     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e6a0:        leaq    0x48(%rsp), %rdi
+       0 :   13e6a5:        callq   *0x10fdbd(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13e6ab:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e6b0:        movq    %rax, %rbx
+       0 :   13e6b3:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e6b8:        movq    %rax, %rbx
+       0 :   13e6bb:        leaq    (,%r14,2), %rax
+       0 :   13e6c3:        testq   %rax, %rax
+       0 :   13e6c6:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e6cc:        jmp     0x13e777 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x16f7>
+       0 :   13e6d1:        movq    %rax, %rbx
+       0 :   13e6d4:        jmp     0x13e7a5 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1725>
+       0 :   13e6d9:        movq    %rax, %rbx
+       0 :   13e6dc:        movq    0x10(%rsp), %rsi
+       0 :   13e6e1:        testq   %rsi, %rsi
+       0 :   13e6e4:        setns   %al
+       0 :   13e6e7:        testb   %al, %bpl
+       0 :   13e6ea:        je      0x13e701 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1681>
+       0 :   13e6ec:        testq   %rsi, %rsi
+       0 :   13e6ef:        je      0x13e701 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1681>
+       0 :   13e6f1:        movq    0x18(%rsp), %rdi
+       0 :   13e6f6:        movl    $0x1, %edx
+       0 :   13e6fb:        callq   *0x10f2b7(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e701:        movq    0x48(%rsp), %rax
+       0 :   13e706:        testq   %rax, %rax
+       0 :   13e709:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e70f:        lock
+       0 :   13e710:        decq    (%rax)
+       0 :   13e713:        jne     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e719:        leaq    0x48(%rsp), %rdi
+       0 :   13e71e:        callq   *0x10fd44(%rip)  # 0x24e468 <_DYNAMIC+0xdb0>
+       0 :   13e724:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e729:        movq    %rax, %rbx
+       0 :   13e72c:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e731:        movq    %rax, %rbx
+       0 :   13e734:        leaq    (,%r14,2), %rax
+       0 :   13e73c:        testq   %rax, %rax
+       0 :   13e73f:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e745:        jmp     0x13e777 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x16f7>
+       0 :   13e747:        movq    %rax, %rbx
+       0 :   13e74a:        leaq    (,%r14,2), %rax
+       0 :   13e752:        testq   %rax, %rax
+       0 :   13e755:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e75b:        jmp     0x13e777 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x16f7>
+       0 :   13e75d:        movq    %rax, %rbx
+       0 :   13e760:        testq   %r14, %r14
+       0 :   13e763:        jle     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e769:        jmp     0x13e777 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x16f7>
+       0 :   13e76b:        movq    %rax, %rbx
+       0 :   13e76e:        testq   %r14, %r14
+       0 :   13e771:        jle     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e777:        movl    $0x1, %edx
+       0 :   13e77c:        movq    %rbp, %rdi
+       0 :   13e77f:        movq    %r14, %rsi
+       0 :   13e782:        jmp     0x13e7e4 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1764>
+       0 :   13e784:        movq    %rax, %rbx
+       0 :   13e787:        leaq    (,%rbp,2), %rax
+       0 :   13e78f:        testq   %rax, %rax
+       0 :   13e792:        je      0x13e7a5 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1725>
+       0 :   13e794:        movl    $0x1, %edx
+       0 :   13e799:        movq    %r13, %rdi
+       0 :   13e79c:        movq    %rbp, %rsi
+       0 :   13e79f:        callq   *0x10f213(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e7a5:        movq    0x100(%rsp), %rsi
+       0 :   13e7ad:        testq   %rsi, %rsi
+       0 :   13e7b0:        jle     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e7b6:        movq    0x108(%rsp), %rdi
+       0 :   13e7be:        movl    $0x1, %edx
+       0 :   13e7c3:        jmp     0x13e7e4 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1764>
+       0 :   13e7c5:        movq    %rax, %rbx
+       0 :   13e7c8:        leaq    (,%rbp,2), %rax
+       0 :   13e7d0:        testq   %rax, %rax
+       0 :   13e7d3:        je      0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e7d9:        movl    $0x1, %edx
+       0 :   13e7de:        movq    %r14, %rdi
+       0 :   13e7e1:        movq    %rbp, %rsi
+       0 :   13e7e4:        callq   *0x10f1ce(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e7ea:        jmp     0x13e884 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1804>
+       0 :   13e7ef:        movq    %rax, %rbx
+       0 :   13e7f2:        jmp     0x13e8bc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x183c>
+       0 :   13e7f7:        movq    %rax, %rbx
+       0 :   13e7fa:        nopw    (%rax,%rax)
+       0 :   13e800:        decq    %r15
+       0 :   13e803:        je      0x13e816 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1796>
+       0 :   13e805:        leaq    0x48(%r14), %r12
+       0 :   13e809:        movq    %r14, %rdi
+       0 :   13e80c:        callq   0x146890 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Frame>>
+       0 :   13e811:        movq    %r12, %r14
+       0 :   13e814:        jmp     0x13e800 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1780>
+       0 :   13e816:        movq    0x70(%rsp), %rax
+       0 :   13e81b:        testq   %rax, %rax
+       0 :   13e81e:        je      0x13e906 <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x1886>
+       0 :   13e824:        movq    0x78(%rsp), %rdi
+       0 :   13e829:        shlq    $0x3, %rax
+       0 :   13e82d:        leaq    (%rax,%rax,8), %rsi
+       0 :   13e831:        movl    $0x8, %edx
+       0 :   13e836:        callq   *0x10f17c(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e83c:        leaq    0x160(%rsp), %rdi
+       0 :   13e844:        callq   0x144c20 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+       0 :   13e849:        movq    %rbx, %rdi
+       0 :   13e84c:        callq   0x2400b0 <_fini+0x30>
+       0 :   13e851:        callq   *0x10f179(%rip)  # 0x24d9d0 <_DYNAMIC+0x318>
+       0 :   13e857:        movq    %rax, %rbx
+       0 :   13e85a:        movq    0x100(%rsp), %rsi
+       0 :   13e862:        testq   %rsi, %rsi
+       0 :   13e865:        je      0x13e87a <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x17fa>
+       0 :   13e867:        movq    0x108(%rsp), %rdi
+       0 :   13e86f:        movl    $0x1, %edx
+       0 :   13e874:        callq   *0x10f13e(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e87a:        leaq    0x10(%rsp), %rdi
+       0 :   13e87f:        callq   0x144760 <core::ptr::drop_in_place<quick_xml::errors::Error>>
+       0 :   13e884:        movq    0x150(%rsp), %rax
+       0 :   13e88c:        cmpq    %rax, 0xd0(%rsp)
+       0 :   13e894:        jne     0x13e8bc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x183c>
+       0 :   13e896:        movq    0xd8(%rsp), %rax
+       0 :   13e89e:        cmpq    $0x9, %rax
+       0 :   13e8a2:        ja      0x13e8af <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x182f>
+       0 :   13e8a4:        movl    $0x27d, %ecx
+       0 :   13e8a9:        btq     %rax, %rcx
+       0 :   13e8ad:        jb      0x13e8bc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x183c>
+       0 :   13e8af:        leaq    0xd8(%rsp), %rdi
+       0 :   13e8b7:        callq   0x144870 <core::ptr::drop_in_place<quick_xml::events::Event>>
+       0 :   13e8bc:        movq    0x138(%rsp), %rsi
+       0 :   13e8c4:        testq   %rsi, %rsi
+       0 :   13e8c7:        je      0x13e8dc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x185c>
+       0 :   13e8c9:        movq    0x140(%rsp), %rdi
+       0 :   13e8d1:        movl    $0x1, %edx
+       0 :   13e8d6:        callq   *0x10f0dc(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e8dc:        movq    0xb0(%rsp), %rsi
+       0 :   13e8e4:        testq   %rsi, %rsi
+       0 :   13e8e7:        je      0x13e8fc <litchi_ooxml_common::mce::codec::process_markup_compatibility+0x187c>
+       0 :   13e8e9:        movq    0xb8(%rsp), %rdi
+       0 :   13e8f1:        movl    $0x1, %edx
+       0 :   13e8f6:        callq   *0x10f0bc(%rip)  # 0x24d9b8 <_DYNAMIC+0x300>
+       0 :   13e8fc:        leaq    0x70(%rsp), %rdi
+       0 :   13e901:        callq   0x144cf0 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Frame>>>
+       0 :   13e906:        leaq    0x160(%rsp), %rdi
+       0 :   13e90e:        callq   0x144c20 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+       0 :   13e913:        movq    %rbx, %rdi
+       0 :   13e916:        callq   0x2400b0 <_fini+0x30>
+       0 :   13e91b:        callq   *0x10f0af(%rip)  # 0x24d9d0 <_DYNAMIC+0x318>

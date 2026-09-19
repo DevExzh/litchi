@@ -1,0 +1,21 @@
+{
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-0699-work",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0699",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0699-bin",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0699-profile",
+      "removed": true
+    }
+  ],
+  "workspace_cargo_lock_preserved_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}
