@@ -1,0 +1,14 @@
+{
+  "verified_staged_source_slots": 45,
+  "removed": [
+    "/tmp/litchi-ods-order-statistics",
+    "/tmp/litchi-ods-order-statistics-target"
+  ],
+  "absent_after": true,
+  "preserved": "Root shared target and unrelated worktrees/files",
+  "removed_python_cache_files": [
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/__pycache__/run_profile.cpython-314.pyc",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/gates/__pycache__/stage.cpython-314.pyc"
+  ],
+  "python_cache_absent_after": true
+}

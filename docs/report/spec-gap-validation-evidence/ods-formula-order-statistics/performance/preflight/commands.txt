@@ -1,0 +1,11 @@
+# Candidate isolated worktree (run after source freeze)
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/harness/Cargo.toml --release
+ods-formula-dispersion-performance --case all --phase evaluate --preflight-only
+ods-formula-dispersion-performance --case all --phase parse-evaluate --preflight-only
+
+# Detached d6 baseline (matched controls only)
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/harness/Cargo.toml --release
+ods-formula-dispersion-performance --case <each CONTROL_CASE> --phase evaluate --preflight-only
+ods-formula-dispersion-performance --case <each CONTROL_CASE> --phase parse-evaluate --preflight-only
+
+# Metadata-only harness rename sanity is recorded separately in metadata-sanity.txt.

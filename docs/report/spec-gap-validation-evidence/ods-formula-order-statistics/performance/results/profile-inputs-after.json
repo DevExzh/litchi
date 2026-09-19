@@ -1,0 +1,18 @@
+{
+  "PLAN.md": "e7c7c0148cc12cada0def21e8b3479cb30eabee81388efc847c952ba1bc73899",
+  "README.md": "c76957054db535c5c9faaa65edaf37196ac7df50b819c873c0b939e547a71666",
+  "harness/Cargo.lock": "e9c9abdd84c743e85b5133a9dca007447032e01c70d22050d4905fea07e7b11c",
+  "harness/Cargo.toml": "5377ebe2348b4c66f62515ec8aa9772680aad697d9021cfd828d50df99f9d002",
+  "harness/src/main.rs": "3ae5d26a7a9532c5275c8ff8ef5012a783ed565b111fd6b8aa4c569fea7c1be1",
+  "preflight/README.md": "4df51e3c4b4cb7da708b426ca91fd90c34267a04e6be4dbfc06899bdad6d67de",
+  "preflight/baseline-evaluate.txt": "1bdb9b3b2048596c73b86b0b1571a0b5e05edfa31e3cf6743e55216e995aef2d",
+  "preflight/baseline-parse-evaluate.txt": "adf25bf3e813e885bb1390cfee3bbe3ce6294902cdc492594e8ecf033d578eed",
+  "preflight/candidate-evaluate.txt": "be30c55cf0be5065b10fe69ca8bb11558e3d65eadae035ae615863bd5d281eb2",
+  "preflight/candidate-parse-evaluate.txt": "0ac499904e331f2d68acd40347b29e27762393f82987841de9f70399850657b0",
+  "preflight/commands.txt": "43a5f722c91eb1f62d503ccf535a1d9de712861cf0969bc2ad7e7fff9bd3c964",
+  "preflight/metadata-sanity.txt": "de6a66f0a25c82c26d325066e90390565c19be8eb2ddfed0a317196e5fb87f15",
+  "preflight/summary.json": "1eea4b0e374971448672595866d1fd835e55e7a20c7244de3be07e8debdae94f",
+  "run_profile.py": "6eea04d6df8c8db42af5af9476da51fe7b353301166be175cab86506602e9a00",
+  "summarize.py": "1e2a03a0a298d5ba719d75bb5dc917a64d9f94e80b2fac96f7849ef686bd1fa9",
+  "verify.py": "ca9508cd37ae6aa045c75721259419728ef5748ba3014d48d4c50cbf639687eb"
+}
