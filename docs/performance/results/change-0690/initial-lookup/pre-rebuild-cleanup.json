@@ -1,0 +1,26 @@
+{
+  "completed_utc": "2026-09-19T17:23:53.405253+00:00",
+  "removed_owned_paths": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690-before",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690-after",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0690-profile",
+      "existed_before": true,
+      "exists_after": false
+    }
+  ],
+  "preserved": "Evidence, pre-existing shared targets, unrelated worktrees and lockfiles. The new standalone probe lockfile is retained for reproducibility."
+}

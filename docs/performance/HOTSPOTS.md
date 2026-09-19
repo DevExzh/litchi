@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## 0690 — borrow ASCII queries during CFB directory lookup
+
+[0690](0690-cfb-borrowed-directory-lookups.md) follows a fresh 18% owned-key
+construction profile. Private borrowed ASCII queries remove two temporary
+inline SmallVec keys in both CFB readers, preserving cached Unicode ordering.
+Owned XLS repeated queries improve roughly 4–9%; legacy short-name lookup
+controls improve 31–41%. Allocations and counted I/O match exactly. Invalid
+lookup costs about 1.2 ns more, a missing-query phase costs 10 ns more, and
+large first/build workflows show 1–3% costs. Larger controls retain the Simple file tail
+flag but do not reproduce the one-leg 45365 workflow anomaly. Code grows
+848 bytes; retained state is unchanged. No broad file, tail or cold-I/O claim.
+
+The next larger end-to-end priority is current attribution of repeated PPTX
+MCE passes, following the historical 24.19 ms real-edit versus 8.3 ms control
+in 0653. A private bounded capture/transaction reuse design requires proof of
+blob identity, invalidation, processing-profile identity and memory pricing
+before implementation; see the packet's next-investigation record.
+
 ## 0689 — retain validated SST positions for indexed replay
 
 [0689](0689-xls-sst-chain-checkpoint.md) removes repeated 478/97/24-link SST

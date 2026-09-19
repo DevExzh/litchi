@@ -3,7 +3,7 @@ use super::consts::{
     HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, SECTOR_SIZE_V3,
     SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
-use crate::directory_name::{DirectoryNameData, directory_name_data};
+use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -2627,7 +2627,20 @@ impl<R: Read + Seek> OleFile<R> {
     /// can descend through one branch at each node. Limit the number of visited
     /// nodes as a final defense against a malformed in-memory graph.
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
+        if let Some(target_name) =
+            ascii_lookup_key(name).map_err(|_error| OleError::StreamNotFound)?
+        {
+            return self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name));
+        }
         let target_name = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+        self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name))
+    }
+
+    #[inline]
+    fn find_child_by_name_with<C>(&self, sid: u32, compare: C) -> Result<&DirectoryEntry, OleError>
+    where
+        C: Fn(&DirectoryNameData) -> Ordering,
+    {
         let mut current_sid = sid;
 
         for _ in 0..self.dir_entries.len() {
@@ -2648,7 +2661,7 @@ impl<R: Read + Seek> OleFile<R> {
                 .and_then(Option::as_ref)
                 .ok_or(OleError::StreamNotFound)?;
 
-            current_sid = match target_name.compare(entry_name) {
+            current_sid = match compare(entry_name) {
                 Ordering::Less => entry.sid_left,
                 Ordering::Equal => return Ok(entry),
                 Ordering::Greater => entry.sid_right,

@@ -1,0 +1,87 @@
+[
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-costs.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.123657602001913
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-native.py"
+    ],
+    "exit_code": 0,
+    "seconds": 6.471186117967591
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-extra.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.2765894640469924
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-lookup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.1062101880088449
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-followup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.3632920179516077
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-final.py"
+    ],
+    "exit_code": 0,
+    "seconds": 3.2368164900690317
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-final.py"
+    ],
+    "exit_code": 0,
+    "seconds": 3.524334968999028,
+    "reason": "Final documentation clarification and refreshed documentation gate results."
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-lookup.py",
+      "--initial"
+    ],
+    "exit_code": 0,
+    "seconds": 1.2544605060247704,
+    "reason": "Final warning-denied standalone probe recapture and original archive verification."
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-lookup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.2394358939491212,
+    "reason": "Final warning-denied standalone probe recapture and original archive verification."
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-final.py"
+    ],
+    "exit_code": 0,
+    "seconds": 3.1858284909976646,
+    "reason": "Final warning-denied standalone probe recapture and original archive verification."
+  }
+]

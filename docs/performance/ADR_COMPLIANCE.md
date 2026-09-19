@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## 0690 — lookup-only borrowed CFB ASCII keys
+
+[0690](0690-cfb-borrowed-directory-lookups.md) removes temporary original and
+uppercase UTF-16 key construction only for bounded ASCII queries. Parsed
+metadata, writers and the Unicode fallback retain their existing form.
+
+- ADR 0001/0002/0024: both lookup owners remain in `litchi-cfb`; no public API,
+  dependency or physical identifier crosses an ordinary facade boundary.
+- ADR 0003/0005: immutable parsed keys, source identity, freshness fences,
+  execution/cancellation policy and retained budgets remain unchanged. The
+  query borrows caller bytes only for the synchronous lookup.
+- ADR 0006/0026: empty/NUL/forbidden validation, original UTF-16 length-first
+  ordering, simple-uppercase rules, cached-key presence, checked SID access
+  and bounded traversal are preserved. No unsafe code or normalization added.
+- ADR 0008: differential tests and separate native, allocation/I/O, hardware
+  and lookup-only controls bind the disposition. No coverage promotion or
+  registered performance claim; iWork is excluded.
+
 ## 0689 — bounded SST chain identity reuse in the XLS index
 
 [0689](0689-xls-sst-chain-checkpoint.md) retains one additional opaque CFB

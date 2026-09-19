@@ -1,0 +1,13 @@
+PASS: source/probe/raw/constraint bindings, exact all-query outcome/I/O, exact allocation parity in all build and non-build groups, 96 allocation groups with three identical repeats per phase
+54016-stored-0 [('allocation_calls', 15, 15), ('allocated_bytes', 130658, 130658), ('peak_live_delta', 65560, 65560), ('retained_live_delta', 4, 4)]
+54016-stored-2097152 [('allocation_calls', 8, 8), ('allocated_bytes', 102, 102), ('peak_live_delta', 102, 102), ('retained_live_delta', 4, 4)]
+54016-missing-1048576 [('allocation_calls', 1, 1), ('allocated_bytes', 16, 16), ('peak_live_delta', 16, 16), ('retained_live_delta', 0, 0)]
+Plan1-stored-2097152 [('allocation_calls', 8, 8), ('allocated_bytes', 290, 290), ('peak_live_delta', 290, 290), ('retained_live_delta', 51, 51)]
+Simple-stored-2097152 [('allocation_calls', 8, 8), ('allocated_bytes', 122, 122), ('peak_live_delta', 122, 122), ('retained_live_delta', 9, 9)]
+Simple-missing-2097152 [('allocation_calls', 1, 1), ('allocated_bytes', 16, 16), ('peak_live_delta', 16, 16), ('retained_live_delta', 0, 0)]
+synthetic-70000-default [('allocation_calls', 8, 8), ('allocated_bytes', 122, 122), ('peak_live_delta', 122, 122), ('retained_live_delta', 9, 9)]
+54016-late [('allocation_calls', 2, 2), ('allocated_bytes', 222, 222), ('peak_live_delta', 222, 222), ('retained_live_delta', 0, 0)]
+Plan1-late [('allocation_calls', 2, 2), ('allocated_bytes', 44, 44), ('peak_live_delta', 44, 44), ('retained_live_delta', 0, 0)]
+45365-first [('allocation_calls', 8, 8), ('allocated_bytes', 122, 122), ('peak_live_delta', 122, 122), ('retained_live_delta', 9, 9)]
+45365-late [('allocation_calls', 2, 2), ('allocated_bytes', 166, 166), ('peak_live_delta', 166, 166), ('retained_live_delta', 0, 0)]
+formula-refusal-2097152 [('allocation_calls', 10, 10), ('allocated_bytes', 9651, 9651), ('peak_live_delta', 5235, 5235), ('retained_live_delta', 55, 55)]

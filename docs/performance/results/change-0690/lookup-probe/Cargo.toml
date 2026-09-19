@@ -1,0 +1,19 @@
+[package]
+name = "cfb-lookup-probe-0690"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-cfb = { path = "../../../../../crates/litchi-cfb" }
+sha2 = "0.11"
+
+[[bin]]
+name = "cfb-lookup-probe-0690"
+path = "src/main.rs"
+
+[workspace]
+
+[profile.release]
+debug = false
+strip = false

@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "baseline-profile-command.json": "0b50bdb1425bf6cbc09493b5dba2f6706eef94e70e0ad7182428dd2bf54fe28a",
+    "baseline-profile-driver.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "baseline-profile-symbols.txt": "e8bae045ca1e160cdf3622a8f0915d924454919114f19db9d4e8896f2bb1cd26",
+    "baseline-profile.stderr": "80969c540c2793003f0d509d119271db16f53351ac3eec639405ee208abfd9d3",
+    "baseline-profile.tsv": "0d63793b6b134977112aed83372baecb11a915a943442af3dbd2526d0284fa14"
+  },
+  "candidate": {
+    "candidate-profile-command.json": "257db6089a1f52b08fe4d60be29dabff4f118da22f707774f08fb199765984f1",
+    "candidate-profile-driver.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "candidate-profile-symbols.txt": "eedc172085baa60312ca8c0efad8070c684716180faed8828fe9d966e3f16e4e",
+    "candidate-profile.stderr": "5b6d190258296496b51dd6e8071e624c7394b00a0db2d760ead73bea14a9356c",
+    "candidate-profile.tsv": "dace417049971bb851c814b4121c27682ac9ac4e023e273614189efe04cf01db"
+  }
+}

@@ -1,0 +1,112 @@
+
+/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000b4100 <litchi_cfb::shared::cursor_chain_sector>:
+   b4100:	55                   	push   %rbp
+   b4101:	41 57                	push   %r15
+   b4103:	41 56                	push   %r14
+   b4105:	41 55                	push   %r13
+   b4107:	41 54                	push   %r12
+   b4109:	53                   	push   %rbx
+   b410a:	48 83 ec 78          	sub    $0x78,%rsp
+   b410e:	48 89 fb             	mov    %rdi,%rbx
+   b4111:	0f 28 84 24 b0 00 00 	movaps 0xb0(%rsp),%xmm0
+   b4118:	00 
+   b4119:	0f 11 44 24 18       	movups %xmm0,0x18(%rsp)
+   b411e:	4c 8d 64 24 38       	lea    0x38(%rsp),%r12
+   b4123:	4c 8d 6c 24 60       	lea    0x60(%rsp),%r13
+   b4128:	49 ff c8             	dec    %r8
+   b412b:	4c 8d 74 24 50       	lea    0x50(%rsp),%r14
+   b4130:	4c 8d 7c 24 28       	lea    0x28(%rsp),%r15
+   b4135:	66 66 2e 0f 1f 84 00 	data16 cs nopw 0x0(%rax,%rax,1)
+   b413c:	00 00 00 00 
+   b4140:	49 ff c0             	inc    %r8
+   b4143:	4d 39 c8             	cmp    %r9,%r8
+   b4146:	0f 83 cc 00 00 00    	jae    b4218 <litchi_cfb::shared::cursor_chain_sector+0x118>
+   b414c:	4c 8b 54 24 18       	mov    0x18(%rsp),%r10
+   b4151:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+   b4156:	83 f9 f9             	cmp    $0xfffffff9,%ecx
+   b4159:	77 27                	ja     b4182 <litchi_cfb::shared::cursor_chain_sector+0x82>
+   b415b:	89 cf                	mov    %ecx,%edi
+   b415d:	48 39 fa             	cmp    %rdi,%rdx
+   b4160:	76 4c                	jbe    b41ae <litchi_cfb::shared::cursor_chain_sector+0xae>
+   b4162:	8b 0c be             	mov    (%rsi,%rdi,4),%ecx
+   b4165:	83 f9 fe             	cmp    $0xfffffffe,%ecx
+   b4168:	40 0f 94 c7          	sete   %dil
+   b416c:	83 f9 fa             	cmp    $0xfffffffa,%ecx
+   b416f:	41 0f 92 c3          	setb   %r11b
+   b4173:	41 08 fb             	or     %dil,%r11b
+   b4176:	74 0a                	je     b4182 <litchi_cfb::shared::cursor_chain_sector+0x82>
+   b4178:	83 f9 fe             	cmp    $0xfffffffe,%ecx
+   b417b:	75 c3                	jne    b4140 <litchi_cfb::shared::cursor_chain_sector+0x40>
+   b417d:	e9 9b 00 00 00       	jmp    b421d <litchi_cfb::shared::cursor_chain_sector+0x11d>
+   b4182:	48 89 74 24 10       	mov    %rsi,0x10(%rsp)
+   b4187:	48 89 54 24 08       	mov    %rdx,0x8(%rsp)
+   b418c:	4c 89 04 24          	mov    %r8,(%rsp)
+   b4190:	4c 89 cd             	mov    %r9,%rbp
+   b4193:	4c 89 f7             	mov    %r14,%rdi
+   b4196:	89 ce                	mov    %ecx,%esi
+   b4198:	4c 89 d2             	mov    %r10,%rdx
+   b419b:	48 89 c1             	mov    %rax,%rcx
+   b419e:	e8 5d 01 00 00       	call   b4300 <litchi_cfb::shared::invalid_chain_marker>
+   b41a3:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+   b41a8:	8b 4c 24 58          	mov    0x58(%rsp),%ecx
+   b41ac:	eb 48                	jmp    b41f6 <litchi_cfb::shared::cursor_chain_sector+0xf6>
+   b41ae:	48 89 74 24 10       	mov    %rsi,0x10(%rsp)
+   b41b3:	48 89 54 24 08       	mov    %rdx,0x8(%rsp)
+   b41b8:	4c 89 04 24          	mov    %r8,(%rsp)
+   b41bc:	4c 89 cd             	mov    %r9,%rbp
+   b41bf:	4c 89 ff             	mov    %r15,%rdi
+   b41c2:	89 ce                	mov    %ecx,%esi
+   b41c4:	4c 89 d2             	mov    %r10,%rdx
+   b41c7:	48 89 c1             	mov    %rax,%rcx
+   b41ca:	e8 c1 00 00 00       	call   b4290 <litchi_cfb::shared::invalid_chain_index>
+   b41cf:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+   b41d4:	48 8b 4c 24 30       	mov    0x30(%rsp),%rcx
+   b41d9:	49 8b 54 24 10       	mov    0x10(%r12),%rdx
+   b41de:	49 89 55 10          	mov    %rdx,0x10(%r13)
+   b41e2:	41 0f 10 04 24       	movups (%r12),%xmm0
+   b41e7:	41 0f 11 45 00       	movups %xmm0,0x0(%r13)
+   b41ec:	48 89 44 24 50       	mov    %rax,0x50(%rsp)
+   b41f1:	48 89 4c 24 58       	mov    %rcx,0x58(%rsp)
+   b41f6:	48 83 f8 0b          	cmp    $0xb,%rax
+   b41fa:	75 6f                	jne    b426b <litchi_cfb::shared::cursor_chain_sector+0x16b>
+   b41fc:	49 89 e9             	mov    %rbp,%r9
+   b41ff:	4c 8b 04 24          	mov    (%rsp),%r8
+   b4203:	48 8b 54 24 08       	mov    0x8(%rsp),%rdx
+   b4208:	48 8b 74 24 10       	mov    0x10(%rsp),%rsi
+   b420d:	83 f9 fe             	cmp    $0xfffffffe,%ecx
+   b4210:	0f 85 2a ff ff ff    	jne    b4140 <litchi_cfb::shared::cursor_chain_sector+0x40>
+   b4216:	eb 05                	jmp    b421d <litchi_cfb::shared::cursor_chain_sector+0x11d>
+   b4218:	83 f9 fe             	cmp    $0xfffffffe,%ecx
+   b421b:	75 35                	jne    b4252 <litchi_cfb::shared::cursor_chain_sector+0x152>
+   b421d:	48 8d 44 24 18       	lea    0x18(%rsp),%rax
+   b4222:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+   b4227:	48 8d 05 62 43 00 00 	lea    0x4362(%rip),%rax        # b8590 <<&T as core::fmt::Display>::fmt>
+   b422e:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+   b4233:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+   b4237:	48 8d 35 55 c3 f8 ff 	lea    -0x73cab(%rip),%rsi        # 40593 <anon.e19842de46ce896f24e134d751abf143.399.llvm.7076870620978272968+0x240>
+   b423e:	48 8d 54 24 28       	lea    0x28(%rsp),%rdx
+   b4243:	ff 15 b7 7b 05 00    	call   *0x57bb7(%rip)        # 10be00 <_DYNAMIC+0x508>
+   b4249:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+   b4250:	eb 0a                	jmp    b425c <litchi_cfb::shared::cursor_chain_sector+0x15c>
+   b4252:	89 4b 08             	mov    %ecx,0x8(%rbx)
+   b4255:	48 c7 03 0b 00 00 00 	movq   $0xb,(%rbx)
+   b425c:	48 83 c4 78          	add    $0x78,%rsp
+   b4260:	5b                   	pop    %rbx
+   b4261:	41 5c                	pop    %r12
+   b4263:	41 5d                	pop    %r13
+   b4265:	41 5e                	pop    %r14
+   b4267:	41 5f                	pop    %r15
+   b4269:	5d                   	pop    %rbp
+   b426a:	c3                   	ret
+   b426b:	0f 10 44 24 5c       	movups 0x5c(%rsp),%xmm0
+   b4270:	0f 10 4c 24 68       	movups 0x68(%rsp),%xmm1
+   b4275:	0f 11 4b 18          	movups %xmm1,0x18(%rbx)
+   b4279:	0f 11 43 0c          	movups %xmm0,0xc(%rbx)
+   b427d:	48 89 03             	mov    %rax,(%rbx)
+   b4280:	89 4b 08             	mov    %ecx,0x8(%rbx)
+   b4283:	eb d7                	jmp    b425c <litchi_cfb::shared::cursor_chain_sector+0x15c>

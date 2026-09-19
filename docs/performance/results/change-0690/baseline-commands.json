@@ -1,0 +1,65 @@
+[
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/profile.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 1.724802015000023
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/inspect-assembly.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.15872335399035364
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-native.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 4.3857439970597625
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-costs.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.7482065740041435
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-corpus.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.35900256503373384
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-repeat.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 13.214879896026105
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-diagnostics.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 4.250048835994676
+  }
+]

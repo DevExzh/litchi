@@ -1,0 +1,46 @@
+[
+  {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0690/build-lookup.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 15.720530747086741
+  },
+  {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0690/measure-lookup.py",
+      "baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 3.3441931729903445
+  },
+  {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0690/build-lookup.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 5.72759582195431
+  },
+  {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0690/measure-lookup.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 5.79858200403396
+  },
+  {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0690/audit-lookup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.2451832599472255
+  }
+]

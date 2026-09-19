@@ -1,0 +1,2 @@
+PASS longer controls: 12 groups x 6 legs x 9 samples x 50,000 queries; default 2 MiB in every long-loop case.
+PASS counters/RSS: 8 groups x 2 lengths x 3 repeats x 2 binaries; subtract 100,000 extra queries. Counters include whole-process work.

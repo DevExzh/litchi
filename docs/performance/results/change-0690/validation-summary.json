@@ -1,0 +1,32 @@
+{
+  "baseline": "01d83efcf83d6c03ced71cbba09c66828e56147a",
+  "quality_gates": 6,
+  "additional_consumer_test_gate": 1,
+  "rust_tests_passed": 4407,
+  "rust_tests_ignored": 27,
+  "real_corpus_files": 126,
+  "generated_fixtures": 1,
+  "native_groups": 24,
+  "native_owner_records": 14400,
+  "native_query_records": 115200,
+  "allocation_groups": 96,
+  "allocation_captures": 576,
+  "counted_source_routes": 12,
+  "long_loop_groups": 12,
+  "long_loop_process_samples": 648,
+  "long_loop_queries_per_sample": 50000,
+  "diagnostic_groups": 8,
+  "diagnostic_processes": 96,
+  "source_sha256": {
+    "crates/litchi-cfb/src/directory_name.rs": "34594615688b0e067985c9f1260f9fc111267cdf9eece8fdf9329c620244df8a",
+    "crates/litchi-cfb/src/file.rs": "28f2bc2c928cf91053bbc221573666d20466053df8bfdbc1ed295f037dcbfe8a",
+    "crates/litchi-cfb/src/shared.rs": "e08a7de161a5be50602204f27201bfa459ec0e3f83c274df627260fd20929853"
+  },
+  "performance_claim": "none",
+  "lookup_groups": 12,
+  "lookup_case_process_records": 648,
+  "lookup_calls_per_record": 250000,
+  "followup_groups": 4,
+  "followup_owner_records": 24000,
+  "followup_query_records": 192000
+}
