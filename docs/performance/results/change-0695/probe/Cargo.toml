@@ -1,0 +1,19 @@
+[package]
+name = "mce-attribution-0695"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-ooxml-common = { path = "../../../../../crates/litchi-ooxml-common" }
+sha2 = "0.11"
+
+[[bin]]
+name = "mce-attribution-0695"
+path = "src/main.rs"
+
+[profile.release]
+debug = 1
+strip = false

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0695 — current per-member PPTX MCE attribution
+
+[0695](0695-pptx-mce-work-weight.md) retains 12,800 four-execution native batch
+samples across 16 cases/four legs, exact corpus and trace bindings, three
+hardware-counter slope repetitions and a fresh isolated MCE profile. The
+18-call sequence measures 2.512–2.538 ms; its five presentation calls separately
+measure 83.46–84.87 µs. The presentation/full isolated ratio is 3.33%, with
+3.32–3.39% cycle ratios. The maximum case median spread is 2.72%.
+Production stays at `df44030d6`; these are warm kernel baselines, not capture
+latency, before/after speedups, individual-call tail guarantees or new coverage.
+
 ## 0694 — shared MCE element-name ownership
 
 [0694](0694-mce-borrowed-element-names.md) retains 7,800 native PPTX samples,

@@ -1,0 +1,15 @@
+{
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0695",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0695-profile",
+      "removed": true
+    }
+  ],
+  "binary_sha256": "0e241f5f8ffccec7e0f32226db4cb2fe2cbcd14a9bda844c69205b1dbcfce01b",
+  "profile_data_sha256": "82548a7d9492a634e1164b8c879cdba70f7e53f9f377d95f1906d3bfb2d0a945",
+  "root_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

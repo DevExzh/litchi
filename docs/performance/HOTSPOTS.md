@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0695 — weight remaining MCE work before presentation reuse
+
+[0695](0695-pptx-mce-work-weight.md) prices the exact retained 18-call capture
+sequence with current production MCE. Five presentation calls take 83–85 µs,
+only 3.33% of the isolated 2.51–2.54 ms sequence; counter ratios corroborate
+3.32–3.39% of cycles. Slide 11 alone accounts for roughly 43% of isolated time.
+This reverses a priority based only on five repeated calls: shared per-element
+namespace/context ownership is the next measured hypothesis. Fresh isolated
+`start` self share is 32.22%; it has a different denominator from open/capture.
+No production change, additive capture fraction or speedup is claimed.
+
 ## 0694 — avoid ordinary MCE element-name ownership
 
 [0694](0694-mce-borrowed-element-names.md) follows a fresh 12.48% MCE `start`
