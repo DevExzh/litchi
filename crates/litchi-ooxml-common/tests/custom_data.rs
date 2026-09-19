@@ -13,8 +13,9 @@
 
 use litchi_ooxml_common::custom_data::codec::{
     Limits, parse_properties_with_limits, rewrite_extension_list,
-    rewrite_extension_list_with_limits, rewrite_id, rewrite_id_with_limits,
-    validate_source_properties, write_properties_with_limits,
+    rewrite_extension_list_with_limits, rewrite_extension_list_with_limits_and_output, rewrite_id,
+    rewrite_id_with_limits, rewrite_id_with_limits_and_output, validate_source_properties,
+    write_properties_with_limits,
 };
 use litchi_ooxml_common::custom_data::{
     ExtensionList, Properties, parse_properties, write_properties,
@@ -758,4 +759,77 @@ fn malformed_extension_fragments_are_rejected_before_source_splice() {
         );
         assert_eq!(part.bytes(), source.as_bytes());
     }
+}
+
+#[test]
+fn source_uid_shrink_has_an_independent_output_ceiling() {
+    let bytes = format!("<p:datastoreItem xmlns:p='{X14}' id='long-source-uid'/>");
+    let source = source_part(bytes.as_bytes());
+    let expected = bytes.replace("long-source-uid", "x");
+    let limits = Limits::standard();
+    let result = rewrite_id_with_limits_and_output(&source, "x", &limits, expected.len()).unwrap();
+    assert_eq!(result.bytes(), expected.as_bytes());
+    assert!(matches!(
+        rewrite_id_with_limits_and_output(&source, "x", &limits, expected.len() - 1),
+        Err(litchi_ooxml_common::Error::Limit {
+            resource: "properties XML output",
+            ..
+        })
+    ));
+    let noop = rewrite_id_with_limits_and_output(&source, "long-source-uid", &limits, 0).unwrap();
+    assert!(std::sync::Arc::ptr_eq(
+        &source.shared_bytes(),
+        &noop.shared_bytes()
+    ));
+    assert_eq!(source.bytes(), bytes.as_bytes());
+}
+
+#[test]
+fn extension_output_preflight_covers_shrink_and_empty_root_expansion() {
+    let source_bytes =
+        format!("<p:datastoreItem xmlns:p='{X14}' id='x'><p:extLst/></p:datastoreItem>");
+    let source = source_part(source_bytes.as_bytes());
+    let expected = source_bytes.replace("<p:extLst/>", "");
+    let limits = Limits::standard();
+    let result =
+        rewrite_extension_list_with_limits_and_output(&source, None, &limits, expected.len())
+            .unwrap();
+    assert_eq!(result.bytes(), expected.as_bytes());
+    assert!(matches!(
+        rewrite_extension_list_with_limits_and_output(&source, None, &limits, expected.len() - 1),
+        Err(litchi_ooxml_common::Error::Limit {
+            resource: "properties XML output",
+            ..
+        })
+    ));
+    let empty = format!("<p:datastoreItem xmlns:p='{X14}' id='x'/>");
+    let source = source_part(empty.as_bytes());
+    let extension = ExtensionList {
+        xml: format!("<p:extLst xmlns:p='{X14}'/>").into_bytes(),
+    };
+    let expected = format!(
+        "{}>{}</p:datastoreItem>",
+        empty.strip_suffix("/>").unwrap(),
+        std::str::from_utf8(&extension.xml).unwrap()
+    );
+    let result = rewrite_extension_list_with_limits_and_output(
+        &source,
+        Some(&extension),
+        &limits,
+        expected.len(),
+    )
+    .unwrap();
+    assert_eq!(result.bytes(), expected.as_bytes());
+    assert!(matches!(
+        rewrite_extension_list_with_limits_and_output(
+            &source,
+            Some(&extension),
+            &limits,
+            expected.len() - 1
+        ),
+        Err(litchi_ooxml_common::Error::Limit {
+            resource: "properties XML output",
+            ..
+        })
+    ));
 }

@@ -789,7 +789,20 @@ pub fn rewrite_id_with_limits(
     id: &str,
     limits: &Limits,
 ) -> Result<litchi_opc::OwnedXmlPart> {
+    rewrite_id_with_limits_and_output(source, id, limits, limits.properties_xml_bytes)
+}
+
+/// Rewrite a retained UID with independent source and replacement-output limits.
+/// An exact no-op shares the source token without constructing output.
+#[doc(hidden)]
+pub fn rewrite_id_with_limits_and_output(
+    source: &litchi_opc::OwnedXmlPart,
+    id: &str,
+    limits: &Limits,
+    max_output_bytes: usize,
+) -> Result<litchi_opc::OwnedXmlPart> {
     let limits = limits.validate()?;
+    let maximum = max_output_bytes.min(limits.properties_xml_bytes);
     let info = parse_document(source.bytes(), ExpectedRoot::Properties, false, &limits)?;
     validate_id(id, &limits)?;
     if info.id.as_deref() == Some(id) {
@@ -806,26 +819,15 @@ pub fn rewrite_id_with_limits(
         .len()
         .checked_sub(range.len())
         .and_then(|length| length.checked_add(replacement_len))
-        .ok_or_else(|| {
-            limit_for(
-                "properties XML output",
-                usize::MAX,
-                limits.properties_xml_bytes,
-            )
-        })?;
-    check_limit(
-        &limits,
-        "properties XML output",
-        output_len,
-        limits.properties_xml_bytes,
-    )?;
+        .ok_or_else(|| limit_for("properties XML output", usize::MAX, maximum))?;
+    check_limit(&limits, "properties XML output", output_len, maximum)?;
     let replacement = try_escaped_xstring(id, &limits)?;
     let result = source.replace_attributes(&[(range, replacement)])?;
     check_limit(
         &limits,
         "properties XML output",
         result.bytes().len(),
-        limits.properties_xml_bytes,
+        maximum,
     )?;
     Ok(result)
 }
@@ -847,16 +849,41 @@ pub fn rewrite_extension_list_with_limits(
     extension: Option<&ExtensionList>,
     limits: &Limits,
 ) -> Result<litchi_opc::OwnedXmlPart> {
+    rewrite_extension_list_with_limits_and_output(
+        source,
+        extension,
+        limits,
+        limits.properties_xml_bytes,
+    )
+}
+
+/// Rewrite a retained extension with independent source and replacement-output
+/// limits. Exact no-ops retain their original source token.
+#[doc(hidden)]
+pub fn rewrite_extension_list_with_limits_and_output(
+    source: &litchi_opc::OwnedXmlPart,
+    extension: Option<&ExtensionList>,
+    limits: &Limits,
+    max_output_bytes: usize,
+) -> Result<litchi_opc::OwnedXmlPart> {
     let limits = limits.validate()?;
+    let maximum = max_output_bytes.min(limits.properties_xml_bytes);
     let info = parse_document(source.bytes(), ExpectedRoot::Properties, false, &limits)?;
     let Some(extension) = extension else {
         return if let Some(range) = info.extension_open {
+            let removed = info.extension.as_ref().map_or(0, Range::len);
+            let output_len = source
+                .bytes()
+                .len()
+                .checked_sub(removed)
+                .ok_or_else(|| invalid("Custom Data extension range exceeds source"))?;
+            check_limit(&limits, "properties XML output", output_len, maximum)?;
             let result = source.remove_element(range)?;
             check_limit(
                 &limits,
                 "properties XML output",
                 result.bytes().len(),
-                limits.properties_xml_bytes,
+                maximum,
             )?;
             Ok(result)
         } else {
@@ -876,24 +903,27 @@ pub fn rewrite_extension_list_with_limits(
             return Ok(source.clone());
         }
     }
+    // Expanding an empty root replaces its slash with a full closing tag.
+    let root_tag = &source.bytes()[info.root_open.clone()];
+    let expansion = if info.extension.is_none() && root_tag.ends_with(b"/>") {
+        root_tag
+            .iter()
+            .skip(1)
+            .take_while(|byte| !byte.is_ascii_whitespace() && **byte != b'/' && **byte != b'>')
+            .count()
+            .checked_add(2)
+            .ok_or_else(|| invalid("Custom Data root expansion overflow"))?
+    } else {
+        0
+    };
     let output_len = source
         .bytes()
         .len()
         .checked_sub(info.extension.as_ref().map_or(0, Range::len))
         .and_then(|n| n.checked_add(extension.xml.len()))
-        .ok_or_else(|| {
-            limit_for(
-                "properties XML output",
-                usize::MAX,
-                limits.properties_xml_bytes,
-            )
-        })?;
-    check_limit(
-        &limits,
-        "properties XML output",
-        output_len,
-        limits.properties_xml_bytes,
-    )?;
+        .and_then(|n| n.checked_add(expansion))
+        .ok_or_else(|| limit_for("properties XML output", usize::MAX, maximum))?;
+    check_limit(&limits, "properties XML output", output_len, maximum)?;
     match info.extension_open {
         Some(range) => {
             let result = source.replace_element(range, &extension.xml)?;
@@ -901,7 +931,7 @@ pub fn rewrite_extension_list_with_limits(
                 &limits,
                 "properties XML output",
                 result.bytes().len(),
-                limits.properties_xml_bytes,
+                maximum,
             )?;
             Ok(result)
         },
@@ -911,7 +941,7 @@ pub fn rewrite_extension_list_with_limits(
                 &limits,
                 "properties XML output",
                 result.bytes().len(),
-                limits.properties_xml_bytes,
+                maximum,
             )?;
             Ok(result)
         },

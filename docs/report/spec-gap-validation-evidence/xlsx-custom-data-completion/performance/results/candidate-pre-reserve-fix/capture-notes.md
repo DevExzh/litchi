@@ -1,0 +1,7 @@
+# Diagnostic candidate capture (pre-reserve-fix)
+
+This complete candidate capture predates the fallible actual-edge reserve fix. It is retained as diagnostic raw evidence only and is excluded from the final matched comparison. The accepted comparison is in `../candidate-final`. `source-reconstruction.patch` transforms the accepted frozen `crates/litchi-xlsx/src/connections/embedded_data.rs` (SHA-256 `0d0a8407724d4ba4c53e2613b547ff227268ac88f8b3e3003bd5d6038663a815`) into this diagnostic version (SHA-256 `4e67a2d0ce54c866422b137aa54afcc190e8fc60f80cea62f803d5fd48916022`).
+
+The report's `bindings` column is the total number of connection bindings in the fixture. The raw row field `validation.reference_count` counts bindings pointing to the first storage (`uid-0000`) before a rename, or to `uid-renamed-0000` after the rename. The large fixture has 512 total bindings and 449 first-storage references; medium has 128 total and 113 first-storage references; small has 16 total and 15 first-storage references.
+
+The no-op lane produced an empty transaction (`changed == false` and an empty patch), and the remove/inverse lane restored the source fixture hash. Each raw JSONL row was checked against its per-sample JSON before redundant JSON files were removed. Empty stderr files were removed; the retained raw JSONL, `/usr/bin/time -v` sidecars, reconstruction patch, and result files are listed in `retained-files.sha256`.

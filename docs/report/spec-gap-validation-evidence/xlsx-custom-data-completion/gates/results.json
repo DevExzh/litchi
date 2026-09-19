@@ -1,0 +1,143 @@
+[
+  {
+    "name": "xlsx-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-xlsx"
+    ],
+    "exit_code": 0,
+    "seconds": 24.01580786705017,
+    "log_sha256": "22f5ce8d1eb015443bdcf32a430498e9a45de5d641ed3bb794709305e94c27a2"
+  },
+  {
+    "name": "opc-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-opc"
+    ],
+    "exit_code": 0,
+    "seconds": 16.611812114715576,
+    "log_sha256": "8f0350b935fd80643fa98576dc71a7f9c5fe7a74a3633fb55adeed914639a222"
+  },
+  {
+    "name": "common-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-ooxml-common"
+    ],
+    "exit_code": 0,
+    "seconds": 3.241328477859497,
+    "log_sha256": "88d2edc37b56e71c99335af990922d95c29b39d00fed18c21d16372b37e0f290"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-ooxml-common",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 10.239500284194946,
+    "log_sha256": "2d5fac106c2b5874681cf9504a03c8cbfb05115d8559ffd8f6cda9c7176d0fcd"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-ooxml-common",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 4.750317573547363,
+    "log_sha256": "de53fd9b617127567978ef7d11b85c17fd33b026ca6bf9041776d9f6bb765b01"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-ooxml-common",
+      "--",
+      "--check"
+    ],
+    "exit_code": 1,
+    "seconds": 2.210233688354492,
+    "log_sha256": "0f45c4eff06277d5c484438bab85ddc25ae1680eeb39da64113901b67f175d6f"
+  },
+  {
+    "name": "batch-format",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-xlsx/src/custom_data/codec.rs",
+      "crates/litchi-xlsx/src/custom_data/package.rs",
+      "crates/litchi-xlsx/src/connections/codec.rs",
+      "crates/litchi-xlsx/src/connections/embedded_data.rs",
+      "crates/litchi-xlsx/src/connections/package.rs",
+      "crates/litchi-xlsx/src/package.rs",
+      "crates/litchi-xlsx/src/source_attributes.rs",
+      "crates/litchi-xlsx/tests/custom_data_limits.rs",
+      "crates/litchi-ooxml-common/src/custom_data/codec.rs",
+      "crates/litchi-ooxml-common/tests/custom_data.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.11571383476257324,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 230.9918851852417,
+    "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa"
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.016527414321899414,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

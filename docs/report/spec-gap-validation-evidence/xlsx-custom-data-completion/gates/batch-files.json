@@ -1,0 +1,12 @@
+[
+  "crates/litchi-xlsx/src/custom_data/codec.rs",
+  "crates/litchi-xlsx/src/custom_data/package.rs",
+  "crates/litchi-xlsx/src/connections/codec.rs",
+  "crates/litchi-xlsx/src/connections/embedded_data.rs",
+  "crates/litchi-xlsx/src/connections/package.rs",
+  "crates/litchi-xlsx/src/package.rs",
+  "crates/litchi-xlsx/src/source_attributes.rs",
+  "crates/litchi-xlsx/tests/custom_data_limits.rs",
+  "crates/litchi-ooxml-common/src/custom_data/codec.rs",
+  "crates/litchi-ooxml-common/tests/custom_data.rs"
+]

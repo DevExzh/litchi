@@ -1,0 +1,28 @@
+{
+  "capture_kind": "diagnostic-pre-reserve-fix",
+  "cargo_incremental": "0",
+  "diagnostic_reason": "candidate captured before fallible actual-edge reserve fix; excluded from matched final comparison",
+  "harness_cargo_lock_sha256": "01146937be7eac11b4484aeb2fcf6ee181c157c47973e21a67b7c15fdd576b29",
+  "lanes": [
+    "read",
+    "noop-commit-save",
+    "payload-replacement",
+    "rename-binding-rewrite",
+    "remove-inverse"
+  ],
+  "levels": [
+    "small",
+    "medium",
+    "large"
+  ],
+  "profile_manifest": "profile-manifest.sha256",
+  "rustdocflags": "",
+  "rustflags": "",
+  "samples": 15,
+  "schema": "xlsx-custom-data-performance-provenance-v1",
+  "source_cargo_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "source_commit": "1d39eea516248c758b8ea429c879a4a3245e4fbb",
+  "source_manifest_before": "source-manifest-before.sha256",
+  "source_root": "/tmp/litchi-custom-data-completion",
+  "warmups": 3
+}

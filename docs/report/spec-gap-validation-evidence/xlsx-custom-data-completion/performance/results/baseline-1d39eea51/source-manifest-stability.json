@@ -1,0 +1,6 @@
+{
+  "schema": "xlsx-custom-data-source-stability-v1",
+  "equal": true,
+  "before": "source-manifest-before.sha256",
+  "after": "source-manifest-after.sha256"
+}

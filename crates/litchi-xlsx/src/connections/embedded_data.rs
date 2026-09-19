@@ -4,21 +4,26 @@
 //! rewritten; queries, credentials, unknown XML and connection identities
 //! remain source bytes. No connection is executed or refreshed.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+use litchi_core::Resource;
+use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits, TargetMode};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use super::model::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, CORE_NAMESPACE, MAX_CONNECTIONS,
-    MAX_XML_BYTES, STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
+    STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
 };
+use crate::custom_data::Limits as CustomDataLimits;
 use crate::error::{Error, Result};
-use crate::source_attributes::{escaped_xstring, validate_xml_characters, value_span};
+use crate::source_attributes::{
+    escaped_xstring_len, try_escaped_xstring, validate_xml_characters, value_span,
+};
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -27,6 +32,15 @@ const MAX_DEPTH: usize = 128;
 
 fn invalid(value: impl std::fmt::Display) -> Error {
     crate::error::invalid(value.to_string())
+}
+
+fn limit(resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
+    Error::ResourceLimit(litchi_core::ResourceLimit {
+        resource,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -49,6 +63,7 @@ struct Source {
     name: PackURI,
     bytes: Arc<Vec<u8>>,
     proof: litchi_opc::OwnedXmlPart,
+    relationships: OwnedRelationships,
     edges: Vec<Edge>,
     slots: Vec<Slot>,
     values: Arc<[String]>,
@@ -78,13 +93,27 @@ impl PartialEq for Bindings {
 impl Eq for Bindings {}
 
 impl Bindings {
-    pub(crate) fn load(package: &OpcPackage) -> Result<Self> {
+    pub(crate) fn load_with_limits(
+        package: &OpcPackage,
+        limits: CustomDataLimits,
+        read_limits: ReadLimits,
+    ) -> Result<Self> {
+        // Admit the XML projection before the complete typed graph walk. The
+        // latter has its own schema parser and therefore must not be allowed
+        // to materialize a connections DOM when this owner has already
+        // received a tighter caller profile.
+        for part in package
+            .iter_parts()
+            .filter(|part| part.content_type() == CONNECTIONS_CONTENT_TYPE)
+        {
+            parse_with_limits(part.blob(), limits)?;
+        }
         // Validate the complete workbook connection/query-table graph before
         // the owner/part projection below. This must also reject malformed
         // graphs when no connections content-type part is present, rather
         // than letting the `(None, None)` fast path admit a root edge or an
         // orphan query table.
-        super::package::validate_graph(package).map_err(invalid)?;
+        super::package::validate_graph_with_limits(package, &limits)?;
         let workbook = package.main_document_part()?;
         let mut owners = workbook.rels().iter().filter(|r| {
             matches!(
@@ -121,13 +150,32 @@ impl Bindings {
         // the complete graph and typed connection catalog were validated
         // above. Keep this as a second pass: it retains source locations and
         // deliberately refuses unmodeled MCE contexts.
-        let (slots, values, unmodeled_context) = parse(part.blob())?;
+        if part.blob().len() > limits.max_connections_bytes() {
+            return Err(limit(
+                Resource::InputBytes,
+                "connections XML bytes",
+                part.blob().len(),
+                limits.max_connections_bytes(),
+            ));
+        }
+        let (slots, values, unmodeled_context) = parse_with_limits(part.blob(), limits)?;
         let values = Arc::<[String]>::from(values);
+        let relationships =
+            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
+            return Err(limit(
+                Resource::InputBytes,
+                "connections relationship XML bytes",
+                relationships.bytes().len(),
+                limits.max_relationship_xml_bytes(),
+            ));
+        }
         let source = Source {
             name: part.partname().clone(),
             bytes: part.blob_arc(),
             proof: package.source_xml_part(part.partname())?,
-            edges: capture_edges(package, part)?,
+            relationships,
+            edges: capture_edges(package, part, limits)?,
             slots,
             values: Arc::clone(&values),
             unmodeled_context,
@@ -159,7 +207,17 @@ impl Bindings {
             .count()
     }
 
+    #[cfg(test)]
     pub(crate) fn rebind(&self, from: &str, to: &str) -> Result<Self> {
+        self.rebind_with_limits(from, to, CustomDataLimits::default())
+    }
+
+    pub(crate) fn rebind_with_limits(
+        &self,
+        from: &str,
+        to: &str,
+        limits: CustomDataLimits,
+    ) -> Result<Self> {
         if from == to {
             return Ok(self.clone());
         }
@@ -183,20 +241,59 @@ impl Bindings {
                 total.checked_add(if value == from { to.len() } else { value.len() })
             })
             .ok_or_else(|| invalid("embeddedDataId aggregate size overflow"))?;
-        if size > MAX_XML_BYTES {
-            return Err(invalid("embeddedDataId values exceed the size limit"));
+        if size > limits.max_connections_bytes() {
+            return Err(limit(
+                Resource::OutputBytes,
+                "connections XML bytes",
+                size,
+                limits.max_connections_bytes(),
+            ));
         }
-        let values = self
-            .values
-            .iter()
-            .map(|value| {
-                if value == from {
-                    to.to_owned()
-                } else {
-                    value.clone()
+        if let Some(source) = self.source.as_ref() {
+            if source.slots.len() != source.values.len() || source.slots.len() != self.values.len()
+            {
+                return Err(invalid("connections source binding slot count changed"));
+            }
+            let mut output_bytes = source.bytes.len();
+            for ((slot, before), after) in source
+                .slots
+                .iter()
+                .zip(source.values.iter())
+                .zip(self.values.iter())
+            {
+                if before == after {
+                    continue;
                 }
-            })
-            .collect::<Vec<_>>();
+                let replacement = escaped_xstring_len(after)?;
+                output_bytes = output_bytes
+                    .checked_sub(slot.range.len())
+                    .and_then(|value| value.checked_add(replacement))
+                    .ok_or_else(|| invalid("connections XML output size overflow"))?;
+            }
+            let maximum = limits.max_connections_bytes();
+            if output_bytes > maximum {
+                return Err(limit(
+                    Resource::OutputBytes,
+                    "connections output bytes",
+                    output_bytes,
+                    maximum,
+                ));
+            }
+        }
+        let mut values = Vec::new();
+        values
+            .try_reserve(self.values.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Custom Data connection values",
+                source,
+            })?;
+        for value in self.values.iter() {
+            values.push(if value == from {
+                to.to_owned()
+            } else {
+                value.clone()
+            });
+        }
         Ok(Self {
             source: self.source.clone(),
             values: Arc::from(values),
@@ -209,12 +306,78 @@ impl Bindings {
             .is_some_and(|source| source.values != self.values)
     }
 
+    pub(crate) fn source_bytes_len(&self) -> Option<usize> {
+        self.source.as_ref().map(|source| source.bytes.len())
+    }
+
+    pub(crate) fn source_part_name(&self) -> Option<&PackURI> {
+        self.source.as_ref().map(|source| &source.name)
+    }
+
+    pub(crate) fn source_relationships_bytes_len(&self) -> Option<usize> {
+        self.source
+            .as_ref()
+            .map(|source| source.relationships.bytes().len())
+    }
+
+    /// Exact source-member byte length after the currently staged attribute
+    /// replacements, computed without allocating the replacement XML buffer.
+    pub(crate) fn projected_output_bytes(&self, limits: CustomDataLimits) -> Result<Option<usize>> {
+        let Some(source) = &self.source else {
+            return Ok(None);
+        };
+        if !self.is_changed() {
+            return Ok(Some(source.bytes.len()));
+        }
+        if source.slots.len() != source.values.len() || source.slots.len() != self.values.len() {
+            return Err(invalid("connections source binding slot count changed"));
+        }
+        let mut removed = 0usize;
+        let mut replacement = 0usize;
+        for ((slot, before), after) in source
+            .slots
+            .iter()
+            .zip(source.values.iter())
+            .zip(self.values.iter())
+        {
+            if before == after {
+                continue;
+            }
+            removed = removed
+                .checked_add(slot.range.len())
+                .ok_or_else(|| invalid("connections XML replacement size overflow"))?;
+            replacement = replacement
+                .checked_add(escaped_xstring_len(after)?)
+                .ok_or_else(|| invalid("connections XML replacement size overflow"))?;
+        }
+        let output = source
+            .bytes
+            .len()
+            .checked_sub(removed)
+            .and_then(|size| size.checked_add(replacement))
+            .ok_or_else(|| invalid("connections XML output size overflow"))?;
+        if output > limits.max_connections_bytes() {
+            return Err(limit(
+                Resource::OutputBytes,
+                "connections output bytes",
+                output,
+                limits.max_connections_bytes(),
+            ));
+        }
+        Ok(Some(output))
+    }
+
     pub(crate) fn same_values(&self, other: &Self) -> bool {
         self.values == other.values
             && self.source.as_ref().map(|s| &s.name) == other.source.as_ref().map(|s| &s.name)
     }
 
-    pub(crate) fn publish(&self, package: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn publish_with_limits(
+        &self,
+        package: &mut OpcPackage,
+        limits: CustomDataLimits,
+        output_limit: usize,
+    ) -> Result<()> {
         let Some(source) = &self.source else {
             return Ok(());
         };
@@ -222,6 +385,12 @@ impl Bindings {
             return Ok(());
         }
         let mut edits = Vec::new();
+        edits
+            .try_reserve(source.slots.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Custom Data connection edits",
+                source,
+            })?;
         let mut replacement_bytes = 0usize;
         for ((slot, before), after) in source
             .slots
@@ -230,34 +399,91 @@ impl Bindings {
             .zip(self.values.iter())
         {
             if before != after {
-                let escaped = escaped_xstring(after);
+                let escaped_len = escaped_xstring_len(after)?;
                 replacement_bytes = replacement_bytes
-                    .checked_add(escaped.len())
+                    .checked_add(escaped_len)
                     .ok_or_else(|| invalid("embeddedDataId replacement size overflow"))?;
-                if replacement_bytes > MAX_XML_BYTES {
-                    return Err(invalid("embeddedDataId output exceeds the size limit"));
+                if replacement_bytes > limits.max_connections_bytes() {
+                    return Err(limit(
+                        Resource::OutputBytes,
+                        "connections XML bytes",
+                        replacement_bytes,
+                        limits.max_connections_bytes(),
+                    ));
                 }
+                if escaped_len > limits.max_temporary_bytes() {
+                    return Err(limit(
+                        Resource::Memory,
+                        "temporary connection attribute bytes",
+                        escaped_len,
+                        limits.max_temporary_bytes(),
+                    ));
+                }
+                let escaped = try_escaped_xstring(after)?;
                 edits.push((slot.range.clone(), escaped));
             }
         }
-        let token = source.proof.replace_attributes(&edits)?;
-        if token.bytes().len() > MAX_XML_BYTES {
-            return Err(invalid("connections XML output exceeds the size limit"));
+        let removed = edits
+            .iter()
+            .try_fold(0usize, |total, (range, _)| total.checked_add(range.len()))
+            .ok_or_else(|| invalid("connections XML replacement size overflow"))?;
+        let output_bytes = source
+            .bytes
+            .len()
+            .checked_sub(removed)
+            .and_then(|size| size.checked_add(replacement_bytes))
+            .ok_or_else(|| invalid("connections XML output size overflow"))?;
+        let maximum = limits
+            .max_connections_bytes()
+            .min(output_limit)
+            .min(limits.max_temporary_bytes());
+        if output_bytes > maximum {
+            return Err(limit(
+                Resource::OutputBytes,
+                "connections output bytes",
+                output_bytes,
+                maximum,
+            ));
         }
+        let token = source.proof.replace_attributes(&edits)?;
         package.try_replace_owned_xml_part(&source.bytes, token)?;
         Ok(())
     }
 
-    pub(crate) fn restore(&self, package: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn restore_with_limits(
+        &self,
+        package: &mut OpcPackage,
+        limits: CustomDataLimits,
+        read_limits: ReadLimits,
+    ) -> Result<()> {
         if let Some(source) = &self.source {
+            if source.bytes.len() > limits.max_connections_bytes() {
+                return Err(limit(
+                    Resource::InputBytes,
+                    "connections XML bytes",
+                    source.bytes.len(),
+                    limits.max_connections_bytes(),
+                ));
+            }
             let current = package.get_part(&source.name)?.blob_arc();
             package.try_replace_owned_xml_part(&current, source.proof.clone())?;
+            let current_relationships =
+                package.source_relationships_with_limits(&source.name, read_limits)?;
+            package.try_replace_relationships_with_limits(
+                &current_relationships,
+                &source.relationships,
+                read_limits,
+            )?;
         }
         Ok(())
     }
 }
 
-fn capture_edges(package: &OpcPackage, target: &dyn Part) -> Result<Vec<Edge>> {
+fn capture_edges(
+    package: &OpcPackage,
+    target: &dyn Part,
+    limits: CustomDataLimits,
+) -> Result<Vec<Edge>> {
     let mut edges = Vec::new();
     for (source, relationships) in std::iter::once(("/", package.rels())).chain(
         package
@@ -272,9 +498,18 @@ fn capture_edges(package: &OpcPackage, target: &dyn Part) -> Result<Vec<Edge>> {
                         .target_partname()?
                         .is_equivalent_to(target.partname())
             {
-                if edges.len() >= MAX_CONNECTIONS {
-                    return Err(invalid("connections relationship limit exceeded"));
+                if edges.len() >= MAX_CONNECTIONS.min(limits.max_relationships()) {
+                    return Err(limit(
+                        Resource::Objects,
+                        "connections relationships",
+                        edges.len().saturating_add(1),
+                        MAX_CONNECTIONS.min(limits.max_relationships()),
+                    ));
                 }
+                edges.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "Custom Data connection relationships",
+                    source,
+                })?;
                 edges.push(Edge {
                     source: source.into(),
                     id: relationship.r_id().into(),
@@ -302,21 +537,47 @@ enum Context {
     Other,
 }
 
-fn namespace(value: ResolveResult<'_>) -> Result<&str> {
+fn namespace(value: ResolveResult<'_>) -> Result<Cow<'_, str>> {
     match value {
-        ResolveResult::Bound(value) => std::str::from_utf8(value.0).map_err(invalid),
-        ResolveResult::Unbound => Ok(""),
+        ResolveResult::Bound(value) => {
+            let value = std::str::from_utf8(value.0).map_err(invalid)?;
+            quick_xml::escape::unescape(value).map_err(invalid)
+        },
+        ResolveResult::Unbound => Ok(Cow::Borrowed("")),
         ResolveResult::Unknown(_) => Err(invalid("unbound prefix in connections XML")),
     }
 }
 
+#[cfg(test)]
 fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(invalid("connections XML exceeds the size limit"));
+    parse_with_limits(xml, CustomDataLimits::default())
+}
+
+fn parse_with_limits(
+    xml: &[u8],
+    limits: CustomDataLimits,
+) -> Result<(Vec<Slot>, Vec<String>, bool)> {
+    if xml.len() > limits.max_connections_bytes() {
+        return Err(limit(
+            Resource::InputBytes,
+            "connections XML bytes",
+            xml.len(),
+            limits.max_connections_bytes(),
+        ));
     }
     validate_xml_characters(xml)?;
+    super::codec::preflight_xml_with_limits(
+        xml,
+        limits.max_xml_nodes(),
+        limits.max_xml_events(),
+        limits.max_xml_depth(),
+        limits.max_xml_string_bytes(),
+        limits.max_xml_namespace_bytes(),
+        limits.max_xml_attributes(),
+    )?;
     let mut reader = NsReader::from_reader(xml);
     let mut stack = Vec::new();
+    let mut namespace_stack = Vec::new();
     let mut root_seen = false;
     let mut core = String::new();
     let mut nodes = 0usize;
@@ -325,14 +586,40 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
     let mut slots = Vec::new();
     let mut values = Vec::new();
     let mut unmodeled = false;
+    let mut events = 0usize;
+    let mut namespace_bytes = 0usize;
     loop {
+        events = events.saturating_add(1);
+        if events > limits.max_xml_events() {
+            return Err(limit(
+                Resource::Objects,
+                "connections XML events",
+                events,
+                limits.max_xml_events(),
+            ));
+        }
         let event = reader.read_event().map_err(invalid)?;
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("connections XML structure limit exceeded"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("connections XML node count overflow"))?;
+                if nodes > MAX_NODES.min(limits.max_xml_nodes()) {
+                    return Err(limit(
+                        Resource::Objects,
+                        "connections XML nodes",
+                        nodes,
+                        MAX_NODES.min(limits.max_xml_nodes()),
+                    ));
+                }
+                if stack.len() >= MAX_DEPTH.min(limits.max_xml_depth()) {
+                    return Err(limit(
+                        Resource::Depth,
+                        "connections XML depth",
+                        stack.len().saturating_add(1),
+                        MAX_DEPTH.min(limits.max_xml_depth()),
+                    ));
                 }
                 let ns = namespace(reader.resolver().resolve_element(element.name()).0)?;
                 let name = element.local_name();
@@ -343,8 +630,58 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                 let mut uri = None;
                 let mut embedded = None;
                 let mut attributes = HashSet::new();
+                let mut attribute_count = 0usize;
+                let inherited_namespace_bytes = namespace_bytes;
+                let mut local_namespace_bytes = 0usize;
                 for attribute in element.attributes().with_checks(true) {
                     let attribute = attribute.map_err(invalid)?;
+                    attribute_count = attribute_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("connections XML attribute count overflow"))?;
+                    if attribute_count > limits.max_xml_attributes() {
+                        return Err(limit(
+                            Resource::Objects,
+                            "connections XML attributes",
+                            attribute_count,
+                            limits.max_xml_attributes(),
+                        ));
+                    }
+                    if attribute.value.as_ref().len() > limits.max_xml_string_bytes() {
+                        return Err(limit(
+                            Resource::InputBytes,
+                            "connections XML string bytes",
+                            attribute.value.as_ref().len(),
+                            limits.max_xml_string_bytes(),
+                        ));
+                    }
+                    if attribute.key.as_ref() == b"xmlns"
+                        || attribute.key.as_ref().starts_with(b"xmlns:")
+                    {
+                        let prefix_bytes = attribute
+                            .key
+                            .as_ref()
+                            .strip_prefix(b"xmlns:")
+                            .map_or(0, |prefix| prefix.len());
+                        local_namespace_bytes = local_namespace_bytes
+                            .checked_add(prefix_bytes)
+                            .and_then(|bytes| bytes.checked_add(attribute.value.as_ref().len()))
+                            .ok_or_else(|| {
+                                invalid("connections XML namespace byte count overflow")
+                            })?;
+                        namespace_bytes = inherited_namespace_bytes
+                            .checked_add(local_namespace_bytes)
+                            .ok_or_else(|| {
+                                invalid("connections XML namespace byte count overflow")
+                            })?;
+                        if namespace_bytes > limits.max_xml_namespace_bytes() {
+                            return Err(limit(
+                                Resource::InputBytes,
+                                "connections XML namespace bytes",
+                                namespace_bytes,
+                                limits.max_xml_namespace_bytes(),
+                            ));
+                        }
+                    }
                     if attribute.key.as_ref() == b"xmlns"
                         || attribute.key.as_ref().starts_with(b"xmlns:")
                     {
@@ -352,7 +689,14 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                     }
                     let (attribute_ns, local) = reader.resolver().resolve_attribute(attribute.key);
                     let attribute_ns = namespace(attribute_ns)?;
-                    if !attributes.insert((attribute_ns.to_owned(), local.as_ref().to_vec())) {
+                    let namespaced = !attribute_ns.is_empty();
+                    attributes
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "Custom Data connection attributes",
+                            source,
+                        })?;
+                    if !attributes.insert((attribute_ns.into_owned(), local.as_ref().to_vec())) {
                         return Err(invalid("duplicate expanded attribute in connections XML"));
                     }
                     // Directives do not change a recognized owner's attribute
@@ -364,8 +708,16 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                             reader.decoder(),
                         )
                         .map_err(invalid)?;
+                    if value.len() > limits.max_xml_string_bytes() {
+                        return Err(limit(
+                            Resource::InputBytes,
+                            "connections XML string bytes",
+                            value.len(),
+                            limits.max_xml_string_bytes(),
+                        ));
+                    }
                     validate_xml_characters(value.as_bytes())?;
-                    if !attribute_ns.is_empty() {
+                    if namespaced {
                         continue;
                     }
                     match local.as_ref() {
@@ -374,8 +726,14 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                         b"uri" => uri = Some(value.into_owned()),
                         b"embeddedDataId" if ns == X14 && name == b"connection" => {
                             let value = crate::raw::strings::decode_spreadsheet_text(&value)?;
-                            if value.chars().count() >= 65_536 {
-                                return Err(invalid("embeddedDataId is too long"));
+                            let units = value.encode_utf16().count();
+                            if units > limits.max_uid_units() {
+                                return Err(limit(
+                                    Resource::InputBytes,
+                                    "UID UTF-16 units",
+                                    units,
+                                    limits.max_uid_units(),
+                                ));
                             }
                             embedded = Some((value_span(xml, attribute.value.as_ref())?, value));
                         },
@@ -394,12 +752,12 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                 let context = if stack.is_empty() {
                     if root_seen
                         || name != b"connections"
-                        || !matches!(ns, CORE_NAMESPACE | STRICT_NAMESPACE)
+                        || (ns.as_ref() != CORE_NAMESPACE && ns.as_ref() != STRICT_NAMESPACE)
                     {
                         return Err(invalid("expected one SpreadsheetML connections root"));
                     }
                     root_seen = true;
-                    core = ns.into();
+                    core = ns.as_ref().to_owned();
                     Context::Root
                 } else if ns == core
                     && name == b"connection"
@@ -409,7 +767,14 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                         .ok_or_else(|| invalid("connection ID is absent"))?
                         .parse::<u32>()
                         .map_err(invalid)?;
-                    if ids.len() >= MAX_CONNECTIONS || !ids.insert(id) {
+                    if ids.len() >= MAX_CONNECTIONS {
+                        return Err(invalid("duplicate or excessive connection IDs"));
+                    }
+                    ids.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "Custom Data connection IDs",
+                        source,
+                    })?;
+                    if !ids.insert(id) {
                         return Err(invalid("duplicate or excessive connection IDs"));
                     }
                     Context::Connection(
@@ -447,6 +812,12 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                     if recognized {
                         let (id, kind) =
                             parent.ok_or_else(|| invalid("missing extended connection owner"))?;
+                        extended
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
+                                resource: "Custom Data extended connections",
+                                source,
+                            })?;
                         if kind != Some(5) || !extended.insert(id) {
                             return Err(invalid("x14 connection requires one type-5 owner"));
                         }
@@ -457,6 +828,14 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                         if slots.len() >= MAX_CONNECTIONS {
                             return Err(invalid("embeddedDataId reference limit exceeded"));
                         }
+                        slots.try_reserve(1).map_err(|source| Error::Allocation {
+                            resource: "Custom Data connection slots",
+                            source,
+                        })?;
+                        values.try_reserve(1).map_err(|source| Error::Allocation {
+                            resource: "Custom Data connection values",
+                            source,
+                        })?;
                         slots.push(Slot {
                             connection_id: parent.map_or(0, |v| v.0),
                             range,
@@ -465,21 +844,56 @@ fn parse(xml: &[u8]) -> Result<(Vec<Slot>, Vec<String>, bool)> {
                     }
                 }
                 if is_start {
+                    stack.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "Custom Data connection nesting",
+                        source,
+                    })?;
+                    namespace_stack
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "Custom Data connection namespace nesting",
+                            source,
+                        })?;
                     stack.push(context);
+                    namespace_stack.push(local_namespace_bytes);
+                } else {
+                    namespace_bytes = inherited_namespace_bytes;
                 }
             },
             Event::End(_) => {
                 stack
                     .pop()
                     .ok_or_else(|| invalid("unexpected connections closing element"))?;
+                let local_namespace_bytes = namespace_stack
+                    .pop()
+                    .ok_or_else(|| invalid("connections namespace nesting is unbalanced"))?;
+                namespace_bytes = namespace_bytes
+                    .checked_sub(local_namespace_bytes)
+                    .ok_or_else(|| invalid("connections namespace byte count underflow"))?;
             },
             Event::DocType(_) => return Err(invalid("DTDs are rejected in connections XML")),
             Event::Text(text) => {
+                if text.as_ref().len() > limits.max_xml_string_bytes() {
+                    return Err(limit(
+                        Resource::InputBytes,
+                        "connections XML string bytes",
+                        text.as_ref().len(),
+                        limits.max_xml_string_bytes(),
+                    ));
+                }
                 if stack.is_empty() && !text.decode().map_err(invalid)?.trim().is_empty() {
                     return Err(invalid("text outside connections root"));
                 }
             },
             Event::GeneralRef(reference) => {
+                if reference.as_ref().len() > limits.max_xml_string_bytes() {
+                    return Err(limit(
+                        Resource::InputBytes,
+                        "connections XML string bytes",
+                        reference.as_ref().len(),
+                        limits.max_xml_string_bytes(),
+                    ));
+                }
                 let value = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                 validate_xml_characters(value.as_bytes())?;
                 if stack.is_empty() {
@@ -527,11 +941,15 @@ mod tests {
             bytes.clone(),
         )));
         let proof = package.source_xml_part(&name).unwrap();
+        let relationships = package
+            .source_relationships_with_limits(&name, package.read_limits())
+            .unwrap();
         let bindings = Bindings {
             source: Some(Arc::new(Source {
                 name: PackURI::new("/xl/connections.xml").unwrap(),
                 bytes: Arc::new(bytes),
                 proof,
+                relationships,
                 edges: Vec::new(),
                 slots,
                 values: Arc::clone(&values),
