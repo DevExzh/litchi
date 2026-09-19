@@ -458,6 +458,7 @@ where
             cells,
             _reservation: input_reservation,
             origin: _,
+            preserve_scalar_result: _,
         } = array;
         let mut input = ReservedVec {
             values: cells,
@@ -509,6 +510,7 @@ where
             cells: cells.values,
             _reservation: cells.reservation,
             origin: None,
+            preserve_scalar_result: false,
         })
     }
 

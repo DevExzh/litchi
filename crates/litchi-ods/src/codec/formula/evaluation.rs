@@ -22,7 +22,11 @@
 //! scalar sequence arguments, plus the variance and standard-deviation
 //! reducers (`VAR`, `VARA`, `VARP`, `VARPA`, `STDEV`, `STDEVA`, `STDEVP`,
 //! and `STDEVPA`). Their reference and reference-list forms stay in the value
-//! VM, where cells can be streamed without materializing a range. It also
+//! VM, where cells can be streamed without materializing a range. Order and
+//! rank functions (`MEDIAN`, `MODE`, `LARGE`, `SMALL`, `PERCENTILE`,
+//! `PERCENTRANK`, `QUARTILE`, and `RANK`) share finite numeric kernels with
+//! that VM; this resolver-free profile accepts their scalar argument forms.
+//! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
 //! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
@@ -110,7 +114,8 @@
 //! do not allocate or require an output reservation.
 //! Evaluation limits charge AST visits, operator applications, and admitted
 //! text/numeric byte work. The storage limit covers aggregate live requested
-//! heap capacity for the evaluator stacks and owned text, including capacity
+//! heap capacity for the evaluator stacks, retained order operands, and owned
+//! text, including capacity
 //! growth. Source-tree storage and caller-created copies are outside that
 //! limit. Stack/vector/string growth uses fallible reservations; the shared
 //! core budget and error bookkeeping retain their existing allocation behavior.
@@ -146,6 +151,7 @@ pub mod complex;
 mod discrete;
 mod elementary;
 pub(super) mod numerics;
+mod order;
 mod radix;
 mod roman;
 mod rounding;
@@ -911,6 +917,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if order::is_order_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if is_conditional_aggregate_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1020,6 +1030,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if statistical::is_statistical_function(name) {
             return statistical::apply(self, node, name);
+        }
+        if order::is_order_function(name) {
+            return order::apply(self, node, name);
         }
         if radix::is_radix_function(name) {
             return radix::apply(self, node, name);

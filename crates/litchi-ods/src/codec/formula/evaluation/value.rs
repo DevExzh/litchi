@@ -34,6 +34,11 @@
 //! `COMBINA`, `FACT`, `FACTDOUBLE`, `EVEN`, `ODD`, `DELTA`, and `GESTEP` use
 //! the scalar bridge and broadcast elementwise when their arguments are
 //! arrays.
+//! Order and rank functions include `MEDIAN`, `MODE`, `LARGE`, `SMALL`,
+//! `PERCENTILE`, `PERCENTRANK`, `QUARTILE`, and `RANK`. They consume complete
+//! data sequences while scalar query parameters can determine the result's
+//! matrix shape. Selection retains only admitted numbers under the storage
+//! budget and uses a fallible, work-charged sort.
 //!
 //! Both profiles support all 26 complex-number functions through
 //! [`Value::Complex`]. `IMSUM` and `IMPRODUCT` consume arrays and ordered
@@ -52,7 +57,11 @@
 //! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
 //! reading its cells. A consuming operation, such as adding a number to a range,
 //! materializes its values. [`Mode::Scalar`] instead applies implicit intersection
-//! at the caller's zero-based [`Position`]. Reference lists retain their distinct
+//! at the caller's zero-based [`Position`]. An explicit Array rank parameter
+//! to `LARGE` or `SMALL` produces a
+//! same-shaped Array even in scalar mode; parentheses and a selected `IF`
+//! branch preserve that result until a scalar-demanding consumer projects it.
+//! Reference lists retain their distinct
 //! type: they cannot be converted to a scalar or rectangular array. `AND` and `OR`
 //! accept reference sequences and omit referenced text, logical, and empty cells.
 //!
@@ -150,6 +159,7 @@ mod database;
 #[allow(dead_code)]
 mod geometry;
 mod matrix;
+mod order;
 mod owned;
 mod references;
 mod scalar;
@@ -1286,6 +1296,9 @@ struct RuntimeArrayValue<'a> {
     cells: Vec<RuntimeElement<'a>>,
     _reservation: Option<Reservation>,
     origin: Option<RuntimeArea<'a>>,
+    /// An explicitly array-valued result, rather than implicit scalar
+    /// iteration. Pass-through consumers retain this publication behavior.
+    preserve_scalar_result: bool,
 }
 
 #[derive(Debug)]
@@ -1949,6 +1962,9 @@ where
                 )),
                 value => Ok(value),
             },
+            Mode::Scalar if matches!(&value, RuntimeValue::Array(array) if array.preserve_scalar_result) => {
+                Ok(value)
+            },
             Mode::Scalar => self.project_scalar(value),
         }
     }
@@ -1975,6 +1991,7 @@ where
             cells: output,
             _reservation: reservation,
             origin: None,
+            preserve_scalar_result: false,
         }))
     }
 
@@ -2552,6 +2569,7 @@ where
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
             || statistical::is_statistical_function(name)
+            || order::is_order_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
@@ -2579,6 +2597,8 @@ where
                 } else {
                     ValueFrame::VisitMatrixArgument(child)
                 }
+            } else if order::is_order_function(name) && order::matrix_argument(name, index, child) {
+                ValueFrame::VisitMatrixArgument(child)
             } else if statistical::is_statistical_function(name)
                 && Self::statistical_matrix_argument(child)
             {
@@ -3084,6 +3104,9 @@ where
             super::Kind::Function { name } if statistical::is_statistical_function(name) => {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if order::is_order_function(name) => {
+                self.cacheable_order_branch(node)
+            },
             super::Kind::Function { name } if conditional::is_conditional_function(name) => {
                 self.cacheable_conditional_branch(node)
             },
@@ -3131,6 +3154,17 @@ where
             .is_some_and(|name| Self::matrix_function(name).is_some())
     }
 
+    /// Order reducers consume complete sequence arguments, while their
+    /// scalar parameters may still depend on the projected output position.
+    /// Classify those two contexts independently so a reducer with a local
+    /// reference parameter is not inserted into the scalar demand cache.
+    fn cacheable_order_branch(&mut self, node: super::Node<'expr>) -> EvaluationResult<bool> {
+        // Reuse the iterative context-aware walk: calling the scalar branch
+        // classifier recursively for nested parameters would bypass the VM's
+        // bounded traversal stack.
+        self.cacheable_conditional_criterion(node)
+    }
+
     /// Check that a matrix-function branch has no source-dependent operand.
     ///
     /// This is deliberately a small iterative prepass. MatrixState owns the
@@ -3175,6 +3209,19 @@ where
                 | super::Kind::Function { .. }
                 | super::Kind::Array(_)
                 | super::Kind::ArrayRow => {
+                    if let super::Kind::Function { name } = node.kind() {
+                        if order::is_order_function(name)
+                            || matches!(Self::matrix_function(name), Some(MatrixFunction::Unit))
+                        {
+                            // These functions have scalar parameter slots.
+                            // A fixed literal parameter remains invariant,
+                            // while a projected multicell reference does not.
+                            if !self.cacheable_conditional_criterion(node)? {
+                                return Ok(false);
+                            }
+                            continue;
+                        }
+                    }
                     let count = node.child_count();
                     ensure_capacity(
                         &mut nodes,
@@ -3381,7 +3428,12 @@ where
                         let Some(child) = node.child(index) else {
                             return Ok(false);
                         };
-                        nodes.push((child, full_arguments));
+                        let child_full = if order::is_order_function(name) {
+                            order::criterion_full_argument(name, index, child)
+                        } else {
+                            full_arguments
+                        };
+                        nodes.push((child, child_full));
                     }
                 },
                 super::Kind::NamedExpression { .. }
@@ -3773,6 +3825,7 @@ where
                 cells: matrix.output,
                 _reservation: matrix.output_reservation,
                 origin: None,
+                preserve_scalar_result: false,
             }));
         }
 
@@ -3985,6 +4038,38 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
+                        if let Some(function) = super::order::OrderFunction::from_name(name) {
+                            let count = node.child_count();
+                            self.scalar
+                                .charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
+                            let children = (0..count)
+                                .filter(|index| !function.data_argument(*index))
+                                .count();
+                            self.push_shape_frame(ShapeFrame::Exit {
+                                node,
+                                children,
+                                base: Some(Shape::new(1, 1)?),
+                            })?;
+                            // Only scalar parameters contribute output shape.
+                            // Walk their full expressions using the ordinary
+                            // planner, including references and matrix/lazy
+                            // functions; data sequences remain whole inputs.
+                            for index in (0..count).rev() {
+                                if function.data_argument(index) {
+                                    continue;
+                                }
+                                let child = node.child(index).ok_or(
+                                    EvaluationFailure::InvalidExpression(
+                                        "order shape parameter is missing",
+                                    ),
+                                )?;
+                                self.push_shape_frame(ShapeFrame::Enter {
+                                    node: child,
+                                    demand,
+                                })?;
+                            }
+                            continue;
+                        }
                         if complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
                             || statistical::is_statistical_function(name)
@@ -4892,8 +4977,12 @@ where
                 },
                 ReferenceKindFrame::Function { node, name, count } => {
                     let mut kind = ReferenceOperandKind::Scalar;
-                    for _ in 0..count {
+                    let order_function = super::order::OrderFunction::from_name(name);
+                    for index in (0..count).rev() {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
+                        if order_function.is_some_and(|function| function.data_argument(index)) {
+                            continue;
+                        }
                         if name.eq_ignore_ascii_case("AND")
                             || name.eq_ignore_ascii_case("OR")
                             || complex::is_complex_sequence_function(name)
@@ -6385,6 +6474,20 @@ where
             return self.push_value(value);
         }
 
+        if order::is_order_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = order::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
         if database::is_database_function(name) {
             let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
             if cacheable {
@@ -7085,6 +7188,7 @@ where
             cells,
             _reservation: reservation,
             origin,
+            preserve_scalar_result: false,
         }))
     }
 
@@ -7311,6 +7415,7 @@ where
             cells: output,
             _reservation: reservation,
             origin: Some(area),
+            preserve_scalar_result: false,
         })
     }
 

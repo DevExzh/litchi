@@ -427,7 +427,16 @@ fn apply_decimal<'a>(
         },
         None => 0.0,
     };
-    push_result(evaluator, decimal_round(number, digits, mode))
+    let result = match mode {
+        DecimalMode::Nearest => round_nearest(number, digits),
+        _ => decimal_round(number, digits, mode),
+    };
+    push_result(evaluator, result)
+}
+
+/// Share the `ROUND` numerical profile with functions that specify decimal rounding.
+pub(super) fn round_nearest(number: f64, digits: f64) -> Result<f64, ScalarError> {
+    decimal_round(number, digits, DecimalMode::Nearest)
 }
 
 // A shortest binary64 significand has at most 17 digits. Scientific notation

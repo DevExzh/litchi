@@ -1,0 +1,41 @@
+{
+  "mode": "preflight-only",
+  "timed_samples": false,
+  "candidate_cases": 122,
+  "candidate_phases": {
+    "evaluate": {"exit_code": 0},
+    "parse-evaluate": {"exit_code": 0}
+  },
+  "baseline_commit": "d6c0485365644a5525b7302ba0b3666d43df1b1f",
+  "baseline_control_cases": 21,
+  "baseline_phases": {
+    "evaluate": {"exit_code": 0},
+    "parse-evaluate": {"exit_code": 0}
+  },
+  "projected_parameter_case": {
+    "name": "nested-projected-order-parameter-large",
+    "reference_reads": 26,
+    "read_breakdown": {
+      "position_sensitive_g_parameters": 2,
+      "large_data_range": 12,
+      "countif_criterion_range": 12
+    }
+  },
+  "read_bounds": {
+    "direct_scalar_and_literal_array": 0,
+    "reference_64x4": 256,
+    "reference_256x4": 1024,
+    "formula_error_16x4": 64,
+    "projected_64x4": 512,
+    "projected_256x4": 2048,
+    "projected_1024x4": 8192,
+    "resource_and_reference_list_refusal": 0
+  },
+  "lockfile": "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/gates/Cargo.lock",
+  "receipts": [
+    "candidate-evaluate.txt",
+    "candidate-parse-evaluate.txt",
+    "baseline-evaluate.txt",
+    "baseline-parse-evaluate.txt"
+  ]
+}

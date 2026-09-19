@@ -1,0 +1,19 @@
+{
+  "base_commit": "d6c0485365644a5525b7302ba0b3666d43df1b1f",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "4a7a3ec13a425ed44432a220a8e14c75c8781934cdce6b9632b085a5e9967c1d",
+    "crates/litchi-ods/src/codec/formula/evaluation/order.rs": "516cc2f144de18522ef40f708e542573a259287aff9cfa0741c04beb3f86d86a",
+    "crates/litchi-ods/src/codec/formula/evaluation/rounding.rs": "82a46b6ba227a79979f284e9fbaf9838626fe2a1cad3bafdac968c77a67a6d03",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "190609b5036a3a64a0ac035f9956e215dbb4c20d3152257441e6ed803f7a46e3",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/order.rs": "9f66676154ed7945f02d7e4cdb321d9c5ae9d5e8c61ef3d2cf9ab991a288a88b",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs": "95ac99a7ded56e77966029f9cc1433aa0b70fe07f1a7f30020589dc973e3a5db",
+    "crates/litchi-ods/tests/ods_formula_order_evaluation.rs": "8e464969151e6ebf27f3bfd9c7a27932885581c4f7016e3b801914e1d9f183c2",
+    "crates/litchi-ods/tests/ods_formula_order_limits.rs": "bc9649454de56f84280cbe68c39bdf5ecf1c431659076ba1b00fdbbf6236da5c",
+    "crates/litchi-ods/tests/ods_formula_order_native.rs": "556a18939c9149c27ea52521e994c510c031087b4858e558512c9e12882eac2e",
+    "crates/litchi-ods/tests/ods_formula_order_oracle.rs": "b94a6f337ab21a1beec3d4f4a78dacefab8f3651333bb3affb42f9283ea7f6f9",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/numeric-goldens.json": "b3b7eb6b53535c1f55c1f9995f47fbc1c5c8d60c0f0cb55a710a47522c3bbce4",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/native/cached-results.json": "65605b11c2c4e87278ceb2d173177e18c37cc23b6d80b74e657cd148010e9dd3",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/native/provenance.json": "34dff3c78f41143c127523d5d48009efd8db47c426b141074ad757b76d2ee9b1",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}
