@@ -172,6 +172,7 @@ pub(super) fn eager<'a>(
         && !super::super::radix::is_radix_function(name)
         && !super::super::roman::is_roman_function(name)
         && !super::super::complex::is_complex_function(name)
+        && !super::super::rounding::is_rounding_function(name)
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }
