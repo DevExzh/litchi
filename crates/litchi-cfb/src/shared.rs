@@ -3,7 +3,7 @@
 use crate::shared_bulk::SharedOleBulkRead;
 use crate::{
     consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM},
-    directory_name::directory_name_data,
+    directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data},
     file::{DirectoryEntry, OleError, OleFile, OleFileLimits, ParsedOleIndex},
 };
 use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
@@ -2729,7 +2729,18 @@ impl SharedOleFile {
     }
 
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
+        if let Some(target) = ascii_lookup_key(name).map_err(|_error| OleError::StreamNotFound)? {
+            return self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name));
+        }
         let target = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+        self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name))
+    }
+
+    #[inline]
+    fn find_child_by_name_with<C>(&self, sid: u32, compare: C) -> Result<&DirectoryEntry, OleError>
+    where
+        C: Fn(&DirectoryNameData) -> Ordering,
+    {
         let mut current_sid = sid;
         for _ in 0..self.index.dir_entries.len() {
             if current_sid == ENDOFCHAIN {
@@ -2748,7 +2759,7 @@ impl SharedOleFile {
                 .get(index)
                 .and_then(Option::as_ref)
                 .ok_or(OleError::StreamNotFound)?;
-            current_sid = match target.compare(entry_name) {
+            current_sid = match compare(entry_name) {
                 Ordering::Less => entry.sid_left,
                 Ordering::Equal => return Ok(entry),
                 Ordering::Greater => entry.sid_right,
@@ -3964,6 +3975,210 @@ mod tests {
 
     fn shared(source: Arc<TestSource>) -> SharedOleFile {
         SharedOleFile::open(source).unwrap()
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum LookupOutcome {
+        Found(u32),
+        Missing,
+    }
+
+    /// Frozen lookup oracle for tests that exercise the production shared
+    /// reader. Keep this traversal independent of the query-key implementation
+    /// under test: it constructs the original validated key for every path
+    /// component and compares it with the retained directory cache.
+    fn frozen_lookup<'a>(
+        file: &'a SharedOleFile,
+        path: &[&str],
+    ) -> Result<&'a DirectoryEntry, OleError> {
+        if path.is_empty() {
+            return file.index.root.as_ref().ok_or(OleError::StreamNotFound);
+        }
+        let root = file.index.root.as_ref().ok_or(OleError::StreamNotFound)?;
+        let mut parent_child_sid = root.sid_child;
+
+        for (component_index, name) in path.iter().enumerate() {
+            let target = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+            let mut current_sid = parent_child_sid;
+            let mut found_sid = None;
+
+            for _ in 0..file.index.dir_entries.len() {
+                if current_sid == ENDOFCHAIN {
+                    break;
+                }
+                let index =
+                    usize::try_from(current_sid).map_err(|_error| OleError::StreamNotFound)?;
+                let entry = file
+                    .index
+                    .dir_entries
+                    .get(index)
+                    .and_then(Option::as_ref)
+                    .ok_or(OleError::StreamNotFound)?;
+                let entry_name = file
+                    .index
+                    .dir_name_data
+                    .get(index)
+                    .and_then(Option::as_ref)
+                    .ok_or(OleError::StreamNotFound)?;
+
+                match target.compare(entry_name) {
+                    Ordering::Less => current_sid = entry.sid_left,
+                    Ordering::Greater => current_sid = entry.sid_right,
+                    Ordering::Equal => {
+                        found_sid = Some(index);
+                        break;
+                    },
+                }
+            }
+
+            let index = found_sid.ok_or(OleError::StreamNotFound)?;
+            let entry = file
+                .index
+                .dir_entries
+                .get(index)
+                .and_then(Option::as_ref)
+                .ok_or(OleError::StreamNotFound)?;
+            if component_index + 1 == path.len() {
+                return Ok(entry);
+            }
+            parent_child_sid = entry.sid_child;
+        }
+
+        Err(OleError::StreamNotFound)
+    }
+
+    fn lookup_outcome(result: Result<&DirectoryEntry, OleError>) -> LookupOutcome {
+        match result {
+            Ok(entry) => LookupOutcome::Found(entry.sid),
+            Err(OleError::StreamNotFound) => LookupOutcome::Missing,
+            Err(error) => panic!("unexpected directory lookup error: {error:?}"),
+        }
+    }
+
+    fn assert_lookup_matches_frozen(file: &SharedOleFile, path: &[&str]) {
+        let expected = lookup_outcome(frozen_lookup(file, path));
+        let actual = lookup_outcome(file.find_entry(path));
+        assert_eq!(actual, expected, "directory lookup diverged for {path:?}");
+    }
+
+    fn serialized_streams(paths: &[&[&str]]) -> Vec<u8> {
+        let mut writer = OleWriter::new();
+        for path in paths {
+            writer.create_stream(path, b"").unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn shared_lookup_matches_frozen_oracle_across_wide_tree_and_refusals() {
+        let names: Vec<String> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let mut writer = OleWriter::new();
+        for name in &names {
+            writer.create_stream(&[name.as_str()], b"").unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let file = shared(Arc::new(TestSource::new(output.into_inner())));
+
+        for name in &names {
+            assert_lookup_matches_frozen(&file, &[name.as_str()]);
+            let mixed_case: String = name
+                .chars()
+                .enumerate()
+                .map(|(index, character)| {
+                    if index % 2 == 0 {
+                        character.to_ascii_lowercase()
+                    } else {
+                        character.to_ascii_uppercase()
+                    }
+                })
+                .collect();
+            assert_lookup_matches_frozen(&file, &[mixed_case.as_str()]);
+        }
+
+        let too_long = "x".repeat(crate::directory_name::MAX_DIRECTORY_NAME_CODE_UNITS + 1);
+        for name in ["missing", "", "bad/name", "nul\0name", too_long.as_str()] {
+            assert_lookup_matches_frozen(&file, &[name]);
+        }
+    }
+
+    #[test]
+    fn shared_lookup_matches_unicode_cached_case_and_preserves_simple_uppercase() {
+        let bytes = serialized_streams(&[&["ſtream"], &["élan"], &["straße"]]);
+        let file = shared(Arc::new(TestSource::new(bytes)));
+
+        for name in ["Stream", "STREAM", "ſtream", "ÉLAN", "éLAN", "STRASSE"] {
+            assert_lookup_matches_frozen(&file, &[name]);
+        }
+        assert_eq!(
+            lookup_outcome(file.find_entry(&["Stream"])),
+            LookupOutcome::Found(file.find_entry(&["ſtream"]).unwrap().sid,)
+        );
+        assert_eq!(
+            lookup_outcome(file.find_entry(&["ÉLAN"])),
+            LookupOutcome::Found(file.find_entry(&["élan"]).unwrap().sid,)
+        );
+        assert_eq!(
+            lookup_outcome(file.find_entry(&["STRASSE"])),
+            LookupOutcome::Missing
+        );
+    }
+
+    #[test]
+    fn shared_lookup_keeps_utf16_length_before_ascii_comparison_key() {
+        // `ſa` has UTF-16 length 2 and comparison key `SA`; `Z` has length 1.
+        // A key-first comparison would send `Z` right from the `ſa` root
+        // (`Z > SA`) and miss the valid left sibling.
+        let bytes = serialized_streams(&[&["ſa"], &["Z"]]);
+        let file = shared(Arc::new(TestSource::new(bytes)));
+        let root_child_sid = file.index.root.as_ref().unwrap().sid_child as usize;
+        assert_eq!(
+            file.index.dir_entries[root_child_sid]
+                .as_ref()
+                .unwrap()
+                .name,
+            "ſa"
+        );
+
+        for name in ["Z", "z", "ſa", "SA"] {
+            assert_lookup_matches_frozen(&file, &[name]);
+        }
+    }
+
+    #[test]
+    fn shared_lookup_preserves_nested_storage_and_implicit_root_semantics() {
+        let bytes =
+            serialized_streams(&[&["Storage", "ſtream"], &["Storage", "Other"], &["Sibling"]]);
+        let file = shared(Arc::new(TestSource::new(bytes)));
+
+        for path in [
+            &[][..],
+            &["storage"][..],
+            &["STORE", "Stream"][..],
+            &["sToRaGe", "oThEr"][..],
+            &["Storage", "missing"][..],
+            &["Root Entry"][..],
+        ] {
+            assert_lookup_matches_frozen(&file, path);
+        }
+        assert!(file.exists(&["storage", "STREAM"]));
+        assert!(!file.exists(&["storage", "bad/name"]));
+    }
+
+    #[test]
+    fn shared_lookup_does_not_bypass_missing_or_mismatched_name_cache() {
+        let bytes = serialized_streams(&[&["Alpha"], &["Beta"]]);
+        let mut file = shared(Arc::new(TestSource::new(bytes)));
+        let alpha_sid = file.find_entry(&["Alpha"]).unwrap().sid as usize;
+
+        Arc::get_mut(&mut file.index).unwrap().dir_name_data[alpha_sid] = None;
+        assert_lookup_matches_frozen(&file, &["Alpha"]);
+
+        Arc::get_mut(&mut file.index).unwrap().dir_name_data[alpha_sid] =
+            Some(directory_name_data("Beta").unwrap());
+        assert_lookup_matches_frozen(&file, &["Alpha"]);
     }
 
     fn context(

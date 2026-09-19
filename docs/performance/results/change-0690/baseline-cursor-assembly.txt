@@ -1,0 +1,244 @@
+
+/home/zhuhe/code/litchi-target-0690-before/release/xls0684-repeat:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000b23b0 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted>:
+   b23b0:	55                   	push   %rbp
+   b23b1:	41 57                	push   %r15
+   b23b3:	41 56                	push   %r14
+   b23b5:	41 55                	push   %r13
+   b23b7:	41 54                	push   %r12
+   b23b9:	53                   	push   %rbx
+   b23ba:	48 83 ec 58          	sub    $0x58,%rsp
+   b23be:	4d 89 cc             	mov    %r9,%r12
+   b23c1:	4d 89 c6             	mov    %r8,%r14
+   b23c4:	49 89 f7             	mov    %rsi,%r15
+   b23c7:	48 89 fb             	mov    %rdi,%rbx
+   b23ca:	4c 89 44 24 48       	mov    %r8,0x48(%rsp)
+   b23cf:	48 8d 7c 24 18       	lea    0x18(%rsp),%rdi
+   b23d4:	ff 15 0e a9 05 00    	call   *0x5a90e(%rip)        # 10cce8 <_DYNAMIC+0x7d0>
+   b23da:	48 8b 4c 24 18       	mov    0x18(%rsp),%rcx
+   b23df:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+   b23e4:	48 83 f9 0b          	cmp    $0xb,%rcx
+   b23e8:	75 69                	jne    b2453 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0xa3>
+   b23ea:	80 78 65 02          	cmpb   $0x2,0x65(%rax)
+   b23ee:	75 7f                	jne    b246f <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0xbf>
+   b23f0:	44 8b 48 50          	mov    0x50(%rax),%r9d
+   b23f4:	0f b6 50 64          	movzbl 0x64(%rax),%edx
+   b23f8:	44 8b 68 60          	mov    0x60(%rax),%r13d
+   b23fc:	48 8b 68 48          	mov    0x48(%rax),%rbp
+   b2400:	48 89 6c 24 50       	mov    %rbp,0x50(%rsp)
+   b2405:	49 39 ee             	cmp    %rbp,%r14
+   b2408:	0f 86 c9 00 00 00    	jbe    b24d7 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x127>
+   b240e:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+   b2413:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+   b2418:	48 8b 05 51 a3 05 00 	mov    0x5a351(%rip),%rax        # 10c770 <_DYNAMIC+0x258>
+   b241f:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   b2424:	48 8d 4c 24 50       	lea    0x50(%rsp),%rcx
+   b2429:	48 89 4c 24 28       	mov    %rcx,0x28(%rsp)
+   b242e:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+   b2433:	48 8d 7b 10          	lea    0x10(%rbx),%rdi
+   b2437:	48 8d 35 9e e6 f8 ff 	lea    -0x71962(%rip),%rsi        # 40adc <anon.228daec3cbb5725acc1e7dbda4d25adf.9.llvm.15286798452278911664+0x144>
+   b243e:	48 8d 54 24 18       	lea    0x18(%rsp),%rdx
+   b2443:	ff 15 cf a5 05 00    	call   *0x5a5cf(%rip)        # 10ca18 <_DYNAMIC+0x500>
+   b2449:	48 c7 43 08 06 00 00 	movq   $0x6,0x8(%rbx)
+   b2450:	00 
+   b2451:	eb 6b                	jmp    b24be <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x10e>
+   b2453:	48 8b 54 24 38       	mov    0x38(%rsp),%rdx
+   b2458:	48 89 53 28          	mov    %rdx,0x28(%rbx)
+   b245c:	0f 10 44 24 28       	movups 0x28(%rsp),%xmm0
+   b2461:	0f 11 43 18          	movups %xmm0,0x18(%rbx)
+   b2465:	48 89 4b 08          	mov    %rcx,0x8(%rbx)
+   b2469:	48 89 43 10          	mov    %rax,0x10(%rbx)
+   b246d:	eb 4f                	jmp    b24be <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x10e>
+   b246f:	ff 15 4b a3 05 00    	call   *0x5a34b(%rip)        # 10c7c0 <_DYNAMIC+0x2a8>
+   b2475:	bf 0c 00 00 00       	mov    $0xc,%edi
+   b247a:	be 01 00 00 00       	mov    $0x1,%esi
+   b247f:	ff 15 43 a3 05 00    	call   *0x5a343(%rip)        # 10c7c8 <_DYNAMIC+0x2b0>
+   b2485:	48 85 c0             	test   %rax,%rax
+   b2488:	0f 84 b6 02 00 00    	je     b2744 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x394>
+   b248e:	48 b9 4e 6f 74 20 61 	movabs $0x7473206120746f4e,%rcx
+   b2495:	20 73 74 
+   b2498:	48 89 08             	mov    %rcx,(%rax)
+   b249b:	c7 40 08 72 65 61 6d 	movl   $0x6d616572,0x8(%rax)
+   b24a2:	48 c7 43 08 05 00 00 	movq   $0x5,0x8(%rbx)
+   b24a9:	00 
+   b24aa:	48 c7 43 10 0c 00 00 	movq   $0xc,0x10(%rbx)
+   b24b1:	00 
+   b24b2:	48 89 43 18          	mov    %rax,0x18(%rbx)
+   b24b6:	48 c7 43 20 0c 00 00 	movq   $0xc,0x20(%rbx)
+   b24bd:	00 
+   b24be:	48 c7 03 01 00 00 00 	movq   $0x1,(%rbx)
+   b24c5:	48 89 d8             	mov    %rbx,%rax
+   b24c8:	48 83 c4 58          	add    $0x58,%rsp
+   b24cc:	5b                   	pop    %rbx
+   b24cd:	41 5c                	pop    %r12
+   b24cf:	41 5d                	pop    %r13
+   b24d1:	41 5e                	pop    %r14
+   b24d3:	41 5f                	pop    %r15
+   b24d5:	5d                   	pop    %rbp
+   b24d6:	c3                   	ret
+   b24d7:	75 07                	jne    b24e0 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x130>
+   b24d9:	31 f6                	xor    %esi,%esi
+   b24db:	e9 42 02 00 00       	jmp    b2722 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x372>
+   b24e0:	49 8b 4f 10          	mov    0x10(%r15),%rcx
+   b24e4:	84 d2                	test   %dl,%dl
+   b24e6:	44 89 4c 24 0c       	mov    %r9d,0xc(%rsp)
+   b24eb:	74 26                	je     b2513 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x163>
+   b24ed:	48 8b b9 00 01 00 00 	mov    0x100(%rcx),%rdi
+   b24f4:	48 85 ff             	test   %rdi,%rdi
+   b24f7:	0f 84 57 02 00 00    	je     b2754 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x3a4>
+   b24fd:	4c 89 f0             	mov    %r14,%rax
+   b2500:	48 09 f8             	or     %rdi,%rax
+   b2503:	48 c1 e8 20          	shr    $0x20,%rax
+   b2507:	74 34                	je     b253d <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x18d>
+   b2509:	4c 89 f0             	mov    %r14,%rax
+   b250c:	31 d2                	xor    %edx,%edx
+   b250e:	48 f7 f7             	div    %rdi
+   b2511:	eb 31                	jmp    b2544 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x194>
+   b2513:	48 8b b9 f8 00 00 00 	mov    0xf8(%rcx),%rdi
+   b251a:	48 85 ff             	test   %rdi,%rdi
+   b251d:	0f 84 3e 02 00 00    	je     b2761 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x3b1>
+   b2523:	4c 89 f0             	mov    %r14,%rax
+   b2526:	48 09 f8             	or     %rdi,%rax
+   b2529:	48 c1 e8 20          	shr    $0x20,%rax
+   b252d:	0f 84 80 00 00 00    	je     b25b3 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x203>
+   b2533:	4c 89 f0             	mov    %r14,%rax
+   b2536:	31 d2                	xor    %edx,%edx
+   b2538:	48 f7 f7             	div    %rdi
+   b253b:	eb 7d                	jmp    b25ba <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x20a>
+   b253d:	44 89 f0             	mov    %r14d,%eax
+   b2540:	31 d2                	xor    %edx,%edx
+   b2542:	f7 f7                	div    %edi
+   b2544:	48 8b 71 30          	mov    0x30(%rcx),%rsi
+   b2548:	48 8b 51 38          	mov    0x38(%rcx),%rdx
+   b254c:	4d 8b 14 24          	mov    (%r12),%r10
+   b2550:	4d 39 fa             	cmp    %r15,%r10
+   b2553:	4c 89 54 24 10       	mov    %r10,0x10(%rsp)
+   b2558:	0f 84 eb 00 00 00    	je     b2649 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x299>
+   b255e:	45 31 c0             	xor    %r8d,%r8d
+   b2561:	44 89 e9             	mov    %r13d,%ecx
+   b2564:	48 89 3c 24          	mov    %rdi,(%rsp)
+   b2568:	4c 8d 15 b7 54 f9 ff 	lea    -0x6ab49(%rip),%r10        # 47a26 <anon.e5f8b878c3eccf417b83928613037d06.91.llvm.10721787851820979709+0xd52>
+   b256f:	48 8d 7c 24 18       	lea    0x18(%rsp),%rdi
+   b2574:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+   b2579:	49 89 c1             	mov    %rax,%r9
+   b257c:	6a 07                	push   $0x7
+   b257e:	41 52                	push   %r10
+   b2580:	e8 db 19 00 00       	call   b3f60 <litchi_cfb::shared::cursor_chain_sector>
+   b2585:	48 83 c4 10          	add    $0x10,%rsp
+   b2589:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+   b258e:	8b 4c 24 20          	mov    0x20(%rsp),%ecx
+   b2592:	48 83 f8 0b          	cmp    $0xb,%rax
+   b2596:	0f 85 8f 00 00 00    	jne    b262b <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x27b>
+   b259c:	be 02 00 00 00       	mov    $0x2,%esi
+   b25a1:	4c 39 7c 24 10       	cmp    %r15,0x10(%rsp)
+   b25a6:	8b 54 24 0c          	mov    0xc(%rsp),%edx
+   b25aa:	75 76                	jne    b2622 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x272>
+   b25ac:	b0 01                	mov    $0x1,%al
+   b25ae:	e9 30 01 00 00       	jmp    b26e3 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x333>
+   b25b3:	44 89 f0             	mov    %r14d,%eax
+   b25b6:	31 d2                	xor    %edx,%edx
+   b25b8:	f7 f7                	div    %edi
+   b25ba:	48 8b 71 18          	mov    0x18(%rcx),%rsi
+   b25be:	48 8b 51 20          	mov    0x20(%rcx),%rdx
+   b25c2:	4d 8b 14 24          	mov    (%r12),%r10
+   b25c6:	4d 39 fa             	cmp    %r15,%r10
+   b25c9:	4c 89 54 24 10       	mov    %r10,0x10(%rsp)
+   b25ce:	0f 84 c1 00 00 00    	je     b2695 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x2e5>
+   b25d4:	45 31 c0             	xor    %r8d,%r8d
+   b25d7:	44 89 e9             	mov    %r13d,%ecx
+   b25da:	48 89 3c 24          	mov    %rdi,(%rsp)
+   b25de:	4c 8d 15 de 53 f9 ff 	lea    -0x6ac22(%rip),%r10        # 479c3 <anon.e5f8b878c3eccf417b83928613037d06.91.llvm.10721787851820979709+0xcef>
+   b25e5:	48 8d 7c 24 18       	lea    0x18(%rsp),%rdi
+   b25ea:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+   b25ef:	49 89 c1             	mov    %rax,%r9
+   b25f2:	6a 03                	push   $0x3
+   b25f4:	41 52                	push   %r10
+   b25f6:	e8 65 19 00 00       	call   b3f60 <litchi_cfb::shared::cursor_chain_sector>
+   b25fb:	48 83 c4 10          	add    $0x10,%rsp
+   b25ff:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+   b2604:	8b 4c 24 20          	mov    0x20(%rsp),%ecx
+   b2608:	48 83 f8 0b          	cmp    $0xb,%rax
+   b260c:	75 1d                	jne    b262b <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x27b>
+   b260e:	be 01 00 00 00       	mov    $0x1,%esi
+   b2613:	4c 39 7c 24 10       	cmp    %r15,0x10(%rsp)
+   b2618:	8b 54 24 0c          	mov    0xc(%rsp),%edx
+   b261c:	0f 84 bf 00 00 00    	je     b26e1 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x331>
+   b2622:	48 8b 3c 24          	mov    (%rsp),%rdi
+   b2626:	e9 da 00 00 00       	jmp    b2705 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x355>
+   b262b:	0f 10 44 24 24       	movups 0x24(%rsp),%xmm0
+   b2630:	0f 10 4c 24 30       	movups 0x30(%rsp),%xmm1
+   b2635:	0f 11 4b 20          	movups %xmm1,0x20(%rbx)
+   b2639:	0f 11 43 14          	movups %xmm0,0x14(%rbx)
+   b263d:	48 89 43 08          	mov    %rax,0x8(%rbx)
+   b2641:	89 4b 10             	mov    %ecx,0x10(%rbx)
+   b2644:	e9 75 fe ff ff       	jmp    b24be <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x10e>
+   b2649:	41 0f b6 4c 24 1c    	movzbl 0x1c(%r12),%ecx
+   b264f:	45 31 c0             	xor    %r8d,%r8d
+   b2652:	80 f9 02             	cmp    $0x2,%cl
+   b2655:	0f 84 06 ff ff ff    	je     b2561 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1b1>
+   b265b:	45 39 4c 24 10       	cmp    %r9d,0x10(%r12)
+   b2660:	0f 85 fb fe ff ff    	jne    b2561 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1b1>
+   b2666:	f6 c1 01             	test   $0x1,%cl
+   b2669:	0f 84 f2 fe ff ff    	je     b2561 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1b1>
+   b266f:	44 89 e9             	mov    %r13d,%ecx
+   b2672:	45 39 6c 24 14       	cmp    %r13d,0x14(%r12)
+   b2677:	0f 85 e7 fe ff ff    	jne    b2564 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1b4>
+   b267d:	4d 8b 44 24 08       	mov    0x8(%r12),%r8
+   b2682:	49 39 c0             	cmp    %rax,%r8
+   b2685:	0f 87 d3 fe ff ff    	ja     b255e <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1ae>
+   b268b:	41 8b 4c 24 18       	mov    0x18(%r12),%ecx
+   b2690:	e9 cf fe ff ff       	jmp    b2564 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x1b4>
+   b2695:	41 0f b6 4c 24 1c    	movzbl 0x1c(%r12),%ecx
+   b269b:	45 31 c0             	xor    %r8d,%r8d
+   b269e:	80 f9 02             	cmp    $0x2,%cl
+   b26a1:	0f 84 30 ff ff ff    	je     b25d7 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x227>
+   b26a7:	45 39 4c 24 10       	cmp    %r9d,0x10(%r12)
+   b26ac:	0f 85 25 ff ff ff    	jne    b25d7 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x227>
+   b26b2:	f6 c1 01             	test   $0x1,%cl
+   b26b5:	0f 85 1c ff ff ff    	jne    b25d7 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x227>
+   b26bb:	44 89 e9             	mov    %r13d,%ecx
+   b26be:	45 39 6c 24 14       	cmp    %r13d,0x14(%r12)
+   b26c3:	0f 85 11 ff ff ff    	jne    b25da <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x22a>
+   b26c9:	4d 8b 44 24 08       	mov    0x8(%r12),%r8
+   b26ce:	49 39 c0             	cmp    %rax,%r8
+   b26d1:	0f 87 fd fe ff ff    	ja     b25d4 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x224>
+   b26d7:	41 8b 4c 24 18       	mov    0x18(%r12),%ecx
+   b26dc:	e9 f9 fe ff ff       	jmp    b25da <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x22a>
+   b26e1:	31 c0                	xor    %eax,%eax
+   b26e3:	48 8b 3c 24          	mov    (%rsp),%rdi
+   b26e7:	4c 8b 44 24 40       	mov    0x40(%rsp),%r8
+   b26ec:	4d 89 44 24 08       	mov    %r8,0x8(%r12)
+   b26f1:	41 89 54 24 10       	mov    %edx,0x10(%r12)
+   b26f6:	45 89 6c 24 14       	mov    %r13d,0x14(%r12)
+   b26fb:	41 89 4c 24 18       	mov    %ecx,0x18(%r12)
+   b2700:	41 88 44 24 1c       	mov    %al,0x1c(%r12)
+   b2705:	4c 89 f0             	mov    %r14,%rax
+   b2708:	48 09 f8             	or     %rdi,%rax
+   b270b:	48 c1 e8 20          	shr    $0x20,%rax
+   b270f:	74 0a                	je     b271b <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x36b>
+   b2711:	4c 89 f0             	mov    %r14,%rax
+   b2714:	31 d2                	xor    %edx,%edx
+   b2716:	48 f7 f7             	div    %rdi
+   b2719:	eb 07                	jmp    b2722 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x372>
+   b271b:	44 89 f0             	mov    %r14d,%eax
+   b271e:	31 d2                	xor    %edx,%edx
+   b2720:	f7 f7                	div    %edi
+   b2722:	89 73 08             	mov    %esi,0x8(%rbx)
+   b2725:	89 4b 0c             	mov    %ecx,0xc(%rbx)
+   b2728:	48 89 53 10          	mov    %rdx,0x10(%rbx)
+   b272c:	4c 89 7b 18          	mov    %r15,0x18(%rbx)
+   b2730:	48 89 6b 20          	mov    %rbp,0x20(%rbx)
+   b2734:	4c 89 73 28          	mov    %r14,0x28(%rbx)
+   b2738:	48 c7 03 00 00 00 00 	movq   $0x0,(%rbx)
+   b273f:	e9 81 fd ff ff       	jmp    b24c5 <litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted+0x115>
+   b2744:	bf 01 00 00 00       	mov    $0x1,%edi
+   b2749:	be 0c 00 00 00       	mov    $0xc,%esi
+   b274e:	ff 15 64 a0 05 00    	call   *0x5a064(%rip)        # 10c7b8 <_DYNAMIC+0x2a0>
+   b2754:	48 8d 3d 65 74 05 00 	lea    0x57465(%rip),%rdi        # 109bc0 <anon.dabf957d0ef84328d923e36d841f6335.77.llvm.14804786298713496608+0x3a0>
+   b275b:	ff 15 47 a6 05 00    	call   *0x5a647(%rip)        # 10cda8 <_DYNAMIC+0x890>
+   b2761:	48 8d 3d 40 74 05 00 	lea    0x57440(%rip),%rdi        # 109ba8 <anon.dabf957d0ef84328d923e36d841f6335.77.llvm.14804786298713496608+0x388>
+   b2768:	ff 15 3a a6 05 00    	call   *0x5a63a(%rip)        # 10cda8 <_DYNAMIC+0x890>

@@ -1,0 +1,170 @@
+{
+  "binary_sha256": "510ec3ae7f8c916b7e57a6946fd2fd8dd4153c59529a7f2ff506b3f94acd6a73",
+  "symbols": [
+    {
+      "label": "next-chain-sector",
+      "symbol": "litchi_cfb::shared::next_chain_sector",
+      "standalone_symbol": false
+    },
+    {
+      "label": "cursor",
+      "symbol": "litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b2550",
+        "--stop-address=0xb290e",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 958,
+      "assembly_file": "candidate-cursor-assembly.txt",
+      "assembly_sha256": "62ebe0d52d992fca19eed453de930b920654cf57a18be8d02b9f6c89fde52617"
+    },
+    {
+      "label": "chain-walk",
+      "symbol": "litchi_cfb::shared::cursor_chain_sector",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b4100",
+        "--stop-address=0xb4285",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 389,
+      "assembly_file": "candidate-chain-walk-assembly.txt",
+      "assembly_sha256": "0051cf17a4dd3f721790dfff4785ac791ed466d912140df7c4f9310243467a6c"
+    },
+    {
+      "label": "marker-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_marker",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b4300",
+        "--stop-address=0xb4365",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 101,
+      "assembly_file": "candidate-marker-error-assembly.txt",
+      "assembly_sha256": "1b92a8b4b4499c8145ae849a488c2bf774f30aae850f69bf7a039a8614a221af"
+    },
+    {
+      "label": "index-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_index",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b4290",
+        "--stop-address=0xb42f5",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 101,
+      "assembly_file": "candidate-index-error-assembly.txt",
+      "assembly_sha256": "431f3ef5fa8635a7d498da043f94e714fe639553808e7fbb170071d7732811b7"
+    },
+    {
+      "label": "query-cell",
+      "symbol": "litchi_xls::workbook::source::query_cell",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x000000000007b600",
+        "--stop-address=0x83b5e",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 34142,
+      "assembly_file": "candidate-query-cell-assembly.txt",
+      "assembly_sha256": "c6ace9ff69fcf3a537b90cc17b847a66ba9170b70aedc85a6c8ed31679773ad6"
+    },
+    {
+      "label": "directory-name",
+      "symbol": "litchi_cfb::directory_name::directory_name_data",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b6620",
+        "--stop-address=0xb6fa8",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 2440,
+      "assembly_file": "candidate-directory-name-assembly.txt",
+      "assembly_sha256": "d5809a27d23f6d043ddbe6b8db9d16479233abbb3d5d645e2e9cac69a80a738b"
+    },
+    {
+      "label": "shared-lookup",
+      "symbol": "litchi_cfb::shared::SharedOleFile::find_child_by_name",
+      "standalone_symbol": false
+    },
+    {
+      "label": "ascii-lookup",
+      "symbol": "litchi_cfb::directory_name::ascii_lookup_key",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b6340",
+        "--stop-address=0xb657a",
+        "/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat"
+      ],
+      "code_bytes": 570,
+      "assembly_file": "candidate-ascii-lookup-assembly.txt",
+      "assembly_sha256": "383c8c5aedd5af021803552c3f0da55340f67b14273991849bf6e2c28bf60942"
+    }
+  ],
+  "section_bytes": {
+    ".interp": 28,
+    ".note.ABI-tag": 32,
+    ".note.gnu.build-id": 36,
+    ".dynsym": 1728,
+    ".gnu.version": 144,
+    ".gnu.version_r": 320,
+    ".gnu.hash": 28,
+    ".dynstr": 1120,
+    ".rela.dyn": 52128,
+    ".rela.plt": 48,
+    ".gcc_except_table": 193488,
+    ".rodata": 92428,
+    ".debug_gdb_scripts": 34,
+    ".eh_frame_hdr": 11004,
+    ".eh_frame": 65124,
+    ".text": 638227,
+    ".init": 27,
+    ".fini": 13,
+    ".plt": 48,
+    ".tdata": 32,
+    ".tbss": 72,
+    ".fini_array": 8,
+    ".init_array": 16,
+    ".data.rel.ro": 35008,
+    ".dynamic": 464,
+    ".got": 3832,
+    ".got.plt": 40,
+    ".relro_padding": 1560,
+    ".tm_clone_table": 0,
+    ".data": 2512,
+    ".bss": 256,
+    ".comment": 177,
+    ".debug_loc": 47239545,
+    ".debug_abbrev": 525404,
+    ".debug_info": 50202297,
+    ".debug_aranges": 319760,
+    ".debug_ranges": 9224128,
+    ".debug_str": 20280065,
+    ".debug_line": 7069476
+  },
+  "section_file": "candidate-binary-sections.txt",
+  "section_sha256": "8027698598ba1e8cb102fae2237f027ace9e119a6e407ff8bd0aae6e752626c3"
+}

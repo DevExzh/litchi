@@ -1,0 +1,6 @@
+PASS quality/build/measurement/corpus/profile/constraint bindings; tests: {'owners': {'passed': 1900, 'failed': 0, 'ignored': 2}, 'facade': {'passed': 61, 'failed': 0, 'ignored': 0}, 'doc-ppt': {'passed': 2446, 'failed': 0, 'ignored': 25}}
+PASS matched assembly bindings.
+PASS final profile hashes, documentation gates and validation summary.
+PASS supplemental lookup comparison and raw bindings.
+PASS supplementary native capture/command/raw bindings.
+PASS final standalone lookup builds deny warnings.

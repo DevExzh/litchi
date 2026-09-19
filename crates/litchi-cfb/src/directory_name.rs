@@ -20,6 +20,26 @@ impl DirectoryNameData {
     }
 }
 
+/// A validated ASCII query; stored directory keys keep their full UTF-16 form.
+pub(crate) struct AsciiLookupKey<'a>(&'a [u8]);
+
+impl AsciiLookupKey<'_> {
+    #[inline]
+    pub(crate) fn compare(&self, other: &DirectoryNameData) -> Ordering {
+        let length = self.0.len().cmp(&other.utf16.len());
+        if length != Ordering::Equal {
+            return length;
+        }
+        for (&byte, &unit) in self.0.iter().zip(other.comparison.iter()) {
+            let ordering = u16::from(byte.to_ascii_uppercase()).cmp(&unit);
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        self.0.len().cmp(&other.comparison.len())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DirectoryNameError {
     Empty,
@@ -106,9 +126,36 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
     Ok(DirectoryNameData { utf16, comparison })
 }
 
+/// Borrows bounded ASCII queries without constructing owned comparison keys.
+/// `None` requires the caller to use `directory_name_data`, including its
+/// validation; it does not mean the unhandled name is valid.
+pub(crate) fn ascii_lookup_key(
+    name: &str,
+) -> Result<Option<AsciiLookupKey<'_>>, DirectoryNameError> {
+    if name.len() > MAX_DIRECTORY_NAME_CODE_UNITS || !name.is_ascii() {
+        return Ok(None);
+    }
+    if name.is_empty() {
+        return Err(DirectoryNameError::Empty);
+    }
+    if name.contains('\0') {
+        return Err(DirectoryNameError::ContainsNul);
+    }
+    if let Some(character) = name
+        .chars()
+        .find(|character| FORBIDDEN_DIRECTORY_NAME_CHARS.contains(character))
+    {
+        return Err(DirectoryNameError::ForbiddenCharacter(character));
+    }
+    Ok(Some(AsciiLookupKey(name.as_bytes())))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{DirectoryNameData, DirectoryNameError, directory_name_data, simple_uppercase};
+    use super::{
+        DirectoryNameData, DirectoryNameError, ascii_lookup_key, directory_name_data,
+        simple_uppercase,
+    };
 
     /// The pre-optimization construction expressed without any ASCII
     /// specialization.  Differential tests below keep this small reference
@@ -161,6 +208,38 @@ mod tests {
             (actual, expected) => panic!(
                 "fast path and general reference disagree for {name:?}: actual={actual:?}, expected={expected:?}"
             ),
+        }
+    }
+
+    fn assert_ascii_lookup_matches_reference(name: &str) {
+        assert_matches_general_reference(name);
+
+        let lookup = ascii_lookup_key(name);
+        if name.is_ascii() && name.len() <= super::MAX_DIRECTORY_NAME_CODE_UNITS {
+            match directory_name_data(name) {
+                Ok(data) => {
+                    let key = match lookup {
+                        Ok(Some(key)) => key,
+                        Ok(None) => panic!("bounded ASCII name did not produce a key"),
+                        Err(error) => panic!("valid bounded ASCII name was rejected: {error:?}"),
+                    };
+                    assert_eq!(
+                        key.compare(&data),
+                        std::cmp::Ordering::Equal,
+                        "borrowed key differs from owned key for {name:?}"
+                    );
+                },
+                Err(expected) => match lookup {
+                    Err(actual) => assert_eq!(actual, expected, "error for {name:?}"),
+                    Ok(Some(_)) => panic!("invalid bounded ASCII name produced a key"),
+                    Ok(None) => panic!("invalid bounded ASCII name fell back unexpectedly"),
+                },
+            }
+        } else {
+            assert!(
+                matches!(lookup, Ok(None)),
+                "non-bounded-ASCII name did not request the general fallback: {name:?}"
+            );
         }
     }
 
@@ -233,12 +312,12 @@ mod tests {
         // DEL, and every ordinary byte at both positions.
         for byte in 0_u8..=0x7f {
             let name = String::from_utf8(vec![byte]).unwrap();
-            assert_matches_general_reference(&name);
+            assert_ascii_lookup_matches_reference(&name);
         }
         for first in 0_u8..=0x7f {
             for second in 0_u8..=0x7f {
                 let name = String::from_utf8(vec![first, second]).unwrap();
-                assert_matches_general_reference(&name);
+                assert_ascii_lookup_matches_reference(&name);
             }
         }
     }
@@ -251,7 +330,7 @@ mod tests {
         for length in 0..=super::MAX_DIRECTORY_NAME_CODE_UNITS + 2 {
             for byte in 0_u8..=0x7f {
                 let name = String::from_utf8(vec![byte; length]).unwrap();
-                assert_matches_general_reference(&name);
+                assert_ascii_lookup_matches_reference(&name);
             }
         }
 
@@ -264,7 +343,7 @@ mod tests {
                     let mut bytes = vec![b'a'; length];
                     bytes[position] = byte;
                     let name = String::from_utf8(bytes).unwrap();
-                    assert_matches_general_reference(&name);
+                    assert_ascii_lookup_matches_reference(&name);
                 }
             }
         }
@@ -364,5 +443,80 @@ mod tests {
         let lower: DirectoryNameData = directory_name_data("workbook").unwrap();
         let upper = directory_name_data("WORKBOOK").unwrap();
         assert_eq!(lower.compare(&upper), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn ascii_lookup_key_falls_back_for_unicode_and_long_names() {
+        let mut names = vec![
+            "é".to_owned(),
+            "😀".to_owned(),
+            "a/é".to_owned(),
+            "\0é".to_owned(),
+            format!("{}é", "a".repeat(30)),
+            format!("{}😀", "a".repeat(29)),
+            format!("{}😀", "a".repeat(30)),
+            "é".repeat(32),
+            "😀".repeat(16),
+            "a".repeat(32),
+            format!("{}!", "a".repeat(31)),
+        ];
+
+        for name in names.drain(..) {
+            assert_ascii_lookup_matches_reference(&name);
+        }
+    }
+
+    #[test]
+    fn ascii_lookup_comparison_matches_owned_ordering_for_unicode_stored_names() {
+        let cases = [
+            ("z", "aa"),
+            ("aa", "z"),
+            ("workbook", "WORKBOOK"),
+            ("A", "a"),
+            ("a", "B"),
+            ("A", "é"),
+            ("z", "ß"),
+            ("z", "😀"),
+        ];
+
+        for (lookup_name, stored_name) in cases {
+            let lookup = match ascii_lookup_key(lookup_name) {
+                Ok(Some(key)) => key,
+                Ok(None) => panic!("ASCII lookup name unexpectedly fell back"),
+                Err(error) => panic!("ASCII lookup name was rejected: {error:?}"),
+            };
+            let lookup_data = directory_name_data(lookup_name).unwrap();
+            let stored_data = directory_name_data(stored_name).unwrap();
+            assert_eq!(
+                lookup.compare(&stored_data),
+                lookup_data.compare(&stored_data),
+                "ordering differs for lookup={lookup_name:?}, stored={stored_name:?}"
+            );
+        }
+
+        // Preserve the final slice-length ordering even when test-only cached
+        // comparison data differs in length from the original UTF-16 name.
+        let key = ascii_lookup_key("ab").unwrap().unwrap();
+        let owned = directory_name_data("ab").unwrap();
+        for comparison in [vec![65], vec![65, 66, 67]] {
+            let mut cached = directory_name_data("ab").unwrap();
+            cached.comparison = comparison.into();
+            assert_eq!(key.compare(&cached), owned.compare(&cached));
+        }
+
+        let long_ascii = "z".repeat(31);
+        let long_unicode = format!("{}😀", "a".repeat(29));
+        let lookup = match ascii_lookup_key(&long_ascii) {
+            Ok(Some(key)) => key,
+            Ok(None) => panic!("bounded ASCII lookup unexpectedly fell back"),
+            Err(error) => panic!("bounded ASCII lookup was rejected: {error:?}"),
+        };
+        let lookup_data = directory_name_data(&long_ascii).unwrap();
+        let stored_data = directory_name_data(&long_unicode).unwrap();
+        assert_eq!(
+            lookup.compare(&stored_data),
+            lookup_data.compare(&stored_data),
+            "ordering differs at the supplementary UTF-16 boundary"
+        );
     }
 }

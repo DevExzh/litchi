@@ -1,0 +1,321 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 772  of event 'cpu/cycles/P'
+# Event count (approx.): 3338102817
+#
+# Overhead  Command         Shared Object     Symbol                                                                                     
+# ........  ..............  ................  ...........................................................................................
+#
+    26.64%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::query_cell
+            |          
+            |--3.05%--lock (inlined)
+            |          lock<litchi_xls::workbook::query_cache::CacheState> (inlined)
+            |          lock (inlined)
+            |          lookup (inlined)
+            |          query_cell (inlined)
+            |          0x10
+            |          
+            |--3.05%--drop<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global> (inlined)
+            |          drop_in_place<alloc::sync::Arc<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global>> (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          
+            |--2.78%--__chaining_lt (inlined)
+            |          lt<u16, u16> (inlined)
+            |          {closure#0} (inlined)
+            |          {closure#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}> (inlined)
+            |          binary_search_by<litchi_xls::workbook::query_cache::CellSlot, core::slice::{impl#0}::partition_point::{closure_env#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}>> (inlined)
+            |          partition_point<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}> (inlined)
+            |          slots_for (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--2.78%--map_err<litchi_xls::records::CellRecord, litchi_xls::error::Error, litchi_xls::workbook::source::SourceBackedError, fn(litchi_xls::error::Error) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+            |          replay_indexed_slot (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--2.25%--unlock (inlined)
+            |          drop<litchi_xls::workbook::query_cache::CacheState> (inlined)
+            |          drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_xls::workbook::query_cache::CacheState>> (inlined)
+            |          lookup (inlined)
+            |          query_cell (inlined)
+            |          0x10
+            |          
+            |--2.25%--replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--1.99%--eq<u16, u16> (inlined)
+            |          {closure#1} (inlined)
+            |          {closure#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#1}> (inlined)
+            |          binary_search_by<litchi_xls::workbook::query_cache::CellSlot, core::slice::{impl#0}::partition_point::{closure_env#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#1}>> (inlined)
+            |          partition_point<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#1}> (inlined)
+            |          slots_for (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--1.99%--select_unpredictable<usize> (inlined)
+            |          binary_search_by<litchi_xls::workbook::query_cache::CellSlot, core::slice::{impl#0}::partition_point::{closure_env#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}>> (inlined)
+            |          partition_point<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}> (inlined)
+            |          slots_for (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--1.33%--clone<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global> (inlined)
+            |          {closure#1} (inlined)
+            |          map<&litchi_xls::workbook::query_cache::CacheEntry, alloc::sync::Arc<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global>, litchi_xls::workbook::query_cache::{impl#1}::lookup::{closure_env#1}> (inlined)
+            |          lookup (inlined)
+            |          query_cell (inlined)
+            |          0x10
+            |          
+            |--1.19%--replay_indexed_slot (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          0x10
+            |          
+            |--0.93%--map_err<litchi_cfb::shared::SharedOleStreamCursor, litchi_cfb::file::OleError, litchi_xls::workbook::source::SourceBackedError, fn(litchi_cfb::file::OleError) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          0x25c
+            |          
+            |--0.80%--binary_search_by<litchi_xls::workbook::query_cache::CellSlot, core::slice::{impl#0}::partition_point::{closure_env#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#1}>> (inlined)
+            |          partition_point<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#1}> (inlined)
+            |          slots_for (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          |          
+            |           --0.53%--cell (inlined)
+            |                     cell_by_index (inlined)
+            |                     0x10
+            |          
+             --0.66%--get_unchecked<litchi_xls::workbook::query_cache::CellSlot> (inlined)
+                       get_unchecked<litchi_xls::workbook::query_cache::CellSlot, usize> (inlined)
+
+    20.80%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleStreamCursor::read_exact
+            |          
+            |--13.38%--branch<litchi_cfb::shared::SharedOleStreamCursorState, litchi_cfb::file::OleError> (inlined)
+            |          read_from_state (inlined)
+            |          {closure#0} (inlined)
+            |          read_exact (inlined)
+            |          |          
+            |          |--6.23%--0xe86b479a
+            |          |          
+            |           --4.77%--0xa00fde86b479a
+            |          
+            |--3.45%--{closure#0} (inlined)
+            |          read_exact (inlined)
+            |          
+            |--3.05%--map<(), litchi_cfb::file::OleError, (litchi_cfb::shared::SharedOleStreamCursorState, u64), litchi_cfb::shared::{impl#11}::finish_cursor_operation::{closure_env#0}<(litchi_cfb::shared::SharedOleStreamCursorState, u64)>> (inlined)
+            |          finish_cursor_operation<(litchi_cfb::shared::SharedOleStreamCursorState, u64)> (inlined)
+            |          read_exact (inlined)
+            |          |          
+            |           --1.85%--0xa00fde86b479a
+            |          
+             --0.53%--branch<(u64, usize), litchi_cfb::file::OleError> (inlined)
+                       read_from_state (inlined)
+                       {closure#0} (inlined)
+                       read_exact (inlined)
+
+    12.05%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::cursor_chain_sector
+            |          
+            |--10.73%--cursor_chain_sector (inlined)
+            |          |          
+            |           --5.43%--0x200000000000012
+            |          
+             --0.66%--next_chain_sector (inlined)
+                       cursor_chain_sector (inlined)
+                       0x200000000000012
+
+     7.02%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::records::SstCursor::read_characters
+            |          
+            |--5.30%--map_err<alloc::string::String, alloc::string::FromUtf16Error, litchi_xls::error::Error, litchi_xls::records::{impl#13}::read_characters::{closure_env#0}> (inlined)
+            |          read_characters (inlined)
+            |          0xdb
+            |          
+             --0.79%--walk_characters<litchi_xls::records::CollectedCodeUnits> (inlined)
+                       read_characters (inlined)
+                       0xdb
+
+     6.76%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleFile::find_entry
+            |          
+            |--1.06%--compare (inlined)
+            |          {closure#1} (inlined)
+            |          find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+            |          find_child_by_name (inlined)
+            |          find_entry (inlined)
+            |          
+            |--0.93%--is_ascii_lowercase (inlined)
+            |          to_ascii_uppercase (inlined)
+            |          compare (inlined)
+            |          {closure#1} (inlined)
+            |          find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+            |          find_child_by_name (inlined)
+            |          find_entry (inlined)
+            |          
+            |--0.93%--find_entry (inlined)
+            |          
+            |--0.53%--get<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> (inlined)
+            |          get<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>, usize> (inlined)
+            |          find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+            |          find_child_by_name (inlined)
+            |          find_entry (inlined)
+            |          
+            |--0.53%--to_ascii_uppercase (inlined)
+            |          compare (inlined)
+            |          {closure#1} (inlined)
+            |          find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+            |          find_child_by_name (inlined)
+            |          find_entry (inlined)
+            |          
+            |--0.53%--next<core::slice::iter::Iter<u8>, core::slice::iter::Iter<u16>> (inlined)
+            |          next<core::slice::iter::Iter<u8>, core::slice::iter::Iter<u16>> (inlined)
+            |          compare (inlined)
+            |          {closure#1} (inlined)
+            |          find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+            |          find_child_by_name (inlined)
+            |          find_entry (inlined)
+            |          
+             --0.53%--find_child_by_name_with<litchi_cfb::shared::{impl#11}::find_child_by_name::{closure_env#1}> (inlined)
+                       find_child_by_name (inlined)
+                       find_entry (inlined)
+
+     3.97%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::target_cell_value
+            |          
+             --3.58%--target_cell_value (inlined)
+                       0xdb
+
+     3.84%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::cell::Cell::from_record_with_formula_context
+            |
+            ---from_record_with_formula_context (inlined)
+               0x51f
+
+     3.44%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::SourceBackedWorkbook::worksheet_by_index
+            |
+            ---atomic_add<usize, usize> (inlined)
+               fetch_add (inlined)
+               clone<litchi_xls::workbook::source::SourceInner, alloc::alloc::Global> (inlined)
+               {closure#1} (inlined)
+               map<usize, litchi_xls::workbook::source::SourceBackedWorksheet, litchi_xls::workbook::source::{impl#17}::worksheet_by_index::{closure#0}::{closure_env#1}> (inlined)
+               {closure#0} (inlined)
+               metadata<core::option::Option<litchi_xls::workbook::source::SourceBackedWorksheet>, litchi_xls::workbook::source::{impl#17}::worksheet_by_index::{closure_env#0}> (inlined)
+               worksheet_by_index (inlined)
+               cell_value_by_index (inlined)
+               0xdb
+
+     1.99%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted
+            |          
+             --1.72%--stream_cursor_at_hinted (inlined)
+
+     1.59%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::directory_name::ascii_lookup_key
+            |          
+             --0.66%--memchr_naive (inlined)
+                       memchr (inlined)
+                       slice_contains (inlined)
+                       contains<u8> (inlined)
+                       is_contained_in (inlined)
+                       contains<char> (inlined)
+                       ascii_lookup_key (inlined)
+                       0x6
+
+     1.46%  xls0684-repeat  xls0684-repeat    [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+            |          
+             --0.53%--alloc (inlined)
+                       alloc_impl_runtime (inlined)
+                       alloc_impl (inlined)
+                       allocate (inlined)
+                       finish_grow<alloc::alloc::Global> (inlined)
+
+     1.32%  xls0684-repeat  libc.so.6         [.] malloc
+            |          
+            |--0.66%--tcache_get_n (inlined)
+            |          tcache_get (inlined)
+            |          __libc_malloc (inlined)
+            |          alloc (inlined)
+            |          alloc_impl_runtime (inlined)
+            |          alloc_impl (inlined)
+            |          allocate (inlined)
+            |          |          
+            |           --0.53%--finish_grow<alloc::alloc::Global> (inlined)
+            |          
+             --0.66%--__libc_malloc (inlined)
+                       alloc (inlined)
+                       alloc_impl_runtime (inlined)
+                       alloc_impl (inlined)
+                       allocate (inlined)
+                       |          
+                        --0.53%--finish_grow<alloc::alloc::Global> (inlined)
+
+     1.19%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::SourceBackedWorkbook::cell_by_index
+            |
+            ---drop<litchi_xls::workbook::source::SourceInner, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_xls::workbook::source::SourceInner, alloc::alloc::Global>> (inlined)
+               drop_in_place<litchi_xls::workbook::source::SourceBackedWorksheet> (inlined)
+               cell_by_index (inlined)
+
+     1.19%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::resolve_shared_string
+     1.06%  xls0684-repeat  libc.so.6         [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+                --0.93%--target_cell_value (inlined)
+                          0xdb
+
+     0.79%  xls0684-repeat  xls0684-repeat    [.] core::ptr::drop_in_place<litchi_cfb::file::OleError>
+            |
+            ---drop_in_place<litchi_cfb::file::OleError> (inlined)
+               0x7
+
+     0.53%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleStreamCursor::physical_span
+     0.53%  xls0684-repeat  xls0684-repeat    [.] <alloc::string::String>::from_utf16
+     0.40%  xls0684-repeat  xls0684-repeat    [.] <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version
+     0.40%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::finish_shared_string
+     0.40%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::records::decode_shared_string_entry
+     0.27%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::read_indexed_frame
+     0.27%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleStreamCursor::normalize_state
+     0.26%  xls0684-repeat  xls0684-repeat    [.] <core::ops::range::RangeInclusive<usize> as core::slice::index::SliceIndex<[T]>>::index
+     0.26%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleStreamCursor::advance_within
+     0.16%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::WorksheetScan::next_frame
+     0.13%  xls0684-repeat  [unknown]         [k] 0xffffffff9ed0504b
+     0.13%  xls0684-repeat  xls0684-repeat    [.] alloc::vec::Vec<T,A>::resize
+     0.13%  xls0684-repeat  [unknown]         [k] 0xffffffff9e800ef0
+     0.13%  xls0684-repeat  [unknown]         [k] 0xffffffff9ecae5c9
+     0.13%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::records::CellRecord::parse
+     0.13%  xls0684-repeat  [unknown]         [k] 0xffffffff9f038d76
+     0.13%  xls0684-repeat  libc.so.6         [.] __memset_avx512_unaligned
+     0.13%  xls0684-repeat  xls0684-repeat    [.] alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+     0.13%  xls0684-repeat  libc.so.6         [.] cfree@GLIBC_2.2.5
+     0.13%  xls0684-repeat  xls0684-repeat    [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.04%  xls0684-repeat  [unknown]         [k] 0xffffffff9f11816e
+     0.03%  taskset         [unknown]         [k] 0xffffffff9ef864c4
+     0.00%  taskset         [unknown]         [k] 0xffffffff9f5ac01a
+     0.00%  taskset         [unknown]         [k] 0xffffffff9fef5ebe
+     0.00%  taskset         [unknown]         [k] 0xffffffff9ed60565
+     0.00%  perf-exec       [unknown]         [k] 0xffffffff9ed3e7b5
+     0.00%  taskset         [unknown]         [k] 0xffffffff9ef5a0a0
+     0.00%  perf-exec       [unknown]         [k] 0xffffffff9ec0c45f
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

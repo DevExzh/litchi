@@ -1,5 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0690 — remove temporary CFB lookup keys with explicit costs
+
+[0690](0690-cfb-borrowed-directory-lookups.md) preserves validated length-first
+ordering, Unicode fallback, bounded traversal, source fences and cache-entry
+checks while removing short-ASCII owned-key construction. Seven new tests and
+extended exhaustive matrices pass with owner/facade and DOC/PPT checks:
+4,407 passed, zero failed, 27 existing ignored. Native and supplemental lookup
+captures preserve outcomes; all 96 allocation groups and 12 I/O routes match.
+
+Matched counters and latency support scoped repeated-query savings. Invalid
+name/missing-query overhead, first/build costs, code growth and descriptive
+tail flags remain visible. Existing fuzz tooling is unavailable, so no new
+fuzz campaign is claimed. The next cross-format priority is measured PPTX
+markup-compatibility pass reuse, with invalidation and resource proofs required.
+OLE2/OOXML and the broader GOAL remain active; iWork is excluded. No registered
+performance claim or CRUD coverage promotion.
+
 ## 0689 — measured SST checkpoint reuse with bounded ownership
 
 [0689](0689-xls-sst-chain-checkpoint.md) retains an existing validated CFB

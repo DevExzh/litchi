@@ -1,0 +1,148 @@
+[
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/check-consumers.py"
+    ],
+    "exit_code": 0,
+    "seconds": 60.492066588951275
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/build.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 66.40151415392756
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/build-lookup.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 5.819744306965731
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/profile.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 4.3102409390266985
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/inspect-assembly.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2854106370359659
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-native.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 8.81870555295609
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-costs.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 0.7556449950207025
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-corpus.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 0.36987542000133544
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-repeat.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 26.460039471974596
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-diagnostics.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 4.239549790043384
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/measure-lookup.py",
+      "candidate"
+    ],
+    "exit_code": 0,
+    "seconds": 5.779914792976342
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-native.py"
+    ],
+    "exit_code": 0,
+    "seconds": 6.503966254065745
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-costs.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.1337027709232643
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-extra.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.1376538809854537
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/audit-lookup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.295721676084213
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/summarize.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.017540556960739195
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0690/run-evidence.py"
+    ],
+    "exit_code": 0,
+    "seconds": 337.0582509030355
+  }
+]

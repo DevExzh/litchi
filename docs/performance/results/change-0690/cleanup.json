@@ -1,0 +1,27 @@
+{
+  "completed_utc": "2026-09-19T17:31:17.998072+00:00",
+  "removed_owned_paths": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690-before",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0690-after",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0690-profile",
+      "existed_before": false,
+      "exists_after": false
+    }
+  ],
+  "earlier_cleanup": "initial-lookup/pre-rebuild-cleanup.json",
+  "preserved": "Evidence, pre-existing shared targets, unrelated worktrees and lockfiles. Final and initial standalone probe lockfiles retained for reproducibility."
+}

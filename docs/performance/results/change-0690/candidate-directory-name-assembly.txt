@@ -1,0 +1,598 @@
+
+/home/zhuhe/code/litchi-target-0690-after/release/xls0684-repeat:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000b6620 <litchi_cfb::directory_name::directory_name_data>:
+   b6620:	55                   	push   %rbp
+   b6621:	41 57                	push   %r15
+   b6623:	41 56                	push   %r14
+   b6625:	41 55                	push   %r13
+   b6627:	41 54                	push   %r12
+   b6629:	53                   	push   %rbx
+   b662a:	48 81 ec 78 01 00 00 	sub    $0x178,%rsp
+   b6631:	48 89 fb             	mov    %rdi,%rbx
+   b6634:	48 85 d2             	test   %rdx,%rdx
+   b6637:	74 28                	je     b6661 <litchi_cfb::directory_name::directory_name_data+0x41>
+   b6639:	49 89 f6             	mov    %rsi,%r14
+   b663c:	48 83 fa 0f          	cmp    $0xf,%rdx
+   b6640:	77 2b                	ja     b666d <litchi_cfb::directory_name::directory_name_data+0x4d>
+   b6642:	31 c0                	xor    %eax,%eax
+   b6644:	66 66 66 2e 0f 1f 84 	data16 data16 cs nopw 0x0(%rax,%rax,1)
+   b664b:	00 00 00 00 00 
+   b6650:	41 80 3c 06 00       	cmpb   $0x0,(%r14,%rax,1)
+   b6655:	74 2d                	je     b6684 <litchi_cfb::directory_name::directory_name_data+0x64>
+   b6657:	48 ff c0             	inc    %rax
+   b665a:	48 39 c2             	cmp    %rax,%rdx
+   b665d:	75 f1                	jne    b6650 <litchi_cfb::directory_name::directory_name_data+0x30>
+   b665f:	eb 2f                	jmp    b6690 <litchi_cfb::directory_name::directory_name_data+0x70>
+   b6661:	c7 43 08 00 00 00 00 	movl   $0x0,0x8(%rbx)
+   b6668:	e9 17 01 00 00       	jmp    b6784 <litchi_cfb::directory_name::directory_name_data+0x164>
+   b666d:	31 ff                	xor    %edi,%edi
+   b666f:	4c 89 f6             	mov    %r14,%rsi
+   b6672:	49 89 d7             	mov    %rdx,%r15
+   b6675:	ff 15 05 5a 05 00    	call   *0x55a05(%rip)        # 10c080 <_DYNAMIC+0x788>
+   b667b:	4c 89 fa             	mov    %r15,%rdx
+   b667e:	48 83 f8 01          	cmp    $0x1,%rax
+   b6682:	75 0c                	jne    b6690 <litchi_cfb::directory_name::directory_name_data+0x70>
+   b6684:	c7 43 08 01 00 00 00 	movl   $0x1,0x8(%rbx)
+   b668b:	e9 f4 00 00 00       	jmp    b6784 <litchi_cfb::directory_name::directory_name_data+0x164>
+   b6690:	4d 8d 3c 16          	lea    (%r14,%rdx,1),%r15
+   b6694:	48 b8 01 40 00 02 00 	movabs $0x800000002004001,%rax
+   b669b:	00 00 08 
+   b669e:	4c 89 f1             	mov    %r14,%rcx
+   b66a1:	66 66 66 66 66 66 2e 	data16 data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+   b66a8:	0f 1f 84 00 00 00 00 
+   b66af:	00 
+   b66b0:	4c 39 f9             	cmp    %r15,%rcx
+   b66b3:	0f 84 e5 00 00 00    	je     b679e <litchi_cfb::directory_name::directory_name_data+0x17e>
+   b66b9:	0f b6 31             	movzbl (%rcx),%esi
+   b66bc:	40 84 f6             	test   %sil,%sil
+   b66bf:	78 1f                	js     b66e0 <litchi_cfb::directory_name::directory_name_data+0xc0>
+   b66c1:	48 ff c1             	inc    %rcx
+   b66c4:	8d 7e df             	lea    -0x21(%rsi),%edi
+   b66c7:	83 ff 3b             	cmp    $0x3b,%edi
+   b66ca:	0f 86 a0 00 00 00    	jbe    b6770 <litchi_cfb::directory_name::directory_name_data+0x150>
+   b66d0:	eb de                	jmp    b66b0 <litchi_cfb::directory_name::directory_name_data+0x90>
+   b66d2:	66 66 66 66 66 2e 0f 	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+   b66d9:	1f 84 00 00 00 00 00 
+   b66e0:	89 f7                	mov    %esi,%edi
+   b66e2:	83 e7 1f             	and    $0x1f,%edi
+   b66e5:	44 0f b6 49 01       	movzbl 0x1(%rcx),%r9d
+   b66ea:	41 83 e1 3f          	and    $0x3f,%r9d
+   b66ee:	40 80 fe df          	cmp    $0xdf,%sil
+   b66f2:	76 45                	jbe    b6739 <litchi_cfb::directory_name::directory_name_data+0x119>
+   b66f4:	44 0f b6 41 02       	movzbl 0x2(%rcx),%r8d
+   b66f9:	41 c1 e1 06          	shl    $0x6,%r9d
+   b66fd:	41 83 e0 3f          	and    $0x3f,%r8d
+   b6701:	45 09 c8             	or     %r9d,%r8d
+   b6704:	40 80 fe f0          	cmp    $0xf0,%sil
+   b6708:	72 48                	jb     b6752 <litchi_cfb::directory_name::directory_name_data+0x132>
+   b670a:	0f b6 71 03          	movzbl 0x3(%rcx),%esi
+   b670e:	83 e7 07             	and    $0x7,%edi
+   b6711:	c1 e7 12             	shl    $0x12,%edi
+   b6714:	41 c1 e0 06          	shl    $0x6,%r8d
+   b6718:	83 e6 3f             	and    $0x3f,%esi
+   b671b:	44 09 c6             	or     %r8d,%esi
+   b671e:	09 fe                	or     %edi,%esi
+   b6720:	81 fe 00 00 11 00    	cmp    $0x110000,%esi
+   b6726:	74 76                	je     b679e <litchi_cfb::directory_name::directory_name_data+0x17e>
+   b6728:	48 83 c1 04          	add    $0x4,%rcx
+   b672c:	8d 7e df             	lea    -0x21(%rsi),%edi
+   b672f:	83 ff 3b             	cmp    $0x3b,%edi
+   b6732:	76 3c                	jbe    b6770 <litchi_cfb::directory_name::directory_name_data+0x150>
+   b6734:	e9 77 ff ff ff       	jmp    b66b0 <litchi_cfb::directory_name::directory_name_data+0x90>
+   b6739:	48 83 c1 02          	add    $0x2,%rcx
+   b673d:	c1 e7 06             	shl    $0x6,%edi
+   b6740:	44 09 cf             	or     %r9d,%edi
+   b6743:	89 fe                	mov    %edi,%esi
+   b6745:	8d 7e df             	lea    -0x21(%rsi),%edi
+   b6748:	83 ff 3b             	cmp    $0x3b,%edi
+   b674b:	76 23                	jbe    b6770 <litchi_cfb::directory_name::directory_name_data+0x150>
+   b674d:	e9 5e ff ff ff       	jmp    b66b0 <litchi_cfb::directory_name::directory_name_data+0x90>
+   b6752:	48 83 c1 03          	add    $0x3,%rcx
+   b6756:	c1 e7 0c             	shl    $0xc,%edi
+   b6759:	41 09 f8             	or     %edi,%r8d
+   b675c:	44 89 c6             	mov    %r8d,%esi
+   b675f:	8d 7e df             	lea    -0x21(%rsi),%edi
+   b6762:	83 ff 3b             	cmp    $0x3b,%edi
+   b6765:	0f 87 45 ff ff ff    	ja     b66b0 <litchi_cfb::directory_name::directory_name_data+0x90>
+   b676b:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
+   b6770:	48 0f a3 f8          	bt     %rdi,%rax
+   b6774:	0f 83 36 ff ff ff    	jae    b66b0 <litchi_cfb::directory_name::directory_name_data+0x90>
+   b677a:	c7 43 08 02 00 00 00 	movl   $0x2,0x8(%rbx)
+   b6781:	89 73 0c             	mov    %esi,0xc(%rbx)
+   b6784:	66 c7 03 02 00       	movw   $0x2,(%rbx)
+   b6789:	48 89 d8             	mov    %rbx,%rax
+   b678c:	48 81 c4 78 01 00 00 	add    $0x178,%rsp
+   b6793:	5b                   	pop    %rbx
+   b6794:	41 5c                	pop    %r12
+   b6796:	41 5d                	pop    %r13
+   b6798:	41 5e                	pop    %r14
+   b679a:	41 5f                	pop    %r15
+   b679c:	5d                   	pop    %rbp
+   b679d:	c3                   	ret
+   b679e:	48 83 fa 20          	cmp    $0x20,%rdx
+   b67a2:	0f 83 9f 02 00 00    	jae    b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b67a8:	48 89 d0             	mov    %rdx,%rax
+   b67ab:	48 83 e0 18          	and    $0x18,%rax
+   b67af:	74 1c                	je     b67cd <litchi_cfb::directory_name::directory_name_data+0x1ad>
+   b67b1:	48 b9 80 80 80 80 80 	movabs $0x8080808080808080,%rcx
+   b67b8:	80 80 80 
+   b67bb:	49 85 0e             	test   %rcx,(%r14)
+   b67be:	0f 85 83 02 00 00    	jne    b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b67c4:	83 f8 08             	cmp    $0x8,%eax
+   b67c7:	0f 85 70 02 00 00    	jne    b6a3d <litchi_cfb::directory_name::directory_name_data+0x41d>
+   b67cd:	89 d1                	mov    %edx,%ecx
+   b67cf:	83 e1 07             	and    $0x7,%ecx
+   b67d2:	74 7d                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b67d4:	41 80 3c 06 00       	cmpb   $0x0,(%r14,%rax,1)
+   b67d9:	0f 88 68 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b67df:	83 f9 01             	cmp    $0x1,%ecx
+   b67e2:	74 6d                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b67e4:	41 80 7c 06 01 00    	cmpb   $0x0,0x1(%r14,%rax,1)
+   b67ea:	0f 88 57 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b67f0:	83 f9 02             	cmp    $0x2,%ecx
+   b67f3:	74 5c                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b67f5:	41 80 7c 06 02 00    	cmpb   $0x0,0x2(%r14,%rax,1)
+   b67fb:	0f 88 46 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6801:	83 f9 03             	cmp    $0x3,%ecx
+   b6804:	74 4b                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b6806:	41 80 7c 06 03 00    	cmpb   $0x0,0x3(%r14,%rax,1)
+   b680c:	0f 88 35 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6812:	83 f9 04             	cmp    $0x4,%ecx
+   b6815:	74 3a                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b6817:	41 80 7c 06 04 00    	cmpb   $0x0,0x4(%r14,%rax,1)
+   b681d:	0f 88 24 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6823:	83 f9 05             	cmp    $0x5,%ecx
+   b6826:	74 29                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b6828:	41 80 7c 06 05 00    	cmpb   $0x0,0x5(%r14,%rax,1)
+   b682e:	0f 88 13 02 00 00    	js     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6834:	83 f9 06             	cmp    $0x6,%ecx
+   b6837:	74 18                	je     b6851 <litchi_cfb::directory_name::directory_name_data+0x231>
+   b6839:	41 80 7c 06 06 00    	cmpb   $0x0,0x6(%r14,%rax,1)
+   b683f:	0f 99 c0             	setns  %al
+   b6842:	48 83 f9 07          	cmp    $0x7,%rcx
+   b6846:	0f 94 c1             	sete   %cl
+   b6849:	84 c8                	test   %cl,%al
+   b684b:	0f 84 f6 01 00 00    	je     b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6851:	66 0f ef c0          	pxor   %xmm0,%xmm0
+   b6855:	66 0f 7f 84 24 f0 00 	movdqa %xmm0,0xf0(%rsp)
+   b685c:	00 00 
+   b685e:	66 0f 7f 84 24 e0 00 	movdqa %xmm0,0xe0(%rsp)
+   b6865:	00 00 
+   b6867:	66 0f 7f 84 24 d0 00 	movdqa %xmm0,0xd0(%rsp)
+   b686e:	00 00 
+   b6870:	66 0f 7f 84 24 c0 00 	movdqa %xmm0,0xc0(%rsp)
+   b6877:	00 00 
+   b6879:	66 0f 7f 84 24 00 01 	movdqa %xmm0,0x100(%rsp)
+   b6880:	00 00 
+   b6882:	66 0f 7f 84 24 10 01 	movdqa %xmm0,0x110(%rsp)
+   b6889:	00 00 
+   b688b:	66 0f 7f 84 24 20 01 	movdqa %xmm0,0x120(%rsp)
+   b6892:	00 00 
+   b6894:	66 0f 7f 84 24 30 01 	movdqa %xmm0,0x130(%rsp)
+   b689b:	00 00 
+   b689d:	48 83 fa 10          	cmp    $0x10,%rdx
+   b68a1:	77 07                	ja     b68aa <litchi_cfb::directory_name::directory_name_data+0x28a>
+   b68a3:	31 c0                	xor    %eax,%eax
+   b68a5:	e9 d6 00 00 00       	jmp    b6980 <litchi_cfb::directory_name::directory_name_data+0x360>
+   b68aa:	48 8d 4a ff          	lea    -0x1(%rdx),%rcx
+   b68ae:	48 83 f9 20          	cmp    $0x20,%rcx
+   b68b2:	b8 20 00 00 00       	mov    $0x20,%eax
+   b68b7:	48 0f 42 c1          	cmovb  %rcx,%rax
+   b68bb:	48 ff c0             	inc    %rax
+   b68be:	89 c1                	mov    %eax,%ecx
+   b68c0:	83 e1 0f             	and    $0xf,%ecx
+   b68c3:	be 10 00 00 00       	mov    $0x10,%esi
+   b68c8:	48 0f 45 f1          	cmovne %rcx,%rsi
+   b68cc:	48 29 f0             	sub    %rsi,%rax
+   b68cf:	49 8d 0c 06          	lea    (%r14,%rax,1),%rcx
+   b68d3:	31 f6                	xor    %esi,%esi
+   b68d5:	66 0f 6f 0d 43 6c f8 	movdqa -0x793bd(%rip),%xmm1        # 3d520 <anon.f28718e7880bde8224fb65ba49faea00.12.llvm.17939874234485617784+0x120>
+   b68dc:	ff 
+   b68dd:	66 0f 6f 15 bb 6e f8 	movdqa -0x79145(%rip),%xmm2        # 3d7a0 <anon.f28718e7880bde8224fb65ba49faea00.12.llvm.17939874234485617784+0x3a0>
+   b68e4:	ff 
+   b68e5:	66 0f 6f 1d 83 6f f8 	movdqa -0x7907d(%rip),%xmm3        # 3d870 <anon.f28718e7880bde8224fb65ba49faea00.13.llvm.17939874234485617784+0x60>
+   b68ec:	ff 
+   b68ed:	0f 1f 00             	nopl   (%rax)
+   b68f0:	f3 41 0f 7e 2c 36    	movq   (%r14,%rsi,1),%xmm5
+   b68f6:	f3 41 0f 7e 64 36 08 	movq   0x8(%r14,%rsi,1),%xmm4
+   b68fd:	66 0f 6f f5          	movdqa %xmm5,%xmm6
+   b6901:	66 0f fc f1          	paddb  %xmm1,%xmm6
+   b6905:	66 0f 6f fe          	movdqa %xmm6,%xmm7
+   b6909:	66 0f de fa          	pmaxub %xmm2,%xmm7
+   b690d:	66 0f 74 fe          	pcmpeqb %xmm6,%xmm7
+   b6911:	66 0f df fb          	pandn  %xmm3,%xmm7
+   b6915:	66 0f ef fd          	pxor   %xmm5,%xmm7
+   b6919:	66 0f 60 e8          	punpcklbw %xmm0,%xmm5
+   b691d:	66 0f 6f f4          	movdqa %xmm4,%xmm6
+   b6921:	66 0f fc f1          	paddb  %xmm1,%xmm6
+   b6925:	66 44 0f 6f c6       	movdqa %xmm6,%xmm8
+   b692a:	66 44 0f de c2       	pmaxub %xmm2,%xmm8
+   b692f:	66 44 0f 74 c6       	pcmpeqb %xmm6,%xmm8
+   b6934:	66 44 0f df c3       	pandn  %xmm3,%xmm8
+   b6939:	66 44 0f ef c4       	pxor   %xmm4,%xmm8
+   b693e:	66 0f 60 e0          	punpcklbw %xmm0,%xmm4
+   b6942:	f3 0f 7f ac 74 c0 00 	movdqu %xmm5,0xc0(%rsp,%rsi,2)
+   b6949:	00 00 
+   b694b:	f3 0f 7f a4 74 d0 00 	movdqu %xmm4,0xd0(%rsp,%rsi,2)
+   b6952:	00 00 
+   b6954:	66 0f 60 f8          	punpcklbw %xmm0,%xmm7
+   b6958:	66 44 0f 60 c0       	punpcklbw %xmm0,%xmm8
+   b695d:	f3 0f 7f bc 74 00 01 	movdqu %xmm7,0x100(%rsp,%rsi,2)
+   b6964:	00 00 
+   b6966:	f3 44 0f 7f 84 74 10 	movdqu %xmm8,0x110(%rsp,%rsi,2)
+   b696d:	01 00 00 
+   b6970:	48 83 c6 10          	add    $0x10,%rsi
+   b6974:	48 39 f0             	cmp    %rsi,%rax
+   b6977:	0f 85 73 ff ff ff    	jne    b68f0 <litchi_cfb::directory_name::directory_name_data+0x2d0>
+   b697d:	49 89 ce             	mov    %rcx,%r14
+   b6980:	48 83 f8 20          	cmp    $0x20,%rax
+   b6984:	0f 84 95 05 00 00    	je     b6f1f <litchi_cfb::directory_name::directory_name_data+0x8ff>
+   b698a:	41 0f b6 0e          	movzbl (%r14),%ecx
+   b698e:	49 ff c6             	inc    %r14
+   b6991:	66 89 8c 44 c0 00 00 	mov    %cx,0xc0(%rsp,%rax,2)
+   b6998:	00 
+   b6999:	8d 71 9f             	lea    -0x61(%rcx),%esi
+   b699c:	40 80 fe 1a          	cmp    $0x1a,%sil
+   b69a0:	40 0f 92 c6          	setb   %sil
+   b69a4:	40 c0 e6 05          	shl    $0x5,%sil
+   b69a8:	40 30 ce             	xor    %cl,%sil
+   b69ab:	40 0f b6 ce          	movzbl %sil,%ecx
+   b69af:	66 89 8c 44 00 01 00 	mov    %cx,0x100(%rsp,%rax,2)
+   b69b6:	00 
+   b69b7:	48 ff c0             	inc    %rax
+   b69ba:	4d 39 fe             	cmp    %r15,%r14
+   b69bd:	75 c1                	jne    b6980 <litchi_cfb::directory_name::directory_name_data+0x360>
+   b69bf:	0f 28 84 24 c0 00 00 	movaps 0xc0(%rsp),%xmm0
+   b69c6:	00 
+   b69c7:	0f 28 8c 24 d0 00 00 	movaps 0xd0(%rsp),%xmm1
+   b69ce:	00 
+   b69cf:	0f 28 94 24 e0 00 00 	movaps 0xe0(%rsp),%xmm2
+   b69d6:	00 
+   b69d7:	0f 28 9c 24 f0 00 00 	movaps 0xf0(%rsp),%xmm3
+   b69de:	00 
+   b69df:	0f 11 5b 32          	movups %xmm3,0x32(%rbx)
+   b69e3:	0f 11 53 22          	movups %xmm2,0x22(%rbx)
+   b69e7:	0f 11 4b 12          	movups %xmm1,0x12(%rbx)
+   b69eb:	0f 11 43 02          	movups %xmm0,0x2(%rbx)
+   b69ef:	0f 28 84 24 00 01 00 	movaps 0x100(%rsp),%xmm0
+   b69f6:	00 
+   b69f7:	0f 28 8c 24 10 01 00 	movaps 0x110(%rsp),%xmm1
+   b69fe:	00 
+   b69ff:	0f 28 94 24 20 01 00 	movaps 0x120(%rsp),%xmm2
+   b6a06:	00 
+   b6a07:	0f 28 9c 24 30 01 00 	movaps 0x130(%rsp),%xmm3
+   b6a0e:	00 
+   b6a0f:	0f 11 43 52          	movups %xmm0,0x52(%rbx)
+   b6a13:	0f 11 4b 62          	movups %xmm1,0x62(%rbx)
+   b6a17:	0f 11 53 72          	movups %xmm2,0x72(%rbx)
+   b6a1b:	0f 11 9b 82 00 00 00 	movups %xmm3,0x82(%rbx)
+   b6a22:	66 c7 03 00 00       	movw   $0x0,(%rbx)
+   b6a27:	48 89 53 48          	mov    %rdx,0x48(%rbx)
+   b6a2b:	66 c7 43 50 00 00    	movw   $0x0,0x50(%rbx)
+   b6a31:	48 89 93 98 00 00 00 	mov    %rdx,0x98(%rbx)
+   b6a38:	e9 4c fd ff ff       	jmp    b6789 <litchi_cfb::directory_name::directory_name_data+0x169>
+   b6a3d:	49 85 4e 08          	test   %rcx,0x8(%r14)
+   b6a41:	0f 84 59 04 00 00    	je     b6ea0 <litchi_cfb::directory_name::directory_name_data+0x880>
+   b6a47:	4c 89 74 24 28       	mov    %r14,0x28(%rsp)
+   b6a4c:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+   b6a51:	66 c7 44 24 38 00 00 	movw   $0x0,0x38(%rsp)
+   b6a58:	48 c7 84 24 90 00 00 	movq   $0x0,0x90(%rsp)
+   b6a5f:	00 00 00 00 00 
+   b6a64:	66 c7 44 24 48 00 00 	movw   $0x0,0x48(%rsp)
+   b6a6b:	48 8d 7c 24 48       	lea    0x48(%rsp),%rdi
+   b6a70:	48 8d 74 24 28       	lea    0x28(%rsp),%rsi
+   b6a75:	e8 a6 07 00 00       	call   b7220 <<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend>
+   b6a7a:	0f b7 4c 24 48       	movzwl 0x48(%rsp),%ecx
+   b6a7f:	8b 44 24 4a          	mov    0x4a(%rsp),%eax
+   b6a83:	89 44 24 18          	mov    %eax,0x18(%rsp)
+   b6a87:	0f b7 44 24 4e       	movzwl 0x4e(%rsp),%eax
+   b6a8c:	66 89 44 24 1c       	mov    %ax,0x1c(%rsp)
+   b6a91:	48 8b 54 24 50       	mov    0x50(%rsp),%rdx
+   b6a96:	48 8b 44 24 58       	mov    0x58(%rsp),%rax
+   b6a9b:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   b6aa0:	0f 10 44 24 60       	movups 0x60(%rsp),%xmm0
+   b6aa5:	0f 29 84 24 40 01 00 	movaps %xmm0,0x140(%rsp)
+   b6aac:	00 
+   b6aad:	0f 10 44 24 70       	movups 0x70(%rsp),%xmm0
+   b6ab2:	0f 29 84 24 50 01 00 	movaps %xmm0,0x150(%rsp)
+   b6ab9:	00 
+   b6aba:	0f 10 84 24 80 00 00 	movups 0x80(%rsp),%xmm0
+   b6ac1:	00 
+   b6ac2:	0f 29 84 24 60 01 00 	movaps %xmm0,0x160(%rsp)
+   b6ac9:	00 
+   b6aca:	48 8b 84 24 90 00 00 	mov    0x90(%rsp),%rax
+   b6ad1:	00 
+   b6ad2:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+   b6ad7:	48 83 f8 20          	cmp    $0x20,%rax
+   b6adb:	76 33                	jbe    b6b10 <litchi_cfb::directory_name::directory_name_data+0x4f0>
+   b6add:	48 83 fa 1f          	cmp    $0x1f,%rdx
+   b6ae1:	76 43                	jbe    b6b26 <litchi_cfb::directory_name::directory_name_data+0x506>
+   b6ae3:	c7 43 08 03 00 00 00 	movl   $0x3,0x8(%rbx)
+   b6aea:	48 89 53 10          	mov    %rdx,0x10(%rbx)
+   b6aee:	66 c7 03 02 00       	movw   $0x2,(%rbx)
+   b6af3:	48 8b 74 24 10       	mov    0x10(%rsp),%rsi
+   b6af8:	48 01 f6             	add    %rsi,%rsi
+   b6afb:	ba 02 00 00 00       	mov    $0x2,%edx
+   b6b00:	48 8b 7c 24 20       	mov    0x20(%rsp),%rdi
+   b6b05:	ff 15 85 50 05 00    	call   *0x55085(%rip)        # 10bb90 <_DYNAMIC+0x298>
+   b6b0b:	e9 79 fc ff ff       	jmp    b6789 <litchi_cfb::directory_name::directory_name_data+0x169>
+   b6b10:	75 14                	jne    b6b26 <litchi_cfb::directory_name::directory_name_data+0x506>
+   b6b12:	c7 43 08 03 00 00 00 	movl   $0x3,0x8(%rbx)
+   b6b19:	48 c7 43 10 20 00 00 	movq   $0x20,0x10(%rbx)
+   b6b20:	00 
+   b6b21:	e9 5e fc ff ff       	jmp    b6784 <litchi_cfb::directory_name::directory_name_data+0x164>
+   b6b26:	48 89 94 24 a8 00 00 	mov    %rdx,0xa8(%rsp)
+   b6b2d:	00 
+   b6b2e:	66 89 4c 24 0e       	mov    %cx,0xe(%rsp)
+   b6b33:	48 89 9c 24 b0 00 00 	mov    %rbx,0xb0(%rsp)
+   b6b3a:	00 
+   b6b3b:	66 c7 44 24 48 00 00 	movw   $0x0,0x48(%rsp)
+   b6b42:	48 c7 84 24 90 00 00 	movq   $0x0,0x90(%rsp)
+   b6b49:	00 00 00 00 00 
+   b6b4e:	4c 89 bc 24 b8 00 00 	mov    %r15,0xb8(%rsp)
+   b6b55:	00 
+   b6b56:	eb 70                	jmp    b6bc8 <litchi_cfb::directory_name::directory_name_data+0x5a8>
+   b6b58:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
+   b6b5f:	00 
+   b6b60:	48 8d 44 24 4a       	lea    0x4a(%rsp),%rax
+   b6b65:	49 39 dd             	cmp    %rbx,%r13
+   b6b68:	0f 87 64 03 00 00    	ja     b6ed2 <litchi_cfb::directory_name::directory_name_data+0x8b2>
+   b6b6e:	4e 8d 3c 68          	lea    (%rax,%r13,2),%r15
+   b6b72:	44 8d 24 6d 00 00 00 	lea    0x0(,%rbp,2),%r12d
+   b6b79:	00 
+   b6b7a:	4b 8d 3c 27          	lea    (%r15,%r12,1),%rdi
+   b6b7e:	48 89 da             	mov    %rbx,%rdx
+   b6b81:	4c 29 ea             	sub    %r13,%rdx
+   b6b84:	48 01 d2             	add    %rdx,%rdx
+   b6b87:	4c 89 fe             	mov    %r15,%rsi
+   b6b8a:	ff 15 e8 52 05 00    	call   *0x552e8(%rip)        # 10be78 <memmove@GLIBC_2.2.5>
+   b6b90:	4c 89 ff             	mov    %r15,%rdi
+   b6b93:	48 8d 74 24 28       	lea    0x28(%rsp),%rsi
+   b6b98:	4c 89 e2             	mov    %r12,%rdx
+   b6b9b:	ff 15 27 52 05 00    	call   *0x55227(%rip)        # 10bdc8 <memcpy@GLIBC_2.14>
+   b6ba1:	31 c0                	xor    %eax,%eax
+   b6ba3:	48 83 bc 24 90 00 00 	cmpq   $0x21,0x90(%rsp)
+   b6baa:	00 21 
+   b6bac:	0f 92 c0             	setb   %al
+   b6baf:	c1 e0 06             	shl    $0x6,%eax
+   b6bb2:	48 01 eb             	add    %rbp,%rbx
+   b6bb5:	48 89 5c 04 50       	mov    %rbx,0x50(%rsp,%rax,1)
+   b6bba:	4c 3b b4 24 b8 00 00 	cmp    0xb8(%rsp),%r14
+   b6bc1:	00 
+   b6bc2:	0f 84 3b 02 00 00    	je     b6e03 <litchi_cfb::directory_name::directory_name_data+0x7e3>
+   b6bc8:	45 0f b6 26          	movzbl (%r14),%r12d
+   b6bcc:	45 84 e4             	test   %r12b,%r12b
+   b6bcf:	78 0f                	js     b6be0 <litchi_cfb::directory_name::directory_name_data+0x5c0>
+   b6bd1:	49 ff c6             	inc    %r14
+   b6bd4:	eb 7a                	jmp    b6c50 <litchi_cfb::directory_name::directory_name_data+0x630>
+   b6bd6:	66 2e 0f 1f 84 00 00 	cs nopw 0x0(%rax,%rax,1)
+   b6bdd:	00 00 00 
+   b6be0:	44 89 e0             	mov    %r12d,%eax
+   b6be3:	83 e0 1f             	and    $0x1f,%eax
+   b6be6:	41 0f b6 56 01       	movzbl 0x1(%r14),%edx
+   b6beb:	83 e2 3f             	and    $0x3f,%edx
+   b6bee:	41 80 fc df          	cmp    $0xdf,%r12b
+   b6bf2:	76 41                	jbe    b6c35 <litchi_cfb::directory_name::directory_name_data+0x615>
+   b6bf4:	41 0f b6 4e 02       	movzbl 0x2(%r14),%ecx
+   b6bf9:	c1 e2 06             	shl    $0x6,%edx
+   b6bfc:	83 e1 3f             	and    $0x3f,%ecx
+   b6bff:	09 d1                	or     %edx,%ecx
+   b6c01:	41 80 fc f0          	cmp    $0xf0,%r12b
+   b6c05:	0f 82 18 01 00 00    	jb     b6d23 <litchi_cfb::directory_name::directory_name_data+0x703>
+   b6c0b:	45 0f b6 66 03       	movzbl 0x3(%r14),%r12d
+   b6c10:	49 83 c6 04          	add    $0x4,%r14
+   b6c14:	83 e0 07             	and    $0x7,%eax
+   b6c17:	c1 e0 12             	shl    $0x12,%eax
+   b6c1a:	c1 e1 06             	shl    $0x6,%ecx
+   b6c1d:	41 83 e4 3f          	and    $0x3f,%r12d
+   b6c21:	41 09 cc             	or     %ecx,%r12d
+   b6c24:	41 09 c4             	or     %eax,%r12d
+   b6c27:	41 81 fc 80 00 00 00 	cmp    $0x80,%r12d
+   b6c2e:	72 20                	jb     b6c50 <litchi_cfb::directory_name::directory_name_data+0x630>
+   b6c30:	e9 07 01 00 00       	jmp    b6d3c <litchi_cfb::directory_name::directory_name_data+0x71c>
+   b6c35:	49 83 c6 02          	add    $0x2,%r14
+   b6c39:	c1 e0 06             	shl    $0x6,%eax
+   b6c3c:	09 d0                	or     %edx,%eax
+   b6c3e:	41 89 c4             	mov    %eax,%r12d
+   b6c41:	41 81 fc 80 00 00 00 	cmp    $0x80,%r12d
+   b6c48:	0f 83 ee 00 00 00    	jae    b6d3c <litchi_cfb::directory_name::directory_name_data+0x71c>
+   b6c4e:	66 90                	xchg   %ax,%ax
+   b6c50:	41 8d 44 24 9f       	lea    -0x61(%r12),%eax
+   b6c55:	45 89 e7             	mov    %r12d,%r15d
+   b6c58:	41 83 e7 5f          	and    $0x5f,%r15d
+   b6c5c:	83 f8 1a             	cmp    $0x1a,%eax
+   b6c5f:	45 0f 43 fc          	cmovae %r12d,%r15d
+   b6c63:	c7 44 24 28 00 00 00 	movl   $0x0,0x28(%rsp)
+   b6c6a:	00 
+   b6c6b:	bd 01 00 00 00       	mov    $0x1,%ebp
+   b6c70:	66 44 89 7c 24 28    	mov    %r15w,0x28(%rsp)
+   b6c76:	48 8b 9c 24 90 00 00 	mov    0x90(%rsp),%rbx
+   b6c7d:	00 
+   b6c7e:	48 83 fb 21          	cmp    $0x21,%rbx
+   b6c82:	4c 8b 6c 24 50       	mov    0x50(%rsp),%r13
+   b6c87:	4c 0f 42 eb          	cmovb  %rbx,%r13
+   b6c8b:	b8 20 00 00 00       	mov    $0x20,%eax
+   b6c90:	48 0f 43 c3          	cmovae %rbx,%rax
+   b6c94:	4c 29 e8             	sub    %r13,%rax
+   b6c97:	48 39 e8             	cmp    %rbp,%rax
+   b6c9a:	73 65                	jae    b6d01 <litchi_cfb::directory_name::directory_name_data+0x6e1>
+   b6c9c:	4c 89 e8             	mov    %r13,%rax
+   b6c9f:	41 bf 11 00 00 00    	mov    $0x11,%r15d
+   b6ca5:	48 01 e8             	add    %rbp,%rax
+   b6ca8:	0f 82 14 02 00 00    	jb     b6ec2 <litchi_cfb::directory_name::directory_name_data+0x8a2>
+   b6cae:	48 8d 48 ff          	lea    -0x1(%rax),%rcx
+   b6cb2:	48 0f bd c9          	bsr    %rcx,%rcx
+   b6cb6:	f7 d1                	not    %ecx
+   b6cb8:	48 c7 c6 ff ff ff ff 	mov    $0xffffffffffffffff,%rsi
+   b6cbf:	48 d3 ee             	shr    %cl,%rsi
+   b6cc2:	48 83 f8 02          	cmp    $0x2,%rax
+   b6cc6:	b8 00 00 00 00       	mov    $0x0,%eax
+   b6ccb:	48 0f 42 f0          	cmovb  %rax,%rsi
+   b6ccf:	48 83 fe ff          	cmp    $0xffffffffffffffff,%rsi
+   b6cd3:	0f 84 e9 01 00 00    	je     b6ec2 <litchi_cfb::directory_name::directory_name_data+0x8a2>
+   b6cd9:	48 ff c6             	inc    %rsi
+   b6cdc:	48 8d 7c 24 48       	lea    0x48(%rsp),%rdi
+   b6ce1:	e8 6a 0d 00 00       	call   b7a50 <smallvec::SmallVec<A>::try_grow>
+   b6ce6:	48 b9 01 00 00 00 00 	movabs $0x8000000000000001,%rcx
+   b6ced:	00 00 80 
+   b6cf0:	48 39 c8             	cmp    %rcx,%rax
+   b6cf3:	0f 85 00 02 00 00    	jne    b6ef9 <litchi_cfb::directory_name::directory_name_data+0x8d9>
+   b6cf9:	48 8b 9c 24 90 00 00 	mov    0x90(%rsp),%rbx
+   b6d00:	00 
+   b6d01:	48 83 fb 21          	cmp    $0x21,%rbx
+   b6d05:	0f 82 55 fe ff ff    	jb     b6b60 <litchi_cfb::directory_name::directory_name_data+0x540>
+   b6d0b:	48 8b 5c 24 50       	mov    0x50(%rsp),%rbx
+   b6d10:	49 39 dd             	cmp    %rbx,%r13
+   b6d13:	0f 87 b9 01 00 00    	ja     b6ed2 <litchi_cfb::directory_name::directory_name_data+0x8b2>
+   b6d19:	48 8b 44 24 58       	mov    0x58(%rsp),%rax
+   b6d1e:	e9 4b fe ff ff       	jmp    b6b6e <litchi_cfb::directory_name::directory_name_data+0x54e>
+   b6d23:	49 83 c6 03          	add    $0x3,%r14
+   b6d27:	c1 e0 0c             	shl    $0xc,%eax
+   b6d2a:	09 c1                	or     %eax,%ecx
+   b6d2c:	41 89 cc             	mov    %ecx,%r12d
+   b6d2f:	41 81 fc 80 00 00 00 	cmp    $0x80,%r12d
+   b6d36:	0f 82 14 ff ff ff    	jb     b6c50 <litchi_cfb::directory_name::directory_name_data+0x630>
+   b6d3c:	48 8d bc 24 98 00 00 	lea    0x98(%rsp),%rdi
+   b6d43:	00 
+   b6d44:	44 89 e6             	mov    %r12d,%esi
+   b6d47:	ff 15 73 55 05 00    	call   *0x55573(%rip)        # 10c2c0 <_DYNAMIC+0x9c8>
+   b6d4d:	83 bc 24 9c 00 00 00 	cmpl   $0x1,0x9c(%rsp)
+   b6d54:	01 
+   b6d55:	8b 84 24 a0 00 00 00 	mov    0xa0(%rsp),%eax
+   b6d5c:	b9 02 00 00 00       	mov    $0x2,%ecx
+   b6d61:	48 83 d9 00          	sbb    $0x0,%rcx
+   b6d65:	85 c0                	test   %eax,%eax
+   b6d67:	ba 03 00 00 00       	mov    $0x3,%edx
+   b6d6c:	48 0f 45 ca          	cmovne %rdx,%rcx
+   b6d70:	48 c7 44 24 28 00 00 	movq   $0x0,0x28(%rsp)
+   b6d77:	00 00 
+   b6d79:	48 89 4c 24 30       	mov    %rcx,0x30(%rsp)
+   b6d7e:	48 8d 4c 24 38       	lea    0x38(%rsp),%rcx
+   b6d83:	89 41 08             	mov    %eax,0x8(%rcx)
+   b6d86:	48 8b 84 24 98 00 00 	mov    0x98(%rsp),%rax
+   b6d8d:	00 
+   b6d8e:	48 89 01             	mov    %rax,(%rcx)
+   b6d91:	48 8d 7c 24 28       	lea    0x28(%rsp),%rdi
+   b6d96:	ff 15 2c 55 05 00    	call   *0x5552c(%rip)        # 10c2c8 <_DYNAMIC+0x9d0>
+   b6d9c:	41 89 c7             	mov    %eax,%r15d
+   b6d9f:	48 8d 7c 24 28       	lea    0x28(%rsp),%rdi
+   b6da4:	ff 15 1e 55 05 00    	call   *0x5551e(%rip)        # 10c2c8 <_DYNAMIC+0x9d0>
+   b6daa:	41 81 ff 00 00 11 00 	cmp    $0x110000,%r15d
+   b6db1:	45 0f 44 fc          	cmove  %r12d,%r15d
+   b6db5:	3d 00 00 11 00       	cmp    $0x110000,%eax
+   b6dba:	45 0f 45 fc          	cmovne %r12d,%r15d
+   b6dbe:	c7 44 24 28 00 00 00 	movl   $0x0,0x28(%rsp)
+   b6dc5:	00 
+   b6dc6:	41 81 ff 00 00 01 00 	cmp    $0x10000,%r15d
+   b6dcd:	0f 82 98 fe ff ff    	jb     b6c6b <litchi_cfb::directory_name::directory_name_data+0x64b>
+   b6dd3:	41 8d 87 00 00 ff 00 	lea    0xff0000(%r15),%eax
+   b6dda:	c1 e8 0a             	shr    $0xa,%eax
+   b6ddd:	0d 00 d8 00 00       	or     $0xd800,%eax
+   b6de2:	41 81 e7 ff 03 00 00 	and    $0x3ff,%r15d
+   b6de9:	41 81 cf 00 dc 00 00 	or     $0xdc00,%r15d
+   b6df0:	66 44 89 7c 24 2a    	mov    %r15w,0x2a(%rsp)
+   b6df6:	bd 02 00 00 00       	mov    $0x2,%ebp
+   b6dfb:	41 89 c7             	mov    %eax,%r15d
+   b6dfe:	e9 6d fe ff ff       	jmp    b6c70 <litchi_cfb::directory_name::directory_name_data+0x650>
+   b6e03:	0f b7 44 24 1c       	movzwl 0x1c(%rsp),%eax
+   b6e08:	48 8b 9c 24 b0 00 00 	mov    0xb0(%rsp),%rbx
+   b6e0f:	00 
+   b6e10:	66 89 43 06          	mov    %ax,0x6(%rbx)
+   b6e14:	8b 44 24 18          	mov    0x18(%rsp),%eax
+   b6e18:	89 43 02             	mov    %eax,0x2(%rbx)
+   b6e1b:	0f 28 84 24 40 01 00 	movaps 0x140(%rsp),%xmm0
+   b6e22:	00 
+   b6e23:	0f 28 8c 24 50 01 00 	movaps 0x150(%rsp),%xmm1
+   b6e2a:	00 
+   b6e2b:	0f 28 94 24 60 01 00 	movaps 0x160(%rsp),%xmm2
+   b6e32:	00 
+   b6e33:	0f 11 43 18          	movups %xmm0,0x18(%rbx)
+   b6e37:	0f 11 4b 28          	movups %xmm1,0x28(%rbx)
+   b6e3b:	0f 11 53 38          	movups %xmm2,0x38(%rbx)
+   b6e3f:	0f 10 44 24 48       	movups 0x48(%rsp),%xmm0
+   b6e44:	0f 10 4c 24 58       	movups 0x58(%rsp),%xmm1
+   b6e49:	0f 10 54 24 68       	movups 0x68(%rsp),%xmm2
+   b6e4e:	0f 10 5c 24 78       	movups 0x78(%rsp),%xmm3
+   b6e53:	0f 11 9b 80 00 00 00 	movups %xmm3,0x80(%rbx)
+   b6e5a:	0f 11 53 70          	movups %xmm2,0x70(%rbx)
+   b6e5e:	0f 11 4b 60          	movups %xmm1,0x60(%rbx)
+   b6e62:	0f 11 43 50          	movups %xmm0,0x50(%rbx)
+   b6e66:	0f 10 84 24 88 00 00 	movups 0x88(%rsp),%xmm0
+   b6e6d:	00 
+   b6e6e:	0f 11 83 90 00 00 00 	movups %xmm0,0x90(%rbx)
+   b6e75:	0f b7 44 24 0e       	movzwl 0xe(%rsp),%eax
+   b6e7a:	66 89 03             	mov    %ax,(%rbx)
+   b6e7d:	48 8b 84 24 a8 00 00 	mov    0xa8(%rsp),%rax
+   b6e84:	00 
+   b6e85:	48 89 43 08          	mov    %rax,0x8(%rbx)
+   b6e89:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+   b6e8e:	48 89 43 10          	mov    %rax,0x10(%rbx)
+   b6e92:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+   b6e97:	48 89 43 48          	mov    %rax,0x48(%rbx)
+   b6e9b:	e9 e9 f8 ff ff       	jmp    b6789 <litchi_cfb::directory_name::directory_name_data+0x169>
+   b6ea0:	83 f8 10             	cmp    $0x10,%eax
+   b6ea3:	0f 84 24 f9 ff ff    	je     b67cd <litchi_cfb::directory_name::directory_name_data+0x1ad>
+   b6ea9:	49 23 4e 10          	and    0x10(%r14),%rcx
+   b6ead:	48 89 c6             	mov    %rax,%rsi
+   b6eb0:	48 83 f6 18          	xor    $0x18,%rsi
+   b6eb4:	48 09 ce             	or     %rcx,%rsi
+   b6eb7:	0f 84 10 f9 ff ff    	je     b67cd <litchi_cfb::directory_name::directory_name_data+0x1ad>
+   b6ebd:	e9 85 fb ff ff       	jmp    b6a47 <litchi_cfb::directory_name::directory_name_data+0x427>
+   b6ec2:	48 8d 3d c0 11 f9 ff 	lea    -0x6ee40(%rip),%rdi        # 48089 <anon.76d24ca58716c65f168cc425d8148aa9.57.llvm.15086456011551332648>
+   b6ec9:	48 8d 0d 90 22 05 00 	lea    0x52290(%rip),%rcx        # 109160 <anon.76d24ca58716c65f168cc425d8148aa9.58.llvm.15086456011551332648>
+   b6ed0:	eb 14                	jmp    b6ee6 <litchi_cfb::directory_name::directory_name_data+0x8c6>
+   b6ed2:	41 bf 1e 00 00 00    	mov    $0x1e,%r15d
+   b6ed8:	48 8d 3d bb 11 f9 ff 	lea    -0x6ee45(%rip),%rdi        # 4809a <anon.76d24ca58716c65f168cc425d8148aa9.57.llvm.15086456011551332648+0x11>
+   b6edf:	48 8d 0d 92 22 05 00 	lea    0x52292(%rip),%rcx        # 109178 <anon.76d24ca58716c65f168cc425d8148aa9.58.llvm.15086456011551332648+0x18>
+   b6ee6:	4c 89 fe             	mov    %r15,%rsi
+   b6ee9:	48 89 ca             	mov    %rcx,%rdx
+   b6eec:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+   b6ef1:	ff 15 a1 51 05 00    	call   *0x551a1(%rip)        # 10c098 <_DYNAMIC+0x7a0>
+   b6ef7:	eb 24                	jmp    b6f1d <litchi_cfb::directory_name::directory_name_data+0x8fd>
+   b6ef9:	48 85 c0             	test   %rax,%rax
+   b6efc:	48 8d 3d 86 11 f9 ff 	lea    -0x6ee7a(%rip),%rdi        # 48089 <anon.76d24ca58716c65f168cc425d8148aa9.57.llvm.15086456011551332648>
+   b6f03:	48 8d 0d 56 22 05 00 	lea    0x52256(%rip),%rcx        # 109160 <anon.76d24ca58716c65f168cc425d8148aa9.58.llvm.15086456011551332648>
+   b6f0a:	74 da                	je     b6ee6 <litchi_cfb::directory_name::directory_name_data+0x8c6>
+   b6f0c:	48 89 c7             	mov    %rax,%rdi
+   b6f0f:	48 89 d6             	mov    %rdx,%rsi
+   b6f12:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+   b6f17:	ff 15 3b 4d 05 00    	call   *0x54d3b(%rip)        # 10bc58 <_DYNAMIC+0x360>
+   b6f1d:	0f 0b                	ud2
+   b6f1f:	48 8d 15 9a 21 05 00 	lea    0x5219a(%rip),%rdx        # 1090c0 <anon.76d24ca58716c65f168cc425d8148aa9.3.llvm.15086456011551332648+0x18>
+   b6f26:	bf 20 00 00 00       	mov    $0x20,%edi
+   b6f2b:	be 20 00 00 00       	mov    $0x20,%esi
+   b6f30:	ff 15 f2 4e 05 00    	call   *0x54ef2(%rip)        # 10be28 <_DYNAMIC+0x530>
+   b6f36:	48 89 c3             	mov    %rax,%rbx
+   b6f39:	48 8b b4 24 90 00 00 	mov    0x90(%rsp),%rsi
+   b6f40:	00 
+   b6f41:	48 83 fe 21          	cmp    $0x21,%rsi
+   b6f45:	72 59                	jb     b6fa0 <litchi_cfb::directory_name::directory_name_data+0x980>
+   b6f47:	48 8b 7c 24 58       	mov    0x58(%rsp),%rdi
+   b6f4c:	48 01 f6             	add    %rsi,%rsi
+   b6f4f:	ba 02 00 00 00       	mov    $0x2,%edx
+   b6f54:	eb 44                	jmp    b6f9a <litchi_cfb::directory_name::directory_name_data+0x97a>
+   b6f56:	48 89 c3             	mov    %rax,%rbx
+   b6f59:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+   b6f5e:	eb 03                	jmp    b6f63 <litchi_cfb::directory_name::directory_name_data+0x943>
+   b6f60:	48 89 c3             	mov    %rax,%rbx
+   b6f63:	48 8b b4 24 90 00 00 	mov    0x90(%rsp),%rsi
+   b6f6a:	00 
+   b6f6b:	48 83 fe 21          	cmp    $0x21,%rsi
+   b6f6f:	72 13                	jb     b6f84 <litchi_cfb::directory_name::directory_name_data+0x964>
+   b6f71:	48 8b 7c 24 58       	mov    0x58(%rsp),%rdi
+   b6f76:	48 01 f6             	add    %rsi,%rsi
+   b6f79:	ba 02 00 00 00       	mov    $0x2,%edx
+   b6f7e:	ff 15 0c 4c 05 00    	call   *0x54c0c(%rip)        # 10bb90 <_DYNAMIC+0x298>
+   b6f84:	49 83 fe 21          	cmp    $0x21,%r14
+   b6f88:	72 16                	jb     b6fa0 <litchi_cfb::directory_name::directory_name_data+0x980>
+   b6f8a:	4d 01 f6             	add    %r14,%r14
+   b6f8d:	ba 02 00 00 00       	mov    $0x2,%edx
+   b6f92:	48 8b 7c 24 20       	mov    0x20(%rsp),%rdi
+   b6f97:	4c 89 f6             	mov    %r14,%rsi
+   b6f9a:	ff 15 f0 4b 05 00    	call   *0x54bf0(%rip)        # 10bb90 <_DYNAMIC+0x298>
+   b6fa0:	48 89 df             	mov    %rbx,%rdi
+   b6fa3:	e8 48 c0 04 00       	call   102ff0 <_Unwind_Resume@plt>
