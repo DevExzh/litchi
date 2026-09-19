@@ -1,0 +1,9 @@
+[
+  {
+    "case": "late-root-error-mce",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 43.73685491571544,
+    "delta_ns": 70080
+  }
+]

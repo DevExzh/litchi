@@ -725,6 +725,96 @@ mod codec_tests {
             Cow::Borrowed(_)
         ))
     }
+
+    #[test]
+    fn marker_search_keeps_short_near_matches_and_arbitrary_bytes_borrowed() {
+        let cases: &[&[u8]] = &[
+            b"",
+            b"\xff\x00\x80",
+            b"http://schemas.openxmlformats.org/markup-compatibility/200",
+            b"http://schemas.openxmlformats.org/markup-compatibility/2007",
+            b"<r>prefix http://schemas.openxmlformats.org/markup-compatibility/2007 suffix</r>",
+        ];
+
+        for source in cases {
+            let output =
+                process_markup_compatibility(source, &Capabilities::new(), &Limits::default())
+                    .expect("a source without the complete MCE namespace is a fast-path no-op");
+            match output.xml {
+                Cow::Borrowed(actual) => assert_eq!(actual, *source),
+                Cow::Owned(_) => panic!("fast path unexpectedly allocated for {source:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn marker_search_preflights_input_then_output_limits() {
+        let source = b"<r \xff";
+        let input_limited = Limits {
+            max_input_bytes: source.len() - 1,
+            max_output_bytes: source.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            process_markup_compatibility(source, &Capabilities::new(), &input_limited),
+            Err(Error::LimitExceeded(message)) if message == "input bytes"
+        ));
+
+        let output_limited = Limits {
+            max_input_bytes: source.len(),
+            max_output_bytes: source.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            process_markup_compatibility(source, &Capabilities::new(), &output_limited),
+            Err(Error::LimitExceeded(message)) if message == "output bytes"
+        ));
+    }
+
+    #[test]
+    fn marker_in_comment_and_text_routes_through_owned_parser_output() {
+        let source = format!(
+            "<r><!--{}--><item>{}</item></r>",
+            super::super::model::NAMESPACE,
+            super::super::model::NAMESPACE,
+        );
+        let output = process_markup_compatibility(
+            source.as_bytes(),
+            &Capabilities::new(),
+            &Limits::default(),
+        )
+        .expect("the namespace marker is valid inside XML comment and text");
+
+        assert_eq!(output.report, Report::default());
+        assert!(matches!(&output.xml, Cow::Owned(_)));
+        assert_eq!(output.xml.as_ref(), source.as_bytes());
+    }
+
+    #[test]
+    fn marker_at_the_last_position_routes_truncated_xml_to_the_parser() {
+        let mut source = b"<r>".to_vec();
+        source.extend_from_slice(super::super::model::NAMESPACE.as_bytes());
+        assert!(source.ends_with(super::super::model::NAMESPACE.as_bytes()));
+
+        assert!(matches!(
+            process_markup_compatibility(&source, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message)) if message == "unterminated XML"
+        ));
+    }
+
+    #[test]
+    fn marker_in_malformed_utf8_attribute_is_not_treated_as_a_fast_path_noop() {
+        let mut source = b"<r value=\"".to_vec();
+        source.extend_from_slice(super::super::model::NAMESPACE.as_bytes());
+        source.push(0xff);
+        source.extend_from_slice(b"\"/>");
+
+        assert!(matches!(
+            process_markup_compatibility(&source, &Capabilities::new(), &Limits::default()),
+            Err(Error::Xml(_))
+        ));
+    }
+
     #[test]
     fn choice_fallback() {
         let x = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:a"><mc:AlternateContent><mc:Choice Requires="a"><yes/></mc:Choice><mc:Fallback><no/></mc:Fallback></mc:AlternateContent></r>"#;

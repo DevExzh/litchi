@@ -1,0 +1,22 @@
+{
+  "phase": "retained",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-ooxml-common",
+    "--lib",
+    "--locked",
+    "mce::",
+    "--",
+    "--test-threads=1"
+  ],
+  "source_sha256": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": "f39bc8088825b9a655f4ecbf4c30de9f7e272d574351693be02d69bcfe7f2dc6",
+    "crates/litchi-ooxml-common/src/mce/tests.rs": "764df9cb00f993434e74cf50e2f6fe3b9ed9d3452fe0756c4543c52495a045eb"
+  },
+  "exit_code": 0,
+  "log": "tests-focused-retained.log",
+  "log_sha256": "6f64accc207effb8faaa0ea963de8594a76cec937fbc6c10390263f859616f00",
+  "rustflags": "-D warnings"
+}

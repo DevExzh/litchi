@@ -1,0 +1,14 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "-l",
+    "--disassemble=_ZN19litchi_ooxml_common3mce5codec5start17hdd6022752589c6d9E",
+    "/home/zhuhe/code/litchi-0700-bin/candidate-native"
+  ],
+  "symbol": "_ZN19litchi_ooxml_common3mce5codec5start17hdd6022752589c6d9E",
+  "exit_code": 0,
+  "binary_sha256": "c6eb7ccc69c95ea5acaa31aa92beab01b35048b94aac9baf5cc443b8cc26c43d",
+  "output_sha256": "a0cf8fc12310657e09339059c65db8affa3ed347c57599caeaebd723632250ce",
+  "stderr": ""
+}

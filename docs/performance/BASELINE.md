@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0700 — rejected direct MCE substring search
+
+[0700](0700-mce-marker-substring-search.md) replaces the marker window scan
+with the existing safe memmem search in a measured candidate. Marker-free
+controls improve substantially, but the longer ABBA follow-up repeats real
+edit/no-op median costs of +1.5–3.4%, and tiny marked XML costs about +45%
+(+210 ns). Allocation metrics are unchanged; processor stack reservation
+grows 216 bytes. All 1,920 oracle invocations match and all integration gates
+pass. The candidate is rejected: production is restored, while five dispatch
+regression tests and the reproducible evidence remain. No shipped gain is claimed.
+
 ## 0699 — marker-free refusal diagnostic baseline
 
 [0699](0699-marker-free-refusal-attribution.md) retains 22,800 diagnostic

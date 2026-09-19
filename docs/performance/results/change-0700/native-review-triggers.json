@@ -1,0 +1,122 @@
+[
+  {
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 4670,
+    "delta_pct": 26.57939669891861
+  },
+  {
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 1510,
+    "delta_pct": 7.881002087682672
+  },
+  {
+    "case": "one-notes-lo",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 6800,
+    "delta_pct": 122.74368231046931
+  },
+  {
+    "case": "noop-real",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_ns": 4980,
+    "delta_pct": 9.595375722543352
+  },
+  {
+    "case": "noop-real",
+    "phase": "capture_ns",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_ns": 239180,
+    "delta_pct": 5.014072861912375
+  },
+  {
+    "case": "noop-real",
+    "phase": "capture_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 444463,
+    "delta_pct": 9.30815879344492
+  },
+  {
+    "case": "noop-real",
+    "phase": "settext_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 25881,
+    "delta_pct": 8.076933879680805
+  },
+  {
+    "case": "noop-real",
+    "phase": "total_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 424433,
+    "delta_pct": 8.09611963928907
+  },
+  {
+    "case": "noop-generated",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 20821,
+    "delta_pct": 72.04498269896193
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 930,
+    "delta_pct": 5.506216696269982
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "commit_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 2570,
+    "delta_pct": 14.838337182448036
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 4370,
+    "delta_pct": 20.969289827255277
+  },
+  {
+    "case": "two-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 3091,
+    "delta_pct": 17.287472035794185
+  },
+  {
+    "case": "two-generated",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_ns": 617.6100000000006,
+    "delta_pct": 5.184349494710392
+  },
+  {
+    "case": "two-generated",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 8640,
+    "delta_pct": 66.61526599845799
+  }
+]
