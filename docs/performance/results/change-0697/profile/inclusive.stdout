@@ -1,0 +1,679 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cpu/cycles/P'
+# Event count (approx.): 10802249038
+#
+# Children      Self  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                                                       
+# ........  ........  ...............  ....................  .............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    27.46%     0.00%  mce-attribution  mce-attribution-0697  [.] start (inlined)
+            |
+            ---start (inlined)
+               |          
+               |--8.71%--after (inlined)
+               |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+               |--8.41%--map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+               |          {closure#0} (inlined)
+               |          clone (inlined)
+               |          clone (inlined)
+               |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          |          
+               |           --8.37%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+               |--2.53%--clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --2.41%--and_then<&litchi_ooxml_common::mce::codec::Frame, alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>, litchi_ooxml_common::mce::codec::start::{closure_env#1}> (inlined)
+                          {closure#1} (inlined)
+                          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+    26.52%    26.52%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::start
+            |          
+            |--12.01%--0x6
+            |          |          
+            |           --10.61%--start (inlined)
+            |                     |          
+            |                     |--8.04%--map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+            |                     |          {closure#0} (inlined)
+            |                     |          clone (inlined)
+            |                     |          clone (inlined)
+            |                     |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |                     |          |          
+            |                     |           --8.00%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |                     |          
+            |                      --2.45%--clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |                                clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          
+            |--5.68%--process_markup_compatibility (inlined)
+            |          start (inlined)
+            |          |          
+            |           --4.33%--after (inlined)
+            |                     clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |                     clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          
+            |--4.21%--start (inlined)
+            |          |          
+            |           --2.33%--and_then<&litchi_ooxml_common::mce::codec::Frame, alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>, litchi_ooxml_common::mce::codec::start::{closure_env#1}> (inlined)
+            |                     {closure#1} (inlined)
+            |                     clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |                     clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          
+             --1.22%--0x7
+                       process_markup_compatibility (inlined)
+                       start (inlined)
+
+    22.06%     0.00%  mce-attribution  mce-attribution-0697  [.] clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |
+            ---clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          
+                --22.02%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+    22.02%     0.00%  mce-attribution  mce-attribution-0697  [.] clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |
+            ---clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+    13.90%     0.00%  mce-attribution  mce-attribution-0697  [.] process_markup_compatibility (inlined)
+            |
+            ---process_markup_compatibility (inlined)
+               |          
+               |--12.06%--start (inlined)
+               |          |          
+               |           --8.71%--after (inlined)
+               |                     clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.10%--drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+    13.82%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000006
+            |
+            ---0x6
+               |          
+               |--11.07%--start (inlined)
+               |          |          
+               |          |--8.41%--map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+               |          |          {closure#0} (inlined)
+               |          |          clone (inlined)
+               |          |          clone (inlined)
+               |          |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          |          |          
+               |          |           --8.37%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          |          
+               |           --2.53%--clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+               |--1.11%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.03%--process_markup_compatibility (inlined)
+                          start (inlined)
+
+     8.74%     0.00%  mce-attribution  mce-attribution-0697  [.] {closure#0} (inlined)
+            |
+            ---{closure#0} (inlined)
+               |          
+                --8.41%--clone (inlined)
+                          clone (inlined)
+                          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          |          
+                           --8.37%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     8.71%     0.00%  mce-attribution  mce-attribution-0697  [.] after (inlined)
+            |
+            ---after (inlined)
+               clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     8.41%     0.00%  mce-attribution  mce-attribution-0697  [.] map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+            |
+            ---map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+               {closure#0} (inlined)
+               clone (inlined)
+               clone (inlined)
+               clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          
+                --8.37%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     8.41%     0.00%  mce-attribution  mce-attribution-0697  [.] clone (inlined)
+            |
+            ---clone (inlined)
+               clone (inlined)
+               clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          
+                --8.37%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.88%     7.88%  mce-attribution  libc.so.6             [.] __memcmp_evex_movbe
+     7.28%     0.00%  mce-attribution  [unknown]             [.] 0x43d8a5d877be12ff
+            |
+            ---0x43d8a5d877be12ff
+               |          
+               |--1.55%--0x7
+               |          |          
+               |           --1.51%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |                     drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |                     drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+               |--1.39%--0x5
+               |          |          
+               |           --1.22%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |                     drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |                     drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+               |--1.24%--0x6
+               |          |          
+               |           --1.07%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |                     drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |                     drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.06%--0xa
+                          drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.23%     0.00%  mce-attribution  mce-attribution-0697  [.] decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+            |
+            ---decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+               |          
+                --6.53%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+
+     7.20%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+            |
+            ---drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.20%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |
+            ---drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.20%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |
+            ---drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.20%     0.00%  mce-attribution  mce-attribution-0697  [.] drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.16%     7.16%  mce-attribution  mce-attribution-0697  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>
+            |          
+             --6.63%--0x43d8a5d877be12ff
+                       |          
+                       |--1.51%--0x7
+                       |          drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                       |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       |          
+                       |--1.18%--0x5
+                       |          drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                       |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       |          
+                       |--1.06%--0xa
+                       |          drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                       |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+                       |          
+                        --1.03%--0x6
+                                  drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                                  drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                                  drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                                  drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     7.02%     7.02%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+            |          
+            |--5.23%--decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+            |          |          
+            |           --4.86%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+            |          
+             --1.64%--0x1
+                       decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+                       |          
+                        --1.59%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+
+     6.53%     0.00%  mce-attribution  mce-attribution-0697  [.] branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+            |
+            ---branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+
+     4.86%     4.86%  mce-attribution  mce-attribution-0697  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+            |          
+             --4.82%--0x3e7
+                       drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+                       drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+                       drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                       drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                       drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.86%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+            |
+            ---drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.86%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+            |
+            ---drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.86%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |
+            ---drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.86%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |
+            ---drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.86%     0.00%  mce-attribution  mce-attribution-0697  [.] drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.82%     0.00%  mce-attribution  [unknown]             [.] 0x00000000000003e7
+            |
+            ---0x3e7
+               drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.53%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000001
+            |
+            ---0x1
+               |          
+               |--1.84%--close (inlined)
+               |          |          
+               |           --1.31%--drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               |                     drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               |                     drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |                     drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |                     drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.80%--decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+                          |          
+                           --1.68%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+
+     4.04%     4.04%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::close
+            |          
+            |--2.13%--close (inlined)
+            |          |          
+            |           --1.59%--drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+            |                     drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+            |                     drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |                     drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |                     drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          
+             --1.84%--0x1
+                       close (inlined)
+                       |          
+                        --1.31%--drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+                                  drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+                                  drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                                  drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                                  drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.04%     0.00%  mce-attribution  mce-attribution-0697  [.] close (inlined)
+            |
+            ---close (inlined)
+               |          
+               |--2.98%--drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               |          drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.06%--drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.04%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |
+            ---drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.04%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |
+            ---drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     4.04%     0.00%  mce-attribution  mce-attribution-0697  [.] drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     3.63%     0.00%  mce-attribution  mce-attribution-0697  [.] write_start (inlined)
+            |
+            ---write_start (inlined)
+               |          
+                --1.02%--any<u8, litchi_ooxml_common::mce::codec::write_start::{closure_env#1}> (inlined)
+
+     3.47%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000007
+            |
+            ---0x7
+               |          
+               |--1.55%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               |          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               |          
+                --1.27%--process_markup_compatibility (inlined)
+                          start (inlined)
+
+     3.06%     3.06%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::write_start
+            |          
+             --2.25%--write_start (inlined)
+
+     3.06%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000005
+            |
+            ---0x5
+               |          
+                --1.35%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     2.98%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+            |
+            ---drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     2.98%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+            |
+            ---drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     2.98%     0.00%  mce-attribution  mce-attribution-0697  [.] extend_from_slice (inlined)
+            |
+            ---extend_from_slice (inlined)
+               |          
+                --2.33%--extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                          spec_extend<u8, alloc::alloc::Global> (inlined)
+                          append_elements<u8, alloc::alloc::Global> (inlined)
+                          |          
+                           --2.29%--copy_nonoverlapping<u8> (inlined)
+                                     |          
+                                      --1.92%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                                                |          
+                                                 --1.39%--feed (inlined)
+
+     2.74%     2.74%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_ncname
+            |          
+             --1.76%--is_ncname (inlined)
+                       |          
+                        --1.39%--is_some_and<char, fn(char) -> bool> (inlined)
+                                  call_once<fn(char) -> bool, (char)> (inlined)
+                                  is_ncname_start (inlined)
+                                  is_name_start (inlined)
+
+     2.74%     0.00%  mce-attribution  mce-attribution-0697  [.] is_ncname (inlined)
+            |
+            ---is_ncname (inlined)
+               |          
+                --1.76%--is_some_and<char, fn(char) -> bool> (inlined)
+                          call_once<fn(char) -> bool, (char)> (inlined)
+                          is_ncname_start (inlined)
+                          is_name_start (inlined)
+
+     2.41%     0.00%  mce-attribution  mce-attribution-0697  [.] and_then<&litchi_ooxml_common::mce::codec::Frame, alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>, litchi_ooxml_common::mce::codec::start::{closure_env#1}> (inlined)
+            |
+            ---and_then<&litchi_ooxml_common::mce::codec::Frame, alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>, litchi_ooxml_common::mce::codec::start::{closure_env#1}> (inlined)
+               {closure#1} (inlined)
+               clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     2.41%     0.00%  mce-attribution  mce-attribution-0697  [.] {closure#1} (inlined)
+            |
+            ---{closure#1} (inlined)
+               clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     2.33%     0.00%  mce-attribution  mce-attribution-0697  [.] extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |
+            ---extend_from_slice<u8, alloc::alloc::Global> (inlined)
+               spec_extend<u8, alloc::alloc::Global> (inlined)
+               append_elements<u8, alloc::alloc::Global> (inlined)
+               |          
+                --2.29%--copy_nonoverlapping<u8> (inlined)
+                          |          
+                           --1.92%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                                     |          
+                                      --1.39%--feed (inlined)
+
+     2.33%     0.00%  mce-attribution  mce-attribution-0697  [.] spec_extend<u8, alloc::alloc::Global> (inlined)
+            |
+            ---spec_extend<u8, alloc::alloc::Global> (inlined)
+               append_elements<u8, alloc::alloc::Global> (inlined)
+               |          
+                --2.29%--copy_nonoverlapping<u8> (inlined)
+                          |          
+                           --1.92%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                                     |          
+                                      --1.39%--feed (inlined)
+
+     2.33%     0.00%  mce-attribution  mce-attribution-0697  [.] append_elements<u8, alloc::alloc::Global> (inlined)
+            |
+            ---append_elements<u8, alloc::alloc::Global> (inlined)
+               |          
+                --2.29%--copy_nonoverlapping<u8> (inlined)
+                          |          
+                           --1.92%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                                     |          
+                                      --1.39%--feed (inlined)
+
+     2.29%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000003
+            |
+            ---0x3
+
+     2.29%     0.00%  mce-attribution  mce-attribution-0697  [.] is_name_character (inlined)
+            |
+            ---is_name_character (inlined)
+               |          
+                --2.21%--is_name_start (inlined)
+
+     2.29%     0.00%  mce-attribution  mce-attribution-0697  [.] next_match (inlined)
+            |
+            ---next_match (inlined)
+
+     2.29%     0.00%  mce-attribution  mce-attribution-0697  [.] copy_nonoverlapping<u8> (inlined)
+            |
+            ---copy_nonoverlapping<u8> (inlined)
+               |          
+                --1.92%--read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                          |          
+                           --1.39%--feed (inlined)
+
+     2.25%     2.25%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_name_character
+            |          
+             --1.63%--is_name_character (inlined)
+                       is_name_start (inlined)
+
+     2.25%     0.00%  mce-attribution  mce-attribution-0697  [.] expand_parts (inlined)
+            |
+            ---expand_parts (inlined)
+
+     2.22%     2.16%  mce-attribution  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     2.21%     0.00%  mce-attribution  mce-attribution-0697  [.] is_name_start (inlined)
+            |
+            ---is_name_start (inlined)
+
+     2.20%     2.20%  mce-attribution  mce-attribution-0697  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+            |          
+             --1.88%--0x55ec6c5a3630
+
+     2.17%     0.00%  mce-attribution  mce-attribution-0697  [.] next_match (inlined)
+            |
+            ---next_match (inlined)
+
+     2.09%     2.09%  mce-attribution  mce-attribution-0697  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+            |          
+             --1.06%--next_match (inlined)
+
+     2.04%     2.04%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::BoundedOutput::push
+            |          
+             --1.14%--push (inlined)
+
+     2.04%     0.00%  mce-attribution  mce-attribution-0697  [.] push (inlined)
+            |
+            ---push (inlined)
+
+     2.00%     0.00%  mce-attribution  [unknown]             [.] 0x000000000000000a
+            |
+            ---0xa
+               |          
+                --1.10%--drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+                          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+                          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+                          drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     1.96%     0.00%  mce-attribution  mce-attribution-0697  [.] read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |
+            ---read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+               |          
+                --1.39%--feed (inlined)
+
+     1.84%     1.84%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::IterState::next
+            |          
+             --1.72%--next (inlined)
+
+     1.84%     0.00%  mce-attribution  mce-attribution-0697  [.] next (inlined)
+            |
+            ---next (inlined)
+
+     1.80%     1.80%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::expand_parts
+     1.80%     1.80%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+            |          
+             --1.39%--process_markup_compatibility (inlined)
+
+     1.76%     0.00%  mce-attribution  mce-attribution-0697  [.] is_qualified_name (inlined)
+            |
+            ---is_qualified_name (inlined)
+               |          
+                --1.02%--split<char> (inlined)
+
+     1.76%     0.00%  mce-attribution  mce-attribution-0697  [.] is_some_and<char, fn(char) -> bool> (inlined)
+            |
+            ---is_some_and<char, fn(char) -> bool> (inlined)
+               call_once<fn(char) -> bool, (char)> (inlined)
+               is_ncname_start (inlined)
+               is_name_start (inlined)
+
+     1.76%     0.00%  mce-attribution  mce-attribution-0697  [.] call_once<fn(char) -> bool, (char)> (inlined)
+            |
+            ---call_once<fn(char) -> bool, (char)> (inlined)
+               is_ncname_start (inlined)
+               is_name_start (inlined)
+
+     1.76%     0.00%  mce-attribution  mce-attribution-0697  [.] is_ncname_start (inlined)
+            |
+            ---is_ncname_start (inlined)
+               is_name_start (inlined)
+
+     1.76%     0.00%  mce-attribution  mce-attribution-0697  [.] is_name_start (inlined)
+            |
+            ---is_name_start (inlined)
+
+     1.72%     1.72%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_qualified_name
+     1.55%     1.55%  mce-attribution  libc.so.6             [.] malloc
+     1.51%     1.51%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::IterState::check_for_duplicates
+            |          
+             --1.43%--check_for_duplicates (inlined)
+
+     1.51%     0.00%  mce-attribution  mce-attribution-0697  [.] check_for_duplicates (inlined)
+            |
+            ---check_for_duplicates (inlined)
+
+     1.43%     1.43%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::state::ReaderState::emit_start
+            |          
+             --1.35%--emit_start (inlined)
+
+     1.43%     0.00%  mce-attribution  mce-attribution-0697  [.] emit_start (inlined)
+            |
+            ---emit_start (inlined)
+
+     1.39%     0.00%  mce-attribution  mce-attribution-0697  [.] from_utf8 (inlined)
+            |
+            ---from_utf8 (inlined)
+
+     1.39%     0.00%  mce-attribution  mce-attribution-0697  [.] feed (inlined)
+            |
+            ---feed (inlined)
+
+     1.39%     1.39%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+            |          
+             --1.35%--extend_from_slice (inlined)
+                       extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                       spec_extend<u8, alloc::alloc::Global> (inlined)
+                       append_elements<u8, alloc::alloc::Global> (inlined)
+                       copy_nonoverlapping<u8> (inlined)
+                       read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+
+     1.35%     0.00%  mce-attribution  [unknown]             [.] 0x000000000000000b
+            |
+            ---0xb
+
+     1.35%     1.35%  mce-attribution  mce-attribution-0697  [.] core::str::converts::from_utf8
+            |          
+             --1.10%--from_utf8 (inlined)
+
+     1.14%     0.00%  mce-attribution  [unknown]             [.] 0x0000000000000009
+            |
+            ---0x9
+
+     1.14%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |
+            ---drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     1.14%     0.00%  mce-attribution  mce-attribution-0697  [.] drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |
+            ---drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     1.14%     0.00%  mce-attribution  mce-attribution-0697  [.] drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+
+     1.02%     0.00%  mce-attribution  mce-attribution-0697  [.] split<char> (inlined)
+            |
+            ---split<char> (inlined)
+
+     1.02%     0.00%  mce-attribution  mce-attribution-0697  [.] any<u8, litchi_ooxml_common::mce::codec::write_start::{closure_env#1}> (inlined)
+            |
+            ---any<u8, litchi_ooxml_common::mce::codec::write_start::{closure_env#1}> (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0697 — fresh remaining MCE ownership attribution
+
+[0697](0697-mce-context-ownership-attribution.md) measures unchanged production
+at `1bf58ace2`: the isolated 18-call real-deck MCE sequence is 2.370–2.392 ms
+across four native legs. Presentation remains 3.32% of isolated time.
+Fresh self shares are 26.52% `start`, 7.16% `Inherited` destruction and 4.86%
+`Ctx` destruction. Frozen assembly and instruction samples distinguish two
+temporary namespace clone/drop pairs from the owners retained by parser frames.
+This is attribution evidence for a subsequent borrowed-view experiment, not an
+A/B speedup or an end-to-end capture fraction. Production is unchanged.
+
 ## 0696 — empty MCE namespace installation comparison
 
 [0696](0696-mce-empty-namespace-installation.md) retains a fresh 7,800-sample

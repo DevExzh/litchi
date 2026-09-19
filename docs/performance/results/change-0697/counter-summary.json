@@ -1,0 +1,317 @@
+[
+  {
+    "case": "all",
+    "repeat": 0,
+    "counts": {
+      "10": {
+        "cycles": 1091764668.0,
+        "instructions": 5021670041.0,
+        "branches": 1014072053.0,
+        "branch-misses": 1959439.0,
+        "cache-misses": 106039.0,
+        "page-faults": 3535.0,
+        "task-clock": 265.15
+      },
+      "210": {
+        "cycles": 22360139084.0,
+        "instructions": 104334307363.0,
+        "branches": 21075780198.0,
+        "branch-misses": 38500916.0,
+        "cache-misses": 865539.0,
+        "page-faults": 66600.0,
+        "task-clock": 4984.68
+      }
+    },
+    "per_sequence": {
+      "cycles": 10634187.208,
+      "instructions": 49656318.661,
+      "branches": 10030854.0725,
+      "branch-misses": 18270.7385,
+      "cache-misses": 379.75,
+      "page-faults": 31.5325,
+      "task-clock": 2.3597650000000003
+    },
+    "ipc": 4.669498259692476,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "all",
+    "repeat": 1,
+    "counts": {
+      "10": {
+        "cycles": 1094026798.0,
+        "instructions": 5017482397.0,
+        "branches": 1013191431.0,
+        "branch-misses": 2021339.0,
+        "cache-misses": 104596.0,
+        "page-faults": 3291.0,
+        "task-clock": 244.11
+      },
+      "210": {
+        "cycles": 22881980153.0,
+        "instructions": 104325285195.0,
+        "branches": 21073035645.0,
+        "branch-misses": 45984511.0,
+        "cache-misses": 841777.0,
+        "page-faults": 71261.0,
+        "task-clock": 5101.08
+      }
+    },
+    "per_sequence": {
+      "cycles": 10893976.6775,
+      "instructions": 49653901.399,
+      "branches": 10029922.107,
+      "branch-misses": 21981.586,
+      "cache-misses": 368.5905,
+      "page-faults": 33.985,
+      "task-clock": 2.4284850000000002
+    },
+    "ipc": 4.557922498728426,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "all",
+    "repeat": 2,
+    "counts": {
+      "10": {
+        "cycles": 1079034255.0,
+        "instructions": 5017917584.0,
+        "branches": 1013270923.0,
+        "branch-misses": 1950761.0,
+        "cache-misses": 99292.0,
+        "page-faults": 3560.0,
+        "task-clock": 240.86
+      },
+      "210": {
+        "cycles": 22534538602.0,
+        "instructions": 104213571063.0,
+        "branches": 21054047841.0,
+        "branch-misses": 39378685.0,
+        "cache-misses": 755072.0,
+        "page-faults": 53247.0,
+        "task-clock": 5026.29
+      }
+    },
+    "per_sequence": {
+      "cycles": 10727752.1735,
+      "instructions": 49597826.7395,
+      "branches": 10020388.459,
+      "branch-misses": 18713.962,
+      "cache-misses": 327.89,
+      "page-faults": 24.8435,
+      "task-clock": 2.392715
+    },
+    "ipc": 4.6233195861867475,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "presentation",
+    "repeat": 0,
+    "counts": {
+      "10": {
+        "cycles": 39038630.0,
+        "instructions": 177797071.0,
+        "branches": 36842873.0,
+        "branch-misses": 70117.0,
+        "cache-misses": 53828.0,
+        "page-faults": 178.0,
+        "task-clock": 8.86
+      },
+      "210": {
+        "cycles": 758362360.0,
+        "instructions": 3663816313.0,
+        "branches": 760535490.0,
+        "branch-misses": 1058731.0,
+        "cache-misses": 57786.0,
+        "page-faults": 178.0,
+        "task-clock": 169.13
+      }
+    },
+    "per_sequence": {
+      "cycles": 359661.865,
+      "instructions": 1743009.621,
+      "branches": 361846.3085,
+      "branch-misses": 494.307,
+      "cache-misses": 1.979,
+      "page-faults": 0.0,
+      "task-clock": 0.08013499999999998
+    },
+    "ipc": 4.846245294868835,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "presentation",
+    "repeat": 1,
+    "counts": {
+      "10": {
+        "cycles": 39407592.0,
+        "instructions": 177970604.0,
+        "branches": 36877820.0,
+        "branch-misses": 76314.0,
+        "cache-misses": 51977.0,
+        "page-faults": 181.0,
+        "task-clock": 8.93
+      },
+      "210": {
+        "cycles": 759342857.0,
+        "instructions": 3666318951.0,
+        "branches": 761111331.0,
+        "branch-misses": 942112.0,
+        "cache-misses": 63592.0,
+        "page-faults": 179.0,
+        "task-clock": 169.38
+      }
+    },
+    "per_sequence": {
+      "cycles": 359967.6325,
+      "instructions": 1744174.1735,
+      "branches": 362116.7555,
+      "branch-misses": 432.899,
+      "cache-misses": 5.8075,
+      "page-faults": -0.001,
+      "task-clock": 0.08022499999999999
+    },
+    "ipc": 4.845363905044991,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "presentation",
+    "repeat": 2,
+    "counts": {
+      "10": {
+        "cycles": 39098632.0,
+        "instructions": 177983470.0,
+        "branches": 36879014.0,
+        "branch-misses": 72329.0,
+        "cache-misses": 54764.0,
+        "page-faults": 178.0,
+        "task-clock": 8.88
+      },
+      "210": {
+        "cycles": 753911124.0,
+        "instructions": 3665521793.0,
+        "branches": 760924626.0,
+        "branch-misses": 988766.0,
+        "cache-misses": 61546.0,
+        "page-faults": 178.0,
+        "task-clock": 168.2
+      }
+    },
+    "per_sequence": {
+      "cycles": 357406.246,
+      "instructions": 1743769.1615,
+      "branches": 362022.806,
+      "branch-misses": 458.2185,
+      "cache-misses": 3.391,
+      "page-faults": 0.0,
+      "task-clock": 0.07966
+    },
+    "ipc": 4.878955477179881,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "slides",
+    "repeat": 0,
+    "counts": {
+      "10": {
+        "cycles": 1037346417.0,
+        "instructions": 4837901422.0,
+        "branches": 976081559.0,
+        "branch-misses": 1926841.0,
+        "cache-misses": 92228.0,
+        "page-faults": 2633.0,
+        "task-clock": 231.27
+      },
+      "210": {
+        "cycles": 21564381666.0,
+        "instructions": 100577747592.0,
+        "branches": 20289589453.0,
+        "branch-misses": 37060433.0,
+        "cache-misses": 833110.0,
+        "page-faults": 64522.0,
+        "task-clock": 4806.6
+      }
+    },
+    "per_sequence": {
+      "cycles": 10263517.6245,
+      "instructions": 47869923.085,
+      "branches": 9656753.947,
+      "branch-misses": 17566.796,
+      "cache-misses": 370.441,
+      "page-faults": 30.9445,
+      "task-clock": 2.287665
+    },
+    "ipc": 4.664085437017217,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "slides",
+    "repeat": 1,
+    "counts": {
+      "10": {
+        "cycles": 1040890896.0,
+        "instructions": 4833673799.0,
+        "branches": 975048817.0,
+        "branch-misses": 1861473.0,
+        "cache-misses": 92375.0,
+        "page-faults": 2550.0,
+        "task-clock": 232.19
+      },
+      "210": {
+        "cycles": 21567700437.0,
+        "instructions": 100206000778.0,
+        "branches": 20234739814.0,
+        "branch-misses": 39025247.0,
+        "cache-misses": 362683.0,
+        "page-faults": 1230.0,
+        "task-clock": 4807.27
+      }
+    },
+    "per_sequence": {
+      "cycles": 10263404.7705,
+      "instructions": 47686163.4895,
+      "branches": 9629845.4985,
+      "branch-misses": 18581.887,
+      "cache-misses": 135.154,
+      "page-faults": -0.66,
+      "task-clock": 2.2875400000000004
+    },
+    "ipc": 4.646232371791849,
+    "task_clock_unit": "milliseconds"
+  },
+  {
+    "case": "slides",
+    "repeat": 2,
+    "counts": {
+      "10": {
+        "cycles": 1049828600.0,
+        "instructions": 4831732482.0,
+        "branches": 975379902.0,
+        "branch-misses": 2005460.0,
+        "cache-misses": 86604.0,
+        "page-faults": 872.0,
+        "task-clock": 234.19
+      },
+      "210": {
+        "cycles": 21580112883.0,
+        "instructions": 100677510191.0,
+        "branches": 20318706290.0,
+        "branch-misses": 37820457.0,
+        "cache-misses": 758340.0,
+        "page-faults": 68549.0,
+        "task-clock": 4811.48
+      }
+    },
+    "per_sequence": {
+      "cycles": 10265142.1415,
+      "instructions": 47922888.8545,
+      "branches": 9671663.194,
+      "branch-misses": 17907.4985,
+      "cache-misses": 335.868,
+      "page-faults": 33.8385,
+      "task-clock": 2.288645
+    },
+    "ipc": 4.668507088738397,
+    "task_clock_unit": "milliseconds"
+  }
+]

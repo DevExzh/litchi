@@ -1,0 +1,100 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "exit_code": 2,
+  "disposition": "Only byte-preserved XML corpus and raw tool output have whitespace findings; authored sources and documentation pass.",
+  "exceptions": [
+    {
+      "path": "docs/performance/results/change-0697/profile/all-0-10.stderr",
+      "sha256": "22478126d7e5e4726c1163249cb1d49faf129196387c51e91dae9d1d8794447c"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/all-0-210.stderr",
+      "sha256": "1d9622cc140e7a3954b38fb4053174410c0a54347e5009bac03a9933857c9486"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/all-1-10.stderr",
+      "sha256": "0564067b78413c564824ab75f72718e82a84588a2a3a39c412a1de89df5648fb"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/all-1-210.stderr",
+      "sha256": "8e02e301f667c244d9416e979ce85405ef209dcc0d0f0373f92ee7d8252ff87f"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/all-2-10.stderr",
+      "sha256": "5c2984df92559a27fe9c6d9b59a172d395a7cdc0c8eeca21b516146ef94a10aa"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/all-2-210.stderr",
+      "sha256": "3e5d119dd59bc9974ed0b42e34a88eece3d9b5a8bb83362dbb5ab742313514c7"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/inclusive.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/inclusive.stdout",
+      "sha256": "1663097d595ed08e693acee89c863353e7faec01093b3976e44fd92d2ad0eadf"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-0-10.stderr",
+      "sha256": "6878f9d0663e8a569dde16df3b68ca0d1c5a309f530f1477ef56e2d6ade2b8e8"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-0-210.stderr",
+      "sha256": "1593b77b4cebb814a512fec86b0e99aea5d06769aa970bf50bf64c91df9b5688"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-1-10.stderr",
+      "sha256": "96bc333670918e6755d29444718b117538b1443b15f75eb612dcbc18755f7a95"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-1-210.stderr",
+      "sha256": "8e74fb67d60d40207ad6c145b15fd0ccc39e838e8aa25165583caa6ccf948698"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-2-10.stderr",
+      "sha256": "98f94d5a7a889cdb42016c0e8c1e88d5ad3704e9486c93008d3f1625f579b934"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/presentation-2-210.stderr",
+      "sha256": "21a691cdb6a58638793f77c8892ded5f774bfdf61f06c365b59b7a8501f9e7fb"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/self.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/self.stdout",
+      "sha256": "89c416df33409f59ff92d8e353555afd5afa3270672b2f12f70891a5761f40df"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-0-10.stderr",
+      "sha256": "978ab55c3cdf06d57d3e729de5b668586e71d25040d8c9feeb3f94aafcc528ec"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-0-210.stderr",
+      "sha256": "42d355f108267e87aedebd30520d027127ed4ab7f7ec4453cd200501a452b299"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-1-10.stderr",
+      "sha256": "5ebfd4e59c477747333ec2bbf408e428a34d6a167e27551da1eb2064575a4680"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-1-210.stderr",
+      "sha256": "390eba3f4fbf7cb28549c4bd77426544fbb1142f52ed33abd755887fe69eabc2"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-2-10.stderr",
+      "sha256": "15b618b02ef5d6d257728789939422152fc0f85c0a598d916e37d2db97d12510"
+    },
+    {
+      "path": "docs/performance/results/change-0697/profile/slides-2-210.stderr",
+      "sha256": "18da3a1d5f274621f74e90c3499cee1a34b722345c6b3521a45b1cb45bfd7baf"
+    }
+  ]
+}

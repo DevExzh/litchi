@@ -1,0 +1,119 @@
+{
+  "binary_sha256": "02312667a7b0931fa37501702315241c1b0c4e6954d87d49ab625098a6dddd75",
+  "profile_data_sha256": "831d7428e147b6c3ae4308947f66e5abcf66976604f0230b00b6fe319302a073",
+  "runs": [
+    {
+      "name": "symbols",
+      "command": [
+        "nm",
+        "-S",
+        "-C",
+        "/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "8ad50927330f26fff76ab991ee3616d1675649bdb9aa2ef1636b124429e474b5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "raw-symbols",
+      "command": [
+        "nm",
+        "-S",
+        "/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "5870a17c916bbf965c6695348df6144d24b018555b37fdb8946c28195f8ba9e8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "start-assembly",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--disassemble=_ZN19litchi_ooxml_common3mce5codec5start17h3624f475b8803444E",
+        "/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "2d1dfe97a535e072a4f100dcea8765ad18f082ce975f5c13b8b779a4df16df2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "start",
+      "command": [
+        "perf",
+        "annotate",
+        "--stdio",
+        "--show-nr-samples",
+        "--symbol",
+        "litchi_ooxml_common::mce::codec::start",
+        "-i",
+        "/home/zhuhe/code/litchi-0697-profile/all.data"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "eb3c12e6ef995760346875860c9af53a466139958f42b696fa4dd0131beabb66",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "inherited-drop-assembly",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--disassemble=_ZN4core3ptr63drop_in_place$LT$litchi_ooxml_common..mce..codec..Inherited$GT$17hac69d4aa8ae88544E",
+        "/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "2d1dfe97a535e072a4f100dcea8765ad18f082ce975f5c13b8b779a4df16df2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "inherited-drop",
+      "command": [
+        "perf",
+        "annotate",
+        "--stdio",
+        "--show-nr-samples",
+        "--symbol",
+        "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>",
+        "-i",
+        "/home/zhuhe/code/litchi-0697-profile/all.data"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "08d3cb88d4ecf9a2b4fe96c90774c86b77a40e1601e5590a01137f2dad9e942d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ctx-drop-assembly",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--disassemble=_ZN4core3ptr57drop_in_place$LT$litchi_ooxml_common..mce..codec..Ctx$GT$17had12a7f2e806ee9dE",
+        "/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "2d1dfe97a535e072a4f100dcea8765ad18f082ce975f5c13b8b779a4df16df2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ctx-drop",
+      "command": [
+        "perf",
+        "annotate",
+        "--stdio",
+        "--show-nr-samples",
+        "--symbol",
+        "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>",
+        "-i",
+        "/home/zhuhe/code/litchi-0697-profile/all.data"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e4f86fa334f1338ed5fe74a990495cf9e9190f73cc3fdfae374e9900f02e04e6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

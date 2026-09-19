@@ -1,0 +1,17 @@
+{
+  "pptx_git_tree": {
+    "829bed696500c8ad2f461156985ff1bcf075346f": "8020ce6821568c49c80a683ac471ec269081146b",
+    "1bf58ace2c2d69db4ab88e21f62aff5f1ba7cf1e": "8020ce6821568c49c80a683ac471ec269081146b"
+  },
+  "historical_trace": {
+    "change": "0693",
+    "commit": "829bed696500c8ad2f461156985ff1bcf075346f",
+    "trace_source": "docs/performance/results/change-0693/trace-runs/20260919T195826994463Z-3152718"
+  },
+  "current_candidate": {
+    "change": "0696",
+    "commit": "1bf58ace2c2d69db4ab88e21f62aff5f1ba7cf1e",
+    "subject": "perf(ooxml): skip empty namespace scope installation"
+  },
+  "statement": "The complete PPTX source tree is byte-identical between the retained 0693 capture topology and current 0696 source. The shared MCE codec changed in 0696; historical trace timings are provenance only and are not reused as measurements."
+}

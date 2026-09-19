@@ -1,0 +1,79 @@
+{
+  "scope": "Instruction samples in the isolated MCE profile, not atomic latency or predicted savings; samples may skid.",
+  "rows": [
+    {
+      "symbol_case": "start",
+      "symbol_samples": 649,
+      "observations": [
+        {
+          "label": "parent Ctx namespace clone",
+          "atomic_address": "0x4311a",
+          "sampled_following_address": "0x4311e",
+          "following_instruction": "jle     0x43301 <litchi_ooxml_common::mce::codec::start+0x8c1>",
+          "following_samples": 205
+        },
+        {
+          "label": "parent Ctx directive clone",
+          "atomic_address": "0x43131",
+          "sampled_following_address": "0x43135",
+          "following_instruction": "jle     0x43301 <litchi_ooxml_common::mce::codec::start+0x8c1>",
+          "following_samples": 0
+        },
+        {
+          "label": "temporary Inherited namespace clone",
+          "atomic_address": "0x43168",
+          "sampled_following_address": "0x4316c",
+          "following_instruction": "jle     0x43301 <litchi_ooxml_common::mce::codec::start+0x8c1>",
+          "following_samples": 62
+        },
+        {
+          "label": "temporary Inherited emitted-boundary clone",
+          "atomic_address": "0x432fb",
+          "sampled_following_address": "0x432ff",
+          "following_instruction": "jg      0x43305 <litchi_ooxml_common::mce::codec::start+0x8c5>",
+          "following_samples": 59
+        },
+        {
+          "label": "ordinary-path child emitted-boundary owner",
+          "atomic_address": "0x45b2e",
+          "sampled_following_address": "0x45b32",
+          "following_instruction": "jg      0x45b48 <litchi_ooxml_common::mce::codec::start+0x3108>",
+          "following_samples": 213
+        }
+      ]
+    },
+    {
+      "symbol_case": "inherited-drop",
+      "symbol_samples": 175,
+      "observations": [
+        {
+          "label": "temporary Inherited namespace release",
+          "atomic_address": "0x4767f",
+          "sampled_following_address": "0x47683",
+          "following_instruction": "jne     0x4768e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>",
+          "following_samples": 132
+        },
+        {
+          "label": "temporary Inherited emitted-boundary release",
+          "atomic_address": "0x47697",
+          "sampled_following_address": "0x4769b",
+          "following_instruction": "jne     0x476b1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>",
+          "following_samples": 43
+        }
+      ]
+    },
+    {
+      "symbol_case": "ctx-drop",
+      "symbol_samples": 119,
+      "observations": [
+        {
+          "label": "Ctx namespace release",
+          "atomic_address": "0x4746f",
+          "sampled_following_address": "0x47473",
+          "following_instruction": "jne     0x4747e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>+0x1e>",
+          "following_samples": 119
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+ Samples |	Source code & Disassembly of mce-attribution-0697 for cpu/cycles/P (175 samples, percent: local period)
+-----------------------------------------------------------------------------------------------------------------------
+         : 0     0x47670 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>>:
+       0 :   47670:        pushq   %r14
+       0 :   47672:        pushq   %rbx
+       0 :   47673:        pushq   %rax
+       0 :   47674:        movq    %rdi, %rbx
+       0 :   47677:        movq    (%rdi), %rax
+       0 :   4767a:        testq   %rax, %rax
+       0 :   4767d:        je      0x4768e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+       0 :   4767f:        lock
+       0 :   47680:        decq    (%rax)
+     132 :   47683:        jne     0x4768e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+       0 :   47685:        movq    %rbx, %rdi
+       0 :   47688:        callq   *0x55bd2(%rip)  # 0x9d260 <_DYNAMIC+0x430>
+       0 :   4768e:        movq    0x8(%rbx), %rax
+       0 :   47692:        testq   %rax, %rax
+       0 :   47695:        je      0x476b1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+       0 :   47697:        lock
+       0 :   47698:        decq    (%rax)
+      43 :   4769b:        jne     0x476b1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+       0 :   4769d:        addq    $0x8, %rbx
+       0 :   476a1:        movq    %rbx, %rdi
+       0 :   476a4:        addq    $0x8, %rsp
+       0 :   476a8:        popq    %rbx
+       0 :   476a9:        popq    %r14
+       0 :   476ab:        jmpq    *0x55baf(%rip)  # 0x9d260 <_DYNAMIC+0x430>
+       0 :   476b1:        addq    $0x8, %rsp
+       0 :   476b5:        popq    %rbx
+       0 :   476b6:        popq    %r14
+       0 :   476b8:        retq
+       0 :   476b9:        movq    %rax, %r14
+       0 :   476bc:        movq    0x8(%rbx), %rax
+       0 :   476c0:        testq   %rax, %rax
+       0 :   476c3:        je      0x476d8 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+       0 :   476c5:        lock
+       0 :   476c6:        decq    (%rax)
+       0 :   476c9:        jne     0x476d8 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+       0 :   476cb:        addq    $0x8, %rbx
+       0 :   476cf:        movq    %rbx, %rdi
+       0 :   476d2:        callq   *0x55b88(%rip)  # 0x9d260 <_DYNAMIC+0x430>
+       0 :   476d8:        movq    %r14, %rdi
+       0 :   476db:        callq   0x99340 <_fini+0x30>
+       0 :   476e0:        callq   *0x55a42(%rip)  # 0x9d128 <_DYNAMIC+0x2f8>
