@@ -72,18 +72,23 @@ recorded by the same freeze manifest.
 * **Zero-read refusal:** `AVERAGE` records `#VALUE!` for an explicit
   `ReferenceList` before `scan_reference`, so the rejected list causes no
   physical cell reads. `COUNTBLANK` enters the resolver scan only for an
-  admitted reference; constants, arrays, and invalid scalar shapes return a
-  formula error without resolver reads. Reference-cell and storage-limit
-  tests also verify refusal before provider access and release of evaluator
-  memory.
+  admitted reference. Direct constants and literal arrays require no resolver
+  reads; rejecting an already evaluated non-reference descriptor adds no reads.
+  Computed arguments can read cells during argument evaluation before this
+  type gate, so this is not a zero-read guarantee for arbitrary expressions.
+  There is no AST preflight that skips computed argument evaluation.
+  Reference-cell and storage-limit tests also verify refusal before provider
+  access and release of evaluator memory.
 
 ## Demand-cache checks
 
 Statistical functions are included in the projected-branch cache lookup before
-their arguments are scheduled and in the apply-time cache get/put path. Their
-arguments enter `VisitMatrixArgument`, preserving complete arrays and reference
-geometry while a reducer produces one scalar. Shape planning and reference-kind
-classification likewise treat every reducer as scalar-valued.
+their arguments are scheduled and in the apply-time cache get/put path.
+Literal array arguments enter `VisitMatrixArgument`; reference arguments retain their area
+geometry through `VisitArgument`. Computed arguments retain the enclosing
+projection so position-dependent scalar descendants are not flattened. Shape
+planning and reference-kind classification likewise treat every reducer as
+scalar-valued.
 
 The cacheability walk is iterative and budgeted. A nested statistical reducer
 propagates the complete-reference context through its sequence arguments, so a
