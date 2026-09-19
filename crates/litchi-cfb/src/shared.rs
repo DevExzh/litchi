@@ -11,7 +11,7 @@ use std::{
     cmp::Ordering,
     io::{self, Read, Seek, SeekFrom},
     sync::{
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, Weak,
         atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering},
     },
 };
@@ -138,6 +138,29 @@ pub struct StreamChainHint<'a> {
     resume: Option<ChainResume>,
 }
 
+/// An immutable allocation-chain checkpoint that can outlive a borrowed hint.
+///
+/// This retains only a weak identity for the reader's immutable parsed index
+/// and a validated chain position. It owns no source bytes, stream cursor, or
+/// allocation table. Each reader constructs its own private index allocation;
+/// a checkpoint from another reader is ignored, even for equal input bytes.
+/// The weak control block prevents identity reuse after the reader is dropped.
+/// Restoring a checkpoint never replaces source freshness checks.
+#[derive(Clone)]
+pub struct StreamChainCheckpoint {
+    index: Weak<ParsedOleIndex>,
+    resume: Option<ChainResume>,
+}
+
+impl std::fmt::Debug for StreamChainCheckpoint {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("StreamChainCheckpoint")
+            .field("has_position", &self.resume.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct ChainResume {
     /// Directory entry identity. All three fields must match before a retained
@@ -152,6 +175,16 @@ struct ChainResume {
 }
 
 impl<'a> StreamChainHint<'a> {
+    /// Captures this validated position without retaining the reader or its
+    /// allocation tables. No allocation or source read is performed.
+    #[must_use]
+    pub fn checkpoint(&self) -> StreamChainCheckpoint {
+        StreamChainCheckpoint {
+            index: Arc::downgrade(&self.file.index),
+            resume: self.resume,
+        }
+    }
+
     /// Where to begin walking for `ordinal`: the retained position when it
     /// belongs to this reader and this stream and is at or before `ordinal`,
     /// and the stream's first sector in every other case.
@@ -849,6 +882,30 @@ impl SharedOleFile {
         StreamChainHint {
             file: self,
             resume: None,
+        }
+    }
+
+    /// Restores a local hint when `checkpoint` belongs to this reader's
+    /// immutable index, or returns an empty hint for a foreign checkpoint.
+    ///
+    /// Stream identity, allocation-table identity, first-sector identity and
+    /// backward-offset checks still run in the ordinary hinted read methods.
+    /// No lock, source read, or allocation occurs here. Every reader currently
+    /// creates a distinct private parsed index; an API that shares indexes
+    /// between readers must preserve this identity boundary explicitly.
+    #[must_use]
+    pub fn chain_hint_from_checkpoint(
+        &self,
+        checkpoint: &StreamChainCheckpoint,
+    ) -> StreamChainHint<'_> {
+        // The stored Weak keeps the allocation control block alive even after
+        // its value dies, so its address cannot be recycled for a new index.
+        // Compare identities without dereferencing either pointer or creating
+        // a temporary weak reference (and changing its atomic count).
+        let matches = std::ptr::eq(checkpoint.index.as_ptr(), Arc::as_ptr(&self.index));
+        StreamChainHint {
+            file: self,
+            resume: if matches { checkpoint.resume } else { None },
         }
     }
 
@@ -6278,6 +6335,67 @@ mod tests {
         pieces
     }
 
+    /// Captures one checkpoint after a successful chain walk, drops the
+    /// borrowed hint, and compares restored reads with fresh reads.  The
+    /// source ranges and version observations are part of the oracle: a
+    /// checkpoint may remove chain-table work, but it must not change the
+    /// positional I/O or freshness fences.
+    fn assert_checkpoint_matches_unhinted(
+        bytes: &[u8],
+        path: &[&str],
+        warm_offset: u64,
+        requests: &[(u64, usize)],
+    ) {
+        let source = Arc::new(TestSource::new(bytes.to_vec()));
+        let file = shared(Arc::clone(&source));
+        let checkpoint = {
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(path, warm_offset, &mut warm, &mut hint)
+                .unwrap();
+            assert!(
+                hint.resume.is_some(),
+                "the warm leg must retain a chain position"
+            );
+            let checkpoint = hint.checkpoint();
+            assert!(
+                checkpoint.resume.is_some(),
+                "the checkpoint must retain the validated chain position"
+            );
+            checkpoint
+        };
+
+        // The checkpoint outlives the borrowed hint above.  A fresh local hint
+        // is made for every request so the comparison exercises restoration,
+        // rather than accidentally carrying state from the previous request.
+        for &(offset, length) in requests {
+            source.reset_observation_counts();
+            let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+            let mut checkpoint_output = vec![0_u8; length];
+            file.read_stream_range_hinted(path, offset, &mut checkpoint_output, &mut restored)
+                .unwrap();
+            let checkpoint_ranges = source.read_ranges();
+            let checkpoint_counts = source.observation_counts();
+
+            source.reset_observation_counts();
+            let mut plain_output = vec![0_u8; length];
+            file.read_stream_range(path, offset, &mut plain_output)
+                .unwrap();
+
+            assert_eq!(checkpoint_output, plain_output);
+            assert_eq!(
+                checkpoint_ranges,
+                source.read_ranges(),
+                "checkpoint changed positional reads for {path:?} at {offset}"
+            );
+            assert_eq!(
+                checkpoint_counts,
+                source.observation_counts(),
+                "checkpoint changed source fences for {path:?} at {offset}"
+            );
+        }
+    }
+
     #[test]
     fn a_hinted_fat_read_matches_an_unhinted_one_over_every_partition() {
         let bytes = sample_bytes();
@@ -6339,6 +6457,259 @@ mod tests {
                 &uniform_partition(expected.len(), piece),
             );
         }
+    }
+
+    #[test]
+    fn a_checkpoint_restores_a_fat_position_after_the_borrowed_hint_is_dropped() {
+        // The checkpoint is created inside the hint's borrow scope and used
+        // after that hint has been dropped.  The patterned fragmented chain
+        // makes a wrong physical resume observable in the returned bytes.
+        let bytes = fragmented_large_bytes();
+        assert_checkpoint_matches_unhinted(
+            &bytes,
+            &["Large"],
+            1_024,
+            &[(1_536, 512), (2_048, 512), (512, 1_024), (4_096, 512)],
+        );
+    }
+
+    #[test]
+    fn a_checkpoint_restores_fat_and_minifat_chains_without_changing_io() {
+        let fat = sample_bytes();
+        assert_checkpoint_matches_unhinted(
+            &fat,
+            &["Large"],
+            1_024,
+            &[(1_536, 256), (4_096, 512), (512, 256)],
+        );
+
+        let (mini, expected) = large_mini_bytes(512, 4_095);
+        assert_checkpoint_matches_unhinted(
+            &mini,
+            &["Mini"],
+            1_024,
+            &[
+                (1_536, 128),
+                (2_048, 512),
+                (64, 128),
+                (expected.len() as u64 - 63, 63),
+            ],
+        );
+
+        let (mini, expected) = large_mini_bytes(4096, 4_000);
+        assert_checkpoint_matches_unhinted(
+            &mini,
+            &["Mini"],
+            999,
+            &[
+                (1_000, 128),
+                (2_000, 512),
+                (0, 64),
+                (expected.len() as u64 - 32, 32),
+            ],
+        );
+    }
+
+    #[test]
+    fn an_empty_checkpoint_restores_as_a_cold_hint() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let checkpoint = {
+            let hint = file.chain_hint();
+            assert!(hint.resume.is_none());
+            let checkpoint = hint.checkpoint();
+            assert!(checkpoint.resume.is_none());
+            checkpoint
+        };
+
+        source.reset_observation_counts();
+        let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+        assert!(restored.resume.is_none());
+        let mut checkpoint_output = vec![0_u8; 1_024];
+        file.read_stream_range_hinted(&["Large"], 1_024, &mut checkpoint_output, &mut restored)
+            .unwrap();
+        let checkpoint_ranges = source.read_ranges();
+        let checkpoint_counts = source.observation_counts();
+
+        source.reset_observation_counts();
+        let mut plain_output = vec![0_u8; 1_024];
+        file.read_stream_range(&["Large"], 1_024, &mut plain_output)
+            .unwrap();
+        assert_eq!(checkpoint_output, plain_output);
+        assert_eq!(checkpoint_ranges, source.read_ranges());
+        assert_eq!(checkpoint_counts, source.observation_counts());
+    }
+
+    #[test]
+    fn a_checkpoint_from_another_owner_is_ignored_even_for_equal_stream_identity() {
+        // Both files expose the same SID, allocation mode, and first sector;
+        // only the private parsed-index allocation separates their identity.
+        // Their later chain legs carry different bytes, so trusting the
+        // checkpoint would be immediately visible.
+        let contiguous = sample_bytes();
+        let plain_source = Arc::new(TestSource::new(contiguous));
+        let plain = shared(Arc::clone(&plain_source));
+        let checkpoint = {
+            let mut hint = plain.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            plain
+                .read_stream_range_hinted(&["Large"], 1_024, &mut warm, &mut hint)
+                .unwrap();
+            hint.checkpoint()
+        };
+
+        let other_source = Arc::new(TestSource::new(fragmented_large_bytes()));
+        let other = shared(Arc::clone(&other_source));
+        assert!(!Weak::ptr_eq(
+            &checkpoint.index,
+            &Arc::downgrade(&other.index)
+        ));
+
+        other_source.reset_observation_counts();
+        let mut restored = other.chain_hint_from_checkpoint(&checkpoint);
+        let mut checkpoint_output = vec![0_u8; 1_024];
+        other
+            .read_stream_range_hinted(&["Large"], 1_024, &mut checkpoint_output, &mut restored)
+            .unwrap();
+        let checkpoint_ranges = other_source.read_ranges();
+        let checkpoint_counts = other_source.observation_counts();
+
+        other_source.reset_observation_counts();
+        let mut plain_output = vec![0_u8; 1_024];
+        other
+            .read_stream_range(&["Large"], 1_024, &mut plain_output)
+            .unwrap();
+        assert_eq!(checkpoint_output, plain_output);
+        assert_eq!(
+            checkpoint_output,
+            fragmented_payload()[1_024..2_048],
+            "the foreign checkpoint must not read the first owner's bytes"
+        );
+        assert_eq!(checkpoint_ranges, other_source.read_ranges());
+        assert_eq!(checkpoint_counts, other_source.observation_counts());
+    }
+
+    #[test]
+    fn an_expired_checkpoint_from_a_dropped_owner_starts_a_fresh_walk() {
+        let checkpoint = {
+            let source = Arc::new(TestSource::new(sample_bytes()));
+            let file = shared(source);
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(&["Large"], 1_024, &mut warm, &mut hint)
+                .unwrap();
+            let checkpoint = hint.checkpoint();
+            assert!(checkpoint.index.upgrade().is_some());
+            checkpoint
+        };
+        assert!(
+            checkpoint.index.upgrade().is_none(),
+            "a weak checkpoint must not keep a dropped parsed index alive"
+        );
+
+        let source = Arc::new(TestSource::new(fragmented_large_bytes()));
+        let file = shared(Arc::clone(&source));
+        source.reset_observation_counts();
+        let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+        let mut checkpoint_output = vec![0_u8; 1_024];
+        file.read_stream_range_hinted(&["Large"], 1_024, &mut checkpoint_output, &mut restored)
+            .unwrap();
+        let checkpoint_ranges = source.read_ranges();
+        let checkpoint_counts = source.observation_counts();
+
+        source.reset_observation_counts();
+        let mut plain_output = vec![0_u8; 1_024];
+        file.read_stream_range(&["Large"], 1_024, &mut plain_output)
+            .unwrap();
+        assert_eq!(checkpoint_output, plain_output);
+        assert_eq!(checkpoint_ranges, source.read_ranges());
+        assert_eq!(checkpoint_counts, source.observation_counts());
+    }
+
+    #[test]
+    fn a_checkpoint_cannot_cross_streams_or_move_a_read_backward() {
+        let bytes = sample_bytes();
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(Arc::clone(&source));
+        let checkpoint = {
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(&["Large"], 7_168, &mut warm, &mut hint)
+                .unwrap();
+            hint.checkpoint()
+        };
+
+        // The stream identity guard must discard a checkpoint captured from a
+        // FAT stream when a MiniFAT stream is selected next.
+        source.reset_observation_counts();
+        let mut wrong_stream = file.chain_hint_from_checkpoint(&checkpoint);
+        let mut small = [0_u8; 11];
+        file.read_stream_range_hinted(&["Small"], 0, &mut small, &mut wrong_stream)
+            .unwrap();
+        let wrong_stream_ranges = source.read_ranges();
+        let wrong_stream_counts = source.observation_counts();
+        source.reset_observation_counts();
+        let mut plain_small = [0_u8; 11];
+        file.read_stream_range(&["Small"], 0, &mut plain_small)
+            .unwrap();
+        assert_eq!(&small, b"mini stream");
+        assert_eq!(small, plain_small);
+        assert_eq!(wrong_stream_ranges, source.read_ranges());
+        assert_eq!(wrong_stream_counts, source.observation_counts());
+
+        // The same checkpoint is now offered for a lower offset on its own
+        // stream.  The singly linked chain must restart at its first sector.
+        source.reset_observation_counts();
+        let mut backward = file.chain_hint_from_checkpoint(&checkpoint);
+        let mut backward_output = vec![0_u8; 1_024];
+        file.read_stream_range_hinted(&["Large"], 512, &mut backward_output, &mut backward)
+            .unwrap();
+        let backward_ranges = source.read_ranges();
+        let backward_counts = source.observation_counts();
+        source.reset_observation_counts();
+        let mut plain_output = vec![0_u8; 1_024];
+        file.read_stream_range(&["Large"], 512, &mut plain_output)
+            .unwrap();
+        assert_eq!(backward_output, plain_output);
+        assert_eq!(backward_ranges, source.read_ranges());
+        assert_eq!(backward_counts, source.observation_counts());
+    }
+
+    #[test]
+    fn a_checkpoint_cannot_cross_two_minifat_streams_with_the_same_table() {
+        let (bytes, _selected) = two_mini_bytes(4_095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(Arc::clone(&source));
+        let selected = file.find_entry(&["Selected"]).unwrap();
+        let other = file.find_entry(&["Other"]).unwrap();
+        assert!(selected.is_minifat && other.is_minifat);
+        assert_ne!(selected.sid, other.sid);
+        assert_ne!(selected.start_sector, other.start_sector);
+
+        let checkpoint = {
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(&["Selected"], 1_024, &mut warm, &mut hint)
+                .unwrap();
+            hint.checkpoint()
+        };
+
+        source.reset_observation_counts();
+        let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+        let mut checkpoint_output = vec![0_u8; 128];
+        file.read_stream_range_hinted(&["Other"], 1_024, &mut checkpoint_output, &mut restored)
+            .unwrap();
+        let checkpoint_ranges = source.read_ranges();
+        let checkpoint_counts = source.observation_counts();
+
+        source.reset_observation_counts();
+        let mut plain_output = vec![0_u8; 128];
+        file.read_stream_range(&["Other"], 1_024, &mut plain_output)
+            .unwrap();
+        assert_eq!(checkpoint_output, plain_output);
+        assert_eq!(checkpoint_output, vec![0xD3; 128]);
+        assert_eq!(checkpoint_ranges, source.read_ranges());
+        assert_eq!(checkpoint_counts, source.observation_counts());
     }
 
     #[test]
@@ -7056,6 +7427,99 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_checkpoint_does_not_change_corrupt_chain_errors() {
+        const POISON: usize = 5;
+
+        for marker in [ENDOFCHAIN, MAXREGSECT, 0xFFFF_FFFB, 0x00FF_FFFF] {
+            let (file, _chain, _payload) = file_with_poisoned_large_chain(POISON, marker);
+            let checkpoint = {
+                let mut hint = file.chain_hint();
+                file.stream_cursor_at_hinted(&["Large"], 1_536, &mut hint)
+                    .expect("the checkpoint must be before the poisoned link");
+                hint.checkpoint()
+            };
+
+            for offset in [3_072_u64, 4_096, 6_144, 8_191] {
+                let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+                let checkpoint_outcome =
+                    cursor_outcome(file.stream_cursor_at_hinted(&["Large"], offset, &mut restored));
+                let plain = cursor_outcome(file.stream_cursor_at(&["Large"], offset));
+                assert_eq!(
+                    checkpoint_outcome, plain,
+                    "checkpoint changed marker 0x{marker:08X} outcome at {offset}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_checkpoint_does_not_bypass_source_freshness_fences() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let checkpoint = {
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(&["Large"], 1_024, &mut warm, &mut hint)
+                .unwrap();
+            hint.checkpoint()
+        };
+
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        let mut restored = file.chain_hint_from_checkpoint(&checkpoint);
+        let mut output = vec![0_u8; 512];
+        assert!(matches!(
+            file.read_stream_range_hinted(&["Large"], 2_048, &mut output, &mut restored),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn concurrent_reads_restore_independent_local_hints_from_one_checkpoint() {
+        let source = Arc::new(TestSource::new(fragmented_large_bytes()));
+        let file = Arc::new(shared(Arc::clone(&source)));
+        let checkpoint = {
+            let mut hint = file.chain_hint();
+            let mut warm = vec![0_u8; 512];
+            file.read_stream_range_hinted(&["Large"], 1_024, &mut warm, &mut hint)
+                .unwrap();
+            hint.checkpoint()
+        };
+        let checkpoint = Arc::new(checkpoint);
+        source.synchronize_next_two_reads();
+
+        thread::scope(|scope| {
+            let first_file = Arc::clone(&file);
+            let first_checkpoint = Arc::clone(&checkpoint);
+            let first = scope.spawn(move || {
+                let mut hint = first_file.chain_hint_from_checkpoint(&first_checkpoint);
+                let mut output = [0_u8; 8];
+                first_file
+                    .read_stream_range_hinted(&["Large"], 2_048, &mut output, &mut hint)
+                    .map(|()| output)
+            });
+
+            let second_file = Arc::clone(&file);
+            let second_checkpoint = Arc::clone(&checkpoint);
+            let second = scope.spawn(move || {
+                let mut hint = second_file.chain_hint_from_checkpoint(&second_checkpoint);
+                let mut output = [0_u8; 8];
+                second_file
+                    .read_stream_range_hinted(&["Large"], 2_048, &mut output, &mut hint)
+                    .map(|()| output)
+            });
+
+            assert_eq!(
+                first.join().unwrap().unwrap(),
+                second.join().unwrap().unwrap()
+            );
+        });
+        assert!(
+            source.max_active_reads.load(AtomicOrdering::SeqCst) >= 2,
+            "restored hints must not serialize positional reads"
+        );
     }
 
     #[test]

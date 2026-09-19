@@ -1,0 +1,40 @@
+Verified source/probe/constraints/corpus/quality/raw bindings, 126-fixture corpus parity, 48 route groups and 88 allocation groups
+REVIEW paired >5% p50: 15228-stored-owned-native-prepared q2-build-trigger {'b1_a1': 7.058823529411762, 'b2_a2': 5.84795321637428, 'aa': 0.87890625, 'abba_a': 0.588235294117645, 'abba_b': -0.5494505494505475}
+REVIEW paired >5% p50: 54016-missing-owned-native-visit open {'b1_a1': 19.080250463229188, 'b2_a2': 5.005255253933516, 'aa': 0.13387815691079386, 'abba_a': 13.41188262730817, 'abba_b': 0.006874673033840928}
+REVIEW paired >5% p50: Simple-missing-owned-native-prepared q1 {'b1_a1': 11.956521739130444, 'b2_a2': 10.869565217391308, 'aa': -3.157894736842104, 'abba_a': 0.0, 'abba_b': -0.9708737864077666}
+REVIEW paired >5% p50: Simple-missing-owned-native-prepared q2-build-trigger {'b1_a1': 8.823529411764696, 'b2_a2': 7.058823529411762, 'aa': -2.3255813953488413, 'abba_a': 0.0, 'abba_b': -1.6216216216216162}
+REVIEW paired >5% p50: Simple-missing-owned-native-prepared queries-2 {'b1_a1': 9.469696969696972, 'b2_a2': 7.984790874524705, 'aa': -2.6119402985074647, 'abba_a': -0.37878787878787845, 'abba_b': -1.730103806228378}
+REVIEW paired >5% p50: Simple-missing-owned-native-prepared queries-3 {'b1_a1': 8.865248226950362, 'b2_a2': 7.14285714285714, 'aa': -2.8070175438596467, 'abba_a': -0.7092198581560294, 'abba_b': -2.28013029315961}
+REVIEW paired >5% p50: Simple-stored-owned-native-prepared q1 {'b1_a1': 6.748466257668717, 'b2_a2': 8.024691358024683, 'aa': 1.2820512820512775, 'abba_a': -0.6134969325153339, 'abba_b': 0.5747126436781658}
+REVIEW paired >5% p50: Simple-stored-owned-native-prepared q2-build-trigger {'b1_a1': 5.747126436781613, 'b2_a2': 11.44578313253013, 'aa': 2.3668639053254337, 'abba_a': -4.597701149425292, 'abba_b': 0.5434782608695565}
+REVIEW paired >5% p50: Simple-stored-owned-native-prepared queries-2 {'b1_a1': 6.5088757396449815, 'b2_a2': 10.397553516819569, 'aa': 1.2307692307692353, 'abba_a': -3.2544378698224907, 'abba_b': 0.2777777777777768}
+REVIEW paired >5% p50: Simple-stored-owned-native-prepared queries-3 {'b1_a1': 5.752212389380529, 'b2_a2': 9.174311926605494, 'aa': 1.6091954022988464, 'abba_a': -3.539823008849563, 'abba_b': -0.4184100418409997}
+Baseline source matches immutable git objects; available binaries match manifests
+All 24 counted routes preserve source I/O/fences/outcomes; final builds match live owner sources
+Verified 4,800 longer diagnostic route records and bindings
+LONG 15228-stored-prepared open {'b1_a1': 0.2271498107084824, 'b2_a2': 0.6793185249083455, 'abba_a': 0.3136830719307815, 'abba_b': 0.7662421756960969}
+LONG 15228-stored-prepared q1 {'b1_a1': 0.2617801047120505, 'b2_a2': 0.5277044854881341, 'abba_a': -0.7853403141361293, 'abba_b': -0.5221932114882533}
+LONG 15228-stored-prepared q2-build-trigger {'b1_a1': 7.738095238095233, 'b2_a2': 8.349900596421467, 'abba_a': -0.1984126984126977, 'abba_b': 0.36832412523020164}
+LONG 15228-stored-prepared q3-warm-repeat-q1 {'b1_a1': -4.761904761904767, 'b2_a2': -8.235294117647063, 'abba_a': 1.1904761904761862, 'abba_b': -2.500000000000002}
+LONG 15228-stored-prepared open-and-queries-3 {'b1_a1': 0.5981608784929815, 'b2_a2': 1.2484271959022353, 'abba_a': 0.04553164895990669, 'abba_b': 0.6922257720979763}
+LONG 54016-missing-visit open {'b1_a1': 0.4908852758450877, 'b2_a2': 0.447022158581567, 'abba_a': -0.13398704591609523, 'abba_b': -0.1775774135879593}
+LONG 54016-stored-prepared open {'b1_a1': -0.3259060694155602, 'b2_a2': -0.00937906817082279, 'abba_a': -0.20610142586244828, 'abba_b': 0.11080602935045203}
+LONG 54016-stored-prepared q1 {'b1_a1': -2.6848777401396573, 'b2_a2': -2.6288533073255627, 'abba_a': -0.21447922433588396, 'abba_b': -0.15703258012793597}
+LONG 54016-stored-prepared q2-build-trigger {'b1_a1': 0.6138625748212112, 'b2_a2': 1.1068897467918282, 'abba_a': 0.19945173996809284, 'abba_b': 0.6904482195797312}
+LONG 54016-stored-prepared q3-warm-repeat-q1 {'b1_a1': -28.727272727272723, 'b2_a2': -27.20588235294118, 'abba_a': -1.0909090909090868, 'abba_b': 1.0204081632652962}
+LONG 54016-stored-prepared open-and-queries-3 {'b1_a1': -0.510838969354499, 'b2_a2': 0.06289373673595833, 'abba_a': -0.03833151218373132, 'abba_b': 0.5381260433198864}
+LONG Simple-missing-prepared open {'b1_a1': 3.5031847133758065, 'b2_a2': 4.647435897435903, 'abba_a': -0.6369426751592355, 'abba_b': 0.4615384615384688}
+LONG Simple-missing-prepared q1 {'b1_a1': 10.869565217391308, 'b2_a2': 11.111111111111116, 'abba_a': -2.1739130434782594, 'abba_b': -1.9607843137254943}
+LONG Simple-missing-prepared q2-build-trigger {'b1_a1': 7.14285714285714, 'b2_a2': 9.756097560975618, 'abba_a': -2.3809523809523836, 'abba_b': 0.0}
+LONG Simple-missing-prepared q3-warm-repeat-q1 {'b1_a1': 0.0, 'b2_a2': 0.0, 'abba_a': 0.0, 'abba_b': 0.0}
+LONG Simple-missing-prepared open-and-queries-3 {'b1_a1': 4.3563068920676296, 'b2_a2': 5.592105263157898, 'abba_a': -1.1703511053316018, 'abba_b': 0.0}
+LONG Simple-stored-prepared open {'b1_a1': 3.8284839203675425, 'b2_a2': 4.87062404870624, 'abba_a': 0.6125574272588086, 'abba_b': 1.6224188790560534}
+LONG Simple-stored-prepared q1 {'b1_a1': 9.210526315789469, 'b2_a2': 9.090909090909083, 'abba_a': 1.3157894736842035, 'abba_b': 1.2048192771084265}
+LONG Simple-stored-prepared q2-build-trigger {'b1_a1': 7.317073170731714, 'b2_a2': 8.493975903614448, 'abba_a': 1.2195121951219523, 'abba_b': 2.3295454545454453}
+LONG Simple-stored-prepared q3-warm-repeat-q1 {'b1_a1': 5.660377358490565, 'b2_a2': 13.207547169811317, 'abba_a': 0.0, 'abba_b': 7.14285714285714}
+LONG Simple-stored-prepared open-and-queries-3 {'b1_a1': 4.849884526558901, 'b2_a2': 6.131805157593129, 'abba_a': 0.7505773672055405, 'abba_b': 1.982378854625555}
+LONG WithCustomViews-stored-prepared open {'b1_a1': -1.9248738553541367, 'b2_a2': -0.6234578365448051, 'abba_a': -0.7830312091197889, 'abba_b': 0.5335365853658569}
+LONG WithCustomViews-stored-prepared q1 {'b1_a1': -1.5163934426229542, 'b2_a2': -1.573033707865168, 'abba_a': 0.30737704918033515, 'abba_b': 0.24968789013732895}
+LONG WithCustomViews-stored-prepared q2-build-trigger {'b1_a1': 0.33897894698611264, 'b2_a2': 0.6569696969696892, 'abba_a': -0.12227454873428023, 'abba_b': 0.19425441295350954}
+LONG WithCustomViews-stored-prepared q3-warm-repeat-q1 {'b1_a1': -22.307692307692307, 'b2_a2': -22.90076335877863, 'abba_a': 0.7692307692307665, 'abba_b': 0.0}
+LONG WithCustomViews-stored-prepared open-and-queries-3 {'b1_a1': -1.1089784602260622, 'b2_a2': -0.6416900866628938, 'abba_a': -0.21219876306248775, 'abba_b': 0.259327151175337}

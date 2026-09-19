@@ -1,0 +1,884 @@
+[
+  {
+    "case": "54016-stored",
+    "mode": "owned",
+    "before": {
+      "phase": "baseline",
+      "case": "54016-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 8453.197,
+            "instructions": 50447.175,
+            "branches": 10376.418,
+            "branch-misses": 2.449,
+            "cache-misses": -7.42,
+            "page-faults": 0.003,
+            "loop_ns": 2114.901
+          },
+          "rss_kib": {
+            "10": 4904,
+            "1010": 4920
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 10853.779,
+            "instructions": 50507.326,
+            "branches": 10381.876,
+            "branch-misses": 3.735,
+            "cache-misses": -0.847,
+            "page-faults": 0.003,
+            "loop_ns": 2299.842
+          },
+          "rss_kib": {
+            "10": 4916,
+            "1010": 4908
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8949.285,
+            "instructions": 50401.697,
+            "branches": 10369.826,
+            "branch-misses": -3.316,
+            "cache-misses": -9.988,
+            "page-faults": -0.001,
+            "loop_ns": 2038.67
+          },
+          "rss_kib": {
+            "10": 4984,
+            "1010": 4980
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 8949.285,
+        "instructions": 50447.175,
+        "branches": 10376.418,
+        "branch-misses": 2.449,
+        "cache-misses": -7.42,
+        "page-faults": 0.003,
+        "loop_ns": 2114.901
+      },
+      "median_rss_kib": {
+        "10": 4916,
+        "1010": 4920
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "54016-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 4698.949,
+            "instructions": 27114.204,
+            "branches": 5592.273,
+            "branch-misses": 1.409,
+            "cache-misses": -11.07,
+            "page-faults": -0.002,
+            "loop_ns": 1301.416
+          },
+          "rss_kib": {
+            "10": 4964,
+            "1010": 4932
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 5303.16,
+            "instructions": 27056.842,
+            "branches": 5580.425,
+            "branch-misses": 1.262,
+            "cache-misses": -2.393,
+            "page-faults": -0.002,
+            "loop_ns": 1213.556
+          },
+          "rss_kib": {
+            "10": 4884,
+            "1010": 4888
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 5407.803,
+            "instructions": 27100.819,
+            "branches": 5590.603,
+            "branch-misses": 1.464,
+            "cache-misses": 6.791,
+            "page-faults": -0.001,
+            "loop_ns": 1231.156
+          },
+          "rss_kib": {
+            "10": 4936,
+            "1010": 4892
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 5303.16,
+        "instructions": 27100.819,
+        "branches": 5590.603,
+        "branch-misses": 1.409,
+        "cache-misses": -2.393,
+        "page-faults": -0.002,
+        "loop_ns": 1231.156
+      },
+      "median_rss_kib": {
+        "10": 4936,
+        "1010": 4892
+      }
+    },
+    "percent": {
+      "cycles": -40.74208162998496,
+      "instructions": -46.27881739661339,
+      "branches": -46.1220336343428,
+      "branch-misses": -42.466312780726824,
+      "cache-misses": null,
+      "page-faults": null,
+      "loop_ns": -41.78658953776087
+    },
+    "rss_percent": {
+      "10": 0.40683482506103097,
+      "1010": -0.5691056910569148
+    }
+  },
+  {
+    "case": "54016-stored",
+    "mode": "file",
+    "before": {
+      "phase": "baseline",
+      "case": "54016-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 16777.711,
+            "instructions": 65295.148,
+            "branches": 12899.243,
+            "branch-misses": 28.581,
+            "cache-misses": 11.802,
+            "page-faults": -0.003,
+            "loop_ns": 3725.348
+          },
+          "rss_kib": {
+            "10": 3948,
+            "1010": 4064
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 16842.584,
+            "instructions": 65331.353,
+            "branches": 12904.463,
+            "branch-misses": 25.876,
+            "cache-misses": -3.581,
+            "page-faults": 0.002,
+            "loop_ns": 3747.899
+          },
+          "rss_kib": {
+            "10": 4000,
+            "1010": 4000
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 17799.86,
+            "instructions": 65215.148,
+            "branches": 12885.321,
+            "branch-misses": 31.689,
+            "cache-misses": 4.089,
+            "page-faults": 0.0,
+            "loop_ns": 3663.078
+          },
+          "rss_kib": {
+            "10": 4000,
+            "1010": 4040
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 16842.584,
+        "instructions": 65295.148,
+        "branches": 12899.243,
+        "branch-misses": 28.581,
+        "cache-misses": 4.089,
+        "page-faults": 0.0,
+        "loop_ns": 3725.348
+      },
+      "median_rss_kib": {
+        "10": 4000,
+        "1010": 4040
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "54016-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 13619.311,
+            "instructions": 41942.571,
+            "branches": 8112.774,
+            "branch-misses": 29.448,
+            "cache-misses": 6.981,
+            "page-faults": 0.001,
+            "loop_ns": 2928.993
+          },
+          "rss_kib": {
+            "10": 3972,
+            "1010": 3956
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 12864.692,
+            "instructions": 41854.073,
+            "branches": 8098.686,
+            "branch-misses": 28.329,
+            "cache-misses": 2.368,
+            "page-faults": 0.002,
+            "loop_ns": 2870.564
+          },
+          "rss_kib": {
+            "10": 4008,
+            "1010": 3956
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 12669.473,
+            "instructions": 41850.79,
+            "branches": 8095.968,
+            "branch-misses": 28.327,
+            "cache-misses": 5.412,
+            "page-faults": 0.006,
+            "loop_ns": 2909.295
+          },
+          "rss_kib": {
+            "10": 3936,
+            "1010": 4012
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 12864.692,
+        "instructions": 41854.073,
+        "branches": 8098.686,
+        "branch-misses": 28.329,
+        "cache-misses": 5.412,
+        "page-faults": 0.002,
+        "loop_ns": 2909.295
+      },
+      "median_rss_kib": {
+        "10": 3972,
+        "1010": 3956
+      }
+    },
+    "percent": {
+      "cycles": -23.61806240657609,
+      "instructions": -35.90017898420263,
+      "branches": -37.21580405919944,
+      "branch-misses": -0.881704628949298,
+      "cache-misses": 32.35509904622156,
+      "page-faults": null,
+      "loop_ns": -21.905416621480732
+    },
+    "rss_percent": {
+      "10": -0.7000000000000006,
+      "1010": -2.079207920792081
+    }
+  },
+  {
+    "case": "WithCustomViews-stored",
+    "mode": "owned",
+    "before": {
+      "phase": "baseline",
+      "case": "WithCustomViews-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 4372.691,
+            "instructions": 21137.893,
+            "branches": 4395.673,
+            "branch-misses": 2.835,
+            "cache-misses": 1.986,
+            "page-faults": 0.001,
+            "loop_ns": 1010.685
+          },
+          "rss_kib": {
+            "10": 3124,
+            "1010": 3072
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 4922.807,
+            "instructions": 21215.999,
+            "branches": 4411.206,
+            "branch-misses": 5.54,
+            "cache-misses": 1.878,
+            "page-faults": 0.004,
+            "loop_ns": 1005.855
+          },
+          "rss_kib": {
+            "10": 3024,
+            "1010": 3004
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 4062.099,
+            "instructions": 21238.381,
+            "branches": 4413.729,
+            "branch-misses": 3.559,
+            "cache-misses": -3.895,
+            "page-faults": 0.004,
+            "loop_ns": 1012.465
+          },
+          "rss_kib": {
+            "10": 3012,
+            "1010": 3124
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 4372.691,
+        "instructions": 21215.999,
+        "branches": 4411.206,
+        "branch-misses": 3.559,
+        "cache-misses": 1.878,
+        "page-faults": 0.004,
+        "loop_ns": 1010.685
+      },
+      "median_rss_kib": {
+        "10": 3024,
+        "1010": 3072
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "WithCustomViews-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 3196.395,
+            "instructions": 13092.047,
+            "branches": 2744.874,
+            "branch-misses": 0.703,
+            "cache-misses": 1.044,
+            "page-faults": 0.001,
+            "loop_ns": 725.303
+          },
+          "rss_kib": {
+            "10": 2984,
+            "1010": 3032
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 3601.45,
+            "instructions": 13092.093,
+            "branches": 2746.339,
+            "branch-misses": 5.984,
+            "cache-misses": 2.26,
+            "page-faults": 0.007,
+            "loop_ns": 712.103
+          },
+          "rss_kib": {
+            "10": 3108,
+            "1010": 2968
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2766.174,
+            "instructions": 13059.116,
+            "branches": 2739.809,
+            "branch-misses": 4.235,
+            "cache-misses": 4.337,
+            "page-faults": -0.002,
+            "loop_ns": 721.283
+          },
+          "rss_kib": {
+            "10": 3032,
+            "1010": 3064
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 3196.395,
+        "instructions": 13092.047,
+        "branches": 2744.874,
+        "branch-misses": 4.235,
+        "cache-misses": 2.26,
+        "page-faults": 0.001,
+        "loop_ns": 721.283
+      },
+      "median_rss_kib": {
+        "10": 3032,
+        "1010": 3032
+      }
+    },
+    "percent": {
+      "cycles": -26.90096327410283,
+      "instructions": -38.291630764122864,
+      "branches": -37.77497582293823,
+      "branch-misses": 18.99409946614219,
+      "cache-misses": 20.34078807241746,
+      "page-faults": -75.0,
+      "loop_ns": -28.634243112344592
+    },
+    "rss_percent": {
+      "10": 0.2645502645502562,
+      "1010": -1.302083333333337
+    }
+  },
+  {
+    "case": "WithCustomViews-stored",
+    "mode": "file",
+    "before": {
+      "phase": "baseline",
+      "case": "WithCustomViews-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 12210.035,
+            "instructions": 35965.892,
+            "branches": 6902.615,
+            "branch-misses": 31.861,
+            "cache-misses": 4.057,
+            "page-faults": 0.004,
+            "loop_ns": 2651.843
+          },
+          "rss_kib": {
+            "10": 2772,
+            "1010": 2796
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 11771.272,
+            "instructions": 35910.817,
+            "branches": 6891.031,
+            "branch-misses": 29.186,
+            "cache-misses": 5.125,
+            "page-faults": 0.001,
+            "loop_ns": 2591.823
+          },
+          "rss_kib": {
+            "10": 2988,
+            "1010": 2732
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 11988.167,
+            "instructions": 35909.944,
+            "branches": 6893.495,
+            "branch-misses": 32.502,
+            "cache-misses": 4.735,
+            "page-faults": 0.001,
+            "loop_ns": 2750.573
+          },
+          "rss_kib": {
+            "10": 2772,
+            "1010": 2804
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 11988.167,
+        "instructions": 35910.817,
+        "branches": 6893.495,
+        "branch-misses": 31.861,
+        "cache-misses": 4.735,
+        "page-faults": 0.001,
+        "loop_ns": 2651.843
+      },
+      "median_rss_kib": {
+        "10": 2772,
+        "1010": 2796
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "WithCustomViews-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 10476.296,
+            "instructions": 27720.653,
+            "branches": 5216.886,
+            "branch-misses": 26.866,
+            "cache-misses": 1.767,
+            "page-faults": -0.001,
+            "loop_ns": 2357.011
+          },
+          "rss_kib": {
+            "10": 2936,
+            "1010": 2760
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 11166.138,
+            "instructions": 27735.408,
+            "branches": 5219.468,
+            "branch-misses": 29.07,
+            "cache-misses": 6.643,
+            "page-faults": 0.003,
+            "loop_ns": 2316.791
+          },
+          "rss_kib": {
+            "10": 2856,
+            "1010": 2792
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 9665.33,
+            "instructions": 27633.928,
+            "branches": 5200.477,
+            "branch-misses": 25.982,
+            "cache-misses": -7.683,
+            "page-faults": -0.004,
+            "loop_ns": 2317.551
+          },
+          "rss_kib": {
+            "10": 3036,
+            "1010": 2856
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 10476.296,
+        "instructions": 27720.653,
+        "branches": 5216.886,
+        "branch-misses": 26.866,
+        "cache-misses": 1.767,
+        "page-faults": -0.001,
+        "loop_ns": 2317.551
+      },
+      "median_rss_kib": {
+        "10": 2936,
+        "1010": 2792
+      }
+    },
+    "percent": {
+      "cycles": -12.611360852747545,
+      "instructions": -22.806955352756255,
+      "branches": -24.321610445789833,
+      "branch-misses": -15.677474027808291,
+      "cache-misses": -62.68215417106653,
+      "page-faults": null,
+      "loop_ns": -12.60602531899513
+    },
+    "rss_percent": {
+      "10": 5.9163059163059195,
+      "1010": -0.14306151645206988
+    }
+  },
+  {
+    "case": "Simple-stored",
+    "mode": "owned",
+    "before": {
+      "phase": "baseline",
+      "case": "Simple-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 1885.753,
+            "instructions": 7294.483,
+            "branches": 1557.915,
+            "branch-misses": -0.411,
+            "cache-misses": 0.359,
+            "page-faults": -0.003,
+            "loop_ns": 438.462
+          },
+          "rss_kib": {
+            "10": 2612,
+            "1010": 2492
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2522.218,
+            "instructions": 7355.081,
+            "branches": 1567.721,
+            "branch-misses": 6.861,
+            "cache-misses": 7.285,
+            "page-faults": 0.002,
+            "loop_ns": 433.232
+          },
+          "rss_kib": {
+            "10": 2492,
+            "1010": 2516
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2144.303,
+            "instructions": 7297.261,
+            "branches": 1557.334,
+            "branch-misses": 7.865,
+            "cache-misses": 5.739,
+            "page-faults": -0.002,
+            "loop_ns": 468.562
+          },
+          "rss_kib": {
+            "10": 2516,
+            "1010": 2536
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 2144.303,
+        "instructions": 7297.261,
+        "branches": 1557.915,
+        "branch-misses": 6.861,
+        "cache-misses": 5.739,
+        "page-faults": -0.002,
+        "loop_ns": 438.462
+      },
+      "median_rss_kib": {
+        "10": 2516,
+        "1010": 2516
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "Simple-stored",
+      "mode": "owned",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 1142.326,
+            "instructions": 7382.981,
+            "branches": 1569.802,
+            "branch-misses": -2.987,
+            "cache-misses": -11.97,
+            "page-faults": 0.002,
+            "loop_ns": 436.182
+          },
+          "rss_kib": {
+            "10": 2540,
+            "1010": 2528
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2083.515,
+            "instructions": 7316.535,
+            "branches": 1559.109,
+            "branch-misses": 1.863,
+            "cache-misses": 2.699,
+            "page-faults": 0.002,
+            "loop_ns": 435.282
+          },
+          "rss_kib": {
+            "10": 2552,
+            "1010": 2532
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 1895.712,
+            "instructions": 7303.304,
+            "branches": 1559.877,
+            "branch-misses": -0.736,
+            "cache-misses": -3.206,
+            "page-faults": -0.003,
+            "loop_ns": 446.532
+          },
+          "rss_kib": {
+            "10": 2536,
+            "1010": 2548
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 1895.712,
+        "instructions": 7316.535,
+        "branches": 1559.877,
+        "branch-misses": -0.736,
+        "cache-misses": -3.206,
+        "page-faults": 0.002,
+        "loop_ns": 436.182
+      },
+      "median_rss_kib": {
+        "10": 2540,
+        "1010": 2532
+      }
+    },
+    "percent": {
+      "cycles": -11.593091088339659,
+      "instructions": 0.264126498969941,
+      "branches": 0.12593755115009042,
+      "branch-misses": null,
+      "cache-misses": null,
+      "page-faults": null,
+      "loop_ns": -0.5199994526321472
+    },
+    "rss_percent": {
+      "10": 0.9538950715421324,
+      "1010": 0.6359300476947549
+    }
+  },
+  {
+    "case": "Simple-stored",
+    "mode": "file",
+    "before": {
+      "phase": "baseline",
+      "case": "Simple-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 9807.598,
+            "instructions": 21912.745,
+            "branches": 4022.235,
+            "branch-misses": 30.471,
+            "cache-misses": 9.846,
+            "page-faults": 0.003,
+            "loop_ns": 2074.43
+          },
+          "rss_kib": {
+            "10": 2740,
+            "1010": 2472
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 9520.131,
+            "instructions": 21921.796,
+            "branches": 4022.374,
+            "branch-misses": 30.27,
+            "cache-misses": 6.094,
+            "page-faults": -0.004,
+            "loop_ns": 2041.92
+          },
+          "rss_kib": {
+            "10": 2500,
+            "1010": 2584
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 9044.838,
+            "instructions": 21971.001,
+            "branches": 4029.56,
+            "branch-misses": 27.706,
+            "cache-misses": 4.348,
+            "page-faults": -0.003,
+            "loop_ns": 2040.519
+          },
+          "rss_kib": {
+            "10": 2796,
+            "1010": 2516
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 9520.131,
+        "instructions": 21921.796,
+        "branches": 4022.374,
+        "branch-misses": 30.27,
+        "cache-misses": 6.094,
+        "page-faults": -0.003,
+        "loop_ns": 2041.92
+      },
+      "median_rss_kib": {
+        "10": 2740,
+        "1010": 2516
+      }
+    },
+    "after": {
+      "phase": "candidate",
+      "case": "Simple-stored",
+      "mode": "file",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 9417.182,
+            "instructions": 21849.942,
+            "branches": 4007.345,
+            "branch-misses": 28.802,
+            "cache-misses": 8.601,
+            "page-faults": -0.001,
+            "loop_ns": 2038.851
+          },
+          "rss_kib": {
+            "10": 2600,
+            "1010": 2488
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 9269.063,
+            "instructions": 21837.881,
+            "branches": 4006.456,
+            "branch-misses": 25.633,
+            "cache-misses": 1.354,
+            "page-faults": -0.002,
+            "loop_ns": 2058.99
+          },
+          "rss_kib": {
+            "10": 2592,
+            "1010": 2504
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 9326.401,
+            "instructions": 21972.639,
+            "branches": 4028.574,
+            "branch-misses": 28.069,
+            "cache-misses": 8.142,
+            "page-faults": 0.003,
+            "loop_ns": 2042.5
+          },
+          "rss_kib": {
+            "10": 2744,
+            "1010": 2744
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 9326.401,
+        "instructions": 21849.942,
+        "branches": 4007.345,
+        "branch-misses": 28.069,
+        "cache-misses": 8.142,
+        "page-faults": -0.001,
+        "loop_ns": 2042.5
+      },
+      "median_rss_kib": {
+        "10": 2600,
+        "1010": 2504
+      }
+    },
+    "percent": {
+      "cycles": -2.03495098964499,
+      "instructions": -0.3277742389355298,
+      "branches": -0.37363507222352155,
+      "branch-misses": -7.271225635943179,
+      "cache-misses": 33.60682638660977,
+      "page-faults": null,
+      "loop_ns": 0.02840463877133992
+    },
+    "rss_percent": {
+      "10": -5.109489051094895,
+      "1010": -0.4769475357710662
+    }
+  }
+]

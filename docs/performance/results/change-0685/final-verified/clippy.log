@@ -1,0 +1,12 @@
+HEAD c207f2c430625e836ba3a5cd7579642727a51915
+$ cargo clippy -p litchi-cfb -p litchi-xls --all-features --lib --no-deps --locked -- -D warnings
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.39s
+
+exit 0

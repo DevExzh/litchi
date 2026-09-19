@@ -1,0 +1,25 @@
+{
+  "command": [
+    "perf",
+    "record",
+    "-F",
+    "997",
+    "--call-graph",
+    "dwarf",
+    "-o",
+    "/home/zhuhe/code/litchi-0685-profile/baseline.data",
+    "--",
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0685-before/release/xls0684-repeat",
+    "owned",
+    "test-data/poi/test-data/spreadsheet/54016.xls",
+    "0",
+    "0",
+    "0",
+    "2000000"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "fbc07011edeb731f2ef216ea6711a85b50f032c056374d614cb7dc5c80f1f418"
+}

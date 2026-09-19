@@ -1,0 +1,122 @@
+[
+  {
+    "case": "54016-stored",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "second_row": 5095,
+    "second_column": 106
+  },
+  {
+    "case": "54016-missing",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "sheet": 0,
+    "row": 0,
+    "column": 108,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "45365-2-stored",
+    "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+    "sha256": "8f34695f74d3cec8ef3826c71161b36bcdc2bc939763f346cf8347ac616a5ce0",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "second_row": 664,
+    "second_column": 24
+  },
+  {
+    "case": "WithCustomViews-stored",
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "second_row": 301,
+    "second_column": 10
+  },
+  {
+    "case": "WithCustomViews-missing",
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+    "sheet": 0,
+    "row": 0,
+    "column": 12,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "15228-stored",
+    "path": "test-data/poi/test-data/spreadsheet/15228.xls",
+    "sha256": "ceb03c0228ad73cc382ea3d4e98223fcb6406887936f0e89b9acd2c8eb87d8fe",
+    "sheet": 0,
+    "row": 1,
+    "column": 1,
+    "second_row": 73,
+    "second_column": 0
+  },
+  {
+    "case": "Simple-stored",
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "sha256": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "Simple-missing",
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "sha256": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a",
+    "sheet": 0,
+    "row": 0,
+    "column": 1,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "formula-refusal",
+    "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "sheet": 6,
+    "row": 0,
+    "column": 0,
+    "second_row": 0,
+    "second_column": 1
+  },
+  {
+    "case": "54016-last",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    "sheet": 0,
+    "row": 5095,
+    "column": 106,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "45365-2-last",
+    "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+    "sha256": "8f34695f74d3cec8ef3826c71161b36bcdc2bc939763f346cf8347ac616a5ce0",
+    "sheet": 0,
+    "row": 664,
+    "column": 24,
+    "second_row": 0,
+    "second_column": 0
+  },
+  {
+    "case": "WithCustomViews-last",
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+    "sheet": 0,
+    "row": 301,
+    "column": 10,
+    "second_row": 0,
+    "second_column": 0
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "disposition": "retain scoped worksheet-prefix optimization; tiny/refusal regressions accepted and follow-up required",
+  "performance_claim": "none",
+  "rust_tests_passed": 1931,
+  "rust_tests_ignored": 2,
+  "corpus_fixtures": 126,
+  "native_route_records": 8640,
+  "longer_native_records": 4800,
+  "allocation_records": 528,
+  "counted_routes_exact_parity": 24,
+  "source_frozen_after_final_quality": true,
+  "raw_whitespace": "Unmodified perf symbol text and archived patch excluded from diff whitespace check.",
+  "artifacts_sha256": {
+    "audit.log": "b3b982dac98df03b5ba2a02b449fcef21bb1bf77e9bf4ca660509b0293ebdf51",
+    "audit-diagnostics.log": "65f824d1a57f61aa5fe8c8c86ceb42cf8f0a7b0a86bd6e0518e3df51d0257633",
+    "final-verified/results.json": "51754ad1c575f74af8ad8a1f9135d2f008f8c69556f0deb9d0188b370cc5a912",
+    "final-builds.json": "7e1cc0326679f3077b540a3d0f74f4c67e385cbc33f3602ff232eca413ece351",
+    "evidence/results.json": "af6cc408e32d5a2fa6090fd87014e072e09704610dc279e2e1994247c5af7fc1",
+    "evidence/final-doc-results.json": "e15db0d70c2a5d46565249c7feb0337f4a831f6f8e5f48c5e8ec20a8489f14e5",
+    "profiles-manifest.json": "5fa2c6ab51ae8c135ffc5496543cb0d2d34acf431a64ded2c09ac68acdc4b0c8",
+    "cleanup.json": "672abacd2cf400b624148217b24e2360ad270bb2c4186fc40f59185dfdd44dda"
+  }
+}

@@ -1,5 +1,22 @@
 # Performance optimization ADR-compliance matrix
 
+## 0685 — immutable checkpoints preserve reader identity and source fences
+
+[0685](0685-xls-worksheet-chain-checkpoints.md) keeps opaque chain state in CFB
+and worksheet cache admission in XLS (ADRs 0001/0002/0024), with no dependency
+edge or unsafe code. Under ADRs 0003/0006 the checkpoint is weakly tied to the
+private immutable parsed-index allocation; foreign/expired identities fall
+back to a cold hint. Current constructors do not share parsed indexes; a future
+shared-index constructor must add an explicit reader-identity boundary.
+Stream/table/start/backward checks and source/error fences remain unchanged.
+
+For ADR 0005 the inline checkpoint is charged inside existing candidate/resident
+reservations; index overhead rises 128 → 192 while fixed cache overhead remains
+128. Weak lifetime does not retain parsed tables or source bytes. Publication
+requires the complete successful scan and final fences; each replay gets local
+mutable state. Measured 32-byte retention, tiny/refusal latency regressions and
+a process-RSS flag are disclosed. No ADR amendment or global claim is made.
+
 ## 0684 — XLS locator cache preserves replay and resource boundaries
 
 [0684](0684-xls-occurrence-query-index.md) follows ADRs 0001/0002/0024 by keeping
