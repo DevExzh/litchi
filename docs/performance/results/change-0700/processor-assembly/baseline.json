@@ -1,0 +1,36 @@
+{
+  "phase": "baseline",
+  "binary_sha256": "cee3fff7d324344f8cef5fb23c5d5ce82dd6649eac5cfc95989486a891509430",
+  "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+  "address": 1526272,
+  "size": 6305,
+  "commands": [
+    {
+      "name": "symbols",
+      "command": [
+        "nm",
+        "-S",
+        "-C",
+        "/home/zhuhe/code/litchi-0700-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "fd09b1d64f9a6cc9e433cc46d49f1a7f3ffa171967906792fd1078056d91e682",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "processor",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1526272",
+        "--stop-address=1532577",
+        "/home/zhuhe/code/litchi-0700-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "84ae63b729b3faec5e10a1f4d97b2fa5157dd383c98f09f36e196fd9e45be068",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

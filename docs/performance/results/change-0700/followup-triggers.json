@@ -1,0 +1,335 @@
+[
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 286.5704387990762,
+    "delta_ns": 74451
+  },
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 11.63927143491781,
+    "delta_ns": 2620
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 30.449313033791302,
+    "delta_ns": 8200
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 48.74229370329417,
+    "delta_ns": 277272
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "apply_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 36.98788469572483,
+    "delta_ns": 26561
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 21.24872924432395,
+    "delta_ns": 12541
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "capture_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 22.806179871082154,
+    "delta_ns": 153801
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 11.87103077674645,
+    "delta_ns": 2430
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 18.210555618010616,
+    "delta_ns": 136070
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 17.56024908485685,
+    "delta_ns": 135471
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "settext_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 42.9453574116879,
+    "delta_ns": 64470
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 48.669987716664394,
+    "delta_ns": 71321
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 8.822812987168716,
+    "delta_ns": 141261
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 9.361797154530205,
+    "delta_ns": 150501
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 5.990016638935103,
+    "delta_ns": 360
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 9.944311853619725,
+    "delta_ns": 1250
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 26.651982378854623,
+    "delta_ns": 4840
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 35.46936481169196,
+    "delta_ns": 6310
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 7.207315299942896,
+    "delta_ns": 374233
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 5.745018512590372,
+    "delta_ns": 304372
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 54.30863403862818,
+    "delta_ns": 58290
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "capture_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 6.967378254872747,
+    "delta_ns": 336834
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "capture_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 8.446972247172745,
+    "delta_ns": 411525
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "capture_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 8.18275543423943,
+    "delta_ns": 399543
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 9.808811305070652,
+    "delta_ns": 2360
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 35.70281124497991,
+    "delta_ns": 8890
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 38.306606097093756,
+    "delta_ns": 6999
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 25.125434195291383,
+    "delta_ns": 6510
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 5.113086864985061,
+    "delta_ns": 273123
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 5.358007538158782,
+    "delta_ns": 292232
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 6.44359341470222,
+    "delta_ns": 342132
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 7.865490192986591,
+    "delta_ns": 419003
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "settext_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 12.874908796635598,
+    "delta_ns": 158460
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "settext_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 13.97116768030482,
+    "delta_ns": 190231
+  },
+  {
+    "kind": "refusal",
+    "case": "late-missing-relationship-mce",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 6.191738965724958,
+    "delta_ns": 9970
+  },
+  {
+    "kind": "refusal",
+    "case": "small-valid",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 19.245839105690756,
+    "delta_ns": 50151
+  },
+  {
+    "kind": "refusal",
+    "case": "small-valid",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 14.753020917859683,
+    "delta_ns": 40180
+  }
+]

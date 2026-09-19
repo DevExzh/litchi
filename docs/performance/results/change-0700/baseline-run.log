@@ -1,0 +1,48 @@
+baseline assembly retained
+one-real a0 0
+one-control a0 0
+one-generated a0 0
+one-notes-poi a0 0
+one-notes-lo a0 0
+noop-real a0 0
+noop-control a0 0
+noop-generated a0 0
+noop-notes-poi a0 0
+noop-notes-lo a0 0
+two-real a0 0
+two-control a0 0
+two-generated a0 0
+two-generated a1 0
+two-control a1 0
+two-real a1 0
+noop-notes-lo a1 0
+noop-notes-poi a1 0
+noop-generated a1 0
+noop-control a1 0
+noop-real a1 0
+one-notes-lo a1 0
+one-notes-poi a1 0
+one-generated a1 0
+one-control a1 0
+one-real a1 0
+one-real allocations captured
+one-control allocations captured
+one-generated allocations captured
+one-notes-poi allocations captured
+one-notes-lo allocations captured
+noop-real allocations captured
+noop-control allocations captured
+noop-generated allocations captured
+noop-notes-poi allocations captured
+noop-notes-lo allocations captured
+two-real allocations captured
+two-control allocations captured
+two-generated allocations captured
+a0 0
+a1 0
+record 0
+self-symbols 0
+inclusive-symbols 0
+counters-10 0
+counters-210 0
+rss 0

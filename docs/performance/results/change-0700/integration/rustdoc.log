@@ -1,0 +1,10 @@
+HEAD 6dfe64739fb80b8df19f9a6561d559994a8e9c88
+$ cargo doc -p litchi-pptx -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx --all-features --no-deps --locked
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.19s
+   Generated /home/zhuhe/code/litchi-target-0700/doc/litchi_docx/index.html and 3 other files
+
+exit 0

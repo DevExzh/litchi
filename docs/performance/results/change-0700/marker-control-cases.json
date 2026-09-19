@@ -1,0 +1,95 @@
+{
+  "schema": "0700-marker-control-cases-v1",
+  "probe": "0700-mce-oracle",
+  "profile": "baseline",
+  "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+  "marker_bytes": 59,
+  "case_order": [
+    "tiny-marker-free",
+    "tiny-valid-marked",
+    "large-near-prefix-marker-free",
+    "long-late-comment-hit",
+    "root-comment-hit"
+  ],
+  "generation_command": [
+    "python3",
+    "docs/performance/results/change-0700/measure-marker-controls.py",
+    "--generate-only"
+  ],
+  "census_command": [
+    "python3",
+    "docs/performance/results/change-0700/measure-marker-controls.py",
+    "--census-only"
+  ],
+  "case_root": "marker-controls/cases",
+  "cases": [
+    {
+      "case": "tiny-marker-free",
+      "kind": "tiny-free",
+      "file": "marker-controls/cases/tiny-marker-free.xml",
+      "bytes": 4,
+      "sha256": "5382511e672645156e2889ebc21c72a0e59377fcbe774abaa703e0a42b3d2006",
+      "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "marker_bytes": 59,
+      "marker_count": 0,
+      "marker_positions": [],
+      "description": "valid marker-free XML shorter than the 59-byte URI"
+    },
+    {
+      "case": "tiny-valid-marked",
+      "kind": "tiny-marked",
+      "file": "marker-controls/cases/tiny-valid-marked.xml",
+      "bytes": 75,
+      "sha256": "4097fb818a58c2c03763dab92509f978ce364096815bc99193230f3c00dbdf5a",
+      "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "marker_bytes": 59,
+      "marker_count": 1,
+      "marker_positions": [
+        13
+      ],
+      "description": "valid XML with the marker in a root namespace declaration"
+    },
+    {
+      "case": "large-near-prefix-marker-free",
+      "kind": "near-prefix",
+      "file": "marker-controls/cases/large-near-prefix-marker-free.xml",
+      "bytes": 245766,
+      "sha256": "70810845532e80cde45218537e976d9ec2c5f0a9b162a3425c7672fa7b290521",
+      "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "marker_bytes": 59,
+      "marker_count": 0,
+      "marker_positions": [],
+      "description": "large valid text made from repeated 58-byte URI prefixes",
+      "near_prefix_repetitions": 4096
+    },
+    {
+      "case": "long-late-comment-hit",
+      "kind": "late-comment",
+      "file": "marker-controls/cases/long-late-comment-hit.xml",
+      "bytes": 131145,
+      "sha256": "a3f278bc5f5ba5ab19e21870efbb3500f9883a3c589311ed7ff6c0afb6860af1",
+      "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "marker_bytes": 59,
+      "marker_count": 1,
+      "marker_positions": [
+        131079
+      ],
+      "description": "long valid XML whose only exact URI is in the trailing comment",
+      "late_text_bytes": 131072
+    },
+    {
+      "case": "root-comment-hit",
+      "kind": "root-hit",
+      "file": "marker-controls/cases/root-comment-hit.xml",
+      "bytes": 77,
+      "sha256": "177cf027cef4d217c6ba45e77ca7dc24776af5c23395fbf9dd0f79c52e87fb0c",
+      "marker_uri": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "marker_bytes": 59,
+      "marker_count": 1,
+      "marker_positions": [
+        7
+      ],
+      "description": "valid XML with the exact URI at the root comment"
+    }
+  ]
+}

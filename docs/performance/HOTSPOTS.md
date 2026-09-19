@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0700 — avoid per-call substring-search setup on marked XML
+
+[0700](0700-mce-marker-substring-search.md) confirms that replacing the
+59-byte window loop removes substantial marker-free work, including about
+98.8% of the over-limit refusal time. Direct memmem setup also adds roughly
+210 ns to tiny marked XML and repeats +1.5–3.4% real-work median costs in
+the longer follow-up, with +216 bytes of processor stack reservation. Reject
+this general replacement. Next, measure a lower-setup exact search using the
+existing safe first-byte search plus exact prefix comparison, with the same
+marked, repeated-prefix, refusal and real-work controls. This is an untested
+hypothesis; production retains the baseline window scan.
+
 ## 0699 — measure the marker-free namespace scan next
 
 [0699](0699-marker-free-refusal-attribution.md) distinguishes the early-name
