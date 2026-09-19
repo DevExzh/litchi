@@ -1195,7 +1195,7 @@ impl ProductAccumulator {
     }
 }
 
-fn binary_parts(value: f64) -> (f64, i32) {
+pub(super) fn binary_parts(value: f64) -> (f64, i32) {
     debug_assert!(value.is_finite() && value > 0.0);
     let bits = value.to_bits();
     let raw_exponent = ((bits >> 52) & 0x7ff) as i32;
@@ -1210,7 +1210,7 @@ fn binary_parts(value: f64) -> (f64, i32) {
     (mantissa, raw_exponent - 1023)
 }
 
-fn scale_binary(value: f64, exponent: i64) -> f64 {
+pub(super) fn scale_binary(value: f64, exponent: i64) -> f64 {
     debug_assert!(value.is_finite() && value.abs() >= 1.0 && value.abs() < 2.0);
     let bits = value.to_bits();
     let sign = bits & SIGN_BIT;
@@ -1450,7 +1450,10 @@ impl ExtremaAccumulator {
     }
 }
 
-fn scale_product(left: f64, right: f64, factor: f64) -> Result<f64, ScalarError> {
+/// Multiply two dimensional scales by a finite normalized factor without
+/// overflowing an intermediate binary64 product. Descriptive reducers use
+/// this for `scale * mean_abs_deviation` and `scale² * sum_of_squares`.
+pub(super) fn scale_product(left: f64, right: f64, factor: f64) -> Result<f64, ScalarError> {
     if left == 0.0 || right == 0.0 || factor == 0.0 {
         return Ok(0.0);
     }

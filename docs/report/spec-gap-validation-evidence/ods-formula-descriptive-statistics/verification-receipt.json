@@ -1,0 +1,62 @@
+{
+  "status": "pass-with-retained-RSS-flag",
+  "command": [
+    "python3",
+    "-B",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/verify.py"
+  ],
+  "exit_code": 0,
+  "verifier_sha256": "66ec39667e0e8dc3850351218a475e60c07ee72a3d19e16fad9e7a97fd351f3b",
+  "verification_sha256": "ede539abbd51e0b543118f52ac5943b6329b978c425e1704509badc25f5147c4",
+  "freeze_sha256": "795a4f1844ae668d6d4ebfa6107c8aabc78f0879981aa59b8aecead6edd22157",
+  "performance_manifest_sha256": "bf5159dda72cafdd04816a111cd0afd21e4edddc5223722b3b73b2d9b3b8f74e",
+  "review_sha256": "4cc2944c8a2762dde86eacbb18f67ad50b811e10c40855418d4c9ab52f1686f8",
+  "resource_review_sha256": "3e29a638cb358004f9cb39e0eb2e9ad2cf0a320220f72ae78d9bde8e51a11bf2",
+  "oracle_review_sha256": "b05d0a4bfd621235570a100d0a1723c3e8bbf778c8d1e6a4f808aa1226f76927",
+  "cleanup_sha256": "68bd026303720db3308542b8b3c53641c966e982a069d15bd6e00a32be6b49b9",
+  "gates": {
+    "failed": 0,
+    "focused": {
+      "evaluation": 12,
+      "limits": 18,
+      "native": 2,
+      "oracle": 7
+    },
+    "gates": 7,
+    "ignored": 0,
+    "passed": 1477,
+    "verified": true
+  },
+  "oracle_observations": 413,
+  "native_observations": 39,
+  "accepted_performance_samples": 4170,
+  "excluded_attempt": {
+    "reason": "harness fixture mismatch",
+    "excluded_baseline_samples": 720,
+    "candidate_timing_samples": 0,
+    "corrected_actual_avedev": "265/128"
+  },
+  "performance_disposition": "accepted-with-RSS-flag",
+  "rss_flag": {
+    "case": "representative-percentrank",
+    "phase": "evaluate",
+    "baseline_range_kib": [
+      3176,
+      3516
+    ],
+    "candidate_range_kib": [
+      3140,
+      3544
+    ],
+    "bootstrap_seed": 20260919,
+    "bootstrap_resamples": 10000,
+    "bootstrap_method": "Independent 15-sample median resampling; candidate then baseline; sorted indices 249 and 9749",
+    "bootstrap_percentile_95_delta": [
+      -0.02163461538461542,
+      0.07230392156862742
+    ],
+    "interpretation": "Single-capture uncertainty, not a causal or cross-platform conclusion; no timing rerun"
+  },
+  "cancellation_scope": "Each timed child shares one cancellation context for four calls: exactly one read, followed by three pre-cancelled refusals. Root verifier checks the exact batch count; frozen profile verifier normalization defect is documented.",
+  "broader_spec_gap_goal_complete": false
+}

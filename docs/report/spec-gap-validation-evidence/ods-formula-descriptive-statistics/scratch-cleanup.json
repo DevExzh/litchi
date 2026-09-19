@@ -1,0 +1,29 @@
+{
+  "owned_paths": {
+    "/tmp/harmonic_cases": "absent",
+    "/tmp/harmonic_cases2": "absent",
+    "/tmp/harmonic_cases2.rs": "absent",
+    "/tmp/harmonic_exact": "absent",
+    "/tmp/harmonic_resource": "absent",
+    "/tmp/litchi-moments-probe": "absent",
+    "/tmp/litchi-moments-test": "absent",
+    "/tmp/litchi-moments-test-release": "absent",
+    "/tmp/litchi-ods-descriptive-kernel-probe": "absent",
+    "/tmp/litchi-ods-descriptive-numeric-probe": "absent",
+    "/tmp/litchi-ods-descriptive-statistics": "absent",
+    "/tmp/litchi-ods-descriptive-statistics-baseline-7yffulzh": "absent",
+    "/tmp/litchi-ods-descriptive-statistics-target": "absent",
+    "/tmp/moments-current-harness": "absent",
+    "/tmp/moments-diffcheck": "absent",
+    "/tmp/reciprocal_sum_tests": "absent",
+    "/var/tmp/litchi-ods-descriptive-statistics-baseline-b8e5d5fe257fd95747c69a3c44a53cedd96f77ed-4t3qqr2r": "absent",
+    "/var/tmp/litchi-ods-descriptive-statistics-baseline-b8e5d5fe257fd95747c69a3c44a53cedd96f77ed-cpj40tjc": "absent",
+    "/var/tmp/litchi-ods-descriptive-statistics-candidate-final-nizd0kw5": "absent",
+    "/var/tmp/litchi-ods-descriptive-statistics-candidate-final-yzw01pwo": "absent",
+    "/var/tmp/litchi-ods-descriptive-statistics-candidate-preflight-9ees2l_l": "absent"
+  },
+  "registered_descriptive_worktrees": 0,
+  "evidence_pycache_directories": 0,
+  "performance_receipts_checked": true,
+  "unrelated_paths_untouched": true
+}
