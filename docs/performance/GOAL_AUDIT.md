@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0681 — measured prerequisites remain distinct from implemented outcomes
+
+[0681](0681-next-batch-evidence-audit.md) corrects the retained XLSX timing
+direction and stale selector inventory, with seven passing evidence gates.
+The next cache/scanner investigations are [0678](0678-xls-query-cache-design.md),
+[0679](0679-xlsx-scanner-publication-design.md), and
+[0680](0680-docx-paragraph-memo-design.md). They retain corpus sizing, source
+control-flow evidence and DOCX allocation/instruction profiles. Review requires
+all duplicate XLS occurrences to preserve target-specific errors and rejects
+premature XLSX callbacks. No production optimization or full-goal completion
+is inferred from these designs; cache implementation, end-to-end measurements
+and the broader completion audit remain outstanding.
+
 ## 0675 — review and integration preserve correctness before performance
 
 Record: [0675](0675-third-wave-integration.md). Review checks deferred

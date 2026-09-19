@@ -1,5 +1,26 @@
 # Performance CRUD coverage
 
+## 0681: current selector inventory supersedes the 0587 missing-selector list
+
+The historical 0587 section below describes its own revision. Source inspection
+at `389167b38` confirms that several of its missing selectors now exist:
+
+| Historical gap | Current implementation and evidence record |
+| --- | --- |
+| DOC/PPT facade file opens | `doc_facade_file_open`, `ppt_facade_file_open`; [0638](0638-facade-and-ordinary-save-selectors.md). |
+| XLS source-backed all-cells and text, including simulated ranges | `xls_range_source_open_all_cells`, `xls_range_source_open_full_text`; [0605](0605-xls-retained-sheet-index.md), [0627](0627-ole2-range-source-selectors.md). |
+| Ordinary DOCX/XLSX/PPTX saves | The three `*_ordinary_save_lifecycle` selectors; [0638](0638-facade-and-ordinary-save-selectors.md). |
+| Producer-shaped OOXML inputs | XLSX producer selected-cell and DOCX/PPTX producer selected-object selectors; [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md). |
+| Opened PPTX transaction phases and XLSB structural edit/save | `pptx_semantic_opened_transaction_phases`, `xlsb_semantic_workbook_structure_edit_save`; [0674](0674-performance-gate-hygiene.md). |
+
+The [source inventory](results/change-0681/selector-audit.json) records exact
+selector spellings and the inspected source digest. This is an inventory
+correction, not a new benchmark capture or coverage-index promotion. The
+machine-readable CRUD index still determines mapped/measured coverage;
+opt-in selector availability alone does not establish a representative baseline,
+physical cold-cache behavior, native round trips or completion of a checklist
+category. The other 0587 gaps require their own current evidence review.
+
 ## 0587: coverage gaps named by the survey; no coverage change
 
 Change [0587](0587-remaining-opportunity-survey.md) adds no selector and

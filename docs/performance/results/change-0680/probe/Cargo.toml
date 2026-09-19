@@ -1,0 +1,18 @@
+[package]
+name = "probe0680"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "probe0680"
+path = "src/main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+
+[profile.release]
+debug = 1

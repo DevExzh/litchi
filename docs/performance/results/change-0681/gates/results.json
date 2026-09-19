@@ -1,0 +1,107 @@
+[
+  {
+    "name": "claims",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 69.51
+  },
+  {
+    "name": "claims-structural",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 0.05
+  },
+  {
+    "name": "gate-tests",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_perf_claims.py"
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 75.92
+  },
+  {
+    "name": "report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 0.05
+  },
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 0.05
+  },
+  {
+    "name": "non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 3.99
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "head": "389167b38c8b43c84c0d1799369e17360a59209c",
+    "exit_code": 0,
+    "seconds": 262.33
+  }
+]
