@@ -1,0 +1,30 @@
+{
+  "baseline_head": "8f16c57b27fd7878ece718e22db80839583f0098",
+  "paths": [
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "name_command": [
+    "git",
+    "diff",
+    "--name-only",
+    "8f16c57b27fd7878ece718e22db80839583f0098",
+    "--",
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "diff_command": [
+    "git",
+    "diff",
+    "--no-ext-diff",
+    "--binary",
+    "--full-index",
+    "8f16c57b27fd7878ece718e22db80839583f0098",
+    "--",
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "patch": "source-diff.patch",
+  "patch_bytes": 16120,
+  "patch_sha256": "0dcdc0329d46ef42e72eb51b914b7329dbaead85c19a515e348300bc354ec51d"
+}

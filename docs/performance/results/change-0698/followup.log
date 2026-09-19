@@ -1,0 +1,25 @@
+one-real a0
+noop-real a0
+one-control a0
+one-notes-poi a0
+refusal a0
+oracle a0
+one-notes-poi b0
+one-control b0
+noop-real b0
+one-real b0
+refusal b0
+oracle b0
+one-real b1
+noop-real b1
+one-control b1
+one-notes-poi b1
+refusal b1
+oracle b1
+one-notes-poi a3
+one-control a3
+noop-real a3
+one-real a3
+refusal a3
+oracle a3
+follow-up summary 16 40 rows; 21 triggers

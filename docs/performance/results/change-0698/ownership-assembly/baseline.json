@@ -1,0 +1,87 @@
+{
+  "phase": "baseline",
+  "binary": "/home/zhuhe/code/litchi-0698-bin/baseline-native",
+  "binary_sha256": "02c34ebf7e912d5a54cfcd18073e108a6a096a77ac575677df6c76aa58b5bc23",
+  "symbols": [
+    {
+      "name": "start",
+      "symbol": "litchi_ooxml_common::mce::codec::start",
+      "present": true,
+      "address": 1538432,
+      "size": 18083
+    },
+    {
+      "name": "inherited-drop",
+      "symbol": "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>",
+      "present": true,
+      "address": 1557936,
+      "size": 118
+    },
+    {
+      "name": "ctx-drop",
+      "symbol": "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>",
+      "present": true,
+      "address": 1557408,
+      "size": 118
+    }
+  ],
+  "commands": [
+    {
+      "name": "symbols",
+      "command": [
+        "nm",
+        "-S",
+        "-C",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "efdbfe1d62ebcdeba801fc26f6447d3efb38f51bd604d65c9d41f1e2f2763b63",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "start",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1538432",
+        "--stop-address=1556515",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "268eacaa4df768791a28b852293970fa6dbf50a37c6f9907ecc2eaa6a85f865e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "inherited-drop",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1557936",
+        "--stop-address=1558054",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "c34b3e26a94374733a0d90e6991d26d4cc164479e5837c78b7ba1d7e7b822f49",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ctx-drop",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1557408",
+        "--stop-address=1557526",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "623859d2a9a86cc916f3b8b6f0c85d00bf38707a0ab8106200449514811491a9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

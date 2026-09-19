@@ -1,0 +1,14 @@
+{
+  "binary_sha256": "02c34ebf7e912d5a54cfcd18073e108a6a096a77ac575677df6c76aa58b5bc23",
+  "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+  "raw_data_sha256": "3f84ad9207509bf4e00d43f3f533e9cff060fc880333aa2c69c5bd188fef326c",
+  "files": {
+    "rss.txt": "4c23ea4d336cea7a86c0f1911619dcef6e45498c919e3135ca7762999fb08638",
+    "counters-10.txt": "d1e47fc3fa4fa70bed1c8b91f46077318514347030bb997b737df893a093cead",
+    "self-symbols.txt": "3092af05e769711ce3288efe37d97351dcc5155c088d3b3b68c679e3fc7896d6",
+    "counters-210.txt": "e6dc0e5a15744385deea6741cbcef0e2e5b5875ddb80a04de1b3cdd25bd2e08e",
+    "commands.json": "1bca4366d95280a115166889b614658ed5008e713294540fe265dff79836de0b",
+    "inclusive-symbols.txt": "b7069486e2c3cb04647f5ef2681b821636483c5d97476a54d2ab8dec1da902b4",
+    "record.txt": "1f97f9b4bafa3b6be7457c5618e6f295851819df39fc846aa6dc9f7965eb9817"
+  }
+}

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0698 — rejected borrowed inherited namespace experiment
+
+[0698](0698-mce-borrowed-inherited-namespaces.md) rejects the borrowed-view
+candidate despite a 2.30–2.45% real one-edit median improvement in the longer
+ABBA follow-up. Reachable early-name refusal regresses +15.12% initially and
++7.84% (+2.75 µs) in a separate follow-up pair, exceeding the review threshold.
+Allocation metrics are identical and semantic parity holds across 1,920
+oracle invocations. Candidate stack reservation grows 128 bytes. The production
+codec is restored to baseline; only three regression tests and the evidence
+remain. These rejected-candidate measurements are not shipped speedups.
+
 ## 0697 — fresh remaining MCE ownership attribution
 
 [0697](0697-mce-context-ownership-attribution.md) measures unchanged production

@@ -1,0 +1,7 @@
+fmt 0 {'passed': 0, 'failed': 0, 'ignored': 0}
+check 0 {'passed': 0, 'failed': 0, 'ignored': 0}
+clippy 0 {'passed': 0, 'failed': 0, 'ignored': 0}
+tests-default 0 {'passed': 1214, 'failed': 0, 'ignored': 2}
+tests 0 {'passed': 4138, 'failed': 0, 'ignored': 33}
+facade 0 {'passed': 45, 'failed': 0, 'ignored': 0}
+rustdoc 0 {'passed': 0, 'failed': 0, 'ignored': 0}

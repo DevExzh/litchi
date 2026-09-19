@@ -329,6 +329,102 @@ mod preservation_tests {
             Err(Error::NonConformant(message)) if message == "unknown MCE attribute"
         ));
     }
+
+    #[test]
+    fn inherited_scope_survives_selected_alt_and_unwrapped_branch_rebindings() {
+        let source = format!(
+            r#"<r xmlns:mc="{MC}" xmlns="urn:root" xmlns:s="urn:s" xmlns:x="urn:outer" mc:Ignorable="x"><mc:AlternateContent xmlns:x="urn:alt" xmlns:q="urn:q" mc:Ignorable="x q"><x:skipped/><mc:Choice Requires="s" xmlns:x="urn:choice" mc:Ignorable="x q" mc:PreserveElements="x:item" mc:PreserveAttributes="q:flag" mc:ProcessContent="q:wrap"><x:item q:flag="kept"/><q:wrap xmlns=""><leaf/></q:wrap></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        let mut capabilities = Capabilities::new();
+        capabilities.understand_namespace("urn:s");
+
+        let (actual, report) = run_with(&source, &capabilities, &Limits::default())
+            .expect("selected AlternateContent branch remains valid");
+        assert_eq!(
+            actual,
+            format!(
+                r#"<r xmlns:mc="{MC}" xmlns="urn:root" xmlns:s="urn:s" xmlns:x="urn:outer"><x:item xmlns:x="urn:choice" xmlns:q="urn:q" q:flag="kept"></x:item><leaf xmlns="" xmlns:x="urn:choice" xmlns:q="urn:q"></leaf></r>"#
+            )
+        );
+        assert_eq!(
+            report,
+            Report {
+                alternate_content_count: 1,
+                selected_choices: 1,
+                ignored_elements: 1,
+                ignored_attributes: 1,
+                preserved_elements: 1,
+                preserved_attributes: 1,
+                unwrapped_elements: 1,
+                ..Report::default()
+            }
+        );
+    }
+
+    #[test]
+    fn opaque_and_skipped_scopes_keep_the_nearest_emitted_namespace() {
+        let source = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:e="urn:ext" mc:Ignorable="x"><e:opaque xmlns:p="urn:outer"><p:raw xmlns:p="urn:inner" xmlns=""><leaf p:flag="1"/></p:raw></e:opaque><x:skip><e:opaque xmlns:q="urn:hidden"><q:lost/></e:opaque></x:skip><tail/></r>"#
+        );
+        let mut capabilities = Capabilities::new();
+        capabilities.preserve_extension_element(Name {
+            namespace: "urn:ext".to_owned(),
+            local_name: "opaque".to_owned(),
+        });
+
+        let (actual, report) = run_with(&source, &capabilities, &Limits::default())
+            .expect("opaque and skipped scopes remain valid");
+        assert_eq!(
+            actual,
+            format!(
+                r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:e="urn:ext"><e:opaque xmlns:p="urn:outer"><p:raw xmlns:p="urn:inner" xmlns=""><leaf p:flag="1"></leaf></p:raw></e:opaque><tail></tail></r>"#
+            )
+        );
+        assert_eq!(
+            report,
+            Report {
+                ignored_elements: 1,
+                ignored_attributes: 1,
+                ..Report::default()
+            }
+        );
+    }
+
+    #[test]
+    fn nested_context_errors_keep_first_refusal_precedence() {
+        let invalid_qname = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s" xmlns:x="urn:x" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="s"><x:bad:element mc:NotARealDirective="1"/></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        assert!(matches!(
+            run_with(&invalid_qname, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message))
+                if message == "invalid QName: invalid XML QName 'x:bad:element'"
+        ));
+
+        let choice_after_fallback = format!(
+            r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Fallback/><mc:Choice Requires="missing"><fallback/></mc:Choice></mc:AlternateContent></r>"#
+        );
+        assert!(matches!(
+            run_with(
+                &choice_after_fallback,
+                &Capabilities::new(),
+                &Limits::default()
+            ),
+            Err(Error::NonConformant(message)) if message == "Choice after Fallback"
+        ));
+
+        let process_content_attribute = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s" xmlns:x="urn:x" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="s" mc:ProcessContent="x:wrap"><x:wrap xmlns:z="urn:z"><x:bad:element/></x:wrap></mc:Choice><mc:Fallback/></mc:AlternateContent></r>"#
+        );
+        assert!(matches!(
+            run_with(
+                &process_content_attribute,
+                &Capabilities::new(),
+                &Limits::default()
+            ),
+            Err(Error::NonConformant(message)) if message == "unbound prefix xmlns"
+        ));
+    }
 }
 
 #[cfg(test)]

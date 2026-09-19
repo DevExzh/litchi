@@ -1,0 +1,22 @@
+[package]
+name = "probe0698-refusal"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+allocations = []
+
+[dependencies]
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+sha2 = "0.11"
+
+[[bin]]
+name = "probe0698"
+path = "src/main.rs"
+
+[profile.release]
+debug = 1
+strip = false

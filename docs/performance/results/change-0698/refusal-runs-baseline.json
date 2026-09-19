@@ -1,0 +1,40 @@
+[
+  {
+    "leg": "a0",
+    "phase": "baseline",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0698-bin/baseline-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.579650660045445,
+    "output": "refusal/a0.tsv",
+    "output_sha256": "3e8d2e82f99b37e41b1deb337b54beed2b2e27bfb41105f5a1b5222a2f274d31",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c7b5a28b72c41d9bfe1066e2a0951679d7a29b9760cb17afea6515892417fb5d"
+  },
+  {
+    "leg": "a1",
+    "phase": "baseline",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0698-bin/baseline-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.5704463040456176,
+    "output": "refusal/a1.tsv",
+    "output_sha256": "6c347c49ac9b3c18462d8b9e37a3792f6e8b2c8e5c3354170820d439fb0463c6",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c7b5a28b72c41d9bfe1066e2a0951679d7a29b9760cb17afea6515892417fb5d"
+  }
+]
