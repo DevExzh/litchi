@@ -1,0 +1,1492 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index",
+  "route": "visit",
+  "mode": "file-native",
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "input_bytes": 984576,
+  "input_sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+  "worksheet": 0,
+  "first_row": 0,
+  "first_column": 108,
+  "second_row": 0,
+  "second_column": 0,
+  "warmups": 3,
+  "samples": 30,
+  "source_scope": "native litchi-core FileSource; source counters unavailable; logical warm-cache file access",
+  "timing_scope": "query/visitor elapsed_ns excludes semantic projection and digest work; total_elapsed_ns includes route setup for diagnostics",
+  "digest_scope": "compact value projection and visitor digest are outside the measured query/visitor call",
+  "fresh_snapshot_per_sample": true,
+  "records": [
+    {
+      "sample": 3,
+      "total_elapsed_ns": 9982078,
+      "open": {
+        "elapsed_ns": 269041,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3004264,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 4,
+      "total_elapsed_ns": 9991448,
+      "open": {
+        "elapsed_ns": 264691,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3010724,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 5,
+      "total_elapsed_ns": 9982638,
+      "open": {
+        "elapsed_ns": 263481,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3002694,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 6,
+      "total_elapsed_ns": 9978488,
+      "open": {
+        "elapsed_ns": 264691,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3010274,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 7,
+      "total_elapsed_ns": 9992518,
+      "open": {
+        "elapsed_ns": 275671,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3015554,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 8,
+      "total_elapsed_ns": 9967077,
+      "open": {
+        "elapsed_ns": 272001,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3008424,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 9,
+      "total_elapsed_ns": 10108129,
+      "open": {
+        "elapsed_ns": 264161,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3009964,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 10,
+      "total_elapsed_ns": 10086099,
+      "open": {
+        "elapsed_ns": 265261,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3020895,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 11,
+      "total_elapsed_ns": 10081028,
+      "open": {
+        "elapsed_ns": 271291,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3005204,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 12,
+      "total_elapsed_ns": 10068289,
+      "open": {
+        "elapsed_ns": 264521,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3008965,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 13,
+      "total_elapsed_ns": 10005038,
+      "open": {
+        "elapsed_ns": 265911,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3012584,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 14,
+      "total_elapsed_ns": 10097168,
+      "open": {
+        "elapsed_ns": 262331,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3028714,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 15,
+      "total_elapsed_ns": 10087479,
+      "open": {
+        "elapsed_ns": 272331,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3011795,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 16,
+      "total_elapsed_ns": 10027858,
+      "open": {
+        "elapsed_ns": 263341,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3056145,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 17,
+      "total_elapsed_ns": 9981398,
+      "open": {
+        "elapsed_ns": 263311,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3003435,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 18,
+      "total_elapsed_ns": 9562916,
+      "open": {
+        "elapsed_ns": 263921,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3003154,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 19,
+      "total_elapsed_ns": 10040878,
+      "open": {
+        "elapsed_ns": 263281,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3007785,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 20,
+      "total_elapsed_ns": 9836447,
+      "open": {
+        "elapsed_ns": 263541,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3006915,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 21,
+      "total_elapsed_ns": 9920588,
+      "open": {
+        "elapsed_ns": 265412,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3052704,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 22,
+      "total_elapsed_ns": 10112589,
+      "open": {
+        "elapsed_ns": 275941,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3005605,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 23,
+      "total_elapsed_ns": 9872957,
+      "open": {
+        "elapsed_ns": 264711,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3010025,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 24,
+      "total_elapsed_ns": 9574556,
+      "open": {
+        "elapsed_ns": 263372,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3007484,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 25,
+      "total_elapsed_ns": 10091649,
+      "open": {
+        "elapsed_ns": 263032,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3009604,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 26,
+      "total_elapsed_ns": 9909397,
+      "open": {
+        "elapsed_ns": 264091,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3015205,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 27,
+      "total_elapsed_ns": 10091408,
+      "open": {
+        "elapsed_ns": 264421,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3002454,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 28,
+      "total_elapsed_ns": 9901348,
+      "open": {
+        "elapsed_ns": 274071,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3012615,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 29,
+      "total_elapsed_ns": 9954258,
+      "open": {
+        "elapsed_ns": 271411,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3011664,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 30,
+      "total_elapsed_ns": 9885147,
+      "open": {
+        "elapsed_ns": 261511,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3001294,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 31,
+      "total_elapsed_ns": 9915298,
+      "open": {
+        "elapsed_ns": 262321,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3054415,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    },
+    {
+      "sample": 32,
+      "total_elapsed_ns": 10108548,
+      "open": {
+        "elapsed_ns": 262831,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [],
+      "visit": {
+        "elapsed_ns": 3002415,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        },
+        "actual_callbacks": 38950,
+        "oracle_callbacks": 38950,
+        "oracle_digest": "cells:38950:64fb35590520edeebee671ab12a92c97c60491ab284e16317faaa9ced06a7386",
+        "oracle_metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        }
+      }
+    }
+  ]
+}

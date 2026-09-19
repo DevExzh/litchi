@@ -1,0 +1,21 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.36s
+     Running unittests src/lib.rs (target/debug/deps/litchi_xls-056d18b626b02b23)
+
+running 13 tests
+test workbook::query_cache::tests::abandoning_a_grown_candidate_releases_buffers_and_both_budgets ... ok
+test workbook::query_cache::tests::all_pinned_entries_refuse_a_candidate ... ok
+test workbook::query_cache::tests::cell_slots_are_grouped_by_coordinate ... ok
+test workbook::query_cache::tests::concurrent_duplicate_publish_releases_the_loser_and_pins_the_winner ... ok
+test workbook::query_cache::tests::concurrent_reservations_share_one_owner_ceiling ... ok
+test workbook::query_cache::tests::disabled_cache_never_admits_a_candidate ... ok
+test workbook::query_cache::tests::dropping_an_unpublished_candidate_releases_its_managed_reservation ... ok
+test workbook::query_cache::tests::index_overhead_covers_the_retained_arc_and_cache_metadata_layout ... ok
+test workbook::query_cache::tests::pinned_entry_blocks_admission_without_releasing_its_reservation ... ok
+test workbook::query_cache::tests::pinned_entry_survives_pressure_and_unpinned_entry_is_lru_evicted ... ok
+test workbook::query_cache::tests::second_and_later_misses_can_retry_candidate_admission ... ok
+test workbook::query_cache::tests::source_version_is_part_of_the_cache_boundary ... ok
+test workbook::query_cache::tests::successful_retention_charges_the_hierarchy_until_cache_drop ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1068 filtered out; finished in 0.00s
+

@@ -1,0 +1,2362 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index",
+  "route": "prepared",
+  "mode": "file-native",
+  "input_path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+  "input_bytes": 1402368,
+  "input_sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+  "worksheet": 6,
+  "first_row": 0,
+  "first_column": 0,
+  "second_row": 0,
+  "second_column": 1,
+  "warmups": 3,
+  "samples": 30,
+  "source_scope": "native litchi-core FileSource; source counters unavailable; logical warm-cache file access",
+  "timing_scope": "query/visitor elapsed_ns excludes semantic projection and digest work; total_elapsed_ns includes route setup for diagnostics",
+  "digest_scope": "compact value projection and visitor digest are outside the measured query/visitor call",
+  "fresh_snapshot_per_sample": true,
+  "records": [
+    {
+      "sample": 3,
+      "total_elapsed_ns": 111831,
+      "open": {
+        "elapsed_ns": 88991,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5350,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 4,
+      "total_elapsed_ns": 109470,
+      "open": {
+        "elapsed_ns": 86770,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5590,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5170,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 5,
+      "total_elapsed_ns": 111211,
+      "open": {
+        "elapsed_ns": 88181,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5480,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5210,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 6,
+      "total_elapsed_ns": 110690,
+      "open": {
+        "elapsed_ns": 88190,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5410,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5240,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5160,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 7,
+      "total_elapsed_ns": 107991,
+      "open": {
+        "elapsed_ns": 85511,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5370,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5270,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 8,
+      "total_elapsed_ns": 107581,
+      "open": {
+        "elapsed_ns": 85280,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5360,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5150,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5240,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 9,
+      "total_elapsed_ns": 121510,
+      "open": {
+        "elapsed_ns": 98410,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5350,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5160,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5210,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 10,
+      "total_elapsed_ns": 110281,
+      "open": {
+        "elapsed_ns": 87221,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5370,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 11,
+      "total_elapsed_ns": 108680,
+      "open": {
+        "elapsed_ns": 86240,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5440,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5200,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 12,
+      "total_elapsed_ns": 111501,
+      "open": {
+        "elapsed_ns": 88471,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5270,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5250,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 13,
+      "total_elapsed_ns": 107490,
+      "open": {
+        "elapsed_ns": 84950,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5240,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5190,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 14,
+      "total_elapsed_ns": 106901,
+      "open": {
+        "elapsed_ns": 84511,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5200,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 15,
+      "total_elapsed_ns": 107351,
+      "open": {
+        "elapsed_ns": 84780,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5440,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5200,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 16,
+      "total_elapsed_ns": 108180,
+      "open": {
+        "elapsed_ns": 85740,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5490,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5200,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 17,
+      "total_elapsed_ns": 107761,
+      "open": {
+        "elapsed_ns": 85341,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5470,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5050,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 18,
+      "total_elapsed_ns": 118190,
+      "open": {
+        "elapsed_ns": 95620,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5440,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5230,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5250,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 19,
+      "total_elapsed_ns": 107071,
+      "open": {
+        "elapsed_ns": 84581,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5430,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5110,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 20,
+      "total_elapsed_ns": 107180,
+      "open": {
+        "elapsed_ns": 84400,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5190,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5170,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 21,
+      "total_elapsed_ns": 106361,
+      "open": {
+        "elapsed_ns": 84341,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5380,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5120,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 22,
+      "total_elapsed_ns": 107721,
+      "open": {
+        "elapsed_ns": 85150,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5471,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5170,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5180,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 23,
+      "total_elapsed_ns": 106240,
+      "open": {
+        "elapsed_ns": 84090,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5350,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5160,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5100,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 24,
+      "total_elapsed_ns": 105881,
+      "open": {
+        "elapsed_ns": 83691,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5490,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5160,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 25,
+      "total_elapsed_ns": 106490,
+      "open": {
+        "elapsed_ns": 83930,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5620,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5230,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5150,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 26,
+      "total_elapsed_ns": 105681,
+      "open": {
+        "elapsed_ns": 83461,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5490,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5120,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 27,
+      "total_elapsed_ns": 122461,
+      "open": {
+        "elapsed_ns": 95600,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5680,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 9280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5181,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 28,
+      "total_elapsed_ns": 109480,
+      "open": {
+        "elapsed_ns": 86660,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5220,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5170,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 29,
+      "total_elapsed_ns": 106681,
+      "open": {
+        "elapsed_ns": 83971,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5470,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5190,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5140,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 30,
+      "total_elapsed_ns": 107040,
+      "open": {
+        "elapsed_ns": 84200,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5510,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5260,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5250,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 31,
+      "total_elapsed_ns": 108101,
+      "open": {
+        "elapsed_ns": 85541,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5430,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5240,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5220,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 32,
+      "total_elapsed_ns": 107140,
+      "open": {
+        "elapsed_ns": 84490,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 5560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 5250,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 5210,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "error",
+            "row": null,
+            "column": null,
+            "projection": null,
+            "error": "source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token"
+          }
+        }
+      ],
+      "visit": null
+    }
+  ]
+}

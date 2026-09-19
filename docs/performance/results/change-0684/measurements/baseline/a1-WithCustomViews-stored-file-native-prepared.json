@@ -1,0 +1,2362 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index",
+  "route": "prepared",
+  "mode": "file-native",
+  "input_path": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "input_bytes": 165888,
+  "input_sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+  "worksheet": 0,
+  "first_row": 0,
+  "first_column": 0,
+  "second_row": 301,
+  "second_column": 10,
+  "warmups": 3,
+  "samples": 30,
+  "source_scope": "native litchi-core FileSource; source counters unavailable; logical warm-cache file access",
+  "timing_scope": "query/visitor elapsed_ns excludes semantic projection and digest work; total_elapsed_ns includes route setup for diagnostics",
+  "digest_scope": "compact value projection and visitor digest are outside the measured query/visitor call",
+  "fresh_snapshot_per_sample": true,
+  "records": [
+    {
+      "sample": 3,
+      "total_elapsed_ns": 118850,
+      "open": {
+        "elapsed_ns": 35720,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27430,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26300,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 4,
+      "total_elapsed_ns": 118711,
+      "open": {
+        "elapsed_ns": 35330,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27370,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26381,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 5,
+      "total_elapsed_ns": 119740,
+      "open": {
+        "elapsed_ns": 36260,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27440,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26410,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27510,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 6,
+      "total_elapsed_ns": 116391,
+      "open": {
+        "elapsed_ns": 33410,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27291,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 7,
+      "total_elapsed_ns": 119150,
+      "open": {
+        "elapsed_ns": 35320,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27500,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26470,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 8,
+      "total_elapsed_ns": 127761,
+      "open": {
+        "elapsed_ns": 34481,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27690,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 36810,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 9,
+      "total_elapsed_ns": 120601,
+      "open": {
+        "elapsed_ns": 35540,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 28100,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 27200,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27601,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 10,
+      "total_elapsed_ns": 120810,
+      "open": {
+        "elapsed_ns": 36020,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27800,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26900,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27840,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 11,
+      "total_elapsed_ns": 119231,
+      "open": {
+        "elapsed_ns": 34550,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27950,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26811,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27680,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 12,
+      "total_elapsed_ns": 118310,
+      "open": {
+        "elapsed_ns": 34000,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26760,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27720,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 13,
+      "total_elapsed_ns": 118281,
+      "open": {
+        "elapsed_ns": 34320,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27611,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26590,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27630,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 14,
+      "total_elapsed_ns": 118850,
+      "open": {
+        "elapsed_ns": 34480,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27690,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 27010,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 15,
+      "total_elapsed_ns": 120111,
+      "open": {
+        "elapsed_ns": 35321,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27750,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 27040,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27810,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 16,
+      "total_elapsed_ns": 119031,
+      "open": {
+        "elapsed_ns": 34500,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27670,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26730,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27891,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 17,
+      "total_elapsed_ns": 130680,
+      "open": {
+        "elapsed_ns": 41880,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 28000,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 30880,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27630,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 18,
+      "total_elapsed_ns": 118661,
+      "open": {
+        "elapsed_ns": 34700,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27550,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26781,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27510,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 19,
+      "total_elapsed_ns": 118590,
+      "open": {
+        "elapsed_ns": 34370,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26780,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27630,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 20,
+      "total_elapsed_ns": 118511,
+      "open": {
+        "elapsed_ns": 34370,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27571,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26770,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27620,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 21,
+      "total_elapsed_ns": 118200,
+      "open": {
+        "elapsed_ns": 34070,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27660,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26700,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 22,
+      "total_elapsed_ns": 117311,
+      "open": {
+        "elapsed_ns": 33521,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27590,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26610,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27490,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 23,
+      "total_elapsed_ns": 116880,
+      "open": {
+        "elapsed_ns": 33050,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27420,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26590,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27700,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 24,
+      "total_elapsed_ns": 116911,
+      "open": {
+        "elapsed_ns": 33191,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27460,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 25,
+      "total_elapsed_ns": 124011,
+      "open": {
+        "elapsed_ns": 33190,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 34630,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27451,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 26,
+      "total_elapsed_ns": 117080,
+      "open": {
+        "elapsed_ns": 33250,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27550,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26560,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27510,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 27,
+      "total_elapsed_ns": 116621,
+      "open": {
+        "elapsed_ns": 32780,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27520,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26731,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27460,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 28,
+      "total_elapsed_ns": 115990,
+      "open": {
+        "elapsed_ns": 32560,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27350,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26570,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27420,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 29,
+      "total_elapsed_ns": 116251,
+      "open": {
+        "elapsed_ns": 32470,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27331,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26580,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27690,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 30,
+      "total_elapsed_ns": 116970,
+      "open": {
+        "elapsed_ns": 33190,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27650,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26590,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27400,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 31,
+      "total_elapsed_ns": 116611,
+      "open": {
+        "elapsed_ns": 32860,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27481,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26700,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27450,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 32,
+      "total_elapsed_ns": 116620,
+      "open": {
+        "elapsed_ns": 32770,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 27540,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 26640,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 301,
+            "column": 10,
+            "projection": "empty",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 27490,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:51:6f60c47cef726242",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    }
+  ]
+}

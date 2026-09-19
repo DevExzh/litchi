@@ -1,0 +1,2362 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index",
+  "route": "prepared",
+  "mode": "owned-native",
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "input_bytes": 984576,
+  "input_sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+  "worksheet": 0,
+  "first_row": 0,
+  "first_column": 108,
+  "second_row": 0,
+  "second_column": 0,
+  "warmups": 3,
+  "samples": 30,
+  "source_scope": "native litchi-core OwnedSource; source counters unavailable; no filesystem I/O",
+  "timing_scope": "query/visitor elapsed_ns excludes semantic projection and digest work; total_elapsed_ns includes route setup for diagnostics",
+  "digest_scope": "compact value projection and visitor digest are outside the measured query/visitor call",
+  "fresh_snapshot_per_sample": true,
+  "records": [
+    {
+      "sample": 3,
+      "total_elapsed_ns": 1360566,
+      "open": {
+        "elapsed_ns": 275281,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343831,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 711654,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 4,
+      "total_elapsed_ns": 1345317,
+      "open": {
+        "elapsed_ns": 267411,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344512,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 705053,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 340,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 5,
+      "total_elapsed_ns": 1354716,
+      "open": {
+        "elapsed_ns": 267461,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 351041,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 708954,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 6,
+      "total_elapsed_ns": 1350667,
+      "open": {
+        "elapsed_ns": 276551,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 342602,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 704013,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 7,
+      "total_elapsed_ns": 1353796,
+      "open": {
+        "elapsed_ns": 269821,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343061,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 713394,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 290,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 8,
+      "total_elapsed_ns": 1359097,
+      "open": {
+        "elapsed_ns": 269631,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 351972,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 709433,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 9,
+      "total_elapsed_ns": 1360746,
+      "open": {
+        "elapsed_ns": 278131,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344352,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 710493,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 10,
+      "total_elapsed_ns": 1342177,
+      "open": {
+        "elapsed_ns": 268801,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343652,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 701733,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 270,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 11,
+      "total_elapsed_ns": 1340526,
+      "open": {
+        "elapsed_ns": 268291,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 352012,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 692213,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 300,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 12,
+      "total_elapsed_ns": 1356627,
+      "open": {
+        "elapsed_ns": 276741,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344312,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 707103,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 360,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 13,
+      "total_elapsed_ns": 1343766,
+      "open": {
+        "elapsed_ns": 269131,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343292,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 703413,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 300,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 14,
+      "total_elapsed_ns": 1340646,
+      "open": {
+        "elapsed_ns": 268621,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 352402,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 691713,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 15,
+      "total_elapsed_ns": 1358297,
+      "open": {
+        "elapsed_ns": 276542,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344381,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 709114,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 340,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 16,
+      "total_elapsed_ns": 1343606,
+      "open": {
+        "elapsed_ns": 268521,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344652,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 702143,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 300,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 17,
+      "total_elapsed_ns": 1341987,
+      "open": {
+        "elapsed_ns": 267432,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 352381,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 693784,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 18,
+      "total_elapsed_ns": 1356506,
+      "open": {
+        "elapsed_ns": 274211,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344542,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 709113,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 19,
+      "total_elapsed_ns": 1344967,
+      "open": {
+        "elapsed_ns": 267352,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 345471,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 704494,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 20,
+      "total_elapsed_ns": 1346136,
+      "open": {
+        "elapsed_ns": 266681,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 351272,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 700263,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 21,
+      "total_elapsed_ns": 1345577,
+      "open": {
+        "elapsed_ns": 266472,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344151,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 706764,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 290,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 22,
+      "total_elapsed_ns": 1342136,
+      "open": {
+        "elapsed_ns": 265761,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344082,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 704503,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 340,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 23,
+      "total_elapsed_ns": 1344347,
+      "open": {
+        "elapsed_ns": 266072,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 350701,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 699974,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 24,
+      "total_elapsed_ns": 1343906,
+      "open": {
+        "elapsed_ns": 265961,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344782,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 705363,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 25,
+      "total_elapsed_ns": 1340047,
+      "open": {
+        "elapsed_ns": 266051,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 353152,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 692933,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 26,
+      "total_elapsed_ns": 1344056,
+      "open": {
+        "elapsed_ns": 271541,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344522,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 700053,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 27,
+      "total_elapsed_ns": 1341546,
+      "open": {
+        "elapsed_ns": 265481,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343892,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 704423,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 28,
+      "total_elapsed_ns": 1341657,
+      "open": {
+        "elapsed_ns": 266192,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 353151,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 694194,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 280,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 29,
+      "total_elapsed_ns": 1344416,
+      "open": {
+        "elapsed_ns": 272281,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 343962,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 699793,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 300,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 30,
+      "total_elapsed_ns": 1346447,
+      "open": {
+        "elapsed_ns": 265832,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 345201,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 706874,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 330,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 31,
+      "total_elapsed_ns": 1344286,
+      "open": {
+        "elapsed_ns": 266151,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 354982,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 695123,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 320,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    },
+    {
+      "sample": 32,
+      "total_elapsed_ns": 1342237,
+      "open": {
+        "elapsed_ns": 271972,
+        "metrics": {
+          "read_calls": 0,
+          "read_bytes": 0,
+          "version_calls": 0,
+          "len_calls": 0,
+          "range_union_bytes": 0
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 344341,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 698914,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 0,
+            "column": 0,
+            "projection": "string:4:3643189d1abbb7f4",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 310,
+          "metrics": {
+            "read_calls": 0,
+            "read_bytes": 0,
+            "version_calls": 0,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "missing",
+            "row": 0,
+            "column": 108,
+            "projection": null,
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    }
+  ]
+}

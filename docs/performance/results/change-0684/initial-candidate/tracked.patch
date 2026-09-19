@@ -1,0 +1,770 @@
+diff --git a/crates/litchi-xls/src/workbook/mod.rs b/crates/litchi-xls/src/workbook/mod.rs
+index 48f7c9a58..9d9b0ec91 100644
+--- a/crates/litchi-xls/src/workbook/mod.rs
++++ b/crates/litchi-xls/src/workbook/mod.rs
+@@ -8,6 +8,7 @@
+ mod codec;
+ mod model;
+ pub mod package;
++mod query_cache;
+ pub mod source;
+ 
+ #[cfg(test)]
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index 2301c69bc..3568766c3 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -8,6 +8,7 @@
+ //! `*_with_execution` variants. Finite scan limits remain mandatory for
+ //! bounded work.
+ 
++use super::query_cache::{CellSlot, IndexCandidate, QueryIndexCache, WorksheetCellIndex};
+ use crate::cell::Cell;
+ use crate::error::Error;
+ use crate::leniency::{Leniency, ToleranceLog};
+@@ -56,6 +57,7 @@ const DEFAULT_TEXT_CELLS: usize = 1_000_000;
+ const DEFAULT_TEXT_BYTES: u64 = 128 * 1024 * 1024;
+ const DEFAULT_SHEET_COUNT: usize = 4_096;
+ const DEFAULT_MATERIALIZE_BYTES: u64 = 128 * 1024 * 1024;
++const DEFAULT_QUERY_INDEX_BYTES: u64 = 2 * 1024 * 1024;
+ const MATERIALIZE_CHUNK_BYTES: usize = 64 * 1024;
+ /// Workbook globals records whose bytes are fetched exactly rather than in a
+ /// window: one read for the header, one for the payload and the next record's
+@@ -101,6 +103,9 @@ pub struct SourceBackedLimits {
+     pub max_text_bytes: u64,
+     /// Maximum number of `BoundSheet8` entries.
+     pub max_sheet_count: usize,
++    /// Maximum logical bytes retained by selected-query worksheet indexes.
++    /// Zero disables the optional query index cache.
++    pub max_query_index_bytes: u64,
+ }
+ 
+ impl Default for SourceBackedLimits {
+@@ -116,6 +121,7 @@ impl Default for SourceBackedLimits {
+             max_text_cells: DEFAULT_TEXT_CELLS,
+             max_text_bytes: DEFAULT_TEXT_BYTES,
+             max_sheet_count: DEFAULT_SHEET_COUNT,
++            max_query_index_bytes: DEFAULT_QUERY_INDEX_BYTES,
+         }
+     }
+ }
+@@ -201,6 +207,15 @@ impl SourceBackedLimits {
+         self
+     }
+ 
++    /// Sets the logical byte ceiling for retained selected-query indexes.
++    /// Passing zero disables the optional cache without changing query
++    /// correctness or the ordinary worksheet scan limits.
++    #[must_use]
++    pub const fn with_max_query_index_bytes(mut self, value: u64) -> Self {
++        self.max_query_index_bytes = value;
++        self
++    }
++
+     fn validate(self) -> std::result::Result<Self, SourceBackedError> {
+         if self.max_global_bytes == 0
+             || self.max_materialize_bytes == 0
+@@ -397,6 +412,7 @@ struct SourceInner {
+     formatting: Arc<Formatting>,
+     encoding: Encoding,
+     limits: SourceBackedLimits,
++    query_cache: Arc<QueryIndexCache>,
+ }
+ 
+ /// An immutable, cheaply cloned source-backed XLS workbook.
+@@ -1063,6 +1079,7 @@ impl SourceBackedWorkbook {
+                 worksheet_names.push(sheet.name.clone());
+             }
+         }
++        let cache_sheet_count = parsed.sheets.len();
+         let inner = Arc::new(SourceInner {
+             source,
+             cfb,
+@@ -1075,6 +1092,10 @@ impl SourceBackedWorkbook {
+             formatting: Arc::new(parsed.formatting),
+             encoding: parsed.encoding,
+             limits,
++            query_cache: Arc::new(QueryIndexCache::new(
++                limits.max_query_index_bytes,
++                cache_sheet_count,
++            )),
+         });
+         inner.ensure_current()?;
+         Ok(Self { inner })
+@@ -2886,6 +2907,7 @@ trait CellSink {
+     fn accept(
+         &mut self,
+         record: &CellRecord,
++        occurrence: CellOccurrence,
+         scan: &ScanContext<'_>,
+         strings: &mut SharedStringResolver<'_>,
+     ) -> Result<()>;
+@@ -2919,7 +2941,13 @@ trait CellSink {
+     /// [`CellSink::accept`] does and in the same position, so that a malformed
+     /// cell format is refused wherever it sits whether or not the sink keeps
+     /// the cell.
+-    fn accept_measured(&mut self, measured: &MeasuredCell, scan: &ScanContext<'_>) -> Result<()> {
++    fn accept_measured(
++        &mut self,
++        measured: &MeasuredCell,
++        occurrence: CellOccurrence,
++        scan: &ScanContext<'_>,
++    ) -> Result<()> {
++        let _ = occurrence;
+         scan.formatting
+             .validate_cell_xf(measured.xf_index)
+             .map_err(SourceBackedError::Parse)
+@@ -2934,43 +2962,81 @@ struct ScanContext<'a> {
+     execution: Option<&'a ExecutionContext>,
+ }
+ 
++/// Source location metadata for one stored-cell occurrence.  It is passed to
++/// sinks only while a scan already owns the corresponding validated frame;
++/// the private query-index sink uses it to retain locators without changing
++/// the ordinary visitor result.
++#[derive(Clone, Copy)]
++struct CellOccurrence {
++    stream_offset: u64,
++    kind: u16,
++    ordinal: u16,
++}
++
+ /// The selected-cell sink: exactly what `process_cell` did before this scan
+ /// loop was shared.
+-struct TargetCell {
++struct TargetCell<'a> {
+     row: u16,
+     column: u16,
+     found: Option<SourceBackedCell>,
++    index: Option<IndexCandidate<'a>>,
+ }
+ 
+-impl CellSink for TargetCell {
++impl CellSink for TargetCell<'_> {
+     #[inline]
+     fn accept(
+         &mut self,
+         record: &CellRecord,
++        occurrence: CellOccurrence,
+         scan: &ScanContext<'_>,
+         strings: &mut SharedStringResolver<'_>,
+     ) -> Result<()> {
+         scan.formatting
+             .validate_cell_xf(cell_xf_index(record))
+             .map_err(SourceBackedError::Parse)?;
++        if let Some(index) = self.index.as_mut() {
++            index.push(CellSlot {
++                stream_offset: occurrence.stream_offset,
++                row: record.row(),
++                column: record.col(),
++                kind: occurrence.kind,
++                xf: cell_xf_index(record),
++                ordinal: occurrence.ordinal,
++            });
++        }
+         if record.row() != self.row || record.col() != self.column {
+             return Ok(());
+         }
+-        let Some(cell) =
+-            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting))
+-        else {
+-            return Ok(());
+-        };
+-        let value = if let Some(string_index) = cell.shared_string_index() {
+-            resolve_shared_string(scan.owner, string_index, scan.execution, strings)?
+-        } else {
+-            cell.value().clone()
+-        };
+-        self.found = Some(SourceBackedCell {
+-            row: u32::from(self.row),
+-            column: u32::from(self.column),
+-            value,
+-        });
++        if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
++            self.found = Some(SourceBackedCell {
++                row: u32::from(self.row),
++                column: u32::from(self.column),
++                value,
++            });
++        }
++        Ok(())
++    }
++
++    #[inline]
++    fn accept_measured(
++        &mut self,
++        measured: &MeasuredCell,
++        occurrence: CellOccurrence,
++        scan: &ScanContext<'_>,
++    ) -> Result<()> {
++        scan.formatting
++            .validate_cell_xf(measured.xf_index)
++            .map_err(SourceBackedError::Parse)?;
++        if let Some(index) = self.index.as_mut() {
++            index.push(CellSlot {
++                stream_offset: occurrence.stream_offset,
++                row: measured.row,
++                column: measured.col,
++                kind: occurrence.kind,
++                xf: measured.xf_index,
++                ordinal: occurrence.ordinal,
++            });
++        }
+         Ok(())
+     }
+ 
+@@ -2985,6 +3051,30 @@ impl CellSink for TargetCell {
+     }
+ }
+ 
++/// Converts a validated selected-cell record using the exact target-query
++/// shared-string distinction.  In particular, a missing SST is the typed
++/// `SST not available` value returned by `resolve_shared_string_inner`; the
++/// text-projection helper intentionally uses a different diagnostic and must
++/// not serve indexed query hits.
++fn target_cell_value(
++    record: &CellRecord,
++    owner: &SourceInner,
++    execution: Option<&ExecutionContext>,
++    strings: &mut SharedStringResolver<'_>,
++) -> Result<Option<litchi_core::sheet::CellValue>> {
++    let Some(cell) =
++        Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting))
++    else {
++        return Ok(None);
++    };
++    let value = if let Some(string_index) = cell.shared_string_index() {
++        resolve_shared_string(owner, string_index, execution, strings)?
++    } else {
++        cell.value().clone()
++    };
++    Ok(Some(value))
++}
++
+ /// The whole-sheet sink: reports every stored cell in stream order and retains
+ /// nothing of its own.
+ struct VisitCells<F> {
+@@ -2998,6 +3088,7 @@ where
+     fn accept(
+         &mut self,
+         record: &CellRecord,
++        _occurrence: CellOccurrence,
+         scan: &ScanContext<'_>,
+         strings: &mut SharedStringResolver<'_>,
+     ) -> Result<()> {
+@@ -3096,6 +3187,7 @@ fn scan_worksheet<S: CellSink>(
+     let mut first = true;
+     loop {
+         let frame = scan.next_frame()?;
++        let frame_offset = scan.position.saturating_sub(4);
+         if first {
+             first = false;
+             if frame.kind != BOF {
+@@ -3120,7 +3212,7 @@ fn scan_worksheet<S: CellSink>(
+             }
+             return finish_scan(owner, execution);
+         }
+-        if let Some(mut formula) = pending_formula.take() {
++        if let Some((mut formula, occurrence)) = pending_formula.take() {
+             if frame.kind == STRING {
+                 let payload = scan.take_payload(&frame)?;
+                 let mut continues = Vec::new();
+@@ -3150,7 +3242,7 @@ fn scan_worksheet<S: CellSink>(
+                 if let CellRecord::Formula { value, .. } = &mut formula {
+                     *value = FormulaValue::String(text);
+                 }
+-                sink.accept(&formula, &context, &mut strings)?;
++                sink.accept(&formula, occurrence, &context, &mut strings)?;
+                 continue;
+             }
+             if !matches!(frame.kind, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
+@@ -3158,7 +3250,7 @@ fn scan_worksheet<S: CellSink>(
+                     "string-valued FORMULA is not followed by STRING".into(),
+                 ));
+             }
+-            pending_formula = Some(formula);
++            pending_formula = Some((formula, occurrence));
+         }
+ 
+         match frame.kind {
+@@ -3167,7 +3259,15 @@ fn scan_worksheet<S: CellSink>(
+                 if !wants_record(sink, payload) {
+                     let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
+                         .map_err(SourceBackedError::Parse)?;
+-                    sink.accept_measured(&measured, &context)?;
++                    sink.accept_measured(
++                        &measured,
++                        CellOccurrence {
++                            stream_offset: frame_offset,
++                            kind: frame.kind,
++                            ordinal: 0,
++                        },
++                        &context,
++                    )?;
+                     continue;
+                 }
+                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
+@@ -3180,12 +3280,37 @@ fn scan_worksheet<S: CellSink>(
+                     }
+                 ) {
+                     if sink.defers_string_formula(&cell) {
+-                        pending_formula = Some(cell);
++                        pending_formula = Some((
++                            cell,
++                            CellOccurrence {
++                                stream_offset: frame_offset,
++                                kind: frame.kind,
++                                ordinal: 0,
++                            },
++                        ));
+                     } else {
+-                        sink.accept(&cell, &context, &mut strings)?;
++                        sink.accept(
++                            &cell,
++                            CellOccurrence {
++                                stream_offset: frame_offset,
++                                kind: frame.kind,
++                                ordinal: 0,
++                            },
++                            &context,
++                            &mut strings,
++                        )?;
+                     }
+                 } else {
+-                    sink.accept(&cell, &context, &mut strings)?;
++                    sink.accept(
++                        &cell,
++                        CellOccurrence {
++                            stream_offset: frame_offset,
++                            kind: frame.kind,
++                            ordinal: 0,
++                        },
++                        &context,
++                        &mut strings,
++                    )?;
+                 }
+             },
+             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
+@@ -3193,18 +3318,49 @@ fn scan_worksheet<S: CellSink>(
+                 if !wants_record(sink, payload) {
+                     let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
+                         .map_err(SourceBackedError::Parse)?;
+-                    sink.accept_measured(&measured, &context)?;
++                    sink.accept_measured(
++                        &measured,
++                        CellOccurrence {
++                            stream_offset: frame_offset,
++                            kind: frame.kind,
++                            ordinal: 0,
++                        },
++                        &context,
++                    )?;
+                     continue;
+                 }
+                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
+                     .map_err(SourceBackedError::Parse)?;
+-                sink.accept(&cell, &context, &mut strings)?;
++                sink.accept(
++                    &cell,
++                    CellOccurrence {
++                        stream_offset: frame_offset,
++                        kind: frame.kind,
++                        ordinal: 0,
++                    },
++                    &context,
++                    &mut strings,
++                )?;
+             },
+             0x00BD => {
+                 let payload = scan.read_payload(&frame)?;
+                 let mut processing = Ok(());
++                let mut ordinal = 0_u16;
+                 CellRecord::visit_mul_rk_measured(payload, |measured, value| {
+                     if processing.is_ok() {
++                        let current = ordinal;
++                        let Some(next) = ordinal.checked_add(1) else {
++                            processing = Err(SourceBackedError::InvalidData(
++                                "MulRk cell ordinal overflows u16".into(),
++                            ));
++                            return;
++                        };
++                        ordinal = next;
++                        let occurrence = CellOccurrence {
++                            stream_offset: frame_offset,
++                            kind: frame.kind,
++                            ordinal: current,
++                        };
+                         if sink.wants(measured.row, measured.col) {
+                             let cell = CellRecord::Rk {
+                                 row: measured.row,
+@@ -3212,9 +3368,9 @@ fn scan_worksheet<S: CellSink>(
+                                 xf_index: measured.xf_index,
+                                 value: crate::utils::rk_to_f64(value),
+                             };
+-                            processing = sink.accept(&cell, &context, &mut strings);
++                            processing = sink.accept(&cell, occurrence, &context, &mut strings);
+                         } else {
+-                            processing = sink.accept_measured(&measured, &context);
++                            processing = sink.accept_measured(&measured, occurrence, &context);
+                         }
+                     }
+                 })
+@@ -3224,17 +3380,31 @@ fn scan_worksheet<S: CellSink>(
+             0x00BE => {
+                 let payload = scan.read_payload(&frame)?;
+                 let mut processing = Ok(());
++                let mut ordinal = 0_u16;
+                 CellRecord::visit_mul_blank_measured(payload, |measured| {
+                     if processing.is_ok() {
++                        let current = ordinal;
++                        let Some(next) = ordinal.checked_add(1) else {
++                            processing = Err(SourceBackedError::InvalidData(
++                                "MulBlank cell ordinal overflows u16".into(),
++                            ));
++                            return;
++                        };
++                        ordinal = next;
++                        let occurrence = CellOccurrence {
++                            stream_offset: frame_offset,
++                            kind: frame.kind,
++                            ordinal: current,
++                        };
+                         if sink.wants(measured.row, measured.col) {
+                             let cell = CellRecord::Blank {
+                                 row: measured.row,
+                                 col: measured.col,
+                                 xf_index: measured.xf_index,
+                             };
+-                            processing = sink.accept(&cell, &context, &mut strings);
++                            processing = sink.accept(&cell, occurrence, &context, &mut strings);
+                         } else {
+-                            processing = sink.accept_measured(&measured, &context);
++                            processing = sink.accept_measured(&measured, occurrence, &context);
+                         }
+                     }
+                 })
+@@ -3261,13 +3431,306 @@ fn query_cell(
+         owner.ensure_current()?;
+         return Ok(None);
+     }
++    if let Some(index) = owner
++        .query_cache
++        .lookup(sheet_index, owner.expected_version)
++    {
++        return replay_indexed_cell(
++            owner,
++            sheet_index,
++            &index,
++            row as u16,
++            column as u16,
++            execution,
++        );
++    }
++    let index_candidate = owner
++        .query_cache
++        .observe_miss(sheet_index)
++        .then(|| owner.query_cache.begin_candidate(sheet_index, execution))
++        .flatten();
+     let mut sink = TargetCell {
+         row: row as u16,
+         column: column as u16,
+         found: None,
++        index: index_candidate,
++    };
++    match scan_worksheet(owner, sheet_index, execution, &mut sink) {
++        Ok(()) => {
++            let found = sink.found;
++            if let Some(candidate) = sink.index.take() {
++                let _ = candidate.publish(owner.expected_version);
++            }
++            Ok(found)
++        },
++        Err(error) => Err(error),
++    }
++}
++
++/// Replays every occurrence for one coordinate from a previously published
++/// worksheet index.  The index proves that the complete worksheet already
++/// validated, but each selected frame is still parsed and decoded here so
++/// target-specific XF, SST, and formula-STRING errors retain their original
++/// precedence.
++fn replay_indexed_cell(
++    owner: &Arc<SourceInner>,
++    sheet_index: usize,
++    index: &WorksheetCellIndex,
++    row: u16,
++    column: u16,
++    execution: Option<&ExecutionContext>,
++) -> Result<Option<SourceBackedCell>> {
++    if let Some(context) = execution {
++        context.check().map_err(SourceBackedError::from)?;
++    }
++    let sheet = owner
++        .sheets
++        .get(sheet_index)
++        .ok_or_else(|| SourceBackedError::WorksheetNotFound(sheet_index.to_string()))?;
++    let refs = owner
++        .workbook_path
++        .iter()
++        .map(String::as_str)
++        .collect::<Vec<_>>();
++    let mut strings = SharedStringResolver::new(owner, &refs);
++    let mut chain = owner.cfb.chain_hint();
++    let mut found = None;
++    for slot in index.slots_for(row, column) {
++        if let Some(context) = execution {
++            context.check().map_err(SourceBackedError::from)?;
++        }
++        let mut cursor = owner
++            .cfb
++            .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
++            .map_err(SourceBackedError::from)?;
++        if let Some(value) =
++            replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
++        {
++            found = Some(SourceBackedCell {
++                row: u32::from(row),
++                column: u32::from(column),
++                value,
++            });
++        }
++    }
++    if let Some(context) = execution {
++        context.check().map_err(SourceBackedError::from)?;
++    }
++    owner.ensure_current()?;
++    Ok(found)
++}
++
++/// Reads and decodes one indexed occurrence.  A fresh cursor starts at the
++/// retained BIFF frame offset; formula string results continue on that same
++/// cursor so their CONTINUE grammar remains identical to the scan path.
++fn replay_indexed_slot(
++    owner: &SourceInner,
++    upper_bound: u64,
++    slot: &CellSlot,
++    cursor: &mut SharedOleStreamCursor<'_>,
++    execution: Option<&ExecutionContext>,
++    strings: &mut SharedStringResolver<'_>,
++) -> Result<Option<litchi_core::sheet::CellValue>> {
++    let (kind, payload) = read_indexed_frame(cursor, upper_bound)?;
++    if kind != slot.kind {
++        return Err(SourceBackedError::InvalidData(
++            "worksheet index frame kind changed".into(),
++        ));
++    }
++    let mut record = match kind {
++        0x00BD => replay_mul_rk_record(&payload, slot)?,
++        0x00BE => replay_mul_blank_record(&payload, slot)?,
++        0x0006 | 0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
++            let record = CellRecord::parse(kind, &payload, &owner.encoding)
++                .map_err(SourceBackedError::Parse)?;
++            if record.row() != slot.row
++                || record.col() != slot.column
++                || cell_xf_index(&record) != slot.xf
++            {
++                return Err(SourceBackedError::InvalidData(
++                    "worksheet index cell locator changed".into(),
++                ));
++            }
++            record
++        },
++        _ => {
++            return Err(SourceBackedError::InvalidData(
++                "worksheet index points to a non-cell frame".into(),
++            ));
++        },
+     };
+-    scan_worksheet(owner, sheet_index, execution, &mut sink)?;
+-    Ok(sink.found)
++
++    if let CellRecord::Formula {
++        value: FormulaValue::StringPending,
++        ..
++    } = &record
++    {
++        let string_payload = loop {
++            if let Some(context) = execution {
++                context.check().map_err(SourceBackedError::from)?;
++            }
++            let (string_kind, string_payload) = read_indexed_frame(cursor, upper_bound)?;
++            if string_kind == STRING {
++                break string_payload;
++            }
++            if string_kind == EOF {
++                if !string_payload.is_empty() {
++                    return Err(SourceBackedError::InvalidData(
++                        "BIFF worksheet EOF has a non-empty payload".into(),
++                    ));
++                }
++                return Err(SourceBackedError::InvalidData(
++                    "string-valued FORMULA lacks STRING result".into(),
++                ));
++            }
++            if !matches!(string_kind, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
++                return Err(SourceBackedError::InvalidData(
++                    "string-valued FORMULA is not followed by STRING".into(),
++                ));
++            }
++        };
++        let mut continues = Vec::new();
++        let text = loop {
++            match crate::utils::decode_string_record(&string_payload, &continues)
++                .map_err(SourceBackedError::Parse)?
++            {
++                crate::utils::StringRecordDecode::Complete(text) => break text,
++                crate::utils::StringRecordDecode::NeedContinue => {
++                    if let Some(context) = execution {
++                        context.check().map_err(SourceBackedError::from)?;
++                    }
++                    let (continue_kind, continue_payload) =
++                        read_indexed_frame(cursor, upper_bound)?;
++                    if continue_kind != CONTINUE {
++                        return Err(SourceBackedError::InvalidData(
++                            "FORMULA string result continuation is not CONTINUE".into(),
++                        ));
++                    }
++                    if let Some(context) = execution {
++                        context.check().map_err(SourceBackedError::from)?;
++                    }
++                    continues
++                        .try_reserve(1)
++                        .map_err(|_error| SourceBackedError::Allocation {
++                            resource: "formula STRING continuations",
++                            requested: 1,
++                        })?;
++                    continues.push(continue_payload);
++                },
++            }
++        };
++        if let CellRecord::Formula { value, .. } = &mut record {
++            *value = FormulaValue::String(text);
++        }
++    }
++    owner
++        .formatting
++        .validate_cell_xf(cell_xf_index(&record))
++        .map_err(SourceBackedError::Parse)?;
++    target_cell_value(&record, owner, execution, strings)
++}
++
++fn read_indexed_frame(
++    cursor: &mut SharedOleStreamCursor<'_>,
++    upper_bound: u64,
++) -> Result<(u16, Vec<u8>)> {
++    let offset = cursor.position();
++    if offset.checked_add(4).is_none_or(|end| end > upper_bound) {
++        return Err(SourceBackedError::InvalidData(
++            "indexed worksheet frame header exceeds its boundary".into(),
++        ));
++    }
++    let mut header = [0_u8; 4];
++    cursor
++        .read_exact(&mut header)
++        .map_err(SourceBackedError::from)?;
++    let kind = u16::from_le_bytes([header[0], header[1]]);
++    let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
++    if payload_len > litchi_biff::MAX_RECORD_BYTES {
++        return Err(SourceBackedError::ResourceLimit {
++            resource: "BIFF record bytes",
++            observed: payload_len as u64,
++            maximum: litchi_biff::MAX_RECORD_BYTES as u64,
++        });
++    }
++    let end = offset
++        .checked_add(4)
++        .and_then(|value| value.checked_add(payload_len as u64))
++        .ok_or_else(|| {
++            SourceBackedError::InvalidData("indexed worksheet frame overflows".into())
++        })?;
++    if end > upper_bound {
++        return Err(SourceBackedError::InvalidData(
++            "indexed worksheet frame exceeds its boundary".into(),
++        ));
++    }
++    let mut payload = Vec::new();
++    payload
++        .try_reserve_exact(payload_len)
++        .map_err(|_error| SourceBackedError::Allocation {
++            resource: "indexed worksheet payload",
++            requested: payload_len as u64,
++        })?;
++    payload.resize(payload_len, 0);
++    cursor
++        .read_exact(&mut payload)
++        .map_err(SourceBackedError::from)?;
++    Ok((kind, payload))
++}
++
++fn replay_mul_rk_record(payload: &[u8], slot: &CellSlot) -> Result<CellRecord> {
++    let mut found = None;
++    let mut ordinal = 0_u16;
++    CellRecord::visit_mul_rk_measured(payload, |measured, value| {
++        let current = ordinal;
++        ordinal = ordinal.saturating_add(1);
++        if current == slot.ordinal {
++            found = Some(CellRecord::Rk {
++                row: measured.row,
++                col: measured.col,
++                xf_index: measured.xf_index,
++                value: crate::utils::rk_to_f64(value),
++            });
++        }
++    })
++    .map_err(SourceBackedError::Parse)?;
++    let record = found.ok_or_else(|| {
++        SourceBackedError::InvalidData("worksheet index MulRk ordinal is out of range".into())
++    })?;
++    if record.row() != slot.row || record.col() != slot.column || cell_xf_index(&record) != slot.xf
++    {
++        return Err(SourceBackedError::InvalidData(
++            "worksheet index MulRk locator changed".into(),
++        ));
++    }
++    Ok(record)
++}
++
++fn replay_mul_blank_record(payload: &[u8], slot: &CellSlot) -> Result<CellRecord> {
++    let mut found = None;
++    let mut ordinal = 0_u16;
++    CellRecord::visit_mul_blank_measured(payload, |measured| {
++        let current = ordinal;
++        ordinal = ordinal.saturating_add(1);
++        if current == slot.ordinal {
++            found = Some(CellRecord::Blank {
++                row: measured.row,
++                col: measured.col,
++                xf_index: measured.xf_index,
++            });
++        }
++    })
++    .map_err(SourceBackedError::Parse)?;
++    let record = found.ok_or_else(|| {
++        SourceBackedError::InvalidData("worksheet index MulBlank ordinal is out of range".into())
++    })?;
++    if record.row() != slot.row || record.col() != slot.column || cell_xf_index(&record) != slot.xf
++    {
++        return Err(SourceBackedError::InvalidData(
++            "worksheet index MulBlank locator changed".into(),
++        ));
++    }
++    Ok(record)
+ }
+ 
+ /// Walks one worksheet once and reports every stored cell in stream order.
+diff --git a/crates/litchi-xls/tests/source_backed.rs b/crates/litchi-xls/tests/source_backed.rs
+index a1d0c3533..e729d3fe4 100644
+--- a/crates/litchi-xls/tests/source_backed.rs
++++ b/crates/litchi-xls/tests/source_backed.rs
+@@ -3195,7 +3195,10 @@ fn the_whole_sheet_walk_reports_shared_strings() {
+ #[test]
+ fn the_whole_sheet_walk_costs_one_scan_not_one_per_cell() {
+     let source = Arc::new(CountingSource::new(ole_fixture("WithCustomViews.xls")));
+-    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
++    // Compare the visitor with the uncached query scan. Retained-index query
++    // savings are exercised separately in xls_query_index_cache.
++    let limits = SourceBackedLimits::default().with_max_query_index_bytes(0);
++    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+ 
+     // One selected-cell query: the whole-substream scan every query pays for,

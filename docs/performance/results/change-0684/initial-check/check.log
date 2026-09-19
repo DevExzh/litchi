@@ -1,0 +1,27 @@
+HEAD 5805d54a1d8435e1bee96cde1303310703440d16
+$ cargo check -p litchi-xls --all-features --all-targets --locked
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+error[E0596]: cannot borrow `slots` as mutable, as it is not declared as mutable
+   --> crates/litchi-xls/src/workbook/query_cache.rs:267:9
+    |
+267 |         slots
+    |         ^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+265 |         let mut slots = std::mem::take(&mut candidate.slots);
+    |             +++
+
+For more information about this error, try `rustc --explain E0596`.
+error: could not compile `litchi-xls` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-xls` (lib test) due to 1 previous error
+
+exit 101

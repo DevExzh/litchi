@@ -1,0 +1,21 @@
+baseline corpus owned 126
+baseline corpus file 126
+baseline counts/alloc 54016-stored
+baseline counts/alloc 54016-missing
+baseline counts/alloc 45365-2-stored
+baseline counts/alloc WithCustomViews-stored
+baseline counts/alloc WithCustomViews-missing
+baseline counts/alloc 15228-stored
+baseline counts/alloc Simple-stored
+baseline counts/alloc Simple-missing
+baseline counts/alloc formula-refusal
+baseline timing 54016-stored
+baseline timing 54016-missing
+baseline timing 45365-2-stored
+baseline timing WithCustomViews-stored
+baseline timing WithCustomViews-missing
+baseline timing 15228-stored
+baseline timing Simple-stored
+baseline timing Simple-missing
+baseline timing formula-refusal
+baseline complete

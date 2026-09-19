@@ -1,0 +1,5 @@
+HEAD 5805d54a1d8435e1bee96cde1303310703440d16
+$ cargo clippy -p litchi-xls --all-features --lib --no-deps --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+
+exit 0

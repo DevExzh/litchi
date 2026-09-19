@@ -1,0 +1,169 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cpu/cycles/P'
+# Event count (approx.): 15758423942
+#
+# Overhead  Symbol                                                                                                       IPC   [IPC Coverage]
+# ........  ...........................................................................................................  ....................
+#
+    24.16%  [.] litchi_xls::workbook::source::WorksheetScan::next_frame                                                  -      -            
+            |          
+            |--17.41%--next_frame (inlined)
+            |          |          
+            |           --6.67%--0x3ffffff
+            |          
+            |--4.31%--checked_add (inlined)
+            |          next_frame (inlined)
+            |          0x3ffffff
+            |          
+            |--0.53%--check_execution (inlined)
+            |          next_frame (inlined)
+            |          0x3ffffff
+            |          
+             --0.53%--checked_sub (inlined)
+                       index<u8> (inlined)
+                       index<u8, core::ops::range::Range<usize>> (inlined)
+                       index<u8, core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       frame_header (inlined)
+                       next_frame (inlined)
+                       0x3ffffff
+
+    19.76%  [.] litchi_xls::workbook::source::query_cell                                                                 -      -            
+            |          
+            |--15.62%--scan_worksheet<litchi_xls::workbook::source::TargetCell> (inlined)
+            |          query_cell (inlined)
+            |          |          
+            |           --13.30%--0xe25c9
+            |          
+            |--0.98%--wants (inlined)
+            |          |          
+            |           --0.90%--{closure#0}<litchi_xls::workbook::source::TargetCell> (inlined)
+            |                     is_none_or<&[u8], litchi_xls::workbook::source::wants_record::{closure_env#0}<litchi_xls::workbook::source::TargetCell>> (inlined)
+            |                     wants_record<litchi_xls::workbook::source::TargetCell> (inlined)
+            |                     scan_worksheet<litchi_xls::workbook::source::TargetCell> (inlined)
+            |                     query_cell (inlined)
+            |          
+            |--0.98%--branch<litchi_xls::workbook::source::WorksheetFrame, litchi_xls::workbook::source::SourceBackedError> (inlined)
+            |          scan_worksheet<litchi_xls::workbook::source::TargetCell> (inlined)
+            |          query_cell (inlined)
+            |          0xe25c9
+            |          
+            |--0.84%--{closure#3}<litchi_xls::workbook::source::TargetCell> (inlined)
+            |          visit_mul_blank_measured<litchi_xls::workbook::source::scan_worksheet::{closure_env#3}<litchi_xls::workbook::source::TargetCell>> (inlined)
+            |          scan_worksheet<litchi_xls::workbook::source::TargetCell> (inlined)
+            |          query_cell (inlined)
+            |          
+             --0.50%--drop_in_place<core::result::Result<(), litchi_xls::workbook::source::SourceBackedError>> (inlined)
+                       {closure#3}<litchi_xls::workbook::source::TargetCell> (inlined)
+                       visit_mul_blank_measured<litchi_xls::workbook::source::scan_worksheet::{closure_env#3}<litchi_xls::workbook::source::TargetCell>> (inlined)
+                       scan_worksheet<litchi_xls::workbook::source::TargetCell> (inlined)
+                       query_cell (inlined)
+                       cell (inlined)
+                       cell_by_index (inlined)
+
+    18.18%  [.] litchi_xls::workbook::source::WorksheetScan::read_payload                                                -      -            
+            |          
+            |--11.75%--read_payload (inlined)
+            |          |          
+            |           --3.50%--0x3ffffff
+            |          
+            |--3.25%--consume_payload (inlined)
+            |          read_payload (inlined)
+            |          0x3ffffff
+            |          
+            |--0.98%--ensure (inlined)
+            |          consume_payload (inlined)
+            |          read_payload (inlined)
+            |          0x3ffffff
+            |          
+            |--0.95%--min<usize> (inlined)
+            |          consume_payload (inlined)
+            |          read_payload (inlined)
+            |          0x3ffffff
+            |          
+             --0.62%--check_execution (inlined)
+                       consume_payload (inlined)
+                       read_payload (inlined)
+                       0x3ffffff
+
+    16.24%  [.] litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::validate_cell_xf  -      -            
+            |          
+             --2.21%--0xe25c9
+
+     9.30%  [.] litchi_xls::records::CellRecord::measure                                                                 -      -            
+            |          
+            |--7.15%--measure (inlined)
+            |          |          
+            |           --5.04%--0x4aef2
+            |          
+             --1.29%--measure_fixed (inlined)
+                       measure (inlined)
+
+     4.84%  [.] litchi_cfb::shared::SharedOleStreamCursor::read_exact                                                    -      -            
+            |          
+             --4.70%--branch<litchi_cfb::shared::SharedOleStreamCursorState, litchi_cfb::file::OleError> (inlined)
+                       read_from_state (inlined)
+                       {closure#0} (inlined)
+                       read_exact (inlined)
+
+     2.07%  [.] litchi_xls::records::CellRecord::packed_cell_range                                                       -      -            
+            |          
+             --2.01%--packed_cell_range (inlined)
+
+     2.01%  [.] litchi_xls::workbook::source::WorksheetScan::skip_payload                                                -      -            
+            |          
+            |--1.12%--skip_payload (inlined)
+            |          
+             --0.78%--saturating_add (inlined)
+                       filled_end (inlined)
+                       skip_payload (inlined)
+
+     1.23%  [.] __memmove_avx512_unaligned_erms                                                                          -      -            
+            |          
+             --1.18%--copy_nonoverlapping<u8> (inlined)
+                       copy_from_slice_impl<u8> (inlined)
+                       copy_from_slice<u8> (inlined)
+                       read_slice_at (inlined)
+                       read_at (inlined)
+
+     0.78%  [.] __memset_avx512_unaligned_erms                                                                           -      -            
+            |
+            ---write<u8> (inlined)
+               extend_with<u8, alloc::alloc::Global> (inlined)
+               resize<u8, alloc::alloc::Global> (inlined)
+               fill (inlined)
+
+     0.48%  [k] 0xffffffff9e800ef0                                                                                       -      -            
+     0.36%  [.] litchi_cfb::shared::next_chain_sector                                                                    -      -            
+     0.06%  [k] 0xffffffff9ec0c2a4                                                                                       -      -            
+     0.06%  [k] 0xffffffff9ec0c45d                                                                                       -      -            
+     0.06%  [.] litchi_cfb::shared::SharedOleStreamCursor::move_forward                                                  -      -            
+     0.06%  [.] litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted                                               -      -            
+     0.03%  [k] 0xffffffff9ff0178b                                                                                       -      -            
+     0.03%  [k] 0xffffffff9ecc5f01                                                                                       -      -            
+     0.03%  [.] litchi_xls::workbook::source::WorksheetScan::fill                                                        -      -            
+     0.03%  [.] _int_realloc                                                                                             -      -            
+     0.03%  [k] 0xffffffff9ecfa483                                                                                       -      -            
+     0.03%  [.] litchi_cfb::directory_name::directory_name_data                                                          -      -            
+     0.03%  [.] realloc                                                                                                  -      -            
+     0.03%  [.] malloc                                                                                                   -      -            
+     0.03%  [k] 0xffffffff9ff30b07                                                                                       -      -            
+     0.03%  [k] 0xffffffff9ed75a1a                                                                                       -      -            
+     0.03%  [k] 0xffffffff9ed776d5                                                                                       -      -            
+     0.03%  [k] 0xffffffff9ed0504b                                                                                       -      -            
+     0.01%  [k] 0xffffffff9ef8644d                                                                                       -      -            
+     0.01%  [k] 0xffffffff9f1119a7                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ef60882                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ff2aebc                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ebb6c9a                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ee05e13                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ef5a0a0                                                                                       -      -            
+     0.00%  [k] 0xffffffff9ec0c45f                                                                                       -      -            
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0684 — XLS repeated queries with explicit construction and retention costs
+
+[0684](0684-xls-occurrence-query-index.md) completes the bounded worksheet
+occurrence-cache implementation and fixture measurement prerequisite from
+0678. All six quality gates pass, including 1,455 XLS tests and 61 facade tests;
+126-fixture differentials match exactly for owned and file sources. Weighted
+candidate/resident admission, pinned lifetimes, concurrent publication,
+cancellation and refusal order have focused coverage and independent review.
+
+Warm large-sheet work decreases materially, while second-query construction,
+three-query 45365, tiny file-backed hits, repeated refusals and retained RSS
+have explicit costs. This closes no global CRUD coverage or program-level
+performance claim. Snapshot chain hints, catalog scans, physical cold-cache,
+remote and concurrent scaling remain open. OLE2/OOXML work continues; iWork is
+excluded.
+
 ## 0683 — compact XLSX selections retain complete validation
 
 [0683](0683-xlsx-selected-record-compaction.md) implements the compact-record

@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## 0684 — XLS locator cache preserves replay and resource boundaries
+
+[0684](0684-xls-occurrence-query-index.md) follows ADRs 0001/0002/0024 by keeping
+BIFF occurrence locators and replay in the XLS owner, using existing core/CFB
+contracts and adding no dependency edge. ADRs 0003/0006 retain immutable source
+identity, duplicate/error precedence, complete successful scan before
+publication, target SST/formula checks and leading/trailing fences. Ordinary
+visitors retain their existing behavior.
+
+For ADR 0005, local weighted tables plus resident/candidate index capacity are
+bounded, clean entries are LRU-evictable, active Arcs pin managed reservations,
+and optional admission failure falls back to scanning. Opening has no execution
+context, so its fallible table storage uses the local limit; execution-bearing
+candidate/index storage uses hierarchical Memory reservations. Logical weights
+do not claim an allocator/RSS bound. Build cost, refused builds, tiny-file
+regressions and retained RSS increases are documented alongside warm gains.
+No ADR amendment, unsafe code, ambient source, executor or registered claim.
+
 ## 0683 — tagged XLSX records preserve publication and error boundaries
 
 [0683](0683-xlsx-selected-record-compaction.md) replaces the raw scanner's

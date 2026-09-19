@@ -1,0 +1,49 @@
+HEAD 5805d54a1d8435e1bee96cde1303310703440d16
+$ cargo check -p litchi-xls --all-features --all-targets --locked
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+error[E0308]: mismatched types
+    --> crates/litchi-xls/tests/xls_query_index_cache.rs:833:46
+     |
+ 833 |         .cell_value_with_execution(3_999, 0, &execution)
+     |          -------------------------           ^^^^^^^^^^ expected `&ExecutionContext`, found `&CancellationToken`
+     |          |
+     |          arguments to this method are incorrect
+     |
+     = note: expected reference `&ExecutionContext`
+                found reference `&CancellationToken`
+note: method defined here
+    --> crates/litchi-xls/src/workbook/source.rs:1477:12
+     |
+1477 |     pub fn cell_value_with_execution(
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+    --> crates/litchi-xls/tests/xls_query_index_cache.rs:845:46
+     |
+ 845 |         .cell_value_with_execution(3_999, 0, &fresh_execution)
+     |          -------------------------           ^^^^^^^^^^^^^^^^ expected `&ExecutionContext`, found `&CancellationToken`
+     |          |
+     |          arguments to this method are incorrect
+     |
+     = note: expected reference `&ExecutionContext`
+                found reference `&CancellationToken`
+note: method defined here
+    --> crates/litchi-xls/src/workbook/source.rs:1477:12
+     |
+1477 |     pub fn cell_value_with_execution(
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unused variable: `end`
+   --> crates/litchi-xls/tests/xls_query_index_cache.rs:242:17
+    |
+242 |     let (start, end) = first_frame_of_kind(&original, 0x00FD);
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_end`
+    |
+    = note: `-D unused-variables` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unused_variables)]`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+
+exit 101

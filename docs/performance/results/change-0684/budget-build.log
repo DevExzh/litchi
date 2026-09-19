@@ -1,0 +1,24 @@
+     Locking 145 packages to latest Rust 1.95.0 compatible versions
+      Adding crypto-common v0.1.6 (available: v0.1.7)
+   Compiling xls-index-budget-probe-0684 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0684/budget-probe)
+error: invalid format string: expected `}`, found `(`
+   --> src/main.rs:247:33
+    |
+247 |                 println!("{usage()}");
+    |                           -     ^ expected `}` in format string
+    |                           |
+    |                           because of this opening brace
+    |
+    = note: if you intended to print `{`, you can escape it using `{{`
+
+error: invalid format string: expected `}`, found `(`
+   --> src/main.rs:252:79
+    |
+252 |                     io::Error::other(format!("unknown option {value:?}\n{usage()}")).into(),
+    |                                                                         -     ^ expected `}` in format string
+    |                                                                         |
+    |                                                                         because of this opening brace
+    |
+    = note: if you intended to print `{`, you can escape it using `{{`
+
+error: could not compile `xls-index-budget-probe-0684` (bin "xls-index-budget-probe-0684") due to 2 previous errors

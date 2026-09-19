@@ -1,0 +1,14 @@
+{
+  "evidence/results.json": {
+    "count": 6,
+    "sha256": "d41a7637b969039123c658b12a42375a8add30d508d9d80e09cbe09c27c5dd8f"
+  },
+  "evidence/final-results.json": {
+    "count": 5,
+    "sha256": "38d7280e4d7e76f6576c0caa699639b3158d2081e7d943c343ad8e8089601bfa"
+  },
+  "final-verified/results.json": {
+    "count": 6,
+    "sha256": "633c84eee61e5829b260a199c01a15a7a02ebf2dbccbb0ce7237a951412e2747"
+  }
+}
