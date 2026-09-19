@@ -1,0 +1,1 @@
+operation=cells-cold	callbacks=65536	result=ok	allocation_calls=2234256	allocated_bytes=78095771	deallocation_calls=2168667	deallocated_bytes=66652024	peak_live_delta=14679130	retained_live_delta=5673984	elapsed_ns=153944841

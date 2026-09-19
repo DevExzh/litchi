@@ -1,0 +1,13 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests/source_backed_selected_payloads.rs (target/debug/deps/source_backed_selected_payloads-cd7707de08265fad)
+
+running 5 tests
+test late_refusal_after_every_payload_arm_produces_zero_callbacks ... ok
+test raw_selected_payload_tags_cover_values_formula_strings_and_dependencies ... ok
+test repeated_shared_strings_validate_unselected_dependency_maximum ... ok
+test selected_callback_can_reenter_the_workbook_after_scan_publication ... ok
+test selected_tagged_payloads_match_cold_warm_and_visit_routes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

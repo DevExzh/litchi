@@ -1,0 +1,482 @@
+diff --git a/crates/litchi-xlsx/src/raw/mod.rs b/crates/litchi-xlsx/src/raw/mod.rs
+index 03188a495..b52e61272 100644
+--- a/crates/litchi-xlsx/src/raw/mod.rs
++++ b/crates/litchi-xlsx/src/raw/mod.rs
+@@ -32,7 +32,7 @@ pub(crate) mod worksheet_property;
+ pub mod selected_worksheet {
+     pub use super::worksheet::selected::{
+         NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, SelectedCells,
+-        SelectedDependencies, SelectedRecord, StreamResult, scan, scan_range,
++        SelectedDependencies, SelectedPayload, SelectedRecord, StreamResult, scan, scan_range,
+     };
+ }
+ 
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/selected.rs b/crates/litchi-xlsx/src/raw/worksheet/selected.rs
+index 61017dd2f..83a7763d0 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/selected.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/selected.rs
+@@ -63,7 +63,7 @@ const X14AC_NAMESPACE: &[u8] = x14ac::NAMESPACE;
+ /// or that a valid non-formula shared-string record was deferred. The latter
+ /// is identified by [`SelectedCell::dependencies`] retaining its shared-string
+ /// index. `Some(Cell::Empty)` is an explicitly stored empty cell. The range
+-/// API exposes the same distinction directly through [`SelectedRecord`].
++/// API exposes the same distinction through [`SelectedRecord::payload`].
+ #[derive(Debug)]
+ pub struct SelectedCell {
+     /// Requested coordinate, retained so later source readers can bind the
+@@ -85,17 +85,33 @@ pub struct SelectedCell {
+ /// One physical cell record retained by a rectangular worksheet selection.
+ ///
+ /// The range scanner is sparse: absent coordinates do not produce records.
+-/// An explicit empty `<c>` record is represented by `cell: Some(Cell::Empty)`.
+-/// A valid non-formula shared-string record is deferred instead, with its
+-/// index in [`Self::shared_string_index`] and `cell` set to `None`.
++/// An explicit empty `<c>` record is represented by
++/// [`SelectedPayload::Cell`] containing [`Cell::Empty`]. A valid non-formula
++/// shared-string record is deferred as [`SelectedPayload::SharedString`].
+ #[derive(Debug)]
+ pub struct SelectedRecord {
+     /// Physical worksheet coordinate of the stored `<c>` record.
+     pub address: Address,
+-    /// Stored semantic cell, or `None` for a deferred shared-string record.
+-    pub cell: Option<Cell>,
+-    /// Zero-based shared-string index for a deferred `t="s"` record.
+-    pub shared_string_index: Option<u32>,
++    /// Exactly one retained payload. The tagged representation keeps the
++    /// scanner's invariant in the type and avoids carrying two independent
++    /// option discriminants for every physical record.
++    pub payload: SelectedPayload,
++}
++
++/// The mutually exclusive payload retained for one selected physical cell.
++///
++/// A selected record is either a fully validated semantic cell or a deferred
++/// shared-string reference. The scanner never publishes a record without one
++/// of these payloads, so callers do not need to reproduce the former
++/// both/neither defensive check before resolving it.
++#[derive(Debug)]
++#[non_exhaustive]
++pub enum SelectedPayload {
++    /// A fully validated semantic cell, including an explicit empty cell.
++    Cell(Cell),
++    /// A zero-based shared-string index whose text is resolved after the
++    /// worksheet reader has been released.
++    SharedString(u32),
+ }
+ 
+ /// Sparse physical records retained by an eligible rectangular scan.
+@@ -128,7 +144,7 @@ pub struct SelectedDependencies {
+     /// cell and is distinct from a missing coordinate or an explicit empty
+     /// cell. For a range scan this compatibility field is populated only when
+     /// exactly one physical record was selected; use
+-    /// [`SelectedRecord::shared_string_index`] for per-record indexes.
++    /// [`SelectedRecord::payload`] for per-record indexes.
+     pub target_shared_string_index: Option<u32>,
+ }
+ 
+@@ -286,12 +302,17 @@ pub fn scan(
+                 },
+             };
+             let mut dependencies = selected.dependencies;
+-            dependencies.target_shared_string_index = record
+-                .as_ref()
+-                .and_then(|record| record.shared_string_index);
++            dependencies.target_shared_string_index =
++                record.as_ref().and_then(|record| match &record.payload {
++                    SelectedPayload::Cell(_) => None,
++                    SelectedPayload::SharedString(index) => Some(*index),
++                });
+             Ok(ScanOutcome::Eligible(SelectedCell {
+                 address: requested,
+-                cell: record.and_then(|record| record.cell),
++                cell: record.and_then(|record| match record.payload {
++                    SelectedPayload::Cell(cell) => Some(cell),
++                    SelectedPayload::SharedString(_) => None,
++                }),
+                 covering_merge,
+                 dependencies,
+             }))
+@@ -540,7 +561,10 @@ impl Scanner {
+             None
+         };
+         let target_shared_string_index = (self.selected.len() == 1)
+-            .then(|| self.selected[0].shared_string_index)
++            .then(|| match &self.selected[0].payload {
++                SelectedPayload::Cell(_) => None,
++                SelectedPayload::SharedString(index) => Some(*index),
++            })
+             .flatten();
+         let mut dependencies = self.dependencies;
+         dependencies.target_shared_string_index = target_shared_string_index;
+@@ -1162,8 +1186,7 @@ impl Scanner {
+             if selected {
+                 self.retain_selected(SelectedRecord {
+                     address,
+-                    cell: None,
+-                    shared_string_index: Some(index),
++                    payload: SelectedPayload::SharedString(index),
+                 })?;
+             }
+             return Ok(());
+@@ -1213,8 +1236,7 @@ impl Scanner {
+         if selected {
+             self.retain_selected(SelectedRecord {
+                 address,
+-                cell: Some(semantic),
+-                shared_string_index: None,
++                payload: SelectedPayload::Cell(semantic),
+             })?;
+         }
+         self.recycle_numeric_value(cell);
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+index b85d8dffc..67765d164 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+@@ -1,4 +1,5 @@
+ use super::model::MAX_XML_DEPTH;
++use super::selected::{SelectedPayload, SelectedRecord};
+ use super::{parse, parse_defaults, x14ac};
+ use crate::cell::{Cell, Text, Value};
+ use crate::column;
+@@ -19,6 +20,25 @@ fn box_stream_result<T>(
+     result.map_err(Box::new)
+ }
+ 
++/// Project the compact selected-record payload into the old test oracle's
++/// optional semantic-cell view.  The production representation now stores
++/// this choice as one tagged enum; keeping this adapter in tests makes every
++/// existing range assertion explicit about how a deferred shared string is
++/// treated without reintroducing the old two-option shape.
++fn selected_record_cell(record: &SelectedRecord) -> Option<&Cell> {
++    match &record.payload {
++        SelectedPayload::Cell(cell) => Some(cell),
++        SelectedPayload::SharedString(_) => None,
++    }
++}
++
++fn selected_record_shared_string_index(record: &SelectedRecord) -> Option<u32> {
++    match &record.payload {
++        SelectedPayload::Cell(_) => None,
++        SelectedPayload::SharedString(index) => Some(*index),
++    }
++}
++
+ /// What the materialized parser answers for the same worksheet bytes.
+ ///
+ /// Change 0658 stops the selected-cell scan at the event that settles an
+@@ -1962,18 +1982,21 @@ mod streaming_0365_range_tests {
+                 .collect::<Vec<_>>(),
+             vec![address("C1"), address("E1"), address("B2"), address("A4")]
+         );
+-        assert_number(selected.cells[0].cell.as_ref(), "31");
+-        assert!(matches!(selected.cells[1].cell.as_ref(), Some(Cell::Empty)));
+-        assert_number(selected.cells[2].cell.as_ref(), "22");
++        assert_number(super::selected_record_cell(&selected.cells[0]), "31");
++        assert!(matches!(
++            super::selected_record_cell(&selected.cells[1]),
++            Some(Cell::Empty)
++        ));
++        assert_number(super::selected_record_cell(&selected.cells[2]), "22");
+         assert!(matches!(
+-            selected.cells[3].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[3]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+         ));
+         assert!(
+             selected
+                 .cells
+                 .iter()
+-                .all(|record| record.shared_string_index.is_none())
++                .all(|record| super::selected_record_shared_string_index(record).is_none())
+         );
+     }
+ 
+@@ -1989,12 +2012,12 @@ mod streaming_0365_range_tests {
+         let first = eligible_range(&xml, "A1:A1");
+         assert_eq!(first.cells.len(), 1);
+         assert_eq!(first.cells[0].address, address("A1"));
+-        assert_number(first.cells[0].cell.as_ref(), "1");
++        assert_number(super::selected_record_cell(&first.cells[0]), "1");
+ 
+         let last = eligible_range(&xml, "XFD1048576:XFD1048576");
+         assert_eq!(last.cells.len(), 1);
+         assert_eq!(last.cells[0].address, address("XFD1048576"));
+-        assert_number(last.cells[0].cell.as_ref(), "9");
++        assert_number(super::selected_record_cell(&last.cells[0]), "9");
+ 
+         let edge = eligible_range(&xml, "XFC1048575:XFD1048576");
+         assert_eq!(edge.cells.len(), 1);
+@@ -2027,11 +2050,16 @@ mod streaming_0365_range_tests {
+             selected
+                 .cells
+                 .iter()
+-                .map(|record| record.shared_string_index)
++                .map(super::selected_record_shared_string_index)
+                 .collect::<Vec<_>>(),
+             vec![Some(3), Some(9), Some(11)]
+         );
+-        assert!(selected.cells.iter().all(|record| record.cell.is_none()));
++        assert!(
++            selected
++                .cells
++                .iter()
++                .all(|record| super::selected_record_cell(record).is_none())
++        );
+         assert_eq!(selected.dependencies.max_shared_string_index, Some(19));
+         assert_eq!(selected.dependencies.max_direct_style_index, Some(37));
+         assert_eq!(selected.dependencies.target_shared_string_index, None);
+@@ -2061,13 +2089,13 @@ mod streaming_0365_range_tests {
+             assert_eq!(range.dependencies, single.dependencies);
+             let range_record = range.cells.first();
+             assert_same_cell(
+-                range_record.and_then(|record| record.cell.as_ref()),
++                range_record.and_then(super::selected_record_cell),
+                 single.cell.as_ref(),
+             );
+             if let Some(record) = range_record {
+                 assert_eq!(record.address, single.address);
+                 assert_eq!(
+-                    record.shared_string_index,
++                    super::selected_record_shared_string_index(record),
+                     single.dependencies.target_shared_string_index
+                 );
+             } else {
+@@ -2125,7 +2153,7 @@ mod streaming_0365_range_tests {
+         );
+         let selected = eligible_range(&merged, "A1:B1");
+         assert_eq!(selected.cells.len(), 1);
+-        assert_number(selected.cells[0].cell.as_ref(), "1");
++        assert_number(super::selected_record_cell(&selected.cells[0]), "1");
+ 
+         let cases = [
+             (
+@@ -2157,7 +2185,7 @@ mod streaming_0365_range_tests {
+             r#"<sheetData><row r="1"><c r="A1" s="{MAX_CELL_STYLE}"><v>1</v></c></row></sheetData>"#
+         ));
+         let selected = eligible_range(&valid, "A1");
+-        assert_number(selected.cells[0].cell.as_ref(), "1");
++        assert_number(super::selected_record_cell(&selected.cells[0]), "1");
+         assert_eq!(
+             selected.dependencies.max_direct_style_index,
+             Some(MAX_CELL_STYLE)
+@@ -2183,19 +2211,19 @@ mod streaming_0365_range_tests {
+         let selected = eligible_range(&xml, "A1:D1");
+ 
+         assert!(matches!(
+-            selected.cells[0].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[0]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+         ));
+         assert!(matches!(
+-            selected.cells[1].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[1]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+         ));
+         assert!(matches!(
+-            selected.cells[2].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[2]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+         ));
+         assert!(matches!(
+-            selected.cells[3].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[3]),
+             Some(Cell::Value(Value::Text(value)))
+                 if value.as_str() == "&😀<A" && value.as_str().chars().count() == 4
+         ));
+@@ -2373,15 +2401,15 @@ mod streaming_0367_merge_tests {
+             vec![address("A1"), address("E1"), address("C2")]
+         );
+         assert!(matches!(
+-            selected.cells[0].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[0]),
+             Some(Cell::Value(Value::Number(value))) if value.as_str() == "1"
+         ));
+         assert!(matches!(
+-            selected.cells[1].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[1]),
+             Some(Cell::Value(Value::Number(value))) if value.as_str() == "5"
+         ));
+         assert!(matches!(
+-            selected.cells[2].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[2]),
+             Some(Cell::Value(Value::Number(value))) if value.as_str() == "3"
+         ));
+     }
+@@ -2710,10 +2738,10 @@ mod streaming_0366_general_reference_tests {
+             [record] => {
+                 assert_eq!(record.address, single.address);
+                 assert_eq!(
+-                    record.shared_string_index,
++                    super::selected_record_shared_string_index(record),
+                     single.dependencies.target_shared_string_index
+                 );
+-                assert_eq!(record.cell.as_ref(), single.cell.as_ref());
++                assert_eq!(super::selected_record_cell(record), single.cell.as_ref());
+             },
+             other => panic!("one-cell range retained multiple records: {other:?}"),
+         }
+@@ -2995,15 +3023,15 @@ mod streaming_0400_numeric_scratch_tests {
+ 
+         assert_eq!(selected.cells.len(), 6);
+         assert!(matches!(
+-            selected.cells[0].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[0]),
+             Some(Cell::Value(Value::Number(value)))
+                 if value.as_str() == "1234567890123456789012345678901234567890.123456789"
+         ));
+         assert!(matches!(
+-            selected.cells[1].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[1]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str() == "text"
+         ));
+-        match selected.cells[2].cell.as_ref() {
++        match super::selected_record_cell(&selected.cells[2]) {
+             Some(Cell::Formula(formula)) => {
+                 assert_eq!(formula.text(), "1+1");
+                 assert!(matches!(
+@@ -3014,14 +3042,17 @@ mod streaming_0400_numeric_scratch_tests {
+             other => panic!("expected cached numeric formula, got {other:?}"),
+         }
+         assert!(matches!(
+-            selected.cells[3].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[3]),
+             Some(Cell::Value(Value::Text(value))) if value.as_str() == "inline"
+         ));
+         assert!(matches!(
+-            selected.cells[4].cell.as_ref(),
++            super::selected_record_cell(&selected.cells[4]),
+             Some(Cell::Value(Value::Error(value))) if value.as_str() == "#N/A"
+         ));
+-        assert!(matches!(selected.cells[5].cell.as_ref(), Some(Cell::Empty)));
++        assert!(matches!(
++            super::selected_record_cell(&selected.cells[5]),
++            Some(Cell::Empty)
++        ));
+     }
+ 
+     #[test]
+diff --git a/crates/litchi-xlsx/src/workbook/source.rs b/crates/litchi-xlsx/src/workbook/source.rs
+index 3ae9a7310..fefa11076 100644
+--- a/crates/litchi-xlsx/src/workbook/source.rs
++++ b/crates/litchi-xlsx/src/workbook/source.rs
+@@ -34,6 +34,7 @@ use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
+ use crate::cell::{Cell, Store, Text, Value, View};
+ use crate::error::{Error, Result, allocation, invalid};
+ use crate::raw;
++use crate::raw::selected_worksheet::SelectedPayload;
+ 
+ const CHARTSHEET_REL: &str =
+     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+@@ -930,16 +931,24 @@ impl SourceWorksheet {
+         };
+ 
+         let dependencies = selected.dependencies;
++        // Only shared-string records need this staging vector. Reserving for
++        // every selected physical cell made numeric/inline ranges allocate a
++        // temporary index table whose length was always zero after the scan.
++        let requested_count = selected
++            .cells
++            .iter()
++            .filter(|record| matches!(&record.payload, SelectedPayload::SharedString(_)))
++            .count();
+         let mut requested = Vec::new();
+         requested
+-            .try_reserve_exact(selected.cells.len())
++            .try_reserve_exact(requested_count)
+             .map_err(|source| allocation("source-backed selected shared-string indexes", source))?;
+         let mut fallback = false;
+         for record in &selected.cells {
+-            let Some(index) = record.shared_string_index else {
++            let SelectedPayload::SharedString(index) = &record.payload else {
+                 continue;
+             };
+-            let Ok(index) = usize::try_from(index) else {
++            let Ok(index) = usize::try_from(*index) else {
+                 fallback = true;
+                 break;
+             };
+@@ -973,10 +982,10 @@ impl SourceWorksheet {
+ 
+         if !fallback {
+             for record in &selected.cells {
+-                let Some(index) = record.shared_string_index else {
++                let SelectedPayload::SharedString(index) = &record.payload else {
+                     continue;
+                 };
+-                let Ok(index) = usize::try_from(index) else {
++                let Ok(index) = usize::try_from(*index) else {
+                     fallback = true;
+                     break;
+                 };
+@@ -1002,27 +1011,6 @@ impl SourceWorksheet {
+         if fallback {
+             return Ok(Selection::Stored(self.store()?));
+         }
+-
+-        // Refuse a malformed retained record here, where the whole-range read
+-        // refused it, rather than part-way through a caller's visit. The two
+-        // refusals below are defensive: the scanner retains a record through
+-        // one constructor whose only two call sites set exactly one of the
+-        // two fields, so neither shape is reachable from a valid scan.
+-        for record in &selected.cells {
+-            match (&record.cell, record.shared_string_index) {
+-                (Some(_), None) | (None, Some(_)) => {},
+-                (Some(_), Some(_)) => {
+-                    return Err(invalid(
+-                        "selected worksheet record has both a semantic cell and shared-string dependency",
+-                    ));
+-                },
+-                (None, None) => {
+-                    return Err(invalid(
+-                        "selected worksheet record has neither a semantic cell nor dependency",
+-                    ));
+-                },
+-            }
+-        }
+         Ok(Selection::Selected {
+             cells: selected.cells,
+             shared_text,
+@@ -1132,9 +1120,10 @@ fn collect_stored_cells(store: &Store, range: Rect) -> Result<Vec<SourceCell>> {
+ 
+ /// Bind one retained selected record to its resolved shared-string payload.
+ ///
+-/// `stream_selection` has already refused every record shape this cannot
+-/// resolve, so the refusals below are defensive and unreachable from a valid
+-/// scan; they are kept so that no record can be published unchecked.
++/// `SelectedRecord::payload` makes the semantic/deferred choice an invariant,
++/// so this conversion has no late both/neither refusal branch. Dependency
++/// presence and source fences are still checked before the selection is
++/// published by `stream_selection`.
+ ///
+ /// Always inlined: the record and the produced cell are both larger than a
+ /// register pair, so an out-of-line call copies each of them through the stack
+@@ -1146,9 +1135,9 @@ fn resolve_selected_record(
+     record: raw::selected_worksheet::SelectedRecord,
+     shared_text: Option<&[(usize, Text)]>,
+ ) -> Result<SourceCell> {
+-    let cell = match (record.cell, record.shared_string_index) {
+-        (Some(cell), None) => cell,
+-        (None, Some(index)) => {
++    let cell = match record.payload {
++        SelectedPayload::Cell(cell) => cell,
++        SelectedPayload::SharedString(index) => {
+             let index = usize::try_from(index)
+                 .map_err(|_error| invalid("shared-string index exceeds this platform"))?;
+             let text = shared_text
+@@ -1161,16 +1150,6 @@ fn resolve_selected_record(
+                 .ok_or_else(|| invalid("selected shared-string dependency was not retained"))?;
+             Cell::Value(Value::Text(text))
+         },
+-        (Some(_), Some(_)) => {
+-            return Err(invalid(
+-                "selected worksheet record has both a semantic cell and shared-string dependency",
+-            ));
+-        },
+-        (None, None) => {
+-            return Err(invalid(
+-                "selected worksheet record has neither a semantic cell nor dependency",
+-            ));
+-        },
+     };
+     Ok(SourceCell {
+         address: record.address,

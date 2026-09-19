@@ -1,4 +1,5 @@
 use super::model::MAX_XML_DEPTH;
+use super::selected::{SelectedPayload, SelectedRecord};
 use super::{parse, parse_defaults, x14ac};
 use crate::cell::{Cell, Text, Value};
 use crate::column;
@@ -17,6 +18,25 @@ fn box_stream_result<T>(
     result: Result<T, litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>,
 ) -> BoxedStreamResult<T> {
     result.map_err(Box::new)
+}
+
+/// Project the compact selected-record payload into the old test oracle's
+/// optional semantic-cell view.  The production representation now stores
+/// this choice as one tagged enum; keeping this adapter in tests makes every
+/// existing range assertion explicit about how a deferred shared string is
+/// treated without reintroducing the old two-option shape.
+fn selected_record_cell(record: &SelectedRecord) -> Option<&Cell> {
+    match &record.payload {
+        SelectedPayload::Cell(cell) => Some(cell),
+        SelectedPayload::SharedString(_) => None,
+    }
+}
+
+fn selected_record_shared_string_index(record: &SelectedRecord) -> Option<u32> {
+    match &record.payload {
+        SelectedPayload::Cell(_) => None,
+        SelectedPayload::SharedString(index) => Some(*index),
+    }
 }
 
 /// What the materialized parser answers for the same worksheet bytes.
@@ -1962,18 +1982,21 @@ mod streaming_0365_range_tests {
                 .collect::<Vec<_>>(),
             vec![address("C1"), address("E1"), address("B2"), address("A4")]
         );
-        assert_number(selected.cells[0].cell.as_ref(), "31");
-        assert!(matches!(selected.cells[1].cell.as_ref(), Some(Cell::Empty)));
-        assert_number(selected.cells[2].cell.as_ref(), "22");
+        assert_number(super::selected_record_cell(&selected.cells[0]), "31");
         assert!(matches!(
-            selected.cells[3].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[1]),
+            Some(Cell::Empty)
+        ));
+        assert_number(super::selected_record_cell(&selected.cells[2]), "22");
+        assert!(matches!(
+            super::selected_record_cell(&selected.cells[3]),
             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
         ));
         assert!(
             selected
                 .cells
                 .iter()
-                .all(|record| record.shared_string_index.is_none())
+                .all(|record| super::selected_record_shared_string_index(record).is_none())
         );
     }
 
@@ -1989,12 +2012,12 @@ mod streaming_0365_range_tests {
         let first = eligible_range(&xml, "A1:A1");
         assert_eq!(first.cells.len(), 1);
         assert_eq!(first.cells[0].address, address("A1"));
-        assert_number(first.cells[0].cell.as_ref(), "1");
+        assert_number(super::selected_record_cell(&first.cells[0]), "1");
 
         let last = eligible_range(&xml, "XFD1048576:XFD1048576");
         assert_eq!(last.cells.len(), 1);
         assert_eq!(last.cells[0].address, address("XFD1048576"));
-        assert_number(last.cells[0].cell.as_ref(), "9");
+        assert_number(super::selected_record_cell(&last.cells[0]), "9");
 
         let edge = eligible_range(&xml, "XFC1048575:XFD1048576");
         assert_eq!(edge.cells.len(), 1);
@@ -2027,11 +2050,16 @@ mod streaming_0365_range_tests {
             selected
                 .cells
                 .iter()
-                .map(|record| record.shared_string_index)
+                .map(super::selected_record_shared_string_index)
                 .collect::<Vec<_>>(),
             vec![Some(3), Some(9), Some(11)]
         );
-        assert!(selected.cells.iter().all(|record| record.cell.is_none()));
+        assert!(
+            selected
+                .cells
+                .iter()
+                .all(|record| super::selected_record_cell(record).is_none())
+        );
         assert_eq!(selected.dependencies.max_shared_string_index, Some(19));
         assert_eq!(selected.dependencies.max_direct_style_index, Some(37));
         assert_eq!(selected.dependencies.target_shared_string_index, None);
@@ -2061,13 +2089,13 @@ mod streaming_0365_range_tests {
             assert_eq!(range.dependencies, single.dependencies);
             let range_record = range.cells.first();
             assert_same_cell(
-                range_record.and_then(|record| record.cell.as_ref()),
+                range_record.and_then(super::selected_record_cell),
                 single.cell.as_ref(),
             );
             if let Some(record) = range_record {
                 assert_eq!(record.address, single.address);
                 assert_eq!(
-                    record.shared_string_index,
+                    super::selected_record_shared_string_index(record),
                     single.dependencies.target_shared_string_index
                 );
             } else {
@@ -2125,7 +2153,7 @@ mod streaming_0365_range_tests {
         );
         let selected = eligible_range(&merged, "A1:B1");
         assert_eq!(selected.cells.len(), 1);
-        assert_number(selected.cells[0].cell.as_ref(), "1");
+        assert_number(super::selected_record_cell(&selected.cells[0]), "1");
 
         let cases = [
             (
@@ -2157,7 +2185,7 @@ mod streaming_0365_range_tests {
             r#"<sheetData><row r="1"><c r="A1" s="{MAX_CELL_STYLE}"><v>1</v></c></row></sheetData>"#
         ));
         let selected = eligible_range(&valid, "A1");
-        assert_number(selected.cells[0].cell.as_ref(), "1");
+        assert_number(super::selected_record_cell(&selected.cells[0]), "1");
         assert_eq!(
             selected.dependencies.max_direct_style_index,
             Some(MAX_CELL_STYLE)
@@ -2183,19 +2211,19 @@ mod streaming_0365_range_tests {
         let selected = eligible_range(&xml, "A1:D1");
 
         assert!(matches!(
-            selected.cells[0].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[0]),
             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
         ));
         assert!(matches!(
-            selected.cells[1].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[1]),
             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
         ));
         assert!(matches!(
-            selected.cells[2].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[2]),
             Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
         ));
         assert!(matches!(
-            selected.cells[3].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[3]),
             Some(Cell::Value(Value::Text(value)))
                 if value.as_str() == "&😀<A" && value.as_str().chars().count() == 4
         ));
@@ -2373,15 +2401,15 @@ mod streaming_0367_merge_tests {
             vec![address("A1"), address("E1"), address("C2")]
         );
         assert!(matches!(
-            selected.cells[0].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[0]),
             Some(Cell::Value(Value::Number(value))) if value.as_str() == "1"
         ));
         assert!(matches!(
-            selected.cells[1].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[1]),
             Some(Cell::Value(Value::Number(value))) if value.as_str() == "5"
         ));
         assert!(matches!(
-            selected.cells[2].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[2]),
             Some(Cell::Value(Value::Number(value))) if value.as_str() == "3"
         ));
     }
@@ -2710,10 +2738,10 @@ mod streaming_0366_general_reference_tests {
             [record] => {
                 assert_eq!(record.address, single.address);
                 assert_eq!(
-                    record.shared_string_index,
+                    super::selected_record_shared_string_index(record),
                     single.dependencies.target_shared_string_index
                 );
-                assert_eq!(record.cell.as_ref(), single.cell.as_ref());
+                assert_eq!(super::selected_record_cell(record), single.cell.as_ref());
             },
             other => panic!("one-cell range retained multiple records: {other:?}"),
         }
@@ -2995,15 +3023,15 @@ mod streaming_0400_numeric_scratch_tests {
 
         assert_eq!(selected.cells.len(), 6);
         assert!(matches!(
-            selected.cells[0].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[0]),
             Some(Cell::Value(Value::Number(value)))
                 if value.as_str() == "1234567890123456789012345678901234567890.123456789"
         ));
         assert!(matches!(
-            selected.cells[1].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[1]),
             Some(Cell::Value(Value::Text(value))) if value.as_str() == "text"
         ));
-        match selected.cells[2].cell.as_ref() {
+        match super::selected_record_cell(&selected.cells[2]) {
             Some(Cell::Formula(formula)) => {
                 assert_eq!(formula.text(), "1+1");
                 assert!(matches!(
@@ -3014,14 +3042,17 @@ mod streaming_0400_numeric_scratch_tests {
             other => panic!("expected cached numeric formula, got {other:?}"),
         }
         assert!(matches!(
-            selected.cells[3].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[3]),
             Some(Cell::Value(Value::Text(value))) if value.as_str() == "inline"
         ));
         assert!(matches!(
-            selected.cells[4].cell.as_ref(),
+            super::selected_record_cell(&selected.cells[4]),
             Some(Cell::Value(Value::Error(value))) if value.as_str() == "#N/A"
         ));
-        assert!(matches!(selected.cells[5].cell.as_ref(), Some(Cell::Empty)));
+        assert!(matches!(
+            super::selected_record_cell(&selected.cells[5]),
+            Some(Cell::Empty)
+        ));
     }
 
     #[test]

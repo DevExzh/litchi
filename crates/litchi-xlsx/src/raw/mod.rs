@@ -32,7 +32,7 @@ pub(crate) mod worksheet_property;
 pub mod selected_worksheet {
     pub use super::worksheet::selected::{
         NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, SelectedCells,
-        SelectedDependencies, SelectedRecord, StreamResult, scan, scan_range,
+        SelectedDependencies, SelectedPayload, SelectedRecord, StreamResult, scan, scan_range,
     };
 }
 

@@ -1,0 +1,2 @@
+Verified source, constraints, probe, raw bindings, 8 differential cases, 46 workload groups; wrote comparison.json
+REVIEW >5% paired p50 regression: long-inline-cells-selected {'b1_a1': 10.868755516058371, 'b2_a2': 10.504152422534286, 'aa': 0.16423116185866338, 'abba_a': 0.14917327652512746, 'abba_b': -0.1801773887776026}

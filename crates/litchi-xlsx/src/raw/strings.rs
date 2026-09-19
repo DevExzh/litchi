@@ -797,6 +797,10 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
     let mut index = 0;
 
     while index + 7 <= bytes.len() {
+        let Some(offset) = memchr::memchr(b'_', &bytes[index..]) else {
+            break;
+        };
+        index += offset;
         let Some((unit, end)) = spreadsheet_escape_at(bytes, index) else {
             index += 1;
             continue;
@@ -1218,5 +1222,95 @@ mod tests {
             decode_spreadsheet_text(&encoded).expect("decode encoded text"),
             original
         );
+    }
+
+    fn scalar_decode_spreadsheet_text(value: &str) -> Result<String> {
+        let bytes = value.as_bytes();
+        let mut decoded = String::with_capacity(value.len());
+        let mut copied_until = 0;
+        let mut index = 0;
+
+        while index + 7 <= bytes.len() {
+            let Some((unit, end)) = spreadsheet_escape_at(bytes, index) else {
+                index += 1;
+                continue;
+            };
+            decoded.push_str(&value[copied_until..index]);
+            if (0xD800..=0xDBFF).contains(&unit) {
+                let Some((low, pair_end)) = spreadsheet_escape_at(bytes, end) else {
+                    return Err(invalid(format!(
+                        "unpaired high surrogate in SpreadsheetML escape at byte {index}"
+                    )));
+                };
+                if !(0xDC00..=0xDFFF).contains(&low) {
+                    return Err(invalid(format!(
+                        "unpaired high surrogate in SpreadsheetML escape at byte {index}"
+                    )));
+                }
+                let scalar =
+                    0x1_0000 + ((u32::from(unit) - 0xD800) << 10) + (u32::from(low) - 0xDC00);
+                let character = char::from_u32(scalar).ok_or_else(|| {
+                    invalid(format!(
+                        "invalid surrogate pair in SpreadsheetML escape at byte {index}"
+                    ))
+                })?;
+                decoded.push(character);
+                index = pair_end;
+                copied_until = pair_end;
+            } else if (0xDC00..=0xDFFF).contains(&unit) {
+                return Err(invalid(format!(
+                    "unpaired low surrogate in SpreadsheetML escape at byte {index}"
+                )));
+            } else {
+                let character = char::from_u32(u32::from(unit)).ok_or_else(|| {
+                    invalid(format!(
+                        "invalid code unit in SpreadsheetML escape at byte {index}"
+                    ))
+                })?;
+                decoded.push(character);
+                index = end;
+                copied_until = end;
+            }
+        }
+        decoded.push_str(&value[copied_until..]);
+        Ok(decoded)
+    }
+
+    #[test]
+    fn decode_spreadsheet_text_matches_scalar_reference() {
+        let cases = [
+            "".to_owned(),
+            "plain ASCII without escape markers".to_owned(),
+            "Unicode café 日本語 😀 e\u{301}".to_owned(),
+            "_x0041_".to_owned(),
+            "literal __x0041_ and _x12G4_".to_owned(),
+            "truncated _x0041".to_owned(),
+            "_xD83D__xDE00_".to_owned(),
+            "prefixé_xD83D__xDE00_suffix".to_owned(),
+            "é_xD800_".to_owned(),
+            "_xD800__x0041_".to_owned(),
+            "_xDC00_".to_owned(),
+            format!("{} tail", "x".repeat(4096)),
+        ];
+
+        for value in cases {
+            let actual = decode_spreadsheet_text(&value).map_err(|error| error.to_string());
+            let expected =
+                scalar_decode_spreadsheet_text(&value).map_err(|error| error.to_string());
+            assert_eq!(actual, expected, "input: {value:?}");
+        }
+    }
+
+    #[test]
+    fn decode_spreadsheet_text_keeps_surrogate_error_byte_offsets() {
+        let high = decode_spreadsheet_text("é_xD800_").expect_err("unpaired high surrogate");
+        assert!(high.to_string().contains("at byte 2"));
+
+        let wrong_low =
+            decode_spreadsheet_text("_xD800__x0041_").expect_err("wrong surrogate pair");
+        assert!(wrong_low.to_string().contains("at byte 0"));
+
+        let low = decode_spreadsheet_text("😀_xDC00_").expect_err("unpaired low surrogate");
+        assert!(low.to_string().contains("at byte 4"));
     }
 }

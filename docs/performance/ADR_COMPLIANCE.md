@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0683 — tagged XLSX records preserve publication and error boundaries
+
+[0683](0683-xlsx-selected-record-compaction.md) replaces the raw scanner's
+independent optional payloads with a tagged payload, a breaking low-level API
+refactor permitted by ADRs 0001 and 0008. Ordinary CRUD signatures are unchanged.
+Worksheet, archive and dependency validation, reader release, source/execution
+fences and zero-callback refusal retain their order under ADRs 0003 and 0006.
+Exact shared-string staging and an existing safe `memchr` search reduce work;
+no dependency edge, ambient executor, production unsafe code or cache is added.
+The O(N) semantic vectors remain outside managed Memory admission: allocator
+measurements do not establish ADR 0005 budget or RSS guarantees. Accepted ADRs
+and the goal document retain their baseline hashes.
+
 ## 0682 — DOCX semantic reuse retains ownership and admission
 
 [0682](0682-docx-paragraph-index-reuse.md) keeps paragraph ranges in the DOCX

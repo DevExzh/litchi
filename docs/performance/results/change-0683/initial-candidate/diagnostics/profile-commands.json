@@ -1,0 +1,54 @@
+[
+  {
+    "command": [
+      "perf",
+      "record",
+      "-q",
+      "-F",
+      "997",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,4096",
+      "-o",
+      "/home/zhuhe/code/litchi-0683-profile/before.data",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "3000"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "perf",
+      "record",
+      "-q",
+      "-F",
+      "997",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,4096",
+      "-o",
+      "/home/zhuhe/code/litchi-0683-profile/after.data",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "3000"
+    ],
+    "exit_code": 0
+  }
+]

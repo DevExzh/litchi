@@ -1,0 +1,11 @@
+{
+  "removed": [
+    "/home/zhuhe/code/litchi-0683-before",
+    "/home/zhuhe/code/litchi-target-0683-before",
+    "/home/zhuhe/code/litchi-target-0683-after",
+    "/home/zhuhe/code/litchi-0683-corpus",
+    "/home/zhuhe/code/litchi-0683-profile"
+  ],
+  "retained": "Probe sources/locks, deterministic generator and manifests, raw text evidence and source-bound tests remain in the packet.",
+  "scope": "Only batch-owned temporary paths and Python caches were removed."
+}

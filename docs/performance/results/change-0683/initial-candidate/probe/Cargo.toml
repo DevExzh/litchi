@@ -1,0 +1,27 @@
+[package]
+name = "xlsx0683-selected-record-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Keep this retained probe independent of the repository workspace. Its path
+# dependencies still resolve against whichever checkout owns this directory.
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "xlsx0683"
+path = "src/main.rs"
+
+[[bin]]
+name = "xlsx0683_alloc"
+path = "src/bin/alloc.rs"
+
+[dependencies]
+litchi-ooxml-common = { path = "../../../../../crates/litchi-ooxml-common" }
+litchi-xlsx = { path = "../../../../../crates/litchi-xlsx" }
+
+[profile.release]
+debug = 2

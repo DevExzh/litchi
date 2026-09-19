@@ -1,0 +1,17 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-0683-before/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-0683-before/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-0683-before/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-0683-before/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-0683-before/crates/litchi-xlsx)
+   Compiling xlsx0683-selected-record-probe v0.1.0 (/home/zhuhe/code/litchi-0683-before/docs/performance/results/change-0683/probe)
+error[E0432]: unresolved import `litchi_opc`
+  --> src/lib.rs:14:5
+   |
+14 | use litchi_opc::{OpcPackage, PackURI, PackageWriter, TargetMode, XmlPart};
+   |     ^^^^^^^^^^ use of unresolved module or unlinked crate `litchi_opc`
+   |
+   = help: if you wanted to use a crate named `litchi_opc`, use `cargo add litchi_opc` to add it to your `Cargo.toml`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `xlsx0683-selected-record-probe` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,1 @@
+operation=visit-warm	callbacks=65536	result=ok	allocation_calls=0	allocated_bytes=0	deallocation_calls=0	deallocated_bytes=0	peak_live_delta=0	retained_live_delta=0	elapsed_ns=371192

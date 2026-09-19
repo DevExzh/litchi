@@ -1,0 +1,6431 @@
+[
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "layout"
+    ],
+    "output": "layout.tsv",
+    "exit_code": 0,
+    "seconds": 0.001406996976584196
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-dense.tsv",
+    "exit_code": 0,
+    "seconds": 0.3484023920027539
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xml"
+    ],
+    "output": "scan-dense.txt",
+    "exit_code": 0,
+    "seconds": 0.10082940699066967
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15439136500936002
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.1551487579708919
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.15374489198438823
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15522719896398485
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.1561583640286699
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.1562032139627263
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15390191203914583
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.15367205103393644
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.15363987197633833
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15522850898560137
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.15439617505762726
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.15488538797944784
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.04602649190928787
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.046119651990011334
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.045064746984280646
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.04976016003638506
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.05018398293759674
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-dense-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.05089060601312667
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-sparse.tsv",
+    "exit_code": 0,
+    "seconds": 0.0044732720125466585
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xml"
+    ],
+    "output": "scan-sparse.txt",
+    "exit_code": 0,
+    "seconds": 0.002464471966959536
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0023235519183799624
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.002221480943262577
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002183789969421923
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021756408968940377
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021822809940204024
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002225280972197652
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0022426299983635545
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021885710302740335
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002166740014217794
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021709409775212407
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021494500106200576
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0021706699626520276
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0015013570664450526
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.001464277971535921
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014897569781169295
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014799570199102163
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014629970537498593
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-sparse-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014825869584456086
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-long-inline.tsv",
+    "exit_code": 0,
+    "seconds": 0.016354969004169106
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xml"
+    ],
+    "output": "scan-long-inline.txt",
+    "exit_code": 0,
+    "seconds": 0.00650930090341717
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002684002975001931
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0026973129715770483
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027096730191260576
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.003032074077054858
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0026965729193761945
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0026981630362570286
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002697773976251483
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.002683243015781045
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002691973000764847
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027550830272957683
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027140039019286633
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002671002992428839
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034088470274582505
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0033715360332280397
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034258660161867738
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0033988660434260964
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0033893659710884094
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-long-inline-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.003372187027707696
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-shared-string.tsv",
+    "exit_code": 0,
+    "seconds": 0.38161584199406207
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xml"
+    ],
+    "output": "scan-shared-string.txt",
+    "exit_code": 0,
+    "seconds": 0.11402082000859082
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.18258007103577256
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.18252135999500751
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.18379472696688026
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.18323874403722584
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.18344670499209315
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.18262930202763528
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.1829849029891193
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.18419356900267303
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.18199964798986912
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.18354250490665436
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.18369605694897473
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.18370596691966057
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.05051742400974035
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.050297513022087514
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.050960355903953314
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.05201303109060973
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.05364323907997459
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-shared-string-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.051760009955614805
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-formula.tsv",
+    "exit_code": 0,
+    "seconds": 0.006429620902054012
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xml"
+    ],
+    "output": "scan-formula.txt",
+    "exit_code": 0,
+    "seconds": 0.0029595440719276667
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.003194404998794198
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.003028944949619472
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0029861440416425467
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0029301539761945605
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.00291046395432204
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0029333740239962935
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002898353966884315
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.002896424033679068
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002889683935791254
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002909863949753344
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.002879603998735547
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0029003029922023416
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0016870580147951841
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0017266779905185103
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.001690107979811728
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0017017379868775606
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0017486190190538764
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-formula-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.001720638945698738
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-late-fallback.tsv",
+    "exit_code": 0,
+    "seconds": 0.4194787449669093
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xml"
+    ],
+    "output": "scan-late-fallback.txt",
+    "exit_code": 0,
+    "seconds": 0.10013662406709045
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.20054617803543806
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.20094452006742358
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.20217744598630816
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.2050029500387609
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.20430420595221221
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.2038642440456897
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.20052803796716034
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.20144312200136483
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.2023197659291327
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.20446629694197327
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.20433098601642996
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.20629609504248947
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.048690794967114925
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.04714324697852135
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.04905438597779721
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.05337386706378311
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.053746149060316384
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-fallback-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.05254980397876352
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-late-refusal.tsv",
+    "exit_code": 0,
+    "seconds": 0.4188425879692659
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xml"
+    ],
+    "output": "scan-late-refusal.txt",
+    "exit_code": 0,
+    "seconds": 0.10226208006497473
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.21074285998474807
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.21255276899319142
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.21110522304661572
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.21237599896267056
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.21240344899706542
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.2120675570331514
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.2138075859984383
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.21076264104340225
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.21165172499604523
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.21358402504120022
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.21374118595849723
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-late-refusal-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.21013257803861052
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-escaped-text.tsv",
+    "exit_code": 0,
+    "seconds": 0.04843243700452149
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xml"
+    ],
+    "output": "scan-escaped-text.txt",
+    "exit_code": 0,
+    "seconds": 0.0065855319844558835
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.003742597997188568
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.004042380023747683
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0035395980812609196
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034852270036935806
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034023469779640436
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.003378506051376462
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0033214869908988476
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.003334217006340623
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.003311685984954238
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034512359416112304
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.003332437016069889
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0033308370038866997
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0039000490214675665
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.003768657916225493
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.003704868024215102
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0037257979856804013
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.003723238012753427
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-escaped-text-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0037276579532772303
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "diff-malformed-escape.tsv",
+    "exit_code": 0,
+    "seconds": 0.014806553022935987
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "scan",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xml"
+    ],
+    "output": "scan-malformed-escape.txt",
+    "exit_code": 0,
+    "seconds": 0.0066888530272990465
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.003340545925311744
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0028115040622651577
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002806144068017602
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.0028741139685735106
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027678729966282845
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.002865093993023038
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002780643990263343
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.002841184032149613
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027804740238934755
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.002827374031767249
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.0028672540793195367
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1"
+    ],
+    "output": "alloc-malformed-escape-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.0027951329248026013
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "diff",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "diff-real-fallback.tsv",
+    "exit_code": 0,
+    "seconds": 0.5719516680110246
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15848073503002524
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.15903214795980603
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.15884759707842022
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-cold-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.16248748498037457
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-cold-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.1623464139411226
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-cold-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.1636788899777457
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15913274802733213
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.16135383897926658
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.1605613959254697
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-selected-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.16146258998196572
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-selected-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.16184638196136802
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-selected-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.16178959200624377
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.15731130994390696
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.15791868197266012
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-visit-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.15810789295937866
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-warm-0.tsv",
+    "exit_code": 0,
+    "seconds": 0.16041320492513478
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-warm-1.tsv",
+    "exit_code": 0,
+    "seconds": 0.1603661640547216
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683_alloc",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1"
+    ],
+    "output": "alloc-real-fallback-cells-warm-2.tsv",
+    "exit_code": 0,
+    "seconds": 0.16006296302657574
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.2047141230432317
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.186288391938433
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1557944039814174
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.18669750506524
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1995145899709314
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1712026189779863
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1585375680588186
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.187448476906866
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.18470429291483
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.1591750610386953
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.1734497990692034
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.1884221819927916
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.2058724720263854
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.1697999379830435
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.172614470939152
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.1945557069266215
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04821206291671842
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.048015562002547085
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04803482198622078
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.047037737094797194
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-dense-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07761863502673805
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-dense-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07731495308689773
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-dense-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07649925898294896
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/dense.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-dense-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07706100307404995
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017879297025501728
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017446573940105736
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017307973001152277
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017351923044770956
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.01733244291972369
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.01718895207159221
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017307323054410517
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.017293802928179502
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.01653984992299229
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.01639687898568809
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.016433959011919796
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.016560890013352036
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.01660522003658116
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.01654451002832502
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.016413118923082948
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.016452618991024792
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0015570169780403376
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014583469601348042
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.001454827026464045
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0014620169531553984
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-sparse-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.00153650704305619
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-sparse-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0015599579783156514
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-sparse-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0015525580383837223
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/sparse.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-sparse-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0015521079767495394
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.051352177979424596
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02452872903086245
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02477879007346928
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.051314787939190865
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.05155712889973074
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02476246899459511
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02470671001356095
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.051467479090206325
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.050306543009355664
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.023542933980934322
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02362613403238356
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.05051571398507804
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.050463623949326575
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.023638584068976343
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02355275396257639
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.0505676040193066
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.004499122034758329
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003386936034075916
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003503637039102614
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.004529722034931183
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-long-inline-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.004539741901680827
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-long-inline-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0034909769892692566
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-long-inline-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003447856055572629
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/long-inline.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-long-inline-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.004599552019499242
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.557573630940169
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.4984671940328553
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.4976140359649435
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.5279864580370486
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.5154233960201964
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.5228355119470507
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.506208871025592
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.554048115038313
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.53081614500843
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.492412196006626
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.517572818091139
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.523413934977725
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.521060055005364
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.499456031015143
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.520500903017819
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 2.5391975450329483
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.05261402402538806
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.051741269999183714
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.05153798998799175
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.05102973699104041
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-shared-string-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07297244295477867
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-shared-string-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07318190496880561
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-shared-string-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07243918103631586
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/shared-string.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-shared-string-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07419327006209642
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028707729070447385
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02876642905175686
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028352817054837942
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028234077035449445
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028415748034603894
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028512907912954688
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02812505594920367
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.028231737087480724
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.027665534056723118
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02736732200719416
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.027596564032137394
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.027562033967114985
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02748392301145941
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.0273441820172593
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.027365503017790616
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.027572604012675583
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.001728398958221078
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0017439189832657576
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0019522489747032523
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0017371480353176594
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-formula-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.002004399080760777
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-formula-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0019857200095430017
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-formula-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.002009819960221648
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/formula.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-formula-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0019776889821514487
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.890847333939746
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.895898658083752
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.9146456490270793
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.898588111042045
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.996546073933132
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.9350495629478246
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.9152183880796656
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.9298349380260333
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.14488504198379815
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.1439485780429095
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.14308242301922292
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.1443652290618047
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.17299047694541514
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.17326508893165737
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.17124413896817714
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.17146250000223517
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04845548502635211
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04770792101044208
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04756704100873321
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.04815176303964108
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07764411601237953
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07653826999012381
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07691929291468114
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/late-fallback.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.07642420998308808
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-refusal-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.1832623060327023
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-refusal-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.195465811062604
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-refusal-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.1596355789806694
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-refusal-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.1941061769612134
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-refusal-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.158423343906179
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-refusal-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.148899917025119
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-refusal-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.163330908981152
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-refusal-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 3.1868143080500886
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-refusal-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.151149946032092
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-refusal-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.144156942027621
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-refusal-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.148995475959964
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-refusal-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.167559096007608
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-late-refusal-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.172125018085353
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-late-refusal-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.1413008590461686
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-late-refusal-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.146288982941769
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/late-refusal.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-late-refusal-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 3.1416911910055205
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.04224170499946922
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.03983443300239742
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.040341735002584755
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.04118418006692082
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.04078116698656231
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.039679292938672006
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.03988921293057501
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.04095130797941238
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.039697133004665375
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.03855057607870549
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.03859157697297633
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.039953622967004776
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.0397923729615286
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.03929205005988479
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.038739377981983125
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.040144884027540684
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003822128986939788
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.00373818795196712
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.00364734698086977
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0036995280534029007
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-escaped-text-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0038235189858824015
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-escaped-text-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.0036998670548200607
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-escaped-text-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003711337922140956
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi-0683-corpus/escaped-text.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-escaped-text-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.003784989006817341
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-malformed-escape-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.05115399800706655
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-malformed-escape-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.02465094905346632
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-malformed-escape-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.024773490033112466
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-malformed-escape-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.05151767993811518
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-malformed-escape-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.05186584102921188
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-malformed-escape-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.024753700010478497
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-malformed-escape-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.024509278940968215
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-malformed-escape-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 0.051213008002378047
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-malformed-escape-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.05038288398645818
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-malformed-escape-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.023863576003350317
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-malformed-escape-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02352797403000295
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-malformed-escape-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.05044960498344153
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a1-malformed-escape-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.05040174396708608
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b1-malformed-escape-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02403533610049635
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "b2-malformed-escape-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.02340105304028839
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi-0683-corpus/malformed-escape.xlsx",
+      "Sheet1",
+      "3",
+      "20"
+    ],
+    "output": "a2-malformed-escape-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.050271323998458683
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1986270321067423
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1907122809207067
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.141610524035059
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-visit-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.18944261490833
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.213107379968278
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.188504541059956
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.1762653610203415
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-cold",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-cells-cold.tsv",
+    "exit_code": 0,
+    "seconds": 2.230895005981438
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.11763833998702466
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.11519635794684291
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.11538891890086234
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-visit-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.11986695101950318
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.140023298910819
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.1381347089773044
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.13775994698517025
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-selected",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-cells-selected.tsv",
+    "exit_code": 0,
+    "seconds": 0.14122894499450922
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.1181826019892469
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.11640156293287873
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.11573871003929526
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "visit-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-visit-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.1178542310371995
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a1-real-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.1389847530517727
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b1-real-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.13666610198561102
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-after/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "b2-real-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.13844097102992237
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0683-before/release/xlsx0683",
+      "bench",
+      "cells-warm",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "\u041b\u0438\u0441\u0442 1",
+      "3",
+      "20"
+    ],
+    "output": "a2-real-fallback-cells-warm.tsv",
+    "exit_code": 0,
+    "seconds": 0.13952792598865926
+  }
+]
