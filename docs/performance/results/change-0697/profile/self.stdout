@@ -1,0 +1,681 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cpu/cycles/P'
+# Event count (approx.): 10802249038
+#
+# Overhead  Command          Shared Object         Symbol                                                                                                                
+# ........  ...............  ....................  ......................................................................................................................
+#
+    26.52%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::start
+            |          
+            |--22.02%--clone<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          clone<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |          |          
+            |          |--8.71%--after (inlined)
+            |          |          start (inlined)
+            |          |          process_markup_compatibility (inlined)
+            |          |          |          
+            |          |          |--0.90%--0x7
+            |          |          |          
+            |          |          |--0.69%--0x5
+            |          |          |          
+            |          |          |--0.65%--0x6
+            |          |          |          
+            |          |          |--0.57%--0xa
+            |          |          |          
+            |          |          |--0.33%--0xb
+            |          |          |          
+            |          |          |--0.33%--0x3
+            |          |          |          
+            |          |          |--0.24%--0x9
+            |          |          |          
+            |          |          |--0.20%--0x4
+            |          |          |          
+            |          |           --0.20%--0x8
+            |          |          
+            |          |--8.37%--clone (inlined)
+            |          |          clone (inlined)
+            |          |          {closure#0} (inlined)
+            |          |          map_or_else<&litchi_ooxml_common::mce::codec::Frame, litchi_ooxml_common::mce::codec::Ctx, fn() -> litchi_ooxml_common::mce::codec::Ctx, litchi_ooxml_common::mce::codec::start::{closure_env#0}> (inlined)
+            |          |          start (inlined)
+            |          |          0x6
+            |          |          
+            |          |--2.53%--start (inlined)
+            |          |          0x6
+            |          |          
+            |           --2.41%--{closure#1} (inlined)
+            |                     and_then<&litchi_ooxml_common::mce::codec::Frame, alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>, litchi_ooxml_common::mce::codec::start::{closure_env#1}> (inlined)
+            |                     start (inlined)
+            |          
+            |--1.31%--start (inlined)
+            |          |          
+            |           --0.86%--process_markup_compatibility (inlined)
+            |                     |          
+            |                     |--0.16%--0x7
+            |                     |          
+            |                      --0.12%--0x5
+            |          
+            |--0.50%--default<litchi_ooxml_common::mce::codec::NamePattern, std::hash::random::RandomState> (inlined)
+            |          new<litchi_ooxml_common::mce::codec::NamePattern> (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          |          
+            |          |--0.13%--0x6
+            |          |          
+            |           --0.12%--0x9
+            |          
+            |--0.29%--map_err<&str, core::str::error::Utf8Error, litchi_ooxml_common::mce::model::Error, fn(core::str::error::Utf8Error) -> litchi_ooxml_common::mce::model::Error> (inlined)
+            |          start (inlined)
+            |          
+            |--0.20%--next (inlined)
+            |          next<quick_xml::events::attributes::Attributes> (inlined)
+            |          start (inlined)
+            |          
+            |--0.16%--wrap (inlined)
+            |          attributes (inlined)
+            |          start (inlined)
+            |          
+            |--0.16%--checked_sub (inlined)
+            |          index<u8> (inlined)
+            |          index<u8, core::ops::range::Range<usize>> (inlined)
+            |          {closure#0} (inlined)
+            |          map<core::ops::range::Range<usize>, &[u8], quick_xml::events::attributes::{impl#8}::next::{closure_env#0}> (inlined)
+            |          next (inlined)
+            |          next<quick_xml::events::attributes::Attributes> (inlined)
+            |          start (inlined)
+            |          
+            |--0.16%--with_capacity_in<alloc::alloc::Global> (inlined)
+            |          with_capacity_in<u8, alloc::alloc::Global> (inlined)
+            |          with_capacity_in<u8, alloc::alloc::Global> (inlined)
+            |          to_vec<u8, alloc::alloc::Global> (inlined)
+            |          to_vec_in<u8, alloc::alloc::Global> (inlined)
+            |          to_vec<u8> (inlined)
+            |          to_owned<u8> (inlined)
+            |          to_owned (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          
+            |--0.16%--new (inlined)
+            |          default (inlined)
+            |          |          
+            |           --0.12%--default<alloc::string::String, std::hash::random::RandomState> (inlined)
+            |                     new<alloc::string::String> (inlined)
+            |                     start (inlined)
+            |                     process_markup_compatibility (inlined)
+            |          
+            |--0.16%--get_offset_len_noubcheck<u8> (inlined)
+            |          index<u8> (inlined)
+            |          index<u8, core::ops::range::Range<usize>> (inlined)
+            |          {closure#0} (inlined)
+            |          map<core::ops::range::Range<usize>, &[u8], quick_xml::events::attributes::{impl#8}::next::{closure_env#0}> (inlined)
+            |          next (inlined)
+            |          next<quick_xml::events::attributes::Attributes> (inlined)
+            |          start (inlined)
+            |          
+            |--0.12%--then<litchi_ooxml_common::mce::model::Name, litchi_ooxml_common::mce::codec::start::{closure_env#12}> (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          
+            |--0.12%--default<alloc::string::String, std::hash::random::RandomState> (inlined)
+            |          new<alloc::string::String> (inlined)
+            |          start (inlined)
+            |          process_markup_compatibility (inlined)
+            |          
+             --0.12%--branch<(), litchi_ooxml_common::mce::model::Error> (inlined)
+                       start (inlined)
+                       process_markup_compatibility (inlined)
+
+     7.88%  mce-attribution  libc.so.6             [.] __memcmp_evex_movbe
+            |          
+             --0.16%--__memcmp_evex_movbe
+                       equal_same_length<u8, u8> (inlined)
+                       eq<u8, u8> (inlined)
+                       eq<[u8], [u8]> (inlined)
+                       next_match (inlined)
+
+     7.16%  mce-attribution  mce-attribution-0697  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Inherited> (inlined)
+               |          
+               |--1.55%--0x7
+               |          |          
+               |           --1.51%--0x43d8a5d877be12ff
+               |          
+               |--1.35%--0x5
+               |          |          
+               |           --1.22%--0x43d8a5d877be12ff
+               |          
+               |--1.10%--0xa
+               |          |          
+               |           --1.06%--0x43d8a5d877be12ff
+               |          
+               |--1.07%--0x6
+               |          |          
+               |           --1.03%--0x43d8a5d877be12ff
+               |          
+               |--0.74%--0xb
+               |          |          
+               |           --0.57%--0x43d8a5d877be12ff
+               |          
+               |--0.45%--0x3
+               |          0x43d8a5d877be12ff
+               |          
+               |--0.41%--0x9
+               |          0x43d8a5d877be12ff
+               |          
+               |--0.20%--0x8
+               |          0x43d8a5d877be12ff
+               |          
+                --0.12%--0x32
+                          0x43d8a5d877be12ff
+
+     7.02%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+            |          
+            |--6.45%--branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> (inlined)
+            |          decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+            |          |          
+            |           --1.59%--0x1
+            |          
+            |--0.29%--decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+            |          
+            |--0.12%--branch<&str, core::str::error::Utf8Error> (inlined)
+            |          decode (inlined)
+            |          decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+            |          
+             --0.12%--branch<alloc::borrow::Cow<str>, quick_xml::encoding::EncodingError> (inlined)
+                       decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> (inlined)
+
+     4.86%  mce-attribution  mce-attribution-0697  [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               |          
+                --4.82%--0x3e7
+
+     4.04%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::close
+            |
+            ---drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+               drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+               |          
+               |--2.98%--drop_in_place<litchi_ooxml_common::mce::codec::Namespaces> (inlined)
+               |          drop_in_place<litchi_ooxml_common::mce::codec::Ctx> (inlined)
+               |          close (inlined)
+               |          |          
+               |           --1.31%--0x1
+               |          
+                --1.06%--close (inlined)
+                          |          
+                           --0.53%--0x1
+
+     3.06%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::write_start
+            |          
+            |--1.27%--write_start (inlined)
+            |          |          
+            |          |--0.24%--0x7
+            |          |          
+            |           --0.12%--0x7fff00000000
+            |          
+            |--0.94%--any<u8, litchi_ooxml_common::mce::codec::write_start::{closure_env#1}> (inlined)
+            |          write_start (inlined)
+            |          
+            |--0.33%--branch<(), litchi_ooxml_common::mce::model::Error> (inlined)
+            |          write_start (inlined)
+            |          
+             --0.16%--next<litchi_ooxml_common::mce::codec::Attr> (inlined)
+                       |          
+                        --0.12%--write_start (inlined)
+
+     2.74%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_ncname
+            |          
+            |--1.76%--is_name_start (inlined)
+            |          is_ncname_start (inlined)
+            |          call_once<fn(char) -> bool, (char)> (inlined)
+            |          is_some_and<char, fn(char) -> bool> (inlined)
+            |          is_ncname (inlined)
+            |          
+            |--0.41%--eq<u8> (inlined)
+            |          next<u8> (inlined)
+            |          next_code_point<core::slice::iter::Iter<u8>> (inlined)
+            |          next (inlined)
+            |          |          
+            |          |--0.25%--is_ncname (inlined)
+            |          |          expand_parts (inlined)
+            |          |          |          
+            |          |           --0.16%--start (inlined)
+            |          |                     process_markup_compatibility (inlined)
+            |          |          
+            |           --0.16%--try_fold<core::str::iter::Chars, (), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>> (inlined)
+            |                     all<core::str::iter::Chars, fn(char) -> bool> (inlined)
+            |                     is_ncname (inlined)
+            |          
+            |--0.24%--next_code_point<core::slice::iter::Iter<u8>> (inlined)
+            |          next (inlined)
+            |          |          
+            |          |--0.12%--try_fold<core::str::iter::Chars, (), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>> (inlined)
+            |          |          all<core::str::iter::Chars, fn(char) -> bool> (inlined)
+            |          |          is_ncname (inlined)
+            |          |          
+            |           --0.12%--is_ncname (inlined)
+            |          
+            |--0.16%--is_ncname (inlined)
+            |          
+             --0.12%--is_ncname_character (inlined)
+                       call_mut<fn(char) -> bool, (char)> (inlined)
+                       {closure#0}<char, fn(char) -> bool> (inlined)
+                       try_fold<core::str::iter::Chars, (), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>> (inlined)
+                       all<core::str::iter::Chars, fn(char) -> bool> (inlined)
+                       is_ncname (inlined)
+
+     2.25%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_name_character
+            |          
+             --2.16%--is_name_start (inlined)
+                       is_name_character (inlined)
+                       |          
+                       |--0.20%--0x5
+                       |          
+                        --0.16%--_IO_wide_data_0
+
+     2.20%  mce-attribution  mce-attribution-0697  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+            |          
+            |--1.76%--next_match (inlined)
+            |          |          
+            |           --0.12%--0x1
+            |          
+            |--0.20%--checked_sub (inlined)
+            |          get<u8> (inlined)
+            |          get<u8, core::ops::range::Range<usize>> (inlined)
+            |          next_match (inlined)
+            |          
+             --0.20%--memchr_naive (inlined)
+                       memchr (inlined)
+                       next_match (inlined)
+
+     2.16%  mce-attribution  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     2.09%  mce-attribution  mce-attribution-0697  [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+            |          
+            |--1.76%--next_match (inlined)
+            |          |          
+            |          |--0.20%--0x1
+            |          |          
+            |          |--0.20%--0x3
+            |          |          
+            |           --0.12%--0x3a00000039
+            |          
+             --0.20%--checked_sub (inlined)
+                       get<u8> (inlined)
+                       get<u8, core::ops::range::Range<usize>> (inlined)
+                       next_match (inlined)
+                       |          
+                        --0.16%--0x3
+
+     2.04%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::BoundedOutput::push
+            |          
+            |--1.06%--push (inlined)
+            |          |          
+            |          |--0.33%--0x8000000000000000
+            |          |          
+            |           --0.12%--0x8
+            |          
+            |--0.78%--push_mut<u8, alloc::alloc::Global> (inlined)
+            |          push<u8, alloc::alloc::Global> (inlined)
+            |          push (inlined)
+            |          
+             --0.16%--write<u8> (inlined)
+                       push_mut<u8, alloc::alloc::Global> (inlined)
+                       push<u8, alloc::alloc::Global> (inlined)
+                       push (inlined)
+
+     1.84%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::IterState::next
+            |          
+            |--1.06%--next (inlined)
+            |          
+            |--0.20%--recover (inlined)
+            |          next (inlined)
+            |          
+             --0.12%--eq<u8> (inlined)
+                       next<u8> (inlined)
+                       next<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>> (inlined)
+                       next<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>> (inlined)
+
+     1.80%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::expand_parts
+            |          
+            |--1.39%--expand_parts (inlined)
+            |          |          
+            |          |--0.45%--start (inlined)
+            |          |          process_markup_compatibility (inlined)
+            |          |          
+            |           --0.33%--write_start (inlined)
+            |          
+             --0.33%--into_searcher (inlined)
+                       split_once<char> (inlined)
+                       expand_parts (inlined)
+                       |          
+                        --0.12%--0x7fffffffffffffff
+
+     1.80%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+            |          
+            |--1.14%--drop<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global> (inlined)
+            |          drop_in_place<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>> (inlined)
+            |          drop_in_place<core::option::Option<alloc::sync::Arc<litchi_ooxml_common::mce::codec::NamespaceLayer, alloc::alloc::Global>>> (inlined)
+            |          |          
+            |           --1.10%--process_markup_compatibility (inlined)
+            |          
+             --0.45%--process_markup_compatibility (inlined)
+
+     1.72%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::xml_name::validation::is_qualified_name
+            |          
+            |--1.02%--split<char> (inlined)
+            |          is_qualified_name (inlined)
+            |          |          
+            |          |--0.25%--0x2
+            |          |          
+            |           --0.16%--0x3
+            |          
+            |--0.49%--is_qualified_name (inlined)
+            |          |          
+            |           --0.12%--expand_parts (inlined)
+            |          
+             --0.12%--get_end<char> (inlined)
+                       next<char> (inlined)
+                       next<char> (inlined)
+                       is_qualified_name (inlined)
+
+     1.55%  mce-attribution  libc.so.6             [.] malloc
+     1.51%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::IterState::check_for_duplicates
+            |          
+            |--0.61%--check_for_duplicates (inlined)
+            |          
+            |--0.41%--non_null<alloc::alloc::Global, core::ops::range::Range<usize>> (inlined)
+            |          ptr<alloc::alloc::Global, core::ops::range::Range<usize>> (inlined)
+            |          ptr<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+            |          as_mut_ptr<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+            |          push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+            |          push<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+            |          check_for_duplicates (inlined)
+            |          
+             --0.33%--write<core::ops::range::Range<usize>> (inlined)
+                       push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       push<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       check_for_duplicates (inlined)
+
+     1.43%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::state::ReaderState::emit_start
+            |          
+            |--0.49%--strip_suffix<u8, [u8; 2]> (inlined)
+            |          emit_start (inlined)
+            |          
+            |--0.41%--name_len (inlined)
+            |          emit_start (inlined)
+            |          
+            |--0.37%--emit_start (inlined)
+            |          
+             --0.12%--index<u8> (inlined)
+
+     1.39%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+            |          
+            |--0.57%--feed (inlined)
+            |          read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+            |--0.16%--copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+            |--0.16%--consume (inlined)
+            |          read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+            |--0.12%--offset_from<u8> (inlined)
+            |          distance<u8> (inlined)
+            |          next<memchr::memchr::{impl#9}::next::{closure_env#0}> (inlined)
+            |          next (inlined)
+            |          feed (inlined)
+            |          read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+             --0.12%--index<u8> (inlined)
+                       index<u8, core::ops::range::RangeFrom<usize>> (inlined)
+                       index<u8, core::ops::range::RangeFrom<usize>, alloc::alloc::Global> (inlined)
+                       read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                       copy_nonoverlapping<u8> (inlined)
+                       append_elements<u8, alloc::alloc::Global> (inlined)
+                       spec_extend<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice (inlined)
+
+     1.35%  mce-attribution  mce-attribution-0697  [.] core::str::converts::from_utf8
+            |          
+            |--0.49%--wrapping_sub (inlined)
+            |          run_utf8_validation (inlined)
+            |          from_utf8 (inlined)
+            |          
+            |--0.45%--run_utf8_validation (inlined)
+            |          from_utf8 (inlined)
+            |          
+             --0.41%--from_utf8 (inlined)
+
+     0.82%  mce-attribution  mce-attribution-0697  [.] core::ops::function::FnOnce::call_once
+            |          
+            |--0.69%--call_once<std::hash::random::{impl#0}::new::KEYS::{constant#0}::{closure_env#1}, (core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>)> (inlined)
+            |          |          
+            |          |--0.33%--0x7fffffffffffffff
+            |          |          
+            |          |--0.12%--0x6
+            |          |          0x43d8a5d877be12ff
+            |          |          
+            |           --0.12%--0x5
+            |                     0x43d8a5d877be12ff
+            |          
+             --0.12%--get_or_init<core::cell::Cell<(u64, u64)>, !, fn() -> core::cell::Cell<(u64, u64)>> (inlined)
+                       {closure#1} (inlined)
+                       call_once<std::hash::random::{impl#0}::new::KEYS::{constant#0}::{closure_env#1}, (core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>)> (inlined)
+
+     0.82%  mce-attribution  mce-attribution-0697  [.] litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice
+            |          
+            |--0.45%--extend_from_slice (inlined)
+            |          |          
+            |           --0.12%--0x3
+            |          
+            |--0.12%--reserve (inlined)
+            |          extend_from_slice (inlined)
+            |          
+             --0.12%--copy_nonoverlapping<u8> (inlined)
+                       append_elements<u8, alloc::alloc::Global> (inlined)
+                       spec_extend<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice (inlined)
+
+     0.70%  mce-attribution  mce-attribution-0697  [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+            |          
+            |--0.45%--finish_grow<alloc::alloc::Global> (inlined)
+            |          
+             --0.21%--alloc (inlined)
+                       alloc_impl_runtime (inlined)
+                       alloc_impl (inlined)
+                       allocate (inlined)
+                       finish_grow<alloc::alloc::Global> (inlined)
+
+     0.69%  mce-attribution  mce-attribution-0697  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+            |          
+            |--0.33%--new_unchecked (inlined)
+            |          find_avx2 (inlined)
+            |          find_raw (inlined)
+            |          0x3e3e3e3e3e3e3e3d
+            |          
+             --0.33%--find_avx2 (inlined)
+
+     0.65%  mce-attribution  libc.so.6             [.] _int_malloc
+     0.65%  mce-attribution  mce-attribution-0697  [.] quick_xml::escape::normalize_attribute_value
+            |          
+            |--0.29%--normalize_attribute_value<fn(&u8) -> bool, fn(&mut alloc::string::String, &str, usize, char) -> usize, fn(&str) -> core::option::Option<&str>> (inlined)
+            |          
+            |--0.20%--eq<u8> (inlined)
+            |          next<u8> (inlined)
+            |          position<u8, &fn(&u8) -> bool> (inlined)
+            |          normalize_attribute_value<fn(&u8) -> bool, fn(&mut alloc::string::String, &str, usize, char) -> usize, fn(&str) -> core::option::Option<&str>> (inlined)
+            |          
+             --0.12%--position<u8, &fn(&u8) -> bool> (inlined)
+                       normalize_attribute_value<fn(&u8) -> bool, fn(&mut alloc::string::String, &str, usize, char) -> usize, fn(&str) -> core::option::Option<&str>> (inlined)
+
+     0.61%  mce-attribution  mce-attribution-0697  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+            |          
+            |--0.29%--search_chunk<core::core_arch::x86::__m256i, fn(memchr::vector::SensibleMoveMask) -> usize> (inlined)
+            |          find_raw<core::core_arch::x86::__m256i> (inlined)
+            |          find_raw_avx2 (inlined)
+            |          0x2727272727272726
+            |          memchr3_raw (inlined)
+            |          memchr3_raw (inlined)
+            |          {closure#0} (inlined)
+            |          next<memchr::memchr::{impl#9}::next::{closure_env#0}> (inlined)
+            |          next (inlined)
+            |          feed (inlined)
+            |          read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+             --0.16%--_mm256_cmpeq_epi8 (inlined)
+                       cmpeq (inlined)
+                       search_chunk<core::core_arch::x86::__m256i, fn(memchr::vector::SensibleMoveMask) -> usize> (inlined)
+                       find_raw<core::core_arch::x86::__m256i> (inlined)
+                       find_raw_avx2 (inlined)
+                       0x2727272727272726
+                       memchr3_raw (inlined)
+                       memchr3_raw (inlined)
+                       {closure#0} (inlined)
+                       next<memchr::memchr::{impl#9}::next::{closure_env#0}> (inlined)
+                       next (inlined)
+                       feed (inlined)
+                       read_with<&[u8], quick_xml::parser::element::ElementParser> (inlined)
+                       copy_nonoverlapping<u8> (inlined)
+                       append_elements<u8, alloc::alloc::Global> (inlined)
+                       spec_extend<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice<u8, alloc::alloc::Global> (inlined)
+                       extend_from_slice (inlined)
+
+     0.57%  mce-attribution  mce-attribution-0697  [.] alloc::raw_vec::RawVec<T,A>::grow_one
+            |          
+             --0.45%--grow_one<core::ops::range::Range<usize>, alloc::alloc::Global> (inlined)
+                       |          
+                        --0.16%--0x1
+                                  0x6
+
+     0.53%  mce-attribution  mce-attribution-0697  [.] std::thread::local::LocalKey<T>::with
+            |          
+            |--0.29%--with<core::cell::Cell<(u64, u64)>, std::hash::random::{impl#0}::new::{closure_env#0}, std::hash::random::RandomState> (inlined)
+            |          
+             --0.24%--get<(u64, u64)> (inlined)
+                       {closure#0} (inlined)
+                       try_with<core::cell::Cell<(u64, u64)>, std::hash::random::{impl#0}::new::{closure_env#0}, std::hash::random::RandomState> (inlined)
+                       with<core::cell::Cell<(u64, u64)>, std::hash::random::{impl#0}::new::{closure_env#0}, std::hash::random::RandomState> (inlined)
+                       |          
+                       |--0.12%--0x175caedff
+                       |          
+                        --0.12%--0x75caedff
+
+     0.45%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::Reader<R>::read_event_impl
+            |          
+            |--0.25%--read_until_close<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+            |          copy_nonoverlapping<u8> (inlined)
+            |          append_elements<u8, alloc::alloc::Global> (inlined)
+            |          spec_extend<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice<u8, alloc::alloc::Global> (inlined)
+            |          extend_from_slice (inlined)
+            |          
+             --0.16%--read_event_impl<&[u8], &mut alloc::vec::Vec<u8, alloc::alloc::Global>> (inlined)
+
+     0.29%  mce-attribution  [unknown]             [k] 0xffffffff9e800ef0
+            |
+            ---0xffffffff9e800ef0
+
+     0.29%  mce-attribution  mce-attribution-0697  [.] quick_xml::reader::state::ReaderState::emit_end
+            |          
+             --0.12%--emit_end (inlined)
+
+     0.29%  mce-attribution  mce-attribution-0697  [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+            |          
+             --0.20%--finish_grow<alloc::alloc::Global> (inlined)
+
+     0.29%  mce-attribution  mce-attribution-0697  [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+            |
+            ---__rustc::__rust_no_alloc_shim_is_unstable_v2
+
+     0.25%  mce-attribution  [unknown]             [k] 0xffffffff9efed639
+            |
+            ---0xffffffff9efed639
+               0xffffffff9ec1a367
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+
+     0.24%  mce-attribution  mce-attribution-0697  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+            |
+            ---decoded_and_normalized_value (inlined)
+               |          
+                --0.12%--0x100003fff
+
+     0.24%  mce-attribution  libc.so.6             [.] cfree@GLIBC_2.2.5
+     0.24%  mce-attribution  mce-attribution-0697  [.] alloc::raw_vec::RawVecInner<A>::try_allocate_in
+            |          
+             --0.16%--overflowing_mul (inlined)
+                       checked_mul (inlined)
+                       repeat_packed (inlined)
+                       layout_array (inlined)
+                       try_allocate_in<alloc::alloc::Global> (inlined)
+
+     0.20%  mce-attribution  libc.so.6             [.] _int_realloc
+     0.20%  mce-attribution  mce-attribution-0697  [.] core::hash::BuildHasher::hash_one
+     0.20%  mce-attribution  mce-attribution-0697  [.] __rustc::__rdl_alloc
+            |
+            ---__rdl_alloc (inlined)
+
+     0.20%  mce-attribution  libc.so.6             [.] _int_free_merge_chunk
+     0.16%  mce-attribution  mce-attribution-0697  [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+            |
+            ---write<core::hash::sip::Sip13Rounds> (inlined)
+
+     0.16%  mce-attribution  libc.so.6             [.] realloc
+     0.12%  mce-attribution  mce-attribution-0697  [.] <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find
+            |
+            ---find<(&str, &str), litchi_ooxml_common::mce::codec::start::{closure_env#4}> (inlined)
+
+     0.12%  mce-attribution  mce-attribution-0697  [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+            |
+            ---write<core::hash::sip::Sip13Rounds> (inlined)
+
+     0.12%  mce-attribution  libc.so.6             [.] unlink_chunk.isra.0
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

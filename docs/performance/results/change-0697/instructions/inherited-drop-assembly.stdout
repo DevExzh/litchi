@@ -1,0 +1,45 @@
+
+/home/zhuhe/code/litchi-target-0697/release/mce-attribution-0697:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000047670 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>>:
+   47670:	push   %r14
+   47672:	push   %rbx
+   47673:	push   %rax
+   47674:	mov    %rdi,%rbx
+   47677:	mov    (%rdi),%rax
+   4767a:	test   %rax,%rax
+   4767d:	je     4768e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+   4767f:	lock decq (%rax)
+   47683:	jne    4768e <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+   47685:	mov    %rbx,%rdi
+   47688:	call   *0x55bd2(%rip)        # 9d260 <_DYNAMIC+0x430>
+   4768e:	mov    0x8(%rbx),%rax
+   47692:	test   %rax,%rax
+   47695:	je     476b1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+   47697:	lock decq (%rax)
+   4769b:	jne    476b1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+   4769d:	add    $0x8,%rbx
+   476a1:	mov    %rbx,%rdi
+   476a4:	add    $0x8,%rsp
+   476a8:	pop    %rbx
+   476a9:	pop    %r14
+   476ab:	jmp    *0x55baf(%rip)        # 9d260 <_DYNAMIC+0x430>
+   476b1:	add    $0x8,%rsp
+   476b5:	pop    %rbx
+   476b6:	pop    %r14
+   476b8:	ret
+   476b9:	mov    %rax,%r14
+   476bc:	mov    0x8(%rbx),%rax
+   476c0:	test   %rax,%rax
+   476c3:	je     476d8 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+   476c5:	lock decq (%rax)
+   476c9:	jne    476d8 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+   476cb:	add    $0x8,%rbx
+   476cf:	mov    %rbx,%rdi
+   476d2:	call   *0x55b88(%rip)        # 9d260 <_DYNAMIC+0x430>
+   476d8:	mov    %r14,%rdi
+   476db:	call   99340 <_Unwind_Resume@plt>
+   476e0:	call   *0x55a42(%rip)        # 9d128 <_DYNAMIC+0x2f8>

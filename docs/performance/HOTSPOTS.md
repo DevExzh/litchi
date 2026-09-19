@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0697 — borrow temporary inherited views before redesigning frames
+
+[0697](0697-mce-context-ownership-attribution.md) attributes current isolated
+MCE ownership work to frozen instructions: two temporary `Inherited` clone sites
+have 121 following-branch samples, and its two release sites have 175.
+`Inherited` destruction is 7.16% of isolated self samples; these counts are
+not atomic latency or predicted savings. Source review recommends borrowed
+parent namespace views after Alt bookkeeping and before owned frame construction.
+Keep `Ctx`, child emitted-boundary ownership and frame layout unchanged initially;
+those owners have broader lifetimes. Presentation reuse remains lower priority
+at 3.32% of isolated time. Production is unchanged; the next A/B must include
+hoisting/refusal parity and the declaration-heavy controls established in 0696.
+
 ## 0696 — skip redundant empty namespace installation
 
 [0696](0696-mce-empty-namespace-installation.md) guards the empty local namespace

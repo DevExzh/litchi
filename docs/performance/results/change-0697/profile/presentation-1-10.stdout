@@ -1,0 +1,12 @@
+IDENTITY	index=0	input_bytes=2357	input_sha256=9370d9c23700e2300607bf96a5089338788b090a007e682c3fd5dcaae8a73ae6	output_bytes=2801	output_sha256=c19e053c1359a340774e692c578cf7dcb3e44e9488cccf1b829015103fcaa3f2	borrowed=false
+META	probe=0697	warmups=0	samples=10	batch=10	calls=5
+SAMPLE	index=0	elapsed_ns=827114
+SAMPLE	index=1	elapsed_ns=808014
+SAMPLE	index=2	elapsed_ns=807574
+SAMPLE	index=3	elapsed_ns=813683
+SAMPLE	index=4	elapsed_ns=809054
+SAMPLE	index=5	elapsed_ns=819874
+SAMPLE	index=6	elapsed_ns=808074
+SAMPLE	index=7	elapsed_ns=814794
+SAMPLE	index=8	elapsed_ns=817214
+SAMPLE	index=9	elapsed_ns=816344

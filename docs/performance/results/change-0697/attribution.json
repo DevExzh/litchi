@@ -1,0 +1,13 @@
+{
+  "performance_claim": "none",
+  "scope": "isolated default-profile MCE sequence timing; diagnostic attribution only",
+  "denominator": "median of four leg medians of isolated all-sequence time; not capture latency",
+  "ratios": {
+    "presentation": 0.03321897929180387,
+    "slides": 0.9686054123768557,
+    "slide11": 0.4299044726753427,
+    "sum_individual_over_full": 0.981695427202619,
+    "sum_groups_over_full": 1.0018243916686596
+  },
+  "max_leg_median_spread_pct": 2.478763567720632
+}
