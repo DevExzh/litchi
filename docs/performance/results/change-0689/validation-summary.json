@@ -1,0 +1,25 @@
+{
+  "baseline": "9ba2c0b6b04c1dfc1db223279e37acc6e6fa5fd8",
+  "quality_gates": 6,
+  "additional_consumer_test_gate": 1,
+  "rust_tests_passed": 4400,
+  "rust_tests_ignored": 27,
+  "real_corpus_files": 126,
+  "generated_fixtures": 1,
+  "native_groups": 24,
+  "native_owner_records": 14400,
+  "native_query_records": 115200,
+  "allocation_groups": 96,
+  "allocation_captures": 576,
+  "counted_source_routes": 12,
+  "long_loop_groups": 12,
+  "long_loop_process_samples": 648,
+  "long_loop_queries_per_sample": 50000,
+  "diagnostic_groups": 8,
+  "diagnostic_processes": 96,
+  "source_sha256": {
+    "crates/litchi-xls/src/workbook/query_cache.rs": "f873403dedbfe65833813d6607d7c155bc70f483d2b090487dccd0d7cd2aad42",
+    "crates/litchi-xls/src/workbook/source.rs": "14ce4ad0945eec82934634b80a9c30dc1b1858eb5e4193347afc0cb61a979407"
+  },
+  "performance_claim": "none"
+}

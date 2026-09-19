@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "baseline-profile-command.json": "9131ab95b59b7162cd0ea8ffc9f14194e3bfdd26a1f276ab95bfb1495af284ef",
+    "baseline-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "baseline-profile-symbols.txt": "c7b84be8941996f41accc625d655177542efa750c78cd9776e08da3bd2645d8b",
+    "baseline-profile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-profile.stderr": "f901a71fb1c7668dea7b45dd49d265884d9e7e844e9a61f5c1d517a53c866977",
+    "baseline-profile.tsv": "f593cb12dac5b995a4fd923b223e476d8be9b31248b23cd0b972ef40b01a0a8e"
+  },
+  "candidate": {
+    "candidate-profile-command.json": "3af4c34b1d20d671b91447f029898e46a5ecea7fa93137fcda5366dd03552e83",
+    "candidate-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+    "candidate-profile-symbols.txt": "7642c2ddae9471d4cdc6e8a7c75d74c6f04e23cdd57eb87a47156a9fad4e231b",
+    "candidate-profile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-profile.stderr": "34814176bd42f59b54ffc71eca8e3fbe864948e6eb3876e3973fdfdab0adec3d",
+    "candidate-profile.tsv": "1dcd05c44fdc848fd4716f6fa0382e8c03e1f161adc189e55e51dd60470dc76c"
+  }
+}

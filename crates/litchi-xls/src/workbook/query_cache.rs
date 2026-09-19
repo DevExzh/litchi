@@ -5,7 +5,7 @@
 //! entry, and the memory reservations carried by the index remain charged for
 //! exactly the same lifetime.
 
-use litchi_cfb::StreamChainCheckpoint;
+use litchi_cfb::{StreamChainCheckpoint, StreamChainHint};
 use litchi_core::{ExecutionContext, Reservation, Resource, SourceVersion};
 use std::collections::VecDeque;
 use std::mem::size_of;
@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 /// Logical charge for one retained worksheet occurrence slot.
 pub(crate) const SLOT_WEIGHT: u64 = 24;
 /// Logical charge for one worksheet index entry and its LRU metadata.
-pub(crate) const INDEX_OVERHEAD: u64 = 192;
+pub(crate) const INDEX_OVERHEAD: u64 = 224;
 const CACHE_OVERHEAD: u64 = 128;
 const INITIAL_SLOT_CAPACITY: usize = 8;
 const HOTNESS_ADMISSION_REFUSED: u8 = u8::MAX;
@@ -40,6 +40,10 @@ pub(crate) struct CellSlot {
 pub(crate) struct WorksheetCellIndex {
     pub(crate) expected_version: SourceVersion,
     pub(crate) chain_checkpoint: Option<StreamChainCheckpoint>,
+    /// The SST-chain position after the first successfully resolved selected
+    /// `LabelSst`; the checkpoint is immutable and owns no source bytes.
+    /// A typed error value that read no SST bytes can leave it without a position.
+    pub(crate) sst_chain_checkpoint: Option<StreamChainCheckpoint>,
     pub(crate) slots: Vec<CellSlot>,
     _reservations: Vec<Reservation>,
 }
@@ -209,6 +213,7 @@ impl QueryIndexCache {
             slots: Vec::new(),
             reservations: Vec::new(),
             chain_checkpoint: None,
+            sst_chain_checkpoint: None,
             observed_count: 0,
             reserved_weight: 0,
             active: true,
@@ -317,6 +322,7 @@ impl QueryIndexCache {
         let index = Arc::new(WorksheetCellIndex {
             expected_version,
             chain_checkpoint: candidate.chain_checkpoint.take(),
+            sst_chain_checkpoint: candidate.sst_chain_checkpoint.take(),
             slots,
             _reservations: reservations,
         });
@@ -408,6 +414,7 @@ pub(crate) struct IndexCandidate<'a> {
     slots: Vec<CellSlot>,
     reservations: Vec<Reservation>,
     chain_checkpoint: Option<StreamChainCheckpoint>,
+    sst_chain_checkpoint: Option<StreamChainCheckpoint>,
     observed_count: u64,
     reserved_weight: u64,
     active: bool,
@@ -417,6 +424,14 @@ impl IndexCandidate<'_> {
     pub(crate) fn set_chain_checkpoint(&mut self, checkpoint: StreamChainCheckpoint) {
         if self.active {
             self.chain_checkpoint = Some(checkpoint);
+        }
+    }
+
+    /// Retains only the first successful selected-`LabelSst` resolver position.
+    /// The CFB checkpoint is weak and is discarded with an abandoned candidate.
+    pub(crate) fn set_sst_chain_checkpoint(&mut self, chain: &StreamChainHint<'_>) {
+        if self.active && self.sst_chain_checkpoint.is_none() {
+            self.sst_chain_checkpoint = Some(chain.checkpoint());
         }
     }
 
@@ -590,6 +605,7 @@ impl IndexCandidate<'_> {
     fn abandon(&mut self) {
         if self.active {
             self.chain_checkpoint = None;
+            self.sst_chain_checkpoint = None;
             let slots = std::mem::take(&mut self.slots);
             let reservations = std::mem::take(&mut self.reservations);
             drop(slots);
@@ -605,6 +621,7 @@ impl Drop for IndexCandidate<'_> {
     fn drop(&mut self) {
         if self.active {
             self.chain_checkpoint = None;
+            self.sst_chain_checkpoint = None;
             let slots = std::mem::take(&mut self.slots);
             let reservations = std::mem::take(&mut self.reservations);
             drop(slots);
@@ -662,7 +679,7 @@ mod tests {
     )]
 
     use super::*;
-    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
+    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits, OwnedSource};
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Barrier;
 
@@ -670,6 +687,7 @@ mod tests {
         Arc::new(WorksheetCellIndex {
             expected_version: SourceVersion::new(version, 0),
             chain_checkpoint: None,
+            sst_chain_checkpoint: None,
             slots: Vec::new(),
             _reservations: reservations,
         })
@@ -1188,6 +1206,62 @@ mod tests {
         assert_eq!(candidate.slots.capacity(), 0);
         assert_eq!(candidate.reservations.capacity(), 0);
         assert_eq!(cache.lock().reserved_weight, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(parent.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn abandoning_or_retaining_an_sst_checkpoint_keeps_budget_lifetime_exact() {
+        let cache = cache_with_index_budget(4096, 1);
+        let (budget, parent, execution) = hierarchical_execution(4096);
+        let bytes = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
+        ))
+        .unwrap();
+        let file = litchi_cfb::SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let mut hint = file.chain_hint();
+        let _cursor = file
+            .stream_cursor_at_hinted(&["Workbook"], 0, &mut hint)
+            .unwrap();
+
+        let mut abandoned = cache.begin_candidate(0, Some(&execution)).unwrap();
+        abandoned.set_sst_chain_checkpoint(&hint);
+        assert!(abandoned.sst_chain_checkpoint.is_some());
+        abandoned.push(slot());
+        assert!(budget.used(Resource::Memory) > 0);
+        abandoned.abandon();
+        assert!(abandoned.sst_chain_checkpoint.is_none());
+        abandoned.set_sst_chain_checkpoint(&hint);
+        assert!(abandoned.sst_chain_checkpoint.is_none());
+        assert_eq!(cache.lock().reserved_weight, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(parent.used(Resource::Memory), 0);
+
+        // Even an inactive candidate owns an Arc to the cache. Release it
+        // before checking the final cache/index lifetime below.
+        drop(abandoned);
+
+        let mut dropped = cache.begin_candidate(0, Some(&execution)).unwrap();
+        dropped.set_sst_chain_checkpoint(&hint);
+        assert!(dropped.sst_chain_checkpoint.is_some());
+        dropped.push(slot());
+        drop(dropped);
+        assert_eq!(cache.lock().reserved_weight, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(parent.used(Resource::Memory), 0);
+
+        let mut retained = cache.begin_candidate(0, Some(&execution)).unwrap();
+        retained.set_sst_chain_checkpoint(&hint);
+        assert!(retained.sst_chain_checkpoint.is_some());
+        retained.push(slot());
+        let retained = retained.publish(SourceVersion::new(1, 0)).unwrap();
+        assert!(retained.sst_chain_checkpoint.is_some());
+        let weight = cache.lock().entries[0].as_ref().unwrap().weight;
+        assert_eq!(budget.used(Resource::Memory), weight);
+        assert_eq!(budget.used(Resource::Memory), parent.used(Resource::Memory));
+        drop(retained);
+        drop(cache);
         assert_eq!(budget.used(Resource::Memory), 0);
         assert_eq!(parent.used(Resource::Memory), 0);
     }

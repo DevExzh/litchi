@@ -1,5 +1,22 @@
 # Performance optimization ADR-compliance matrix
 
+## 0689 — bounded SST chain identity reuse in the XLS index
+
+[0689](0689-xls-sst-chain-checkpoint.md) retains one additional opaque CFB
+checkpoint in the private XLS worksheet index. Format/cache ownership and
+public APIs remain unchanged (ADRs 0001/0002/0024). The checkpoint owns a weak
+index identity and a validated position, not source bytes or decoded values.
+Each replay restores a local hint; foreign/backward positions use existing
+fallbacks. Reads, source fences, duplicate order, target errors and completed
+scan publication remain unchanged (ADRs 0003/0006).
+
+Under ADR 0005 the fixed index charge rises 192 → 224 bytes before collection,
+including indexes with no useful SST checkpoint. Existing local/hierarchical
+reservations, capacity charges, pinning, eviction, abandonment and cancellation
+remain in force. Allocator gauges, logical charges, code size and process RSS
+are reported separately. No unsafe code, new dependency, memory bound or ADR
+amendment is introduced. Accepted ADR hashes remain unchanged.
+
 ## 0688 — checked chain validation stays on the success path
 
 [0688](0688-cfb-checked-chain-hot-path.md) keeps the shared CFB checked

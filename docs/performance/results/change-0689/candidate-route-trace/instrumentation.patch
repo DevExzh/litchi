@@ -1,0 +1,62 @@
+diff --git a/crates/litchi-cfb/src/shared.rs b/crates/litchi-cfb/src/shared.rs
+index b8a5d86cd..4057df5df 100644
+--- a/crates/litchi-cfb/src/shared.rs
++++ b/crates/litchi-cfb/src/shared.rs
+@@ -3456,6 +3456,7 @@ fn cursor_chain_sector(
+     ordinal: usize,
+     table_name: &str,
+ ) -> Result<u32, OleError> {
++    eprintln!("TRACE chain table={table_name} from={} to={ordinal} links={}", resume.1, ordinal.saturating_sub(resume.1));
+     let (mut sector, walked) = resume;
+     for _ in walked..ordinal {
+         sector = next_chain_sector(table, sector, table_name)?;
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index 487241bd1..d781b38f3 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -3018,6 +3018,14 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
+             return Ok(());
+         }
+         if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
++            if COLLECT_INDEX
++                && matches!(record, CellRecord::LabelSst { .. })
++                && let Some(index) = self.index.as_mut()
++            {
++                // Capture only after target_cell_value has completed: this
++                // keeps SST errors and their existing precedence unchanged.
++                index.set_sst_chain_checkpoint(&strings.chain);
++            }
+             self.found = Some(SourceBackedCell {
+                 row: u32::from(self.row),
+                 column: u32::from(self.column),
+@@ -3530,15 +3538,22 @@ fn replay_indexed_cell(
+         .map(String::as_str)
+         .collect::<Vec<_>>();
+     let mut strings = SharedStringResolver::new(owner, &refs);
++    if let Some(checkpoint) = index.sst_chain_checkpoint.as_ref() {
++        // CFB restores only a checkpoint from this reader; each resolve still
++        // falls back cold for a foreign or backward position.
++        strings.chain = owner.cfb.chain_hint_from_checkpoint(checkpoint);
++    }
+     let mut chain = index.chain_checkpoint.as_ref().map_or_else(
+         || owner.cfb.chain_hint(),
+         |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),
+     );
++    eprintln!("TRACE replay row={row} column={column}");
+     let mut found = None;
+     for slot in index.slots_for(row, column) {
+         if let Some(context) = execution {
+             context.check().map_err(SourceBackedError::from)?;
+         }
++        eprintln!("TRACE worksheet frame_offset={} sheet_start={}", slot.stream_offset, sheet.start);
+         let mut cursor = owner
+             .cfb
+             .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
+@@ -4237,6 +4252,7 @@ fn resolve_shared_string_inner(
+     // where `SST source offset overflow` is reported, and the windowed path
+     // must report it at the same point in the sequence.
+     let first_offset = sst_source_offset(&segments[first_segment], location.start)?;
++    eprintln!("TRACE sst index={string_index} first_offset={first_offset}");
+ 
+     let table_start = strings.region.map_or(0, |(start, _len)| start);
+     let served = strings.table(owner)?.map(|table| {

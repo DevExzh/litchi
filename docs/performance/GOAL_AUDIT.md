@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0689 — measured SST checkpoint reuse with bounded ownership
+
+[0689](0689-xls-sst-chain-checkpoint.md) retains an existing validated CFB
+checkpoint after successful selected shared-string resolution and publishes it
+only with a complete worksheet index. Six new tests cover reverse offsets,
+owner locality, concurrency correctness, malformed tails, error precedence
+and reservation lifetime. Quality and consumer checks pass: 4,400 passed,
+27 existing ignored. Real/generated corpus, outcomes and counted I/O match.
+
+Route traces, profiles, counters and paired timing support scoped SST-heavy
+query savings. All-index storage, stack growth, near-limit slot changes,
+opening/build costs and descriptive tail flags remain explicit. A separate
+24,000-owner follow-up preserves the original evidence. OLE2/OOXML work and
+the broader GOAL remain active; iWork is excluded. No registered performance
+claim or CRUD coverage promotion.
+
 ## 0688 — measured checked-chain inlining with preserved refusal semantics
 
 [0688](0688-cfb-checked-chain-hot-path.md) outlines shared CFB error formatting

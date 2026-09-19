@@ -1,0 +1,8 @@
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE replay row=5095 column=106
+TRACE worksheet frame_offset=841403 sheet_start=306931
+TRACE chain table=FAT from=599 to=1643 links=1044
+TRACE replay row=5095 column=106
+TRACE worksheet frame_offset=841403 sheet_start=306931
+TRACE chain table=FAT from=599 to=1643 links=1044

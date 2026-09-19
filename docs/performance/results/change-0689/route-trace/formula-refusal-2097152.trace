@@ -1,0 +1,2 @@
+TRACE chain table=FAT from=0 to=1591 links=1591
+Error: Parse(InvalidRecord { record_type: 6, message: "shared Formula metadata requires a leading PtgExp token" })

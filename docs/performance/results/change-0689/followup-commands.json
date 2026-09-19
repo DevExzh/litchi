@@ -1,0 +1,26 @@
+[
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/measure-followup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 23.30385725700762
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-followup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.33736649597994983
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-traces.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.022057986934669316
+  }
+]

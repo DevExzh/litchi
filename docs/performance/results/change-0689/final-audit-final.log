@@ -1,0 +1,4 @@
+PASS archived initial lifecycle-test failure and differing test-source bindings.
+PASS quality/build/measurement/corpus/profile/constraint bindings; tests: {'owners': {'passed': 1893, 'failed': 0, 'ignored': 2}, 'facade': {'passed': 61, 'failed': 0, 'ignored': 0}, 'doc-ppt': {'passed': 2446, 'failed': 0, 'ignored': 25}}
+PASS matched assembly bindings.
+PASS final profile hashes, documentation gates and validation summary.

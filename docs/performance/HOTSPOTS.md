@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0689 — retain validated SST positions for indexed replay
+
+[0689](0689-xls-sst-chain-checkpoint.md) removes repeated 478/97/24-link SST
+walks using the existing owner-validated CFB checkpoint. 54016 first-cell owned
+q8 medians improve about 49%; longer controls improve about 58% owned and
+21–22% file. Worksheet walks and counted reads remain unchanged. Each admitted
+index pays 32 logical bytes, including indexes without a checkpoint; query
+stack reservation grows 48 bytes. Near-limit spare capacity, opening/build
+costs and synthetic opening tails remain disclosed. Larger controls do not
+reproduce earlier missing-target drift or large file-query tail flags, but
+provide no universal tail guarantee. Directory-name construction now accounts
+for 17.16% of the smaller candidate profile; worksheet walks and construction
+remain open. No registered claim or coverage promotion.
+
 ## 0688 — remove per-link call/result overhead from checked CFB walks
 
 [0688](0688-cfb-checked-chain-hot-path.md) follows actual calls in baseline

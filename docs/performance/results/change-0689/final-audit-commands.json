@@ -1,0 +1,50 @@
+[
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-costs.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.0497335129184648
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-native.py"
+    ],
+    "exit_code": 0,
+    "seconds": 6.402679631020874
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-extra.py"
+    ],
+    "exit_code": 0,
+    "seconds": 1.240133194020018
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-traces.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.02228323998861015
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-followup.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.3443678900366649
+  },
+  {
+    "command": [
+      "python3",
+      "docs/performance/results/change-0689/audit-final.py"
+    ],
+    "exit_code": 0,
+    "seconds": 3.110149556072429
+  }
+]

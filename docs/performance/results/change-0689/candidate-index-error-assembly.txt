@@ -1,0 +1,29 @@
+
+/home/zhuhe/code/litchi-target-0689-after/release/xls0684-repeat:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000b40f0 <litchi_cfb::shared::invalid_chain_index>:
+   b40f0:	53                   	push   %rbx
+   b40f1:	48 83 ec 40          	sub    $0x40,%rsp
+   b40f5:	48 89 fb             	mov    %rdi,%rbx
+   b40f8:	89 74 24 0c          	mov    %esi,0xc(%rsp)
+   b40fc:	48 89 54 24 10       	mov    %rdx,0x10(%rsp)
+   b4101:	48 89 4c 24 18       	mov    %rcx,0x18(%rsp)
+   b4106:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+   b410b:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   b4110:	48 8b 05 39 89 05 00 	mov    0x58939(%rip),%rax        # 10ca50 <_DYNAMIC+0x538>
+   b4117:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+   b411c:	48 8d 44 24 10       	lea    0x10(%rsp),%rax
+   b4121:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+   b4126:	48 8d 05 c3 38 00 00 	lea    0x38c3(%rip),%rax        # b79f0 <<&T as core::fmt::Display>::fmt>
+   b412d:	48 89 44 24 38       	mov    %rax,0x38(%rsp)
+   b4132:	48 83 c7 08          	add    $0x8,%rdi
+   b4136:	48 8d 35 51 d0 f8 ff 	lea    -0x72faf(%rip),%rsi        # 4118e <anon.a2157f99ed24c51f021f8d93000a2d96.468.llvm.858755183163581898+0x3c>
+   b413d:	48 8d 54 24 20       	lea    0x20(%rsp),%rdx
+   b4142:	ff 15 d0 88 05 00    	call   *0x588d0(%rip)        # 10ca18 <_DYNAMIC+0x500>
+   b4148:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+   b414f:	48 83 c4 40          	add    $0x40,%rsp
+   b4153:	5b                   	pop    %rbx
+   b4154:	c3                   	ret
