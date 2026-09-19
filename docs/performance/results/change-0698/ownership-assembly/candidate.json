@@ -1,0 +1,70 @@
+{
+  "phase": "candidate",
+  "binary": "/home/zhuhe/code/litchi-0698-bin/candidate-native",
+  "binary_sha256": "2c805a413eb4bb458da46ca61b9ce4283a2797d9712ab97480b23ade9cb7ccf8",
+  "symbols": [
+    {
+      "name": "start",
+      "symbol": "litchi_ooxml_common::mce::codec::start",
+      "present": true,
+      "address": 1536192,
+      "size": 17833
+    },
+    {
+      "name": "inherited-drop",
+      "symbol": "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>",
+      "present": false
+    },
+    {
+      "name": "ctx-drop",
+      "symbol": "core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>",
+      "present": true,
+      "address": 1554912,
+      "size": 118
+    }
+  ],
+  "commands": [
+    {
+      "name": "symbols",
+      "command": [
+        "nm",
+        "-S",
+        "-C",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "add57ba338af16303ab7ca6fe3372a6cf168c317396a58de224ddd3531cd6148",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "start",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1536192",
+        "--stop-address=1554025",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "66fc59ad1b7359a09ad45bda4611186353dd995a90bac5a562ae88f7ead95a0a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ctx-drop",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1554912",
+        "--stop-address=1555030",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "98fabcf69750bb79bf30d1f5d197a6f759d4286845c1e7df9ae2d67885031f35",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

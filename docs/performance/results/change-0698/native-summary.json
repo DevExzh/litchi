@@ -1,0 +1,7958 @@
+[
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4805188.5,
+    "mean_ns": 4811964.26,
+    "p95_ns": 4893134,
+    "p99_ns": 4917094,
+    "min_ns": 4730463,
+    "max_ns": 4921624,
+    "median_bootstrap_95ci_ns": [
+      4794454.0,
+      4814778.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16830.0,
+    "mean_ns": 16879.59,
+    "p95_ns": 17680,
+    "p99_ns": 17900,
+    "min_ns": 16100,
+    "max_ns": 18150,
+    "median_bootstrap_95ci_ns": [
+      16710.5,
+      16945.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1035740.0,
+    "mean_ns": 1034288.3,
+    "p95_ns": 1049575,
+    "p99_ns": 1050315,
+    "min_ns": 1013485,
+    "max_ns": 1055565,
+    "median_bootstrap_95ci_ns": [
+      1033205.0,
+      1037360.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5193855.0,
+    "mean_ns": 5196941.7,
+    "p95_ns": 5263576,
+    "p99_ns": 5316875,
+    "min_ns": 5109845,
+    "max_ns": 5321565,
+    "median_bootstrap_95ci_ns": [
+      5182995.0,
+      5204125.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 91655.0,
+    "mean_ns": 92338.97,
+    "p95_ns": 98250,
+    "p99_ns": 100030,
+    "min_ns": 89790,
+    "max_ns": 100051,
+    "median_bootstrap_95ci_ns": [
+      91475.5,
+      91965.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11153519.0,
+    "mean_ns": 11152669.22,
+    "p95_ns": 11269705,
+    "p99_ns": 11319675,
+    "min_ns": 10989844,
+    "max_ns": 11400406,
+    "median_bootstrap_95ci_ns": [
+      11143354.0,
+      11167864.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2576268.0,
+    "mean_ns": 2578003.89,
+    "p95_ns": 2599773,
+    "p99_ns": 2614782,
+    "min_ns": 2557682,
+    "max_ns": 2621622,
+    "median_bootstrap_95ci_ns": [
+      2574223.0,
+      2579993.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16540.0,
+    "mean_ns": 17035.17,
+    "p95_ns": 22640,
+    "p99_ns": 24101,
+    "min_ns": 15690,
+    "max_ns": 24240,
+    "median_bootstrap_95ci_ns": [
+      16480.0,
+      16630.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 559232.5,
+    "mean_ns": 557896.62,
+    "p95_ns": 567052,
+    "p99_ns": 578133,
+    "min_ns": 544032,
+    "max_ns": 583132,
+    "median_bootstrap_95ci_ns": [
+      555442.0,
+      561283.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2709778.5,
+    "mean_ns": 2709599.72,
+    "p95_ns": 2723353,
+    "p99_ns": 2735104,
+    "min_ns": 2689253,
+    "max_ns": 2746933,
+    "median_bootstrap_95ci_ns": [
+      2707653.0,
+      2711098.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 76711.0,
+    "mean_ns": 77054.07,
+    "p95_ns": 78710,
+    "p99_ns": 84480,
+    "min_ns": 75531,
+    "max_ns": 84520,
+    "median_bootstrap_95ci_ns": [
+      76580.0,
+      76980.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5936428.5,
+    "mean_ns": 5939860.87,
+    "p95_ns": 5971079,
+    "p99_ns": 5980209,
+    "min_ns": 5907369,
+    "max_ns": 5991129,
+    "median_bootstrap_95ci_ns": [
+      5932959.0,
+      5940329.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 641758.0,
+    "mean_ns": 641600.08,
+    "p95_ns": 648993,
+    "p99_ns": 652003,
+    "min_ns": 632413,
+    "max_ns": 666453,
+    "median_bootstrap_95ci_ns": [
+      640273.0,
+      643273.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 12080.0,
+    "mean_ns": 12112.13,
+    "p95_ns": 12570,
+    "p99_ns": 13300,
+    "min_ns": 11460,
+    "max_ns": 14800,
+    "median_bootstrap_95ci_ns": [
+      12030.0,
+      12120.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 134920.5,
+    "mean_ns": 135848.23,
+    "p95_ns": 142411,
+    "p99_ns": 144651,
+    "min_ns": 133491,
+    "max_ns": 144841,
+    "median_bootstrap_95ci_ns": [
+      134596.0,
+      135086.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 722799.0,
+    "mean_ns": 723096.14,
+    "p95_ns": 732074,
+    "p99_ns": 743844,
+    "min_ns": 712163,
+    "max_ns": 763713,
+    "median_bootstrap_95ci_ns": [
+      721753.0,
+      724363.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48715.5,
+    "mean_ns": 49299.62,
+    "p95_ns": 54520,
+    "p99_ns": 57671,
+    "min_ns": 47200,
+    "max_ns": 71691,
+    "median_bootstrap_95ci_ns": [
+      48611.0,
+      48790.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1559882.5,
+    "mean_ns": 1562178.8,
+    "p95_ns": 1575577,
+    "p99_ns": 1609608,
+    "min_ns": 1546227,
+    "max_ns": 1611957,
+    "median_bootstrap_95ci_ns": [
+      1558377.0,
+      1561277.5
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 391877.0,
+    "mean_ns": 394356.04,
+    "p95_ns": 402271,
+    "p99_ns": 408892,
+    "min_ns": 385691,
+    "max_ns": 436943,
+    "median_bootstrap_95ci_ns": [
+      390732.0,
+      395037.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5440.0,
+    "mean_ns": 5537.21,
+    "p95_ns": 5750,
+    "p99_ns": 6110,
+    "min_ns": 4950,
+    "max_ns": 15300,
+    "median_bootstrap_95ci_ns": [
+      5390.0,
+      5490.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 134535.5,
+    "mean_ns": 135753.82,
+    "p95_ns": 142871,
+    "p99_ns": 145201,
+    "min_ns": 132411,
+    "max_ns": 157261,
+    "median_bootstrap_95ci_ns": [
+      134106.0,
+      134861.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 474272.5,
+    "mean_ns": 474735.27,
+    "p95_ns": 483093,
+    "p99_ns": 487772,
+    "min_ns": 466263,
+    "max_ns": 499463,
+    "median_bootstrap_95ci_ns": [
+      472362.0,
+      476607.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29835.0,
+    "mean_ns": 30188.24,
+    "p95_ns": 30690,
+    "p99_ns": 38040,
+    "min_ns": 29060,
+    "max_ns": 43350,
+    "median_bootstrap_95ci_ns": [
+      29770.0,
+      29920.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1038825.0,
+    "mean_ns": 1040769.88,
+    "p95_ns": 1053446,
+    "p99_ns": 1062695,
+    "min_ns": 1029565,
+    "max_ns": 1115926,
+    "median_bootstrap_95ci_ns": [
+      1037900.0,
+      1040105.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 472742.5,
+    "mean_ns": 473742.21,
+    "p95_ns": 480792,
+    "p99_ns": 500492,
+    "min_ns": 466163,
+    "max_ns": 503033,
+    "median_bootstrap_95ci_ns": [
+      470323.0,
+      475562.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5015.0,
+    "mean_ns": 5011.14,
+    "p95_ns": 5310,
+    "p99_ns": 5350,
+    "min_ns": 4640,
+    "max_ns": 5430,
+    "median_bootstrap_95ci_ns": [
+      4965.0,
+      5060.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 399727.0,
+    "mean_ns": 401497.74,
+    "p95_ns": 410032,
+    "p99_ns": 421782,
+    "min_ns": 392332,
+    "max_ns": 424572,
+    "median_bootstrap_95ci_ns": [
+      398682.0,
+      401807.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 768504.0,
+    "mean_ns": 768063.02,
+    "p95_ns": 775084,
+    "p99_ns": 787944,
+    "min_ns": 755354,
+    "max_ns": 796034,
+    "median_bootstrap_95ci_ns": [
+      767684.0,
+      769223.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 30595.5,
+    "mean_ns": 30969.91,
+    "p95_ns": 31860,
+    "p99_ns": 38040,
+    "min_ns": 29870,
+    "max_ns": 44400,
+    "median_bootstrap_95ci_ns": [
+      30520.0,
+      30690.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1679663.0,
+    "mean_ns": 1679489.12,
+    "p95_ns": 1692218,
+    "p99_ns": 1707798,
+    "min_ns": 1659838,
+    "max_ns": 1739549,
+    "median_bootstrap_95ci_ns": [
+      1676728.0,
+      1680678.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4729787.5,
+    "mean_ns": 4740174.51,
+    "p95_ns": 4761673,
+    "p99_ns": 5063915,
+    "min_ns": 4697233,
+    "max_ns": 5064655,
+    "median_bootstrap_95ci_ns": [
+      4727843.0,
+      4734787.5
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16970.0,
+    "mean_ns": 17055.81,
+    "p95_ns": 18150,
+    "p99_ns": 18640,
+    "min_ns": 15400,
+    "max_ns": 22760,
+    "median_bootstrap_95ci_ns": [
+      16845.5,
+      17130.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 304761.5,
+    "mean_ns": 306826.3,
+    "p95_ns": 315271,
+    "p99_ns": 320361,
+    "min_ns": 301172,
+    "max_ns": 320842,
+    "median_bootstrap_95ci_ns": [
+      304202.0,
+      305412.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 66910.0,
+    "mean_ns": 67796.53,
+    "p95_ns": 74751,
+    "p99_ns": 76461,
+    "min_ns": 65640,
+    "max_ns": 78070,
+    "median_bootstrap_95ci_ns": [
+      66820.0,
+      67280.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50805.5,
+    "mean_ns": 50945.45,
+    "p95_ns": 51811,
+    "p99_ns": 55761,
+    "min_ns": 49150,
+    "max_ns": 58421,
+    "median_bootstrap_95ci_ns": [
+      50640.0,
+      50940.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5175395.0,
+    "mean_ns": 5183011.2,
+    "p95_ns": 5205415,
+    "p99_ns": 5501467,
+    "min_ns": 5142275,
+    "max_ns": 5511797,
+    "median_bootstrap_95ci_ns": [
+      5169905.0,
+      5178685.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2609923.0,
+    "mean_ns": 2610352.74,
+    "p95_ns": 2642553,
+    "p99_ns": 2655523,
+    "min_ns": 2577262,
+    "max_ns": 2683623,
+    "median_bootstrap_95ci_ns": [
+      2604523.0,
+      2613187.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16490.0,
+    "mean_ns": 16728.52,
+    "p95_ns": 18110,
+    "p99_ns": 20631,
+    "min_ns": 15660,
+    "max_ns": 24970,
+    "median_bootstrap_95ci_ns": [
+      16405.0,
+      16580.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 164496.0,
+    "mean_ns": 165375.4,
+    "p95_ns": 172170,
+    "p99_ns": 174421,
+    "min_ns": 161001,
+    "max_ns": 178741,
+    "median_bootstrap_95ci_ns": [
+      163911.0,
+      165561.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 65875.5,
+    "mean_ns": 66327.1,
+    "p95_ns": 72751,
+    "p99_ns": 74281,
+    "min_ns": 64551,
+    "max_ns": 75850,
+    "median_bootstrap_95ci_ns": [
+      65805.5,
+      65980.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 34995.5,
+    "mean_ns": 35286.29,
+    "p95_ns": 36750,
+    "p99_ns": 42530,
+    "min_ns": 33830,
+    "max_ns": 43301,
+    "median_bootstrap_95ci_ns": [
+      34865.0,
+      35095.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2894834.0,
+    "mean_ns": 2894306.25,
+    "p95_ns": 2922895,
+    "p99_ns": 2939354,
+    "min_ns": 2856344,
+    "max_ns": 2965264,
+    "median_bootstrap_95ci_ns": [
+      2889719.0,
+      2898119.5
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 660658.5,
+    "mean_ns": 662315.63,
+    "p95_ns": 671733,
+    "p99_ns": 686544,
+    "min_ns": 649883,
+    "max_ns": 868254,
+    "median_bootstrap_95ci_ns": [
+      659418.0,
+      662014.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11420.0,
+    "mean_ns": 11557.53,
+    "p95_ns": 11880,
+    "p99_ns": 12010,
+    "min_ns": 10790,
+    "max_ns": 22081,
+    "median_bootstrap_95ci_ns": [
+      11380.0,
+      11540.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 41660.0,
+    "mean_ns": 42290.29,
+    "p95_ns": 42780,
+    "p99_ns": 50750,
+    "min_ns": 41201,
+    "max_ns": 73420,
+    "median_bootstrap_95ci_ns": [
+      41620.0,
+      41720.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39295.5,
+    "mean_ns": 39790.82,
+    "p95_ns": 43120,
+    "p99_ns": 47970,
+    "min_ns": 38550,
+    "max_ns": 51740,
+    "median_bootstrap_95ci_ns": [
+      39190.0,
+      39450.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21905.0,
+    "mean_ns": 22250.72,
+    "p95_ns": 22700,
+    "p99_ns": 30260,
+    "min_ns": 20700,
+    "max_ns": 34740,
+    "median_bootstrap_95ci_ns": [
+      21820.0,
+      21985.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 775864.0,
+    "mean_ns": 778408.29,
+    "p95_ns": 786464,
+    "p99_ns": 805734,
+    "min_ns": 764304,
+    "max_ns": 1050665,
+    "median_bootstrap_95ci_ns": [
+      774889.0,
+      776504.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 392942.0,
+    "mean_ns": 396945.85,
+    "p95_ns": 409912,
+    "p99_ns": 434722,
+    "min_ns": 388152,
+    "max_ns": 470422,
+    "median_bootstrap_95ci_ns": [
+      392091.5,
+      397382.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5425.0,
+    "mean_ns": 5425.63,
+    "p95_ns": 5780,
+    "p99_ns": 5890,
+    "min_ns": 4960,
+    "max_ns": 6190,
+    "median_bootstrap_95ci_ns": [
+      5360.0,
+      5470.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 37665.5,
+    "mean_ns": 37936.46,
+    "p95_ns": 38490,
+    "p99_ns": 45321,
+    "min_ns": 36930,
+    "max_ns": 45400,
+    "median_bootstrap_95ci_ns": [
+      37610.0,
+      37750.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 16920.0,
+    "mean_ns": 17024.02,
+    "p95_ns": 17650,
+    "p99_ns": 18810,
+    "min_ns": 16210,
+    "max_ns": 24140,
+    "median_bootstrap_95ci_ns": [
+      16885.0,
+      16950.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15420.5,
+    "mean_ns": 15560.97,
+    "p95_ns": 15990,
+    "p99_ns": 17001,
+    "min_ns": 14880,
+    "max_ns": 23830,
+    "median_bootstrap_95ci_ns": [
+      15380.0,
+      15485.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 471002.0,
+    "mean_ns": 473081.53,
+    "p95_ns": 486863,
+    "p99_ns": 516273,
+    "min_ns": 463843,
+    "max_ns": 547332,
+    "median_bootstrap_95ci_ns": [
+      467832.0,
+      473662.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 464082.5,
+    "mean_ns": 463827.23,
+    "p95_ns": 472823,
+    "p99_ns": 485403,
+    "min_ns": 454453,
+    "max_ns": 507222,
+    "median_bootstrap_95ci_ns": [
+      459602.0,
+      465142.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4715.0,
+    "mean_ns": 4722.34,
+    "p95_ns": 5000,
+    "p99_ns": 5170,
+    "min_ns": 4210,
+    "max_ns": 5430,
+    "median_bootstrap_95ci_ns": [
+      4670.0,
+      4775.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 108581.0,
+    "mean_ns": 109433.56,
+    "p95_ns": 116741,
+    "p99_ns": 118220,
+    "min_ns": 106481,
+    "max_ns": 118821,
+    "median_bootstrap_95ci_ns": [
+      108301.0,
+      108870.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15230.0,
+    "mean_ns": 15466.57,
+    "p95_ns": 15820,
+    "p99_ns": 22650,
+    "min_ns": 14580,
+    "max_ns": 25850,
+    "median_bootstrap_95ci_ns": [
+      15170.0,
+      15310.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 16180.0,
+    "mean_ns": 16356.17,
+    "p95_ns": 16640,
+    "p99_ns": 24281,
+    "min_ns": 15600,
+    "max_ns": 25030,
+    "median_bootstrap_95ci_ns": [
+      16130.0,
+      16220.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 609763.0,
+    "mean_ns": 609994.28,
+    "p95_ns": 618783,
+    "p99_ns": 631843,
+    "min_ns": 597413,
+    "max_ns": 657013,
+    "median_bootstrap_95ci_ns": [
+      608888.0,
+      611073.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4741428.0,
+    "mean_ns": 4748103.7,
+    "p95_ns": 4784283,
+    "p99_ns": 4812343,
+    "min_ns": 4697113,
+    "max_ns": 5062634,
+    "median_bootstrap_95ci_ns": [
+      4736658.0,
+      4747023.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16450.0,
+    "mean_ns": 16676.02,
+    "p95_ns": 17340,
+    "p99_ns": 26390,
+    "min_ns": 15071,
+    "max_ns": 28560,
+    "median_bootstrap_95ci_ns": [
+      16261.0,
+      16580.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1206061.0,
+    "mean_ns": 1206628.63,
+    "p95_ns": 1217596,
+    "p99_ns": 1228886,
+    "min_ns": 1188635,
+    "max_ns": 1234266,
+    "median_bootstrap_95ci_ns": [
+      1204051.0,
+      1208055.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5260816.0,
+    "mean_ns": 5267310.36,
+    "p95_ns": 5303706,
+    "p99_ns": 5341536,
+    "min_ns": 5223826,
+    "max_ns": 5598187,
+    "median_bootstrap_95ci_ns": [
+      5256865.5,
+      5267055.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 95145.5,
+    "mean_ns": 96267.99,
+    "p95_ns": 101540,
+    "p99_ns": 104580,
+    "min_ns": 93491,
+    "max_ns": 144991,
+    "median_bootstrap_95ci_ns": [
+      94981.0,
+      95310.5
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11330085.0,
+    "mean_ns": 11335294.1,
+    "p95_ns": 11390615,
+    "p99_ns": 11656466,
+    "min_ns": 11256314,
+    "max_ns": 11738067,
+    "median_bootstrap_95ci_ns": [
+      11322275.0,
+      11337235.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2564302.0,
+    "mean_ns": 2567338.6,
+    "p95_ns": 2589153,
+    "p99_ns": 2595502,
+    "min_ns": 2546522,
+    "max_ns": 2636863,
+    "median_bootstrap_95ci_ns": [
+      2561177.5,
+      2567927.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16460.0,
+    "mean_ns": 16607.17,
+    "p95_ns": 17300,
+    "p99_ns": 18100,
+    "min_ns": 15780,
+    "max_ns": 23320,
+    "median_bootstrap_95ci_ns": [
+      16380.5,
+      16531.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 649678.0,
+    "mean_ns": 648842.95,
+    "p95_ns": 656703,
+    "p99_ns": 662453,
+    "min_ns": 633953,
+    "max_ns": 667003,
+    "median_bootstrap_95ci_ns": [
+      647883.0,
+      651524.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2759963.5,
+    "mean_ns": 2764610.32,
+    "p95_ns": 2783944,
+    "p99_ns": 2796114,
+    "min_ns": 2733003,
+    "max_ns": 3054465,
+    "median_bootstrap_95ci_ns": [
+      2756993.0,
+      2762819.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 80736.0,
+    "mean_ns": 81499.01,
+    "p95_ns": 87530,
+    "p99_ns": 89981,
+    "min_ns": 79111,
+    "max_ns": 91401,
+    "median_bootstrap_95ci_ns": [
+      80531.0,
+      80920.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6075374.5,
+    "mean_ns": 6079173.75,
+    "p95_ns": 6110139,
+    "p99_ns": 6138170,
+    "min_ns": 6036290,
+    "max_ns": 6384051,
+    "median_bootstrap_95ci_ns": [
+      6070450.0,
+      6080720.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 642648.0,
+    "mean_ns": 642067.79,
+    "p95_ns": 649923,
+    "p99_ns": 677244,
+    "min_ns": 630293,
+    "max_ns": 687953,
+    "median_bootstrap_95ci_ns": [
+      640208.0,
+      643723.5
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 12435.0,
+    "mean_ns": 12394.08,
+    "p95_ns": 12800,
+    "p99_ns": 13000,
+    "min_ns": 11530,
+    "max_ns": 13460,
+    "median_bootstrap_95ci_ns": [
+      12345.0,
+      12460.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 257701.0,
+    "mean_ns": 259708.57,
+    "p95_ns": 267041,
+    "p99_ns": 268772,
+    "min_ns": 255041,
+    "max_ns": 268802,
+    "median_bootstrap_95ci_ns": [
+      257302.0,
+      258151.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 811334.0,
+    "mean_ns": 811289.66,
+    "p95_ns": 820234,
+    "p99_ns": 825644,
+    "min_ns": 800184,
+    "max_ns": 836944,
+    "median_bootstrap_95ci_ns": [
+      810079.0,
+      812884.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 51100.5,
+    "mean_ns": 51383.18,
+    "p95_ns": 52770,
+    "p99_ns": 57730,
+    "min_ns": 49650,
+    "max_ns": 62331,
+    "median_bootstrap_95ci_ns": [
+      50895.0,
+      51200.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1775984.0,
+    "mean_ns": 1777078.38,
+    "p95_ns": 1788659,
+    "p99_ns": 1812539,
+    "min_ns": 1754049,
+    "max_ns": 1825489,
+    "median_bootstrap_95ci_ns": [
+      1774189.0,
+      1777854.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 645678.0,
+    "mean_ns": 645548.32,
+    "p95_ns": 655473,
+    "p99_ns": 660803,
+    "min_ns": 634853,
+    "max_ns": 673164,
+    "median_bootstrap_95ci_ns": [
+      644333.0,
+      646573.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11830.5,
+    "mean_ns": 12563.88,
+    "p95_ns": 12270,
+    "p99_ns": 13150,
+    "min_ns": 11260,
+    "max_ns": 82520,
+    "median_bootstrap_95ci_ns": [
+      11780.0,
+      11945.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 259316.5,
+    "mean_ns": 261204.46,
+    "p95_ns": 270011,
+    "p99_ns": 280682,
+    "min_ns": 254571,
+    "max_ns": 283121,
+    "median_bootstrap_95ci_ns": [
+      258691.5,
+      259861.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 816844.0,
+    "mean_ns": 819209.04,
+    "p95_ns": 823784,
+    "p99_ns": 854264,
+    "min_ns": 805524,
+    "max_ns": 1053235,
+    "median_bootstrap_95ci_ns": [
+      815994.0,
+      817694.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50950.0,
+    "mean_ns": 51577.19,
+    "p95_ns": 53270,
+    "p99_ns": 60940,
+    "min_ns": 49361,
+    "max_ns": 86331,
+    "median_bootstrap_95ci_ns": [
+      50840.0,
+      51111.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1786894.0,
+    "mean_ns": 1790363.89,
+    "p95_ns": 1803379,
+    "p99_ns": 1856759,
+    "min_ns": 1765179,
+    "max_ns": 2060710,
+    "median_bootstrap_95ci_ns": [
+      1784808.0,
+      1788624.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2605408.0,
+    "mean_ns": 2608994.63,
+    "p95_ns": 2623262,
+    "p99_ns": 2649883,
+    "min_ns": 2578913,
+    "max_ns": 2955015,
+    "median_bootstrap_95ci_ns": [
+      2603322.0,
+      2606892.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16495.0,
+    "mean_ns": 16641.15,
+    "p95_ns": 17281,
+    "p99_ns": 23560,
+    "min_ns": 15700,
+    "max_ns": 23801,
+    "median_bootstrap_95ci_ns": [
+      16440.0,
+      16580.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 641753.0,
+    "mean_ns": 641402.77,
+    "p95_ns": 650013,
+    "p99_ns": 652983,
+    "min_ns": 631393,
+    "max_ns": 691643,
+    "median_bootstrap_95ci_ns": [
+      640868.5,
+      643038.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2793929.0,
+    "mean_ns": 2795367.75,
+    "p95_ns": 2808383,
+    "p99_ns": 2813134,
+    "min_ns": 2766753,
+    "max_ns": 2914694,
+    "median_bootstrap_95ci_ns": [
+      2792393.0,
+      2796863.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 81140.0,
+    "mean_ns": 82268.44,
+    "p95_ns": 89451,
+    "p99_ns": 91610,
+    "min_ns": 79551,
+    "max_ns": 137141,
+    "median_bootstrap_95ci_ns": [
+      80980.0,
+      81310.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6140334.5,
+    "mean_ns": 6144955.74,
+    "p95_ns": 6169230,
+    "p99_ns": 6316691,
+    "min_ns": 6085560,
+    "max_ns": 6483272,
+    "median_bootstrap_95ci_ns": [
+      6136819.5,
+      6144414.5
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4758448.0,
+    "mean_ns": 4766092.04,
+    "p95_ns": 4818383,
+    "p99_ns": 4867964,
+    "min_ns": 4702792,
+    "max_ns": 5044784,
+    "median_bootstrap_95ci_ns": [
+      4754223.0,
+      4763883.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16150.0,
+    "mean_ns": 16302.69,
+    "p95_ns": 17240,
+    "p99_ns": 17770,
+    "min_ns": 15181,
+    "max_ns": 23920,
+    "median_bootstrap_95ci_ns": [
+      16030.0,
+      16240.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1198910.5,
+    "mean_ns": 1199956.84,
+    "p95_ns": 1211736,
+    "p99_ns": 1213916,
+    "min_ns": 1186665,
+    "max_ns": 1265386,
+    "median_bootstrap_95ci_ns": [
+      1196385.5,
+      1200946.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5272015.5,
+    "mean_ns": 5271382.79,
+    "p95_ns": 5305546,
+    "p99_ns": 5328276,
+    "min_ns": 5224196,
+    "max_ns": 5343516,
+    "median_bootstrap_95ci_ns": [
+      5264666.0,
+      5275586.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 94900.5,
+    "mean_ns": 95764.07,
+    "p95_ns": 101590,
+    "p99_ns": 104251,
+    "min_ns": 93431,
+    "max_ns": 115510,
+    "median_bootstrap_95ci_ns": [
+      94645.5,
+      95276.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11347270.0,
+    "mean_ns": 11349765.53,
+    "p95_ns": 11405966,
+    "p99_ns": 11469306,
+    "min_ns": 11254904,
+    "max_ns": 11587806,
+    "median_bootstrap_95ci_ns": [
+      11342625.0,
+      11357825.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 471372.5,
+    "mean_ns": 471697.67,
+    "p95_ns": 483873,
+    "p99_ns": 491072,
+    "min_ns": 464152,
+    "max_ns": 510993,
+    "median_bootstrap_95ci_ns": [
+      467052.0,
+      473137.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4820.0,
+    "mean_ns": 4890.62,
+    "p95_ns": 5090,
+    "p99_ns": 5540,
+    "min_ns": 4400,
+    "max_ns": 12550,
+    "median_bootstrap_95ci_ns": [
+      4780.0,
+      4840.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 111450.5,
+    "mean_ns": 112486.43,
+    "p95_ns": 119131,
+    "p99_ns": 122530,
+    "min_ns": 110151,
+    "max_ns": 123630,
+    "median_bootstrap_95ci_ns": [
+      111310.5,
+      111590.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15110.0,
+    "mean_ns": 15313.59,
+    "p95_ns": 15780,
+    "p99_ns": 22631,
+    "min_ns": 14520,
+    "max_ns": 24220,
+    "median_bootstrap_95ci_ns": [
+      15080.0,
+      15170.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 17340.0,
+    "mean_ns": 17441.01,
+    "p95_ns": 17750,
+    "p99_ns": 18421,
+    "min_ns": 16830,
+    "max_ns": 24280,
+    "median_bootstrap_95ci_ns": [
+      17320.0,
+      17400.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 621613.0,
+    "mean_ns": 622001.52,
+    "p95_ns": 633843,
+    "p99_ns": 642853,
+    "min_ns": 612633,
+    "max_ns": 666894,
+    "median_bootstrap_95ci_ns": [
+      621037.5,
+      622618.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 394812.0,
+    "mean_ns": 397433.45,
+    "p95_ns": 410962,
+    "p99_ns": 422242,
+    "min_ns": 390031,
+    "max_ns": 435642,
+    "median_bootstrap_95ci_ns": [
+      393222.0,
+      398312.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5350.0,
+    "mean_ns": 5431.14,
+    "p95_ns": 5800,
+    "p99_ns": 6050,
+    "min_ns": 4920,
+    "max_ns": 11710,
+    "median_bootstrap_95ci_ns": [
+      5310.0,
+      5415.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 37661.0,
+    "mean_ns": 37880.18,
+    "p95_ns": 38730,
+    "p99_ns": 44830,
+    "min_ns": 36550,
+    "max_ns": 45140,
+    "median_bootstrap_95ci_ns": [
+      37595.0,
+      37755.5
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 17040.0,
+    "mean_ns": 17140.68,
+    "p95_ns": 17540,
+    "p99_ns": 18720,
+    "min_ns": 16470,
+    "max_ns": 24810,
+    "median_bootstrap_95ci_ns": [
+      16980.0,
+      17090.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15385.5,
+    "mean_ns": 15622.29,
+    "p95_ns": 15750,
+    "p99_ns": 22860,
+    "min_ns": 14810,
+    "max_ns": 23020,
+    "median_bootstrap_95ci_ns": [
+      15330.0,
+      15435.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 472872.0,
+    "mean_ns": 473677.44,
+    "p95_ns": 488602,
+    "p99_ns": 499343,
+    "min_ns": 464212,
+    "max_ns": 516152,
+    "median_bootstrap_95ci_ns": [
+      469462.5,
+      474572.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 647808.5,
+    "mean_ns": 646789.72,
+    "p95_ns": 661073,
+    "p99_ns": 666943,
+    "min_ns": 637124,
+    "max_ns": 668934,
+    "median_bootstrap_95ci_ns": [
+      645308.0,
+      648954.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11400.0,
+    "mean_ns": 11397.46,
+    "p95_ns": 11780,
+    "p99_ns": 11990,
+    "min_ns": 10760,
+    "max_ns": 12100,
+    "median_bootstrap_95ci_ns": [
+      11350.0,
+      11455.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 41485.5,
+    "mean_ns": 41666.72,
+    "p95_ns": 42040,
+    "p99_ns": 49130,
+    "min_ns": 40471,
+    "max_ns": 49510,
+    "median_bootstrap_95ci_ns": [
+      41400.0,
+      41620.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39630.0,
+    "mean_ns": 40192.12,
+    "p95_ns": 46320,
+    "p99_ns": 47590,
+    "min_ns": 38751,
+    "max_ns": 48621,
+    "median_bootstrap_95ci_ns": [
+      39520.0,
+      39710.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21820.0,
+    "mean_ns": 22117.17,
+    "p95_ns": 22790,
+    "p99_ns": 29610,
+    "min_ns": 20960,
+    "max_ns": 32940,
+    "median_bootstrap_95ci_ns": [
+      21715.0,
+      21890.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 763229.0,
+    "mean_ns": 762372.59,
+    "p95_ns": 776124,
+    "p99_ns": 784384,
+    "min_ns": 750164,
+    "max_ns": 785684,
+    "median_bootstrap_95ci_ns": [
+      761758.5,
+      763624.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2596232.5,
+    "mean_ns": 2599895.63,
+    "p95_ns": 2634553,
+    "p99_ns": 2655703,
+    "min_ns": 2568382,
+    "max_ns": 2661533,
+    "median_bootstrap_95ci_ns": [
+      2591317.5,
+      2598912.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16410.5,
+    "mean_ns": 16546.89,
+    "p95_ns": 17340,
+    "p99_ns": 18780,
+    "min_ns": 15530,
+    "max_ns": 24700,
+    "median_bootstrap_95ci_ns": [
+      16325.0,
+      16505.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 162711.0,
+    "mean_ns": 163995.16,
+    "p95_ns": 172831,
+    "p99_ns": 175861,
+    "min_ns": 158281,
+    "max_ns": 179981,
+    "median_bootstrap_95ci_ns": [
+      162170.5,
+      163291.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 65775.0,
+    "mean_ns": 66576.54,
+    "p95_ns": 74460,
+    "p99_ns": 74840,
+    "min_ns": 64080,
+    "max_ns": 76760,
+    "median_bootstrap_95ci_ns": [
+      65690.5,
+      66035.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 34940.0,
+    "mean_ns": 35321.29,
+    "p95_ns": 36410,
+    "p99_ns": 44460,
+    "min_ns": 33630,
+    "max_ns": 45941,
+    "median_bootstrap_95ci_ns": [
+      34850.0,
+      35050.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2880344.0,
+    "mean_ns": 2882558.11,
+    "p95_ns": 2915104,
+    "p99_ns": 2930925,
+    "min_ns": 2847344,
+    "max_ns": 2939124,
+    "median_bootstrap_95ci_ns": [
+      2876554.0,
+      2883564.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4763653.5,
+    "mean_ns": 4769331.71,
+    "p95_ns": 4797653,
+    "p99_ns": 4828083,
+    "min_ns": 4715573,
+    "max_ns": 5097205,
+    "median_bootstrap_95ci_ns": [
+      4761143.0,
+      4768623.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16885.0,
+    "mean_ns": 17044.16,
+    "p95_ns": 17930,
+    "p99_ns": 23920,
+    "min_ns": 15630,
+    "max_ns": 24920,
+    "median_bootstrap_95ci_ns": [
+      16721.0,
+      17010.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 307466.5,
+    "mean_ns": 308675.38,
+    "p95_ns": 315822,
+    "p99_ns": 318952,
+    "min_ns": 301601,
+    "max_ns": 319312,
+    "median_bootstrap_95ci_ns": [
+      306262.0,
+      308696.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 67665.5,
+    "mean_ns": 67924.3,
+    "p95_ns": 69230,
+    "p99_ns": 75731,
+    "min_ns": 66270,
+    "max_ns": 76210,
+    "median_bootstrap_95ci_ns": [
+      67530.5,
+      67781.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50950.5,
+    "mean_ns": 51475.07,
+    "p95_ns": 57220,
+    "p99_ns": 60431,
+    "min_ns": 49440,
+    "max_ns": 67090,
+    "median_bootstrap_95ci_ns": [
+      50780.0,
+      51040.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5209915.5,
+    "mean_ns": 5214707.32,
+    "p95_ns": 5250865,
+    "p99_ns": 5279266,
+    "min_ns": 5162045,
+    "max_ns": 5540207,
+    "median_bootstrap_95ci_ns": [
+      5205180.0,
+      5212735.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 462262.0,
+    "mean_ns": 463852.88,
+    "p95_ns": 473532,
+    "p99_ns": 478502,
+    "min_ns": 456232,
+    "max_ns": 502273,
+    "median_bootstrap_95ci_ns": [
+      459672.0,
+      465257.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5100.0,
+    "mean_ns": 5086.32,
+    "p95_ns": 5330,
+    "p99_ns": 5460,
+    "min_ns": 4710,
+    "max_ns": 5460,
+    "median_bootstrap_95ci_ns": [
+      5050.0,
+      5130.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 396447.0,
+    "mean_ns": 397365.74,
+    "p95_ns": 405352,
+    "p99_ns": 407522,
+    "min_ns": 388492,
+    "max_ns": 411142,
+    "median_bootstrap_95ci_ns": [
+      395322.0,
+      397762.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 748838.5,
+    "mean_ns": 749270.3,
+    "p95_ns": 758524,
+    "p99_ns": 772694,
+    "min_ns": 738274,
+    "max_ns": 774844,
+    "median_bootstrap_95ci_ns": [
+      747873.0,
+      749448.5
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29410.0,
+    "mean_ns": 29605.98,
+    "p95_ns": 30040,
+    "p99_ns": 35830,
+    "min_ns": 28550,
+    "max_ns": 36960,
+    "median_bootstrap_95ci_ns": [
+      29305.0,
+      29475.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1644418.0,
+    "mean_ns": 1645399.52,
+    "p95_ns": 1659108,
+    "p99_ns": 1670878,
+    "min_ns": 1627998,
+    "max_ns": 1708779,
+    "median_bootstrap_95ci_ns": [
+      1642028.0,
+      1646028.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 389851.5,
+    "mean_ns": 393069.48,
+    "p95_ns": 402242,
+    "p99_ns": 408672,
+    "min_ns": 386542,
+    "max_ns": 424252,
+    "median_bootstrap_95ci_ns": [
+      388867.0,
+      393277.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5560.0,
+    "mean_ns": 5801.08,
+    "p95_ns": 5920,
+    "p99_ns": 12870,
+    "min_ns": 5050,
+    "max_ns": 16610,
+    "median_bootstrap_95ci_ns": [
+      5491.0,
+      5600.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 135171.0,
+    "mean_ns": 136636.42,
+    "p95_ns": 144771,
+    "p99_ns": 147441,
+    "min_ns": 133131,
+    "max_ns": 162910,
+    "median_bootstrap_95ci_ns": [
+      134900.0,
+      135451.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 472527.5,
+    "mean_ns": 473295.6,
+    "p95_ns": 480602,
+    "p99_ns": 486242,
+    "min_ns": 464922,
+    "max_ns": 497593,
+    "median_bootstrap_95ci_ns": [
+      469752.0,
+      475042.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29725.5,
+    "mean_ns": 30043.25,
+    "p95_ns": 30580,
+    "p99_ns": 37420,
+    "min_ns": 29010,
+    "max_ns": 37480,
+    "median_bootstrap_95ci_ns": [
+      29675.0,
+      29820.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1037405.0,
+    "mean_ns": 1039046.43,
+    "p95_ns": 1048365,
+    "p99_ns": 1059175,
+    "min_ns": 1029745,
+    "max_ns": 1099885,
+    "median_bootstrap_95ci_ns": [
+      1036404.0,
+      1038785.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 640278.0,
+    "mean_ns": 640546.12,
+    "p95_ns": 653193,
+    "p99_ns": 656853,
+    "min_ns": 628663,
+    "max_ns": 659443,
+    "median_bootstrap_95ci_ns": [
+      638893.0,
+      641008.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11860.0,
+    "mean_ns": 12029.73,
+    "p95_ns": 12330,
+    "p99_ns": 19610,
+    "min_ns": 11250,
+    "max_ns": 21161,
+    "median_bootstrap_95ci_ns": [
+      11820.0,
+      11910.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 135286.0,
+    "mean_ns": 136553.73,
+    "p95_ns": 144311,
+    "p99_ns": 149531,
+    "min_ns": 133921,
+    "max_ns": 150391,
+    "median_bootstrap_95ci_ns": [
+      135216.0,
+      135451.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 721478.5,
+    "mean_ns": 721573.22,
+    "p95_ns": 733593,
+    "p99_ns": 743134,
+    "min_ns": 709703,
+    "max_ns": 744414,
+    "median_bootstrap_95ci_ns": [
+      719928.5,
+      722729.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48675.0,
+    "mean_ns": 49138.06,
+    "p95_ns": 52701,
+    "p99_ns": 56260,
+    "min_ns": 46931,
+    "max_ns": 64701,
+    "median_bootstrap_95ci_ns": [
+      48515.0,
+      48820.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1558572.5,
+    "mean_ns": 1560056.26,
+    "p95_ns": 1578728,
+    "p99_ns": 1583108,
+    "min_ns": 1543057,
+    "max_ns": 1599788,
+    "median_bootstrap_95ci_ns": [
+      1556888.0,
+      1560707.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2604443.0,
+    "mean_ns": 2606082.48,
+    "p95_ns": 2627833,
+    "p99_ns": 2650133,
+    "min_ns": 2579292,
+    "max_ns": 2747213,
+    "median_bootstrap_95ci_ns": [
+      2600137.0,
+      2607247.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16200.0,
+    "mean_ns": 16537.3,
+    "p95_ns": 17220,
+    "p99_ns": 27120,
+    "min_ns": 15440,
+    "max_ns": 32370,
+    "median_bootstrap_95ci_ns": [
+      16095.0,
+      16280.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 546872.0,
+    "mean_ns": 548155.37,
+    "p95_ns": 558993,
+    "p99_ns": 576992,
+    "min_ns": 534772,
+    "max_ns": 636873,
+    "median_bootstrap_95ci_ns": [
+      546423.0,
+      548542.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2730203.0,
+    "mean_ns": 2734900.71,
+    "p95_ns": 2759403,
+    "p99_ns": 3029085,
+    "min_ns": 2700123,
+    "max_ns": 3086815,
+    "median_bootstrap_95ci_ns": [
+      2724683.5,
+      2734243.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 76336.0,
+    "mean_ns": 76672.22,
+    "p95_ns": 80701,
+    "p99_ns": 82821,
+    "min_ns": 74671,
+    "max_ns": 83601,
+    "median_bootstrap_95ci_ns": [
+      76215.5,
+      76455.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5975324.0,
+    "mean_ns": 5982575.68,
+    "p95_ns": 6018189,
+    "p99_ns": 6300940,
+    "min_ns": 5918228,
+    "max_ns": 6367211,
+    "median_bootstrap_95ci_ns": [
+      5964254.0,
+      5986214.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4810738.0,
+    "mean_ns": 4813766.81,
+    "p95_ns": 4860824,
+    "p99_ns": 4907974,
+    "min_ns": 4735683,
+    "max_ns": 5080604,
+    "median_bootstrap_95ci_ns": [
+      4801684.0,
+      4817588.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16705.5,
+    "mean_ns": 16988.19,
+    "p95_ns": 18370,
+    "p99_ns": 20420,
+    "min_ns": 15840,
+    "max_ns": 23820,
+    "median_bootstrap_95ci_ns": [
+      16610.0,
+      16875.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1024405.0,
+    "mean_ns": 1023741.36,
+    "p95_ns": 1034555,
+    "p99_ns": 1038285,
+    "min_ns": 1008844,
+    "max_ns": 1039996,
+    "median_bootstrap_95ci_ns": [
+      1021755.0,
+      1026805.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5140705.0,
+    "mean_ns": 5151172.49,
+    "p95_ns": 5229256,
+    "p99_ns": 5485637,
+    "min_ns": 5065074,
+    "max_ns": 5493317,
+    "median_bootstrap_95ci_ns": [
+      5133450.0,
+      5147155.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 91655.5,
+    "mean_ns": 92303.87,
+    "p95_ns": 98941,
+    "p99_ns": 101381,
+    "min_ns": 89861,
+    "max_ns": 104700,
+    "median_bootstrap_95ci_ns": [
+      91321.0,
+      91845.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11095204.0,
+    "mean_ns": 11098211.12,
+    "p95_ns": 11212584,
+    "p99_ns": 11390115,
+    "min_ns": 10958573,
+    "max_ns": 11445645,
+    "median_bootstrap_95ci_ns": [
+      11077568.0,
+      11103274.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4767563.5,
+    "mean_ns": 4768897.78,
+    "p95_ns": 4816164,
+    "p99_ns": 4886724,
+    "min_ns": 4700303,
+    "max_ns": 5108395,
+    "median_bootstrap_95ci_ns": [
+      4758428.0,
+      4776253.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16405.5,
+    "mean_ns": 16513.62,
+    "p95_ns": 17680,
+    "p99_ns": 18270,
+    "min_ns": 15520,
+    "max_ns": 18690,
+    "median_bootstrap_95ci_ns": [
+      16310.0,
+      16525.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1018235.0,
+    "mean_ns": 1018593.64,
+    "p95_ns": 1032595,
+    "p99_ns": 1039365,
+    "min_ns": 1003455,
+    "max_ns": 1041685,
+    "median_bootstrap_95ci_ns": [
+      1015505.0,
+      1020755.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5142035.5,
+    "mean_ns": 5141841.04,
+    "p95_ns": 5202845,
+    "p99_ns": 5221636,
+    "min_ns": 5076745,
+    "max_ns": 5224096,
+    "median_bootstrap_95ci_ns": [
+      5135115.0,
+      5149160.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 91060.0,
+    "mean_ns": 91722.89,
+    "p95_ns": 97340,
+    "p99_ns": 99291,
+    "min_ns": 88700,
+    "max_ns": 100740,
+    "median_bootstrap_95ci_ns": [
+      90850.5,
+      91301.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11048604.0,
+    "mean_ns": 11037763.67,
+    "p95_ns": 11142245,
+    "p99_ns": 11217775,
+    "min_ns": 10903894,
+    "max_ns": 11318625,
+    "median_bootstrap_95ci_ns": [
+      11028604.0,
+      11061154.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2707443.0,
+    "mean_ns": 2711187.36,
+    "p95_ns": 2749293,
+    "p99_ns": 2759624,
+    "min_ns": 2688524,
+    "max_ns": 2762313,
+    "median_bootstrap_95ci_ns": [
+      2704263.0,
+      2709254.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16855.0,
+    "mean_ns": 17004.27,
+    "p95_ns": 17930,
+    "p99_ns": 20680,
+    "min_ns": 15990,
+    "max_ns": 24630,
+    "median_bootstrap_95ci_ns": [
+      16750.0,
+      16940.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 559923.0,
+    "mean_ns": 560171.55,
+    "p95_ns": 569593,
+    "p99_ns": 572543,
+    "min_ns": 548832,
+    "max_ns": 574332,
+    "median_bootstrap_95ci_ns": [
+      558817.5,
+      561273.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2844043.5,
+    "mean_ns": 2846618.08,
+    "p95_ns": 2871344,
+    "p99_ns": 2904984,
+    "min_ns": 2817424,
+    "max_ns": 2910564,
+    "median_bootstrap_95ci_ns": [
+      2839624.0,
+      2847538.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 77531.0,
+    "mean_ns": 78221.71,
+    "p95_ns": 84080,
+    "p99_ns": 84940,
+    "min_ns": 76240,
+    "max_ns": 85050,
+    "median_bootstrap_95ci_ns": [
+      77371.0,
+      77646.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6209445.5,
+    "mean_ns": 6213424.97,
+    "p95_ns": 6269030,
+    "p99_ns": 6287571,
+    "min_ns": 6170151,
+    "max_ns": 6305441,
+    "median_bootstrap_95ci_ns": [
+      6203900.5,
+      6215810.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 645933.0,
+    "mean_ns": 644788.62,
+    "p95_ns": 655933,
+    "p99_ns": 659843,
+    "min_ns": 625493,
+    "max_ns": 664623,
+    "median_bootstrap_95ci_ns": [
+      643604.0,
+      648353.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11915.5,
+    "mean_ns": 12040.45,
+    "p95_ns": 12420,
+    "p99_ns": 12510,
+    "min_ns": 11220,
+    "max_ns": 20590,
+    "median_bootstrap_95ci_ns": [
+      11870.0,
+      11980.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 135875.0,
+    "mean_ns": 136788.59,
+    "p95_ns": 143841,
+    "p99_ns": 146941,
+    "min_ns": 133420,
+    "max_ns": 147031,
+    "median_bootstrap_95ci_ns": [
+      135530.5,
+      136280.5
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 727648.5,
+    "mean_ns": 726811.6,
+    "p95_ns": 735974,
+    "p99_ns": 738304,
+    "min_ns": 711213,
+    "max_ns": 739784,
+    "median_bootstrap_95ci_ns": [
+      725394.0,
+      729203.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48995.0,
+    "mean_ns": 49301.97,
+    "p95_ns": 52040,
+    "p99_ns": 55871,
+    "min_ns": 48060,
+    "max_ns": 56090,
+    "median_bootstrap_95ci_ns": [
+      48835.5,
+      49131.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1569792.5,
+    "mean_ns": 1569934.73,
+    "p95_ns": 1586198,
+    "p99_ns": 1592968,
+    "min_ns": 1541337,
+    "max_ns": 1600987,
+    "median_bootstrap_95ci_ns": [
+      1567478.0,
+      1573118.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 390047.0,
+    "mean_ns": 392306.43,
+    "p95_ns": 400302,
+    "p99_ns": 401032,
+    "min_ns": 385832,
+    "max_ns": 436402,
+    "median_bootstrap_95ci_ns": [
+      389092.0,
+      393791.5
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5395.0,
+    "mean_ns": 5393.54,
+    "p95_ns": 5710,
+    "p99_ns": 5840,
+    "min_ns": 5000,
+    "max_ns": 6090,
+    "median_bootstrap_95ci_ns": [
+      5355.0,
+      5420.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 135355.0,
+    "mean_ns": 136395.63,
+    "p95_ns": 143241,
+    "p99_ns": 145030,
+    "min_ns": 132891,
+    "max_ns": 145130,
+    "median_bootstrap_95ci_ns": [
+      135010.5,
+      135860.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 471337.5,
+    "mean_ns": 473221.22,
+    "p95_ns": 480613,
+    "p99_ns": 490072,
+    "min_ns": 466182,
+    "max_ns": 491452,
+    "median_bootstrap_95ci_ns": [
+      470562.0,
+      474772.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29535.0,
+    "mean_ns": 29732.17,
+    "p95_ns": 30120,
+    "p99_ns": 36000,
+    "min_ns": 28550,
+    "max_ns": 36030,
+    "median_bootstrap_95ci_ns": [
+      29465.0,
+      29600.5
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1035655.0,
+    "mean_ns": 1037206.39,
+    "p95_ns": 1043075,
+    "p99_ns": 1064075,
+    "min_ns": 1030665,
+    "max_ns": 1106746,
+    "median_bootstrap_95ci_ns": [
+      1034760.5,
+      1036545.5
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 461382.5,
+    "mean_ns": 462282.21,
+    "p95_ns": 471763,
+    "p99_ns": 475793,
+    "min_ns": 454882,
+    "max_ns": 498612,
+    "median_bootstrap_95ci_ns": [
+      458672.0,
+      463672.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5060.0,
+    "mean_ns": 5151.43,
+    "p95_ns": 5440,
+    "p99_ns": 5890,
+    "min_ns": 4690,
+    "max_ns": 12720,
+    "median_bootstrap_95ci_ns": [
+      5020.0,
+      5090.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 397147.0,
+    "mean_ns": 396949.86,
+    "p95_ns": 406792,
+    "p99_ns": 410102,
+    "min_ns": 388422,
+    "max_ns": 410672,
+    "median_bootstrap_95ci_ns": [
+      395617.0,
+      398262.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 748278.5,
+    "mean_ns": 748795.85,
+    "p95_ns": 756074,
+    "p99_ns": 772184,
+    "min_ns": 737823,
+    "max_ns": 784214,
+    "median_bootstrap_95ci_ns": [
+      747554.0,
+      749534.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29430.5,
+    "mean_ns": 29663.84,
+    "p95_ns": 30321,
+    "p99_ns": 36261,
+    "min_ns": 28860,
+    "max_ns": 37110,
+    "median_bootstrap_95ci_ns": [
+      29335.5,
+      29535.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1641523.0,
+    "mean_ns": 1643008.3,
+    "p95_ns": 1656488,
+    "p99_ns": 1684198,
+    "min_ns": 1628938,
+    "max_ns": 1707258,
+    "median_bootstrap_95ci_ns": [
+      1639288.0,
+      1643918.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4729428.0,
+    "mean_ns": 4729869.57,
+    "p95_ns": 4748224,
+    "p99_ns": 4773063,
+    "min_ns": 4705973,
+    "max_ns": 4777534,
+    "median_bootstrap_95ci_ns": [
+      4726128.5,
+      4730853.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16650.0,
+    "mean_ns": 16790.23,
+    "p95_ns": 17520,
+    "p99_ns": 18850,
+    "min_ns": 15630,
+    "max_ns": 24970,
+    "median_bootstrap_95ci_ns": [
+      16540.5,
+      16820.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 308291.0,
+    "mean_ns": 308260.94,
+    "p95_ns": 316051,
+    "p99_ns": 316761,
+    "min_ns": 300372,
+    "max_ns": 320322,
+    "median_bootstrap_95ci_ns": [
+      306772.0,
+      309091.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 67686.0,
+    "mean_ns": 68248.03,
+    "p95_ns": 74821,
+    "p99_ns": 76900,
+    "min_ns": 66260,
+    "max_ns": 77550,
+    "median_bootstrap_95ci_ns": [
+      67590.0,
+      67850.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50325.5,
+    "mean_ns": 50845.49,
+    "p95_ns": 56240,
+    "p99_ns": 57770,
+    "min_ns": 49140,
+    "max_ns": 58730,
+    "median_bootstrap_95ci_ns": [
+      50120.0,
+      50545.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5173300.0,
+    "mean_ns": 5174246.76,
+    "p95_ns": 5193325,
+    "p99_ns": 5214195,
+    "min_ns": 5149045,
+    "max_ns": 5235886,
+    "median_bootstrap_95ci_ns": [
+      5171125.0,
+      5175665.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2583132.0,
+    "mean_ns": 2586038.75,
+    "p95_ns": 2604282,
+    "p99_ns": 2661343,
+    "min_ns": 2553233,
+    "max_ns": 2861154,
+    "median_bootstrap_95ci_ns": [
+      2579832.0,
+      2586297.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16400.0,
+    "mean_ns": 16556.06,
+    "p95_ns": 17540,
+    "p99_ns": 18070,
+    "min_ns": 15350,
+    "max_ns": 21930,
+    "median_bootstrap_95ci_ns": [
+      16280.0,
+      16570.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 160565.5,
+    "mean_ns": 161945.29,
+    "p95_ns": 169111,
+    "p99_ns": 170961,
+    "min_ns": 158291,
+    "max_ns": 171421,
+    "median_bootstrap_95ci_ns": [
+      159931.0,
+      161536.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 65990.0,
+    "mean_ns": 66443.23,
+    "p95_ns": 71770,
+    "p99_ns": 73990,
+    "min_ns": 64390,
+    "max_ns": 77041,
+    "median_bootstrap_95ci_ns": [
+      65770.0,
+      66196.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 34985.0,
+    "mean_ns": 35777.29,
+    "p95_ns": 42030,
+    "p99_ns": 43310,
+    "min_ns": 33690,
+    "max_ns": 56180,
+    "median_bootstrap_95ci_ns": [
+      34855.5,
+      35135.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2862879.0,
+    "mean_ns": 2866986.62,
+    "p95_ns": 2883024,
+    "p99_ns": 2939234,
+    "min_ns": 2837254,
+    "max_ns": 3137255,
+    "median_bootstrap_95ci_ns": [
+      2861494.0,
+      2864894.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 661868.0,
+    "mean_ns": 661199.93,
+    "p95_ns": 667933,
+    "p99_ns": 672403,
+    "min_ns": 650753,
+    "max_ns": 703554,
+    "median_bootstrap_95ci_ns": [
+      660468.0,
+      662533.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11795.0,
+    "mean_ns": 11885.29,
+    "p95_ns": 12500,
+    "p99_ns": 12630,
+    "min_ns": 10930,
+    "max_ns": 19620,
+    "median_bootstrap_95ci_ns": [
+      11720.0,
+      11890.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 40770.5,
+    "mean_ns": 41009.56,
+    "p95_ns": 41381,
+    "p99_ns": 48780,
+    "min_ns": 40080,
+    "max_ns": 48810,
+    "median_bootstrap_95ci_ns": [
+      40695.0,
+      40870.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39405.0,
+    "mean_ns": 39794.59,
+    "p95_ns": 41340,
+    "p99_ns": 47640,
+    "min_ns": 38450,
+    "max_ns": 49770,
+    "median_bootstrap_95ci_ns": [
+      39315.0,
+      39571.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21930.5,
+    "mean_ns": 22172.44,
+    "p95_ns": 23190,
+    "p99_ns": 28840,
+    "min_ns": 20830,
+    "max_ns": 29240,
+    "median_bootstrap_95ci_ns": [
+      21850.0,
+      22010.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 776349.0,
+    "mean_ns": 776231.61,
+    "p95_ns": 783073,
+    "p99_ns": 788384,
+    "min_ns": 764543,
+    "max_ns": 822534,
+    "median_bootstrap_95ci_ns": [
+      775034.0,
+      777024.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 394192.0,
+    "mean_ns": 395245.46,
+    "p95_ns": 403842,
+    "p99_ns": 412392,
+    "min_ns": 387802,
+    "max_ns": 434002,
+    "median_bootstrap_95ci_ns": [
+      392152.0,
+      396272.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5355.0,
+    "mean_ns": 5367.71,
+    "p95_ns": 5650,
+    "p99_ns": 5780,
+    "min_ns": 4950,
+    "max_ns": 6020,
+    "median_bootstrap_95ci_ns": [
+      5310.0,
+      5410.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 37970.0,
+    "mean_ns": 38234.17,
+    "p95_ns": 39430,
+    "p99_ns": 44660,
+    "min_ns": 37260,
+    "max_ns": 45820,
+    "median_bootstrap_95ci_ns": [
+      37875.0,
+      38045.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 16960.0,
+    "mean_ns": 17016.44,
+    "p95_ns": 17390,
+    "p99_ns": 17710,
+    "min_ns": 16521,
+    "max_ns": 19471,
+    "median_bootstrap_95ci_ns": [
+      16930.0,
+      17010.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15435.0,
+    "mean_ns": 15501.5,
+    "p95_ns": 15790,
+    "p99_ns": 16330,
+    "min_ns": 14960,
+    "max_ns": 22021,
+    "median_bootstrap_95ci_ns": [
+      15370.0,
+      15460.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 470747.0,
+    "mean_ns": 471522.38,
+    "p95_ns": 480753,
+    "p99_ns": 489292,
+    "min_ns": 463343,
+    "max_ns": 516183,
+    "median_bootstrap_95ci_ns": [
+      468132.0,
+      472262.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 456802.0,
+    "mean_ns": 458081.94,
+    "p95_ns": 465743,
+    "p99_ns": 479162,
+    "min_ns": 450802,
+    "max_ns": 499843,
+    "median_bootstrap_95ci_ns": [
+      454833.0,
+      459462.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4785.0,
+    "mean_ns": 4809.56,
+    "p95_ns": 5060,
+    "p99_ns": 5300,
+    "min_ns": 4510,
+    "max_ns": 5650,
+    "median_bootstrap_95ci_ns": [
+      4740.0,
+      4850.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 107025.0,
+    "mean_ns": 108074.1,
+    "p95_ns": 114580,
+    "p99_ns": 117120,
+    "min_ns": 105581,
+    "max_ns": 117480,
+    "median_bootstrap_95ci_ns": [
+      106911.0,
+      107310.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15265.0,
+    "mean_ns": 15401.98,
+    "p95_ns": 15760,
+    "p99_ns": 19510,
+    "min_ns": 14730,
+    "max_ns": 21550,
+    "median_bootstrap_95ci_ns": [
+      15230.0,
+      15300.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 16290.0,
+    "mean_ns": 16366.31,
+    "p95_ns": 16651,
+    "p99_ns": 17450,
+    "min_ns": 15821,
+    "max_ns": 22281,
+    "median_bootstrap_95ci_ns": [
+      16230.0,
+      16350.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 602933.0,
+    "mean_ns": 602888.99,
+    "p95_ns": 609613,
+    "p99_ns": 625503,
+    "min_ns": 593213,
+    "max_ns": 650024,
+    "median_bootstrap_95ci_ns": [
+      601388.0,
+      604003.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4765033.0,
+    "mean_ns": 4768563.09,
+    "p95_ns": 4814094,
+    "p99_ns": 4836084,
+    "min_ns": 4706493,
+    "max_ns": 4860963,
+    "median_bootstrap_95ci_ns": [
+      4761919.0,
+      4772468.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16685.0,
+    "mean_ns": 16915.68,
+    "p95_ns": 17800,
+    "p99_ns": 23860,
+    "min_ns": 15660,
+    "max_ns": 24360,
+    "median_bootstrap_95ci_ns": [
+      16575.0,
+      16765.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1202805.5,
+    "mean_ns": 1202248.51,
+    "p95_ns": 1212416,
+    "p99_ns": 1216225,
+    "min_ns": 1178796,
+    "max_ns": 1219686,
+    "median_bootstrap_95ci_ns": [
+      1201426.0,
+      1204401.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5264110.5,
+    "mean_ns": 5265636.73,
+    "p95_ns": 5305826,
+    "p99_ns": 5318636,
+    "min_ns": 5196696,
+    "max_ns": 5570747,
+    "median_bootstrap_95ci_ns": [
+      5255881.0,
+      5269696.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 95280.0,
+    "mean_ns": 95759.78,
+    "p95_ns": 102460,
+    "p99_ns": 104721,
+    "min_ns": 93381,
+    "max_ns": 105030,
+    "median_bootstrap_95ci_ns": [
+      95020.0,
+      95461.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11345560.5,
+    "mean_ns": 11349383.39,
+    "p95_ns": 11429306,
+    "p99_ns": 11455536,
+    "min_ns": 11217775,
+    "max_ns": 11607386,
+    "median_bootstrap_95ci_ns": [
+      11330615.0,
+      11362270.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2567042.5,
+    "mean_ns": 2568014.25,
+    "p95_ns": 2585733,
+    "p99_ns": 2589093,
+    "min_ns": 2548962,
+    "max_ns": 2601453,
+    "median_bootstrap_95ci_ns": [
+      2564992.5,
+      2570098.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16270.0,
+    "mean_ns": 16611.67,
+    "p95_ns": 17750,
+    "p99_ns": 23410,
+    "min_ns": 15640,
+    "max_ns": 24680,
+    "median_bootstrap_95ci_ns": [
+      16215.5,
+      16380.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 642793.0,
+    "mean_ns": 643273.94,
+    "p95_ns": 656604,
+    "p99_ns": 660873,
+    "min_ns": 632803,
+    "max_ns": 661134,
+    "median_bootstrap_95ci_ns": [
+      641243.0,
+      644118.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2759363.0,
+    "mean_ns": 2760591.87,
+    "p95_ns": 2776473,
+    "p99_ns": 2789114,
+    "min_ns": 2742453,
+    "max_ns": 2793644,
+    "median_bootstrap_95ci_ns": [
+      2757038.5,
+      2761704.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 80580.0,
+    "mean_ns": 81048.03,
+    "p95_ns": 86431,
+    "p99_ns": 88220,
+    "min_ns": 78701,
+    "max_ns": 89480,
+    "median_bootstrap_95ci_ns": [
+      80360.5,
+      80801.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6065279.5,
+    "mean_ns": 6069764.06,
+    "p95_ns": 6104280,
+    "p99_ns": 6123860,
+    "min_ns": 6034589,
+    "max_ns": 6133220,
+    "median_bootstrap_95ci_ns": [
+      6061940.0,
+      6070540.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 645943.0,
+    "mean_ns": 645212.36,
+    "p95_ns": 652473,
+    "p99_ns": 655223,
+    "min_ns": 635743,
+    "max_ns": 663544,
+    "median_bootstrap_95ci_ns": [
+      645013.0,
+      646563.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 12250.0,
+    "mean_ns": 12412.16,
+    "p95_ns": 12740,
+    "p99_ns": 19480,
+    "min_ns": 11480,
+    "max_ns": 19660,
+    "median_bootstrap_95ci_ns": [
+      12190.5,
+      12320.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 259221.5,
+    "mean_ns": 260737.67,
+    "p95_ns": 268362,
+    "p99_ns": 272382,
+    "min_ns": 256511,
+    "max_ns": 273551,
+    "median_bootstrap_95ci_ns": [
+      258566.5,
+      259891.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 816008.5,
+    "mean_ns": 815979.38,
+    "p95_ns": 821894,
+    "p99_ns": 830874,
+    "min_ns": 804984,
+    "max_ns": 843774,
+    "median_bootstrap_95ci_ns": [
+      815084.0,
+      817024.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 51005.0,
+    "mean_ns": 51507.17,
+    "p95_ns": 57301,
+    "p99_ns": 58401,
+    "min_ns": 49320,
+    "max_ns": 61401,
+    "median_bootstrap_95ci_ns": [
+      50840.0,
+      51100.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a2",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1786039.0,
+    "mean_ns": 1786073.24,
+    "p95_ns": 1797379,
+    "p99_ns": 1802079,
+    "min_ns": 1768698,
+    "max_ns": 1835349,
+    "median_bootstrap_95ci_ns": [
+      1784688.0,
+      1787019.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 631588.0,
+    "mean_ns": 631124.12,
+    "p95_ns": 640673,
+    "p99_ns": 645964,
+    "min_ns": 620633,
+    "max_ns": 653694,
+    "median_bootstrap_95ci_ns": [
+      630433.0,
+      632783.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11710.0,
+    "mean_ns": 11876.66,
+    "p95_ns": 12130,
+    "p99_ns": 18180,
+    "min_ns": 11050,
+    "max_ns": 19320,
+    "median_bootstrap_95ci_ns": [
+      11650.0,
+      11790.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 259916.0,
+    "mean_ns": 261920.33,
+    "p95_ns": 269022,
+    "p99_ns": 272271,
+    "min_ns": 258211,
+    "max_ns": 273631,
+    "median_bootstrap_95ci_ns": [
+      259632.0,
+      260362.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 802309.0,
+    "mean_ns": 802184.84,
+    "p95_ns": 810994,
+    "p99_ns": 815474,
+    "min_ns": 791254,
+    "max_ns": 816384,
+    "median_bootstrap_95ci_ns": [
+      800924.0,
+      803104.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50590.0,
+    "mean_ns": 51022.1,
+    "p95_ns": 56460,
+    "p99_ns": 57601,
+    "min_ns": 49460,
+    "max_ns": 57701,
+    "median_bootstrap_95ci_ns": [
+      50455.5,
+      50741.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1757053.5,
+    "mean_ns": 1758334.15,
+    "p95_ns": 1770149,
+    "p99_ns": 1777869,
+    "min_ns": 1745369,
+    "max_ns": 1796989,
+    "median_bootstrap_95ci_ns": [
+      1755614.0,
+      1758963.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2572533.0,
+    "mean_ns": 2573532.69,
+    "p95_ns": 2595393,
+    "p99_ns": 2613303,
+    "min_ns": 2549442,
+    "max_ns": 2619813,
+    "median_bootstrap_95ci_ns": [
+      2569843.0,
+      2575113.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 17265.0,
+    "mean_ns": 17275.79,
+    "p95_ns": 17830,
+    "p99_ns": 18360,
+    "min_ns": 16291,
+    "max_ns": 18590,
+    "median_bootstrap_95ci_ns": [
+      17110.0,
+      17350.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 649073.0,
+    "mean_ns": 648388.79,
+    "p95_ns": 655223,
+    "p99_ns": 661493,
+    "min_ns": 637393,
+    "max_ns": 664713,
+    "median_bootstrap_95ci_ns": [
+      646718.5,
+      649768.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2773384.0,
+    "mean_ns": 2775377.43,
+    "p95_ns": 2795213,
+    "p99_ns": 2813574,
+    "min_ns": 2746293,
+    "max_ns": 2824463,
+    "median_bootstrap_95ci_ns": [
+      2771318.5,
+      2776583.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 81900.5,
+    "mean_ns": 82322.75,
+    "p95_ns": 87360,
+    "p99_ns": 88800,
+    "min_ns": 80200,
+    "max_ns": 89591,
+    "median_bootstrap_95ci_ns": [
+      81710.5,
+      82020.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6095480.0,
+    "mean_ns": 6097219.45,
+    "p95_ns": 6123820,
+    "p99_ns": 6180310,
+    "min_ns": 6042199,
+    "max_ns": 6190221,
+    "median_bootstrap_95ci_ns": [
+      6092355.0,
+      6097440.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4689963.0,
+    "mean_ns": 4702172.01,
+    "p95_ns": 4793934,
+    "p99_ns": 4821013,
+    "min_ns": 4619392,
+    "max_ns": 4829463,
+    "median_bootstrap_95ci_ns": [
+      4674893.0,
+      4710488.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 15930.0,
+    "mean_ns": 16122.77,
+    "p95_ns": 17161,
+    "p99_ns": 22670,
+    "min_ns": 15150,
+    "max_ns": 23110,
+    "median_bootstrap_95ci_ns": [
+      15840.0,
+      15990.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1185771.0,
+    "mean_ns": 1185978.71,
+    "p95_ns": 1194446,
+    "p99_ns": 1199256,
+    "min_ns": 1172626,
+    "max_ns": 1199875,
+    "median_bootstrap_95ci_ns": [
+      1183576.0,
+      1187550.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5153935.5,
+    "mean_ns": 5158039.51,
+    "p95_ns": 5189445,
+    "p99_ns": 5247825,
+    "min_ns": 5119745,
+    "max_ns": 5274016,
+    "median_bootstrap_95ci_ns": [
+      5149370.0,
+      5160526.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 94240.0,
+    "mean_ns": 94951.91,
+    "p95_ns": 100121,
+    "p99_ns": 101920,
+    "min_ns": 92340,
+    "max_ns": 103811,
+    "median_bootstrap_95ci_ns": [
+      94011.0,
+      94370.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11152964.5,
+    "mean_ns": 11157653.31,
+    "p95_ns": 11263855,
+    "p99_ns": 11297135,
+    "min_ns": 11034824,
+    "max_ns": 11308875,
+    "median_bootstrap_95ci_ns": [
+      11134934.5,
+      11169605.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 454962.5,
+    "mean_ns": 456900.92,
+    "p95_ns": 467312,
+    "p99_ns": 470992,
+    "min_ns": 449852,
+    "max_ns": 495942,
+    "median_bootstrap_95ci_ns": [
+      453577.0,
+      457462.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4585.0,
+    "mean_ns": 4596.83,
+    "p95_ns": 4900,
+    "p99_ns": 4960,
+    "min_ns": 4230,
+    "max_ns": 5240,
+    "median_bootstrap_95ci_ns": [
+      4560.0,
+      4620.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 109285.0,
+    "mean_ns": 110671.21,
+    "p95_ns": 117981,
+    "p99_ns": 120801,
+    "min_ns": 107961,
+    "max_ns": 121570,
+    "median_bootstrap_95ci_ns": [
+      109025.0,
+      109571.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15210.0,
+    "mean_ns": 15258.99,
+    "p95_ns": 15790,
+    "p99_ns": 16320,
+    "min_ns": 14650,
+    "max_ns": 17310,
+    "median_bootstrap_95ci_ns": [
+      15160.0,
+      15250.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 16065.0,
+    "mean_ns": 16068.36,
+    "p95_ns": 16480,
+    "p99_ns": 16710,
+    "min_ns": 15620,
+    "max_ns": 17120,
+    "median_bootstrap_95ci_ns": [
+      16010.0,
+      16100.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 603322.5,
+    "mean_ns": 603653.91,
+    "p95_ns": 613163,
+    "p99_ns": 624473,
+    "min_ns": 593293,
+    "max_ns": 647983,
+    "median_bootstrap_95ci_ns": [
+      601048.0,
+      604308.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 393582.0,
+    "mean_ns": 396083.75,
+    "p95_ns": 405752,
+    "p99_ns": 421082,
+    "min_ns": 387982,
+    "max_ns": 436382,
+    "median_bootstrap_95ci_ns": [
+      392027.0,
+      397187.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5280.0,
+    "mean_ns": 5345.42,
+    "p95_ns": 5520,
+    "p99_ns": 6120,
+    "min_ns": 4870,
+    "max_ns": 12430,
+    "median_bootstrap_95ci_ns": [
+      5230.0,
+      5325.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 38250.0,
+    "mean_ns": 38719.85,
+    "p95_ns": 41740,
+    "p99_ns": 46530,
+    "min_ns": 37390,
+    "max_ns": 46630,
+    "median_bootstrap_95ci_ns": [
+      38155.5,
+      38350.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 16840.5,
+    "mean_ns": 17092.66,
+    "p95_ns": 17540,
+    "p99_ns": 24270,
+    "min_ns": 16270,
+    "max_ns": 24820,
+    "median_bootstrap_95ci_ns": [
+      16795.0,
+      16890.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15280.0,
+    "mean_ns": 15368.82,
+    "p95_ns": 15710,
+    "p99_ns": 16850,
+    "min_ns": 14810,
+    "max_ns": 22960,
+    "median_bootstrap_95ci_ns": [
+      15230.0,
+      15305.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 472877.0,
+    "mean_ns": 472766.7,
+    "p95_ns": 482692,
+    "p99_ns": 499353,
+    "min_ns": 463502,
+    "max_ns": 518952,
+    "median_bootstrap_95ci_ns": [
+      469062.5,
+      474007.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 634953.0,
+    "mean_ns": 635561.5,
+    "p95_ns": 646393,
+    "p99_ns": 667024,
+    "min_ns": 620333,
+    "max_ns": 674853,
+    "median_bootstrap_95ci_ns": [
+      632213.0,
+      637663.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11450.0,
+    "mean_ns": 11556.36,
+    "p95_ns": 11990,
+    "p99_ns": 12350,
+    "min_ns": 10910,
+    "max_ns": 19610,
+    "median_bootstrap_95ci_ns": [
+      11370.0,
+      11495.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 41401.0,
+    "mean_ns": 41897.41,
+    "p95_ns": 44781,
+    "p99_ns": 49250,
+    "min_ns": 40430,
+    "max_ns": 65820,
+    "median_bootstrap_95ci_ns": [
+      41275.0,
+      41581.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39415.0,
+    "mean_ns": 39711.35,
+    "p95_ns": 41040,
+    "p99_ns": 47471,
+    "min_ns": 38720,
+    "max_ns": 48010,
+    "median_bootstrap_95ci_ns": [
+      39305.5,
+      39520.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21710.0,
+    "mean_ns": 21878.62,
+    "p95_ns": 22251,
+    "p99_ns": 28190,
+    "min_ns": 21080,
+    "max_ns": 30300,
+    "median_bootstrap_95ci_ns": [
+      21611.0,
+      21780.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 750164.0,
+    "mean_ns": 750803.44,
+    "p95_ns": 762174,
+    "p99_ns": 784434,
+    "min_ns": 734584,
+    "max_ns": 801334,
+    "median_bootstrap_95ci_ns": [
+      747433.5,
+      752839.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2593762.5,
+    "mean_ns": 2604054.48,
+    "p95_ns": 2643703,
+    "p99_ns": 2648863,
+    "min_ns": 2573162,
+    "max_ns": 2651563,
+    "median_bootstrap_95ci_ns": [
+      2590703.0,
+      2598543.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16290.5,
+    "mean_ns": 16529.34,
+    "p95_ns": 17120,
+    "p99_ns": 23550,
+    "min_ns": 15620,
+    "max_ns": 24160,
+    "median_bootstrap_95ci_ns": [
+      16225.0,
+      16510.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 165501.0,
+    "mean_ns": 166603.33,
+    "p95_ns": 173451,
+    "p99_ns": 178221,
+    "min_ns": 163191,
+    "max_ns": 178570,
+    "median_bootstrap_95ci_ns": [
+      165240.0,
+      165641.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 65535.5,
+    "mean_ns": 66143.66,
+    "p95_ns": 72680,
+    "p99_ns": 74321,
+    "min_ns": 64060,
+    "max_ns": 76580,
+    "median_bootstrap_95ci_ns": [
+      65415.5,
+      65790.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 34855.0,
+    "mean_ns": 35093.13,
+    "p95_ns": 35970,
+    "p99_ns": 42390,
+    "min_ns": 33571,
+    "max_ns": 43830,
+    "median_bootstrap_95ci_ns": [
+      34680.0,
+      34980.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2879299.0,
+    "mean_ns": 2888681.64,
+    "p95_ns": 2927385,
+    "p99_ns": 2934434,
+    "min_ns": 2856844,
+    "max_ns": 2934924,
+    "median_bootstrap_95ci_ns": [
+      2875904.0,
+      2882509.5
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4637692.5,
+    "mean_ns": 4640520.06,
+    "p95_ns": 4665963,
+    "p99_ns": 4680983,
+    "min_ns": 4600883,
+    "max_ns": 4883404,
+    "median_bootstrap_95ci_ns": [
+      4632928.0,
+      4644623.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 15715.5,
+    "mean_ns": 15907.29,
+    "p95_ns": 16600,
+    "p99_ns": 18050,
+    "min_ns": 15130,
+    "max_ns": 24480,
+    "median_bootstrap_95ci_ns": [
+      15650.0,
+      15845.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 301411.5,
+    "mean_ns": 303028.79,
+    "p95_ns": 310581,
+    "p99_ns": 313062,
+    "min_ns": 296582,
+    "max_ns": 314521,
+    "median_bootstrap_95ci_ns": [
+      300986.0,
+      302171.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 67720.5,
+    "mean_ns": 67960.46,
+    "p95_ns": 68870,
+    "p99_ns": 75820,
+    "min_ns": 66170,
+    "max_ns": 76500,
+    "median_bootstrap_95ci_ns": [
+      67606.0,
+      67860.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 49335.5,
+    "mean_ns": 50027.62,
+    "p95_ns": 55900,
+    "p99_ns": 58291,
+    "min_ns": 48330,
+    "max_ns": 71420,
+    "median_bootstrap_95ci_ns": [
+      49275.0,
+      49510.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5074629.5,
+    "mean_ns": 5077710.12,
+    "p95_ns": 5105555,
+    "p99_ns": 5119306,
+    "min_ns": 5039625,
+    "max_ns": 5317626,
+    "median_bootstrap_95ci_ns": [
+      5068200.0,
+      5081085.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 464262.0,
+    "mean_ns": 466332.75,
+    "p95_ns": 474393,
+    "p99_ns": 476833,
+    "min_ns": 456473,
+    "max_ns": 497073,
+    "median_bootstrap_95ci_ns": [
+      463752.0,
+      465773.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5020.0,
+    "mean_ns": 5030.8,
+    "p95_ns": 5330,
+    "p99_ns": 5400,
+    "min_ns": 4520,
+    "max_ns": 5510,
+    "median_bootstrap_95ci_ns": [
+      4985.0,
+      5060.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 397492.0,
+    "mean_ns": 400043.13,
+    "p95_ns": 409202,
+    "p99_ns": 414812,
+    "min_ns": 392822,
+    "max_ns": 418672,
+    "median_bootstrap_95ci_ns": [
+      396152.0,
+      401842.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 756099.0,
+    "mean_ns": 755674.17,
+    "p95_ns": 761864,
+    "p99_ns": 768014,
+    "min_ns": 744813,
+    "max_ns": 774644,
+    "median_bootstrap_95ci_ns": [
+      755024.0,
+      757904.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29555.0,
+    "mean_ns": 29813.99,
+    "p95_ns": 30610,
+    "p99_ns": 35880,
+    "min_ns": 28820,
+    "max_ns": 36251,
+    "median_bootstrap_95ci_ns": [
+      29500.0,
+      29620.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1656983.5,
+    "mean_ns": 1657066.34,
+    "p95_ns": 1667688,
+    "p99_ns": 1683629,
+    "min_ns": 1636309,
+    "max_ns": 1716459,
+    "median_bootstrap_95ci_ns": [
+      1655288.0,
+      1659083.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 417327.0,
+    "mean_ns": 420008.17,
+    "p95_ns": 427642,
+    "p99_ns": 434673,
+    "min_ns": 413212,
+    "max_ns": 452352,
+    "median_bootstrap_95ci_ns": [
+      416092.0,
+      421712.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5390.0,
+    "mean_ns": 5602.35,
+    "p95_ns": 5710,
+    "p99_ns": 14511,
+    "min_ns": 4910,
+    "max_ns": 14991,
+    "median_bootstrap_95ci_ns": [
+      5330.0,
+      5430.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 140526.0,
+    "mean_ns": 141578.04,
+    "p95_ns": 148921,
+    "p99_ns": 151771,
+    "min_ns": 138361,
+    "max_ns": 157301,
+    "median_bootstrap_95ci_ns": [
+      140210.5,
+      140755.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 505852.5,
+    "mean_ns": 505514.62,
+    "p95_ns": 513752,
+    "p99_ns": 523203,
+    "min_ns": 497632,
+    "max_ns": 529103,
+    "median_bootstrap_95ci_ns": [
+      503182.5,
+      506883.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 31180.5,
+    "mean_ns": 31399.17,
+    "p95_ns": 32100,
+    "p99_ns": 37580,
+    "min_ns": 30260,
+    "max_ns": 37690,
+    "median_bootstrap_95ci_ns": [
+      31115.0,
+      31280.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1101981.0,
+    "mean_ns": 1104259.65,
+    "p95_ns": 1115556,
+    "p99_ns": 1135206,
+    "min_ns": 1094885,
+    "max_ns": 1171166,
+    "median_bootstrap_95ci_ns": [
+      1101076.0,
+      1102845.5
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 631488.0,
+    "mean_ns": 631391.34,
+    "p95_ns": 639163,
+    "p99_ns": 646973,
+    "min_ns": 621213,
+    "max_ns": 653084,
+    "median_bootstrap_95ci_ns": [
+      630043.0,
+      632683.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11780.0,
+    "mean_ns": 11929.2,
+    "p95_ns": 12330,
+    "p99_ns": 16450,
+    "min_ns": 11250,
+    "max_ns": 18940,
+    "median_bootstrap_95ci_ns": [
+      11695.0,
+      11840.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 136740.5,
+    "mean_ns": 137796.21,
+    "p95_ns": 144491,
+    "p99_ns": 148671,
+    "min_ns": 135020,
+    "max_ns": 148861,
+    "median_bootstrap_95ci_ns": [
+      136521.0,
+      137030.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 713534.0,
+    "mean_ns": 713096.96,
+    "p95_ns": 720093,
+    "p99_ns": 731463,
+    "min_ns": 701074,
+    "max_ns": 738534,
+    "median_bootstrap_95ci_ns": [
+      712153.5,
+      714528.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48465.0,
+    "mean_ns": 48800.44,
+    "p95_ns": 49970,
+    "p99_ns": 55260,
+    "min_ns": 47420,
+    "max_ns": 56740,
+    "median_bootstrap_95ci_ns": [
+      48370.0,
+      48670.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1543207.5,
+    "mean_ns": 1543203.85,
+    "p95_ns": 1554187,
+    "p99_ns": 1564447,
+    "min_ns": 1526267,
+    "max_ns": 1593328,
+    "median_bootstrap_95ci_ns": [
+      1540687.0,
+      1544697.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2610633.0,
+    "mean_ns": 2603846.83,
+    "p95_ns": 2624123,
+    "p99_ns": 2650542,
+    "min_ns": 2560333,
+    "max_ns": 2659863,
+    "median_bootstrap_95ci_ns": [
+      2606413.0,
+      2612233.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16640.5,
+    "mean_ns": 16716.82,
+    "p95_ns": 17570,
+    "p99_ns": 18190,
+    "min_ns": 15660,
+    "max_ns": 21170,
+    "median_bootstrap_95ci_ns": [
+      16520.0,
+      16825.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 550587.0,
+    "mean_ns": 552727,
+    "p95_ns": 562283,
+    "p99_ns": 563703,
+    "min_ns": 545683,
+    "max_ns": 563922,
+    "median_bootstrap_95ci_ns": [
+      549643.0,
+      552938.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2737779.0,
+    "mean_ns": 2731496.25,
+    "p95_ns": 2752434,
+    "p99_ns": 2757063,
+    "min_ns": 2683584,
+    "max_ns": 2758684,
+    "median_bootstrap_95ci_ns": [
+      2734303.0,
+      2739468.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 76395.0,
+    "mean_ns": 76712.55,
+    "p95_ns": 81830,
+    "p99_ns": 83281,
+    "min_ns": 74871,
+    "max_ns": 83970,
+    "median_bootstrap_95ci_ns": [
+      76211.0,
+      76520.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5996329.0,
+    "mean_ns": 5981797.26,
+    "p95_ns": 6015669,
+    "p99_ns": 6036269,
+    "min_ns": 5887009,
+    "max_ns": 6041059,
+    "median_bootstrap_95ci_ns": [
+      5993400.0,
+      6000559.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4653532.5,
+    "mean_ns": 4657733.56,
+    "p95_ns": 4714733,
+    "p99_ns": 4748753,
+    "min_ns": 4616513,
+    "max_ns": 4753174,
+    "median_bootstrap_95ci_ns": [
+      4648113.0,
+      4658803.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16045.0,
+    "mean_ns": 16145.73,
+    "p95_ns": 17160,
+    "p99_ns": 18110,
+    "min_ns": 15201,
+    "max_ns": 23441,
+    "median_bootstrap_95ci_ns": [
+      15910.0,
+      16090.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1006560.0,
+    "mean_ns": 1006316.15,
+    "p95_ns": 1014355,
+    "p99_ns": 1017495,
+    "min_ns": 996955,
+    "max_ns": 1017565,
+    "median_bootstrap_95ci_ns": [
+      1005720.0,
+      1007425.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5030054.0,
+    "mean_ns": 5043494.72,
+    "p95_ns": 5127725,
+    "p99_ns": 5149395,
+    "min_ns": 4991734,
+    "max_ns": 5337016,
+    "median_bootstrap_95ci_ns": [
+      5022789.5,
+      5037639.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 90290.5,
+    "mean_ns": 91375.3,
+    "p95_ns": 95891,
+    "p99_ns": 104011,
+    "min_ns": 88231,
+    "max_ns": 147651,
+    "median_bootstrap_95ci_ns": [
+      90130.5,
+      90471.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b0",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 10805153.0,
+    "mean_ns": 10815417.06,
+    "p95_ns": 10901563,
+    "p99_ns": 10934633,
+    "min_ns": 10730422,
+    "max_ns": 11189225,
+    "median_bootstrap_95ci_ns": [
+      10797633.0,
+      10814753.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4651387.5,
+    "mean_ns": 4649631.65,
+    "p95_ns": 4718193,
+    "p99_ns": 4728543,
+    "min_ns": 4573943,
+    "max_ns": 4730643,
+    "median_bootstrap_95ci_ns": [
+      4640918.0,
+      4656752.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 15950.5,
+    "mean_ns": 16108.9,
+    "p95_ns": 17190,
+    "p99_ns": 17530,
+    "min_ns": 15090,
+    "max_ns": 24120,
+    "median_bootstrap_95ci_ns": [
+      15850.0,
+      16025.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1017600.0,
+    "mean_ns": 1017275.77,
+    "p95_ns": 1026235,
+    "p99_ns": 1029265,
+    "min_ns": 1001975,
+    "max_ns": 1031305,
+    "median_bootstrap_95ci_ns": [
+      1016535.0,
+      1018620.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5040479.5,
+    "mean_ns": 5038693.05,
+    "p95_ns": 5100174,
+    "p99_ns": 5152735,
+    "min_ns": 4963934,
+    "max_ns": 5159125,
+    "median_bootstrap_95ci_ns": [
+      5026704.5,
+      5050385.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 90160.0,
+    "mean_ns": 90704.76,
+    "p95_ns": 96311,
+    "p99_ns": 97991,
+    "min_ns": 88071,
+    "max_ns": 100321,
+    "median_bootstrap_95ci_ns": [
+      89851.0,
+      90311.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 10820303.0,
+    "mean_ns": 10812726.73,
+    "p95_ns": 10921414,
+    "p99_ns": 10968364,
+    "min_ns": 10675452,
+    "max_ns": 10991173,
+    "median_bootstrap_95ci_ns": [
+      10800432.0,
+      10834943.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2621207.5,
+    "mean_ns": 2617560.18,
+    "p95_ns": 2637513,
+    "p99_ns": 2643083,
+    "min_ns": 2567693,
+    "max_ns": 2643333,
+    "median_bootstrap_95ci_ns": [
+      2619363.0,
+      2624553.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16080.5,
+    "mean_ns": 16350.78,
+    "p95_ns": 17240,
+    "p99_ns": 22800,
+    "min_ns": 15480,
+    "max_ns": 23230,
+    "median_bootstrap_95ci_ns": [
+      15985.0,
+      16190.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 547718.0,
+    "mean_ns": 547560.26,
+    "p95_ns": 555833,
+    "p99_ns": 557292,
+    "min_ns": 539122,
+    "max_ns": 566332,
+    "median_bootstrap_95ci_ns": [
+      544832.0,
+      549477.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2746723.0,
+    "mean_ns": 2740621.91,
+    "p95_ns": 2764753,
+    "p99_ns": 2768954,
+    "min_ns": 2693153,
+    "max_ns": 2773373,
+    "median_bootstrap_95ci_ns": [
+      2744513.0,
+      2749528.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 76020.0,
+    "mean_ns": 76617.26,
+    "p95_ns": 82260,
+    "p99_ns": 84350,
+    "min_ns": 74620,
+    "max_ns": 85470,
+    "median_bootstrap_95ci_ns": [
+      75850.0,
+      76190.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6010829.5,
+    "mean_ns": 5999036.39,
+    "p95_ns": 6033499,
+    "p99_ns": 6037639,
+    "min_ns": 5904209,
+    "max_ns": 6043030,
+    "median_bootstrap_95ci_ns": [
+      6008084.0,
+      6014940.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 638858.0,
+    "mean_ns": 637370.08,
+    "p95_ns": 644693,
+    "p99_ns": 649623,
+    "min_ns": 623843,
+    "max_ns": 655073,
+    "median_bootstrap_95ci_ns": [
+      636458.5,
+      639853.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11920.0,
+    "mean_ns": 11982.78,
+    "p95_ns": 12450,
+    "p99_ns": 12780,
+    "min_ns": 11300,
+    "max_ns": 17740,
+    "median_bootstrap_95ci_ns": [
+      11850.0,
+      12000.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 136331.0,
+    "mean_ns": 137579.57,
+    "p95_ns": 144301,
+    "p99_ns": 146971,
+    "min_ns": 134661,
+    "max_ns": 147190,
+    "median_bootstrap_95ci_ns": [
+      136050.0,
+      136561.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 730713.5,
+    "mean_ns": 729807.07,
+    "p95_ns": 738484,
+    "p99_ns": 744634,
+    "min_ns": 715334,
+    "max_ns": 751903,
+    "median_bootstrap_95ci_ns": [
+      728443.5,
+      732163.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48510.0,
+    "mean_ns": 48773.44,
+    "p95_ns": 51991,
+    "p99_ns": 55610,
+    "min_ns": 46790,
+    "max_ns": 57040,
+    "median_bootstrap_95ci_ns": [
+      48381.0,
+      48635.5
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1567072.5,
+    "mean_ns": 1565734.44,
+    "p95_ns": 1579628,
+    "p99_ns": 1594207,
+    "min_ns": 1543897,
+    "max_ns": 1601518,
+    "median_bootstrap_95ci_ns": [
+      1563263.0,
+      1568577.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 395482.0,
+    "mean_ns": 397381.21,
+    "p95_ns": 406832,
+    "p99_ns": 408902,
+    "min_ns": 386662,
+    "max_ns": 421262,
+    "median_bootstrap_95ci_ns": [
+      394792.0,
+      397307.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5545.0,
+    "mean_ns": 5719.84,
+    "p95_ns": 5811,
+    "p99_ns": 13470,
+    "min_ns": 5150,
+    "max_ns": 14170,
+    "median_bootstrap_95ci_ns": [
+      5510.0,
+      5585.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 135975.5,
+    "mean_ns": 137472.65,
+    "p95_ns": 144261,
+    "p99_ns": 146581,
+    "min_ns": 134160,
+    "max_ns": 162651,
+    "median_bootstrap_95ci_ns": [
+      135721.0,
+      136346.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 478242.0,
+    "mean_ns": 479610.68,
+    "p95_ns": 488222,
+    "p99_ns": 493562,
+    "min_ns": 468852,
+    "max_ns": 510883,
+    "median_bootstrap_95ci_ns": [
+      477302.0,
+      480142.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29460.5,
+    "mean_ns": 29678.41,
+    "p95_ns": 30170,
+    "p99_ns": 36660,
+    "min_ns": 28321,
+    "max_ns": 37671,
+    "median_bootstrap_95ci_ns": [
+      29390.0,
+      29530.5
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1049850.0,
+    "mean_ns": 1050021.79,
+    "p95_ns": 1061085,
+    "p99_ns": 1078525,
+    "min_ns": 1032275,
+    "max_ns": 1115906,
+    "median_bootstrap_95ci_ns": [
+      1048490.5,
+      1050820.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 462827.0,
+    "mean_ns": 463284.25,
+    "p95_ns": 473883,
+    "p99_ns": 479612,
+    "min_ns": 451972,
+    "max_ns": 497102,
+    "median_bootstrap_95ci_ns": [
+      461147.0,
+      465492.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4985.5,
+    "mean_ns": 4997.95,
+    "p95_ns": 5230,
+    "p99_ns": 5280,
+    "min_ns": 4700,
+    "max_ns": 5460,
+    "median_bootstrap_95ci_ns": [
+      4955.0,
+      5040.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 397417.0,
+    "mean_ns": 399554.64,
+    "p95_ns": 409052,
+    "p99_ns": 412602,
+    "min_ns": 391962,
+    "max_ns": 421852,
+    "median_bootstrap_95ci_ns": [
+      396542.0,
+      400242.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 753329.0,
+    "mean_ns": 753073.07,
+    "p95_ns": 761654,
+    "p99_ns": 765113,
+    "min_ns": 738583,
+    "max_ns": 770394,
+    "median_bootstrap_95ci_ns": [
+      752074.0,
+      754824.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29475.0,
+    "mean_ns": 29633.23,
+    "p95_ns": 30040,
+    "p99_ns": 36920,
+    "min_ns": 28770,
+    "max_ns": 38120,
+    "median_bootstrap_95ci_ns": [
+      29405.0,
+      29530.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1650743.5,
+    "mean_ns": 1650718.94,
+    "p95_ns": 1669768,
+    "p99_ns": 1673438,
+    "min_ns": 1628458,
+    "max_ns": 1713508,
+    "median_bootstrap_95ci_ns": [
+      1648258.0,
+      1652713.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4701717.5,
+    "mean_ns": 4703619.04,
+    "p95_ns": 4782763,
+    "p99_ns": 4846084,
+    "min_ns": 4615782,
+    "max_ns": 5082615,
+    "median_bootstrap_95ci_ns": [
+      4683793.0,
+      4711228.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16385.0,
+    "mean_ns": 16395.31,
+    "p95_ns": 17161,
+    "p99_ns": 17930,
+    "min_ns": 15310,
+    "max_ns": 18360,
+    "median_bootstrap_95ci_ns": [
+      16215.0,
+      16521.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 305276.5,
+    "mean_ns": 307605.21,
+    "p95_ns": 315281,
+    "p99_ns": 322322,
+    "min_ns": 301551,
+    "max_ns": 330322,
+    "median_bootstrap_95ci_ns": [
+      304551.0,
+      307602.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 67201.0,
+    "mean_ns": 67709.64,
+    "p95_ns": 73620,
+    "p99_ns": 74920,
+    "min_ns": 65770,
+    "max_ns": 75610,
+    "median_bootstrap_95ci_ns": [
+      66990.5,
+      67401.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 49820.5,
+    "mean_ns": 50591.62,
+    "p95_ns": 54211,
+    "p99_ns": 59830,
+    "min_ns": 48200,
+    "max_ns": 79380,
+    "median_bootstrap_95ci_ns": [
+      49640.0,
+      50060.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5146830.0,
+    "mean_ns": 5146183.52,
+    "p95_ns": 5231925,
+    "p99_ns": 5289406,
+    "min_ns": 5060924,
+    "max_ns": 5519567,
+    "median_bootstrap_95ci_ns": [
+      5127310.0,
+      5154910.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2595637.5,
+    "mean_ns": 2588986.94,
+    "p95_ns": 2612303,
+    "p99_ns": 2619923,
+    "min_ns": 2537873,
+    "max_ns": 2620952,
+    "median_bootstrap_95ci_ns": [
+      2589392.5,
+      2598563.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16760.0,
+    "mean_ns": 16971.46,
+    "p95_ns": 17530,
+    "p99_ns": 22890,
+    "min_ns": 16130,
+    "max_ns": 27730,
+    "median_bootstrap_95ci_ns": [
+      16650.0,
+      16830.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 162081.0,
+    "mean_ns": 163273.53,
+    "p95_ns": 169521,
+    "p99_ns": 173681,
+    "min_ns": 159681,
+    "max_ns": 175981,
+    "median_bootstrap_95ci_ns": [
+      161811.0,
+      162425.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 65265.5,
+    "mean_ns": 65665.82,
+    "p95_ns": 69121,
+    "p99_ns": 74690,
+    "min_ns": 63910,
+    "max_ns": 75450,
+    "median_bootstrap_95ci_ns": [
+      65160.0,
+      65365.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 35305.5,
+    "mean_ns": 35568.66,
+    "p95_ns": 36050,
+    "p99_ns": 42710,
+    "min_ns": 34150,
+    "max_ns": 43600,
+    "median_bootstrap_95ci_ns": [
+      35120.0,
+      35451.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2875834.5,
+    "mean_ns": 2870735.81,
+    "p95_ns": 2893614,
+    "p99_ns": 2899304,
+    "min_ns": 2816434,
+    "max_ns": 2901104,
+    "median_bootstrap_95ci_ns": [
+      2872434.0,
+      2880784.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 633178.5,
+    "mean_ns": 633844.6,
+    "p95_ns": 645913,
+    "p99_ns": 655433,
+    "min_ns": 620273,
+    "max_ns": 658123,
+    "median_bootstrap_95ci_ns": [
+      630993.0,
+      634983.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11590.0,
+    "mean_ns": 11598.15,
+    "p95_ns": 12100,
+    "p99_ns": 12250,
+    "min_ns": 10770,
+    "max_ns": 12270,
+    "median_bootstrap_95ci_ns": [
+      11525.0,
+      11630.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 41335.5,
+    "mean_ns": 41740.71,
+    "p95_ns": 42810,
+    "p99_ns": 48200,
+    "min_ns": 40500,
+    "max_ns": 50580,
+    "median_bootstrap_95ci_ns": [
+      41235.0,
+      41491.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39330.0,
+    "mean_ns": 39609.09,
+    "p95_ns": 40111,
+    "p99_ns": 47380,
+    "min_ns": 38521,
+    "max_ns": 48270,
+    "median_bootstrap_95ci_ns": [
+      39265.0,
+      39380.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21855.0,
+    "mean_ns": 22480.27,
+    "p95_ns": 29140,
+    "p99_ns": 30730,
+    "min_ns": 20840,
+    "max_ns": 43290,
+    "median_bootstrap_95ci_ns": [
+      21745.0,
+      21960.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 748153.5,
+    "mean_ns": 749439.82,
+    "p95_ns": 761804,
+    "p99_ns": 772274,
+    "min_ns": 733723,
+    "max_ns": 773674,
+    "median_bootstrap_95ci_ns": [
+      746204.0,
+      750343.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 393572.0,
+    "mean_ns": 395047.95,
+    "p95_ns": 406012,
+    "p99_ns": 409642,
+    "min_ns": 388062,
+    "max_ns": 434592,
+    "median_bootstrap_95ci_ns": [
+      391761.0,
+      395237.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5340.0,
+    "mean_ns": 5402.93,
+    "p95_ns": 5770,
+    "p99_ns": 5920,
+    "min_ns": 4910,
+    "max_ns": 9210,
+    "median_bootstrap_95ci_ns": [
+      5290.0,
+      5390.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 37650.0,
+    "mean_ns": 37916.35,
+    "p95_ns": 38411,
+    "p99_ns": 44080,
+    "min_ns": 37030,
+    "max_ns": 47331,
+    "median_bootstrap_95ci_ns": [
+      37590.0,
+      37710.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 16855.5,
+    "mean_ns": 17009.64,
+    "p95_ns": 17470,
+    "p99_ns": 20050,
+    "min_ns": 16320,
+    "max_ns": 23500,
+    "median_bootstrap_95ci_ns": [
+      16840.0,
+      16950.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15400.0,
+    "mean_ns": 15414.77,
+    "p95_ns": 15770,
+    "p99_ns": 16150,
+    "min_ns": 14810,
+    "max_ns": 16680,
+    "median_bootstrap_95ci_ns": [
+      15335.5,
+      15450.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 469662.5,
+    "mean_ns": 470949.84,
+    "p95_ns": 481792,
+    "p99_ns": 487362,
+    "min_ns": 462902,
+    "max_ns": 516242,
+    "median_bootstrap_95ci_ns": [
+      467732.0,
+      471212.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 463132.5,
+    "mean_ns": 465737.88,
+    "p95_ns": 475832,
+    "p99_ns": 489532,
+    "min_ns": 453762,
+    "max_ns": 500092,
+    "median_bootstrap_95ci_ns": [
+      462397.0,
+      466992.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4640.0,
+    "mean_ns": 4645.64,
+    "p95_ns": 4950,
+    "p99_ns": 5340,
+    "min_ns": 4150,
+    "max_ns": 5450,
+    "median_bootstrap_95ci_ns": [
+      4605.0,
+      4680.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 107661.0,
+    "mean_ns": 108713.92,
+    "p95_ns": 115281,
+    "p99_ns": 118420,
+    "min_ns": 106500,
+    "max_ns": 137670,
+    "median_bootstrap_95ci_ns": [
+      107510.5,
+      107780.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15125.0,
+    "mean_ns": 15188.98,
+    "p95_ns": 15590,
+    "p99_ns": 17890,
+    "min_ns": 14580,
+    "max_ns": 18680,
+    "median_bootstrap_95ci_ns": [
+      15060.0,
+      15170.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15985.0,
+    "mean_ns": 16240.58,
+    "p95_ns": 16750,
+    "p99_ns": 22880,
+    "min_ns": 15540,
+    "max_ns": 23040,
+    "median_bootstrap_95ci_ns": [
+      15950.0,
+      16020.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 610358.0,
+    "mean_ns": 610682.2,
+    "p95_ns": 622193,
+    "p99_ns": 641483,
+    "min_ns": 597053,
+    "max_ns": 644363,
+    "median_bootstrap_95ci_ns": [
+      606738.0,
+      611553.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4661118.0,
+    "mean_ns": 4665508.7,
+    "p95_ns": 4712783,
+    "p99_ns": 4774003,
+    "min_ns": 4585712,
+    "max_ns": 4796994,
+    "median_bootstrap_95ci_ns": [
+      4657727.5,
+      4668553.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16025.0,
+    "mean_ns": 16150.72,
+    "p95_ns": 17011,
+    "p99_ns": 17380,
+    "min_ns": 15260,
+    "max_ns": 18570,
+    "median_bootstrap_95ci_ns": [
+      15921.0,
+      16200.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1177281.0,
+    "mean_ns": 1177160.12,
+    "p95_ns": 1187506,
+    "p99_ns": 1193796,
+    "min_ns": 1161846,
+    "max_ns": 1201576,
+    "median_bootstrap_95ci_ns": [
+      1174806.0,
+      1178575.5
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5155785.5,
+    "mean_ns": 5148390.91,
+    "p95_ns": 5197305,
+    "p99_ns": 5207075,
+    "min_ns": 5053614,
+    "max_ns": 5211186,
+    "median_bootstrap_95ci_ns": [
+      5146115.0,
+      5160240.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 93660.5,
+    "mean_ns": 94325.97,
+    "p95_ns": 100341,
+    "p99_ns": 100620,
+    "min_ns": 92201,
+    "max_ns": 101901,
+    "median_bootstrap_95ci_ns": [
+      93495.0,
+      93830.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11103299.0,
+    "mean_ns": 11101887.32,
+    "p95_ns": 11182845,
+    "p99_ns": 11232095,
+    "min_ns": 10944274,
+    "max_ns": 11249325,
+    "median_bootstrap_95ci_ns": [
+      11092225.0,
+      11117284.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2577868.0,
+    "mean_ns": 2587265.58,
+    "p95_ns": 2631313,
+    "p99_ns": 2635723,
+    "min_ns": 2548812,
+    "max_ns": 2635732,
+    "median_bootstrap_95ci_ns": [
+      2576052.0,
+      2582028.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 15810.0,
+    "mean_ns": 15959.28,
+    "p95_ns": 16741,
+    "p99_ns": 21280,
+    "min_ns": 14960,
+    "max_ns": 21710,
+    "median_bootstrap_95ci_ns": [
+      15745.0,
+      15880.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 644388.0,
+    "mean_ns": 644462.46,
+    "p95_ns": 651954,
+    "p99_ns": 654143,
+    "min_ns": 632693,
+    "max_ns": 655903,
+    "median_bootstrap_95ci_ns": [
+      642853.0,
+      646013.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2774428.5,
+    "mean_ns": 2783671.67,
+    "p95_ns": 2827444,
+    "p99_ns": 2836304,
+    "min_ns": 2744963,
+    "max_ns": 2836793,
+    "median_bootstrap_95ci_ns": [
+      2770884.0,
+      2781624.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 80195.5,
+    "mean_ns": 80727.58,
+    "p95_ns": 86171,
+    "p99_ns": 89731,
+    "min_ns": 78901,
+    "max_ns": 91020,
+    "median_bootstrap_95ci_ns": [
+      80020.0,
+      80305.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6096330.0,
+    "mean_ns": 6112406.27,
+    "p95_ns": 6199100,
+    "p99_ns": 6207641,
+    "min_ns": 6035529,
+    "max_ns": 6224650,
+    "median_bootstrap_95ci_ns": [
+      6091414.5,
+      6100005.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 631658.0,
+    "mean_ns": 633298.05,
+    "p95_ns": 642983,
+    "p99_ns": 646073,
+    "min_ns": 619973,
+    "max_ns": 656243,
+    "median_bootstrap_95ci_ns": [
+      631083.0,
+      634733.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11650.0,
+    "mean_ns": 11669.49,
+    "p95_ns": 12070,
+    "p99_ns": 12250,
+    "min_ns": 11020,
+    "max_ns": 12330,
+    "median_bootstrap_95ci_ns": [
+      11575.0,
+      11760.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 261766.0,
+    "mean_ns": 263172.97,
+    "p95_ns": 270372,
+    "p99_ns": 272662,
+    "min_ns": 258181,
+    "max_ns": 273522,
+    "median_bootstrap_95ci_ns": [
+      261402.0,
+      262556.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 811154.0,
+    "mean_ns": 810684.61,
+    "p95_ns": 819264,
+    "p99_ns": 823434,
+    "min_ns": 794523,
+    "max_ns": 831944,
+    "median_bootstrap_95ci_ns": [
+      810354.0,
+      812164.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50280.5,
+    "mean_ns": 50623.92,
+    "p95_ns": 53390,
+    "p99_ns": 57491,
+    "min_ns": 48960,
+    "max_ns": 59861,
+    "median_bootstrap_95ci_ns": [
+      50170.0,
+      50400.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "b1",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1769668.5,
+    "mean_ns": 1769655.94,
+    "p95_ns": 1783889,
+    "p99_ns": 1795908,
+    "min_ns": 1746469,
+    "max_ns": 1806638,
+    "median_bootstrap_95ci_ns": [
+      1767428.0,
+      1771749.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 645118.5,
+    "mean_ns": 644850.07,
+    "p95_ns": 653153,
+    "p99_ns": 661103,
+    "min_ns": 632473,
+    "max_ns": 664583,
+    "median_bootstrap_95ci_ns": [
+      643943.5,
+      646173.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 12030.0,
+    "mean_ns": 12077.45,
+    "p95_ns": 12540,
+    "p99_ns": 12790,
+    "min_ns": 11560,
+    "max_ns": 12840,
+    "median_bootstrap_95ci_ns": [
+      11975.5,
+      12100.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 259107.0,
+    "mean_ns": 260898.18,
+    "p95_ns": 269232,
+    "p99_ns": 269812,
+    "min_ns": 256642,
+    "max_ns": 270462,
+    "median_bootstrap_95ci_ns": [
+      258691.5,
+      259741.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 815204.0,
+    "mean_ns": 815233.74,
+    "p95_ns": 822224,
+    "p99_ns": 828944,
+    "min_ns": 804294,
+    "max_ns": 829414,
+    "median_bootstrap_95ci_ns": [
+      814184.0,
+      816439.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 51210.5,
+    "mean_ns": 51574.26,
+    "p95_ns": 55230,
+    "p99_ns": 59100,
+    "min_ns": 49940,
+    "max_ns": 59830,
+    "median_bootstrap_95ci_ns": [
+      51081.0,
+      51351.0
+    ]
+  },
+  {
+    "case": "two-generated",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1783823.5,
+    "mean_ns": 1784848.9,
+    "p95_ns": 1800519,
+    "p99_ns": 1804099,
+    "min_ns": 1769738,
+    "max_ns": 1822889,
+    "median_bootstrap_95ci_ns": [
+      1782469.0,
+      1785749.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2570732.5,
+    "mean_ns": 2571782.5,
+    "p95_ns": 2585572,
+    "p99_ns": 2588483,
+    "min_ns": 2553092,
+    "max_ns": 2607532,
+    "median_bootstrap_95ci_ns": [
+      2567603.0,
+      2573732.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16410.0,
+    "mean_ns": 16640.29,
+    "p95_ns": 17840,
+    "p99_ns": 18160,
+    "min_ns": 15710,
+    "max_ns": 25300,
+    "median_bootstrap_95ci_ns": [
+      16330.0,
+      16550.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 643168.0,
+    "mean_ns": 642819.24,
+    "p95_ns": 654693,
+    "p99_ns": 658744,
+    "min_ns": 626053,
+    "max_ns": 661073,
+    "median_bootstrap_95ci_ns": [
+      641833.0,
+      644418.0
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2765363.5,
+    "mean_ns": 2767602.75,
+    "p95_ns": 2791214,
+    "p99_ns": 2814123,
+    "min_ns": 2741023,
+    "max_ns": 2819034,
+    "median_bootstrap_95ci_ns": [
+      2762703.0,
+      2769393.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 80480.0,
+    "mean_ns": 81218.48,
+    "p95_ns": 87090,
+    "p99_ns": 88131,
+    "min_ns": 78821,
+    "max_ns": 89121,
+    "median_bootstrap_95ci_ns": [
+      80150.0,
+      80735.5
+    ]
+  },
+  {
+    "case": "two-control",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 6080795.0,
+    "mean_ns": 6080287.66,
+    "p95_ns": 6120280,
+    "p99_ns": 6146630,
+    "min_ns": 6035579,
+    "max_ns": 6148810,
+    "median_bootstrap_95ci_ns": [
+      6072349.0,
+      6083779.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4751363.0,
+    "mean_ns": 4757290.93,
+    "p95_ns": 4816614,
+    "p99_ns": 4827774,
+    "min_ns": 4700693,
+    "max_ns": 4829013,
+    "median_bootstrap_95ci_ns": [
+      4747333.0,
+      4754613.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16570.0,
+    "mean_ns": 16601.96,
+    "p95_ns": 17160,
+    "p99_ns": 17450,
+    "min_ns": 15750,
+    "max_ns": 17740,
+    "median_bootstrap_95ci_ns": [
+      16510.0,
+      16645.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1192286.0,
+    "mean_ns": 1192228.38,
+    "p95_ns": 1204846,
+    "p99_ns": 1210446,
+    "min_ns": 1177216,
+    "max_ns": 1215126,
+    "median_bootstrap_95ci_ns": [
+      1190076.0,
+      1194336.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5233260.0,
+    "mean_ns": 5236566.74,
+    "p95_ns": 5282556,
+    "p99_ns": 5300086,
+    "min_ns": 5196375,
+    "max_ns": 5305346,
+    "median_bootstrap_95ci_ns": [
+      5226225.0,
+      5239640.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 95035.0,
+    "mean_ns": 95805.96,
+    "p95_ns": 101301,
+    "p99_ns": 104540,
+    "min_ns": 93010,
+    "max_ns": 105431,
+    "median_bootstrap_95ci_ns": [
+      94881.0,
+      95331.0
+    ]
+  },
+  {
+    "case": "two-real",
+    "workflow": "two",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11291954.5,
+    "mean_ns": 11298767.37,
+    "p95_ns": 11386495,
+    "p99_ns": 11408795,
+    "min_ns": 11200434,
+    "max_ns": 11414465,
+    "median_bootstrap_95ci_ns": [
+      11287224.0,
+      11300174.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 456717.0,
+    "mean_ns": 458602.92,
+    "p95_ns": 466562,
+    "p99_ns": 479643,
+    "min_ns": 451772,
+    "max_ns": 509842,
+    "median_bootstrap_95ci_ns": [
+      455152.0,
+      459782.5
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 4695.0,
+    "mean_ns": 4840.62,
+    "p95_ns": 5040,
+    "p99_ns": 10920,
+    "min_ns": 4380,
+    "max_ns": 11920,
+    "median_bootstrap_95ci_ns": [
+      4660.0,
+      4740.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 108460.5,
+    "mean_ns": 109260.86,
+    "p95_ns": 115251,
+    "p99_ns": 118891,
+    "min_ns": 106450,
+    "max_ns": 120170,
+    "median_bootstrap_95ci_ns": [
+      108320.5,
+      108651.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 15170.0,
+    "mean_ns": 15222.28,
+    "p95_ns": 15680,
+    "p99_ns": 16180,
+    "min_ns": 14670,
+    "max_ns": 17020,
+    "median_bootstrap_95ci_ns": [
+      15100.0,
+      15240.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 16105.0,
+    "mean_ns": 16174.97,
+    "p95_ns": 16430,
+    "p99_ns": 17310,
+    "min_ns": 15730,
+    "max_ns": 22610,
+    "median_bootstrap_95ci_ns": [
+      16030.0,
+      16145.0
+    ]
+  },
+  {
+    "case": "noop-notes-lo",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 604318.0,
+    "mean_ns": 604261.35,
+    "p95_ns": 611793,
+    "p99_ns": 626813,
+    "min_ns": 596203,
+    "max_ns": 659923,
+    "median_bootstrap_95ci_ns": [
+      601703.0,
+      605078.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 392527.0,
+    "mean_ns": 395057.52,
+    "p95_ns": 402772,
+    "p99_ns": 408162,
+    "min_ns": 388572,
+    "max_ns": 424412,
+    "median_bootstrap_95ci_ns": [
+      391767.0,
+      396302.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5230.0,
+    "mean_ns": 5236.94,
+    "p95_ns": 5530,
+    "p99_ns": 5760,
+    "min_ns": 4870,
+    "max_ns": 6410,
+    "median_bootstrap_95ci_ns": [
+      5200.0,
+      5245.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 37500.0,
+    "mean_ns": 37872.27,
+    "p95_ns": 38470,
+    "p99_ns": 44781,
+    "min_ns": 36890,
+    "max_ns": 46370,
+    "median_bootstrap_95ci_ns": [
+      37440.0,
+      37590.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 17340.5,
+    "mean_ns": 17712.28,
+    "p95_ns": 19460,
+    "p99_ns": 25461,
+    "min_ns": 16860,
+    "max_ns": 25540,
+    "median_bootstrap_95ci_ns": [
+      17290.0,
+      17405.5
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 15285.5,
+    "mean_ns": 15405.78,
+    "p95_ns": 15690,
+    "p99_ns": 18250,
+    "min_ns": 14790,
+    "max_ns": 22600,
+    "median_bootstrap_95ci_ns": [
+      15250.0,
+      15340.0
+    ]
+  },
+  {
+    "case": "noop-notes-poi",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 471722.5,
+    "mean_ns": 471439.89,
+    "p95_ns": 480562,
+    "p99_ns": 484652,
+    "min_ns": 463032,
+    "max_ns": 507133,
+    "median_bootstrap_95ci_ns": [
+      467852.0,
+      472652.5
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 642588.0,
+    "mean_ns": 641917.41,
+    "p95_ns": 648723,
+    "p99_ns": 656403,
+    "min_ns": 632093,
+    "max_ns": 665073,
+    "median_bootstrap_95ci_ns": [
+      641798.0,
+      643478.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11680.5,
+    "mean_ns": 11876.16,
+    "p95_ns": 12160,
+    "p99_ns": 19720,
+    "min_ns": 11100,
+    "max_ns": 20501,
+    "median_bootstrap_95ci_ns": [
+      11600.0,
+      11790.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 41135.5,
+    "mean_ns": 41550.82,
+    "p95_ns": 44130,
+    "p99_ns": 49280,
+    "min_ns": 40471,
+    "max_ns": 49421,
+    "median_bootstrap_95ci_ns": [
+      41050.0,
+      41270.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 39390.0,
+    "mean_ns": 39853.57,
+    "p95_ns": 42811,
+    "p99_ns": 47440,
+    "min_ns": 38570,
+    "max_ns": 48181,
+    "median_bootstrap_95ci_ns": [
+      39320.5,
+      39485.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 21770.0,
+    "mean_ns": 21909.35,
+    "p95_ns": 22540,
+    "p99_ns": 28800,
+    "min_ns": 20860,
+    "max_ns": 29091,
+    "median_bootstrap_95ci_ns": [
+      21640.0,
+      21870.0
+    ]
+  },
+  {
+    "case": "noop-generated",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 757858.5,
+    "mean_ns": 757299.91,
+    "p95_ns": 763594,
+    "p99_ns": 771363,
+    "min_ns": 746404,
+    "max_ns": 782704,
+    "median_bootstrap_95ci_ns": [
+      756728.5,
+      758893.5
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2626462.0,
+    "mean_ns": 2626267.35,
+    "p95_ns": 2645763,
+    "p99_ns": 2649913,
+    "min_ns": 2595623,
+    "max_ns": 2682723,
+    "median_bootstrap_95ci_ns": [
+      2624432.0,
+      2628283.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16545.0,
+    "mean_ns": 16699.17,
+    "p95_ns": 17570,
+    "p99_ns": 19780,
+    "min_ns": 15870,
+    "max_ns": 22950,
+    "median_bootstrap_95ci_ns": [
+      16470.0,
+      16620.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 160685.5,
+    "mean_ns": 161746.66,
+    "p95_ns": 168950,
+    "p99_ns": 171481,
+    "min_ns": 158420,
+    "max_ns": 173021,
+    "median_bootstrap_95ci_ns": [
+      160390.0,
+      160941.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 66050.0,
+    "mean_ns": 66701.34,
+    "p95_ns": 73510,
+    "p99_ns": 75671,
+    "min_ns": 64690,
+    "max_ns": 76091,
+    "median_bootstrap_95ci_ns": [
+      65890.0,
+      66110.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 35120.0,
+    "mean_ns": 35509.19,
+    "p95_ns": 39000,
+    "p99_ns": 42350,
+    "min_ns": 34030,
+    "max_ns": 42631,
+    "median_bootstrap_95ci_ns": [
+      35020.0,
+      35255.0
+    ]
+  },
+  {
+    "case": "noop-control",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 2906840.0,
+    "mean_ns": 2907162.61,
+    "p95_ns": 2925675,
+    "p99_ns": 2929104,
+    "min_ns": 2881514,
+    "max_ns": 2978724,
+    "median_bootstrap_95ci_ns": [
+      2905304.5,
+      2908854.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4722748.0,
+    "mean_ns": 4729194.87,
+    "p95_ns": 4768333,
+    "p99_ns": 4784683,
+    "min_ns": 4691523,
+    "max_ns": 4804414,
+    "median_bootstrap_95ci_ns": [
+      4720478.0,
+      4726633.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16315.0,
+    "mean_ns": 16501.76,
+    "p95_ns": 17430,
+    "p99_ns": 21960,
+    "min_ns": 15260,
+    "max_ns": 25200,
+    "median_bootstrap_95ci_ns": [
+      16250.0,
+      16420.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 302821.5,
+    "mean_ns": 304301.03,
+    "p95_ns": 312532,
+    "p99_ns": 313962,
+    "min_ns": 297532,
+    "max_ns": 317342,
+    "median_bootstrap_95ci_ns": [
+      302056.5,
+      303677.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 68140.5,
+    "mean_ns": 68577.1,
+    "p95_ns": 73501,
+    "p99_ns": 75241,
+    "min_ns": 66401,
+    "max_ns": 75470,
+    "median_bootstrap_95ci_ns": [
+      68000.0,
+      68340.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 50085.0,
+    "mean_ns": 50366.73,
+    "p95_ns": 51550,
+    "p99_ns": 58570,
+    "min_ns": 48771,
+    "max_ns": 59150,
+    "median_bootstrap_95ci_ns": [
+      49965.0,
+      50221.0
+    ]
+  },
+  {
+    "case": "noop-real",
+    "workflow": "noop",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5163100.0,
+    "mean_ns": 5169175.79,
+    "p95_ns": 5207015,
+    "p99_ns": 5227815,
+    "min_ns": 5130225,
+    "max_ns": 5241926,
+    "median_bootstrap_95ci_ns": [
+      5159055.0,
+      5168860.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 460727.5,
+    "mean_ns": 462444.34,
+    "p95_ns": 470062,
+    "p99_ns": 489213,
+    "min_ns": 454622,
+    "max_ns": 584023,
+    "median_bootstrap_95ci_ns": [
+      457677.0,
+      463122.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5050.0,
+    "mean_ns": 5054.02,
+    "p95_ns": 5320,
+    "p99_ns": 5380,
+    "min_ns": 4700,
+    "max_ns": 5620,
+    "median_bootstrap_95ci_ns": [
+      5010.0,
+      5080.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 398612.0,
+    "mean_ns": 400738.68,
+    "p95_ns": 408552,
+    "p99_ns": 411232,
+    "min_ns": 394672,
+    "max_ns": 417022,
+    "median_bootstrap_95ci_ns": [
+      397947.0,
+      400802.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 746653.5,
+    "mean_ns": 747203.6,
+    "p95_ns": 753574,
+    "p99_ns": 773834,
+    "min_ns": 736624,
+    "max_ns": 799384,
+    "median_bootstrap_95ci_ns": [
+      745703.5,
+      747564.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29455.0,
+    "mean_ns": 30153.96,
+    "p95_ns": 33191,
+    "p99_ns": 44220,
+    "min_ns": 28530,
+    "max_ns": 58860,
+    "median_bootstrap_95ci_ns": [
+      29390.0,
+      29561.0
+    ]
+  },
+  {
+    "case": "one-notes-lo",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1642923.0,
+    "mean_ns": 1645757.8,
+    "p95_ns": 1656639,
+    "p99_ns": 1707728,
+    "min_ns": 1629428,
+    "max_ns": 1789199,
+    "median_bootstrap_95ci_ns": [
+      1641268.0,
+      1644338.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 389576.5,
+    "mean_ns": 392704.53,
+    "p95_ns": 400402,
+    "p99_ns": 438412,
+    "min_ns": 385942,
+    "max_ns": 444142,
+    "median_bootstrap_95ci_ns": [
+      388852.0,
+      393622.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 5505.0,
+    "mean_ns": 5582.22,
+    "p95_ns": 5800,
+    "p99_ns": 6260,
+    "min_ns": 5020,
+    "max_ns": 12800,
+    "median_bootstrap_95ci_ns": [
+      5470.0,
+      5545.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 134790.5,
+    "mean_ns": 135792.27,
+    "p95_ns": 142541,
+    "p99_ns": 143691,
+    "min_ns": 132541,
+    "max_ns": 145701,
+    "median_bootstrap_95ci_ns": [
+      134530.0,
+      135181.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 472732.5,
+    "mean_ns": 472928.77,
+    "p95_ns": 480982,
+    "p99_ns": 489892,
+    "min_ns": 465942,
+    "max_ns": 508962,
+    "median_bootstrap_95ci_ns": [
+      469357.0,
+      473812.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 29705.0,
+    "mean_ns": 29944.04,
+    "p95_ns": 30450,
+    "p99_ns": 35680,
+    "min_ns": 29040,
+    "max_ns": 40320,
+    "median_bootstrap_95ci_ns": [
+      29660.0,
+      29765.0
+    ]
+  },
+  {
+    "case": "one-notes-poi",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1034895.0,
+    "mean_ns": 1037113.23,
+    "p95_ns": 1045595,
+    "p99_ns": 1087575,
+    "min_ns": 1028055,
+    "max_ns": 1134766,
+    "median_bootstrap_95ci_ns": [
+      1033650.0,
+      1035800.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 643368.5,
+    "mean_ns": 642867.34,
+    "p95_ns": 649913,
+    "p99_ns": 655203,
+    "min_ns": 633803,
+    "max_ns": 663953,
+    "median_bootstrap_95ci_ns": [
+      642554.0,
+      644483.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 11675.0,
+    "mean_ns": 11673.46,
+    "p95_ns": 12081,
+    "p99_ns": 12251,
+    "min_ns": 11000,
+    "max_ns": 13251,
+    "median_bootstrap_95ci_ns": [
+      11590.0,
+      11725.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 134456.0,
+    "mean_ns": 135792.36,
+    "p95_ns": 142721,
+    "p99_ns": 143881,
+    "min_ns": 132561,
+    "max_ns": 144501,
+    "median_bootstrap_95ci_ns": [
+      134325.5,
+      134821.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 725698.0,
+    "mean_ns": 725340.99,
+    "p95_ns": 732783,
+    "p99_ns": 739224,
+    "min_ns": 715083,
+    "max_ns": 742294,
+    "median_bootstrap_95ci_ns": [
+      724278.5,
+      726704.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 48615.0,
+    "mean_ns": 49031,
+    "p95_ns": 54530,
+    "p99_ns": 56240,
+    "min_ns": 47060,
+    "max_ns": 57991,
+    "median_bootstrap_95ci_ns": [
+      48470.0,
+      48730.0
+    ]
+  },
+  {
+    "case": "one-generated",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 1565162.0,
+    "mean_ns": 1564919.55,
+    "p95_ns": 1574637,
+    "p99_ns": 1582487,
+    "min_ns": 1550947,
+    "max_ns": 1607708,
+    "median_bootstrap_95ci_ns": [
+      1563507.0,
+      1566727.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 2597973.0,
+    "mean_ns": 2597669.99,
+    "p95_ns": 2621483,
+    "p99_ns": 2628033,
+    "min_ns": 2559113,
+    "max_ns": 2630753,
+    "median_bootstrap_95ci_ns": [
+      2595382.5,
+      2600653.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16360.0,
+    "mean_ns": 16615.45,
+    "p95_ns": 17780,
+    "p99_ns": 23911,
+    "min_ns": 15760,
+    "max_ns": 23980,
+    "median_bootstrap_95ci_ns": [
+      16265.0,
+      16450.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 550857.5,
+    "mean_ns": 551076.28,
+    "p95_ns": 559223,
+    "p99_ns": 568453,
+    "min_ns": 541653,
+    "max_ns": 573523,
+    "median_bootstrap_95ci_ns": [
+      548877.5,
+      552332.5
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 2718588.0,
+    "mean_ns": 2717439.65,
+    "p95_ns": 2738984,
+    "p99_ns": 2745773,
+    "min_ns": 2678883,
+    "max_ns": 2787223,
+    "median_bootstrap_95ci_ns": [
+      2715163.0,
+      2719899.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 76990.5,
+    "mean_ns": 78443.4,
+    "p95_ns": 84310,
+    "p99_ns": 93350,
+    "min_ns": 74990,
+    "max_ns": 111240,
+    "median_bootstrap_95ci_ns": [
+      76721.0,
+      77381.0
+    ]
+  },
+  {
+    "case": "one-control",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 5960764.0,
+    "mean_ns": 5961456.97,
+    "p95_ns": 5995009,
+    "p99_ns": 6010759,
+    "min_ns": 5895059,
+    "max_ns": 6028929,
+    "median_bootstrap_95ci_ns": [
+      5957559.0,
+      5965529.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "capture_ns",
+    "samples": 100,
+    "p50_ns": 4766988.0,
+    "mean_ns": 4774956.38,
+    "p95_ns": 4855224,
+    "p99_ns": 4884994,
+    "min_ns": 4706893,
+    "max_ns": 4891504,
+    "median_bootstrap_95ci_ns": [
+      4757443.0,
+      4780673.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "clone_ns",
+    "samples": 100,
+    "p50_ns": 16270.0,
+    "mean_ns": 16368.64,
+    "p95_ns": 17110,
+    "p99_ns": 18200,
+    "min_ns": 15420,
+    "max_ns": 22070,
+    "median_bootstrap_95ci_ns": [
+      16170.0,
+      16330.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "settext_ns",
+    "samples": 100,
+    "p50_ns": 1017415.0,
+    "mean_ns": 1017864.29,
+    "p95_ns": 1024425,
+    "p99_ns": 1029785,
+    "min_ns": 1004845,
+    "max_ns": 1031305,
+    "median_bootstrap_95ci_ns": [
+      1016865.0,
+      1018745.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "commit_ns",
+    "samples": 100,
+    "p50_ns": 5141990.0,
+    "mean_ns": 5145160.16,
+    "p95_ns": 5186795,
+    "p99_ns": 5207815,
+    "min_ns": 5099564,
+    "max_ns": 5476406,
+    "median_bootstrap_95ci_ns": [
+      5135700.0,
+      5144850.0
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "apply_ns",
+    "samples": 100,
+    "p50_ns": 91270.5,
+    "mean_ns": 92055.82,
+    "p95_ns": 98490,
+    "p99_ns": 99321,
+    "min_ns": 89611,
+    "max_ns": 99951,
+    "median_bootstrap_95ci_ns": [
+      91016.0,
+      91625.5
+    ]
+  },
+  {
+    "case": "one-real",
+    "workflow": "one",
+    "leg": "a3",
+    "phase": "total_ns",
+    "samples": 100,
+    "p50_ns": 11038678.0,
+    "mean_ns": 11046649.09,
+    "p95_ns": 11139074,
+    "p99_ns": 11198145,
+    "min_ns": 10940903,
+    "max_ns": 11456496,
+    "median_bootstrap_95ci_ns": [
+      11025443.0,
+      11049074.0
+    ]
+  }
+]

@@ -1,0 +1,191 @@
+[
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 25.584645986774902,
+    "delta_ns": 4759
+  },
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 19.353429445172555,
+    "delta_ns": 4430
+  },
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 55.196078431372555,
+    "delta_ns": 43351
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "apply_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 21.03385188804672,
+    "delta_ns": 18510
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "capture_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 11.889904850243527,
+    "delta_ns": 316361
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 7.360406091370564,
+    "delta_ns": 1740
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 5.618033592951677,
+    "delta_ns": 162131
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "apply_ns",
+    "pair": "b0/a0",
+    "metric": "p95_ns",
+    "delta_pct": 17.29323308270676,
+    "delta_ns": 5290
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "apply_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 21.229447852760728,
+    "delta_ns": 8651
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 50.51264722919482,
+    "delta_ns": 52321
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 38.216303470540765,
+    "delta_ns": 9470
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 21.28214535872719,
+    "delta_ns": 223321
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_pct": 7.843584660800618,
+    "delta_ns": 2750.0
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 7.783787892032179,
+    "delta_ns": 2751.543333333335
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_pct": 8.313767644479642,
+    "delta_ns": 2939
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 6.607310215557649,
+    "delta_ns": 2820
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "min_ns",
+    "delta_pct": 8.006912442396308,
+    "delta_ns": 2780
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 7.335640138408306,
+    "delta_ns": 3180
+  },
+  {
+    "kind": "refusal",
+    "case": "generated-12x8-valid",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 8.519316167641854,
+    "delta_ns": 71520
+  },
+  {
+    "kind": "refusal",
+    "case": "late-missing-relationship-mce",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 18.75,
+    "delta_ns": 29460
+  },
+  {
+    "kind": "refusal",
+    "case": "mixed-conformance",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 8.689415052188787,
+    "delta_ns": 11630
+  }
+]

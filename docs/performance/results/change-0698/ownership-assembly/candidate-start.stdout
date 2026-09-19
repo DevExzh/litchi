@@ -1,0 +1,3270 @@
+
+/home/zhuhe/code/litchi-0698-bin/candidate-native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000001770c0 <litchi_ooxml_common::mce::codec::start>:
+  1770c0:	push   %rbp
+  1770c1:	push   %r15
+  1770c3:	push   %r14
+  1770c5:	push   %r13
+  1770c7:	push   %r12
+  1770c9:	push   %rbx
+  1770ca:	sub    $0x618,%rsp
+  1770d1:	mov    %rdi,%r14
+  1770d4:	mov    0x10(%r9),%rax
+  1770d8:	cmp    0x10(%r8),%rax
+  1770dc:	jae    1771e2 <litchi_ooxml_common::mce::codec::start+0x122>
+  1770e2:	mov    %r8,0x360(%rsp)
+  1770ea:	mov    0x10(%rsi),%r13
+  1770ee:	mov    0x18(%rsi),%rbx
+  1770f2:	cmp    %r13,%rbx
+  1770f5:	ja     179664 <litchi_ooxml_common::mce::codec::start+0x25a4>
+  1770fb:	mov    %rcx,%r12
+  1770fe:	mov    %r9,0x98(%rsp)
+  177106:	mov    %edx,0x10c(%rsp)
+  17710d:	mov    0x8(%rsi),%r15
+  177111:	lea    0xb8(%rsp),%rbp
+  177119:	mov    %rbp,%rdi
+  17711c:	mov    %r15,%rsi
+  17711f:	mov    %rbx,%rdx
+  177122:	call   *0x111780(%rip)        # 2888a8 <_DYNAMIC+0x6c8>
+  177128:	cmpb   $0x0,0xb8(%rsp)
+  177130:	je     177235 <litchi_ooxml_common::mce::codec::start+0x175>
+  177136:	movdqu 0x8(%rbp),%xmm0
+  17713b:	movdqa %xmm0,0x4d0(%rsp)
+  177144:	movq   $0x0,0x290(%rsp)
+  177150:	movq   $0x1,0x298(%rsp)
+  17715c:	movq   $0x0,0x2a0(%rsp)
+  177168:	movq   $0x60000020,0x130(%rsp)
+  177174:	lea    0x290(%rsp),%rax
+  17717c:	mov    %rax,0x120(%rsp)
+  177184:	lea    0x107e8d(%rip),%rax        # 27f018 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080>
+  17718b:	mov    %rax,0x128(%rsp)
+  177193:	lea    0x4d0(%rsp),%rdi
+  17719b:	lea    0x120(%rsp),%rsi
+  1771a3:	call   *0x11170f(%rip)        # 2888b8 <_DYNAMIC+0x6d8>
+  1771a9:	test   %al,%al
+  1771ab:	jne    17978e <litchi_ooxml_common::mce::codec::start+0x26ce>
+  1771b1:	mov    0x290(%rsp),%rax
+  1771b9:	movdqu 0x298(%rsp),%xmm0
+  1771c2:	movabs $0x8000000000000001,%rcx
+  1771cc:	add    $0x3,%rcx
+  1771d0:	mov    %rcx,(%r14)
+  1771d3:	mov    %rax,0x8(%r14)
+  1771d7:	movdqu %xmm0,0x10(%r14)
+  1771dd:	jmp    17770c <litchi_ooxml_common::mce::codec::start+0x64c>
+  1771e2:	call   *0x111228(%rip)        # 288410 <_DYNAMIC+0x230>
+  1771e8:	mov    $0x5,%edi
+  1771ed:	mov    $0x1,%esi
+  1771f2:	call   *0x111220(%rip)        # 288418 <_DYNAMIC+0x238>
+  1771f8:	test   %rax,%rax
+  1771fb:	je     17aef5 <litchi_ooxml_common::mce::codec::start+0x3e35>
+  177201:	movb   $0x68,0x4(%rax)
+  177205:	movl   $0x74706564,(%rax)
+  17720b:	movabs $0x8000000000000001,%rcx
+  177215:	or     $0x2,%rcx
+  177219:	mov    %rcx,(%r14)
+  17721c:	movq   $0x5,0x8(%r14)
+  177224:	mov    %rax,0x10(%r14)
+  177228:	movq   $0x5,0x18(%r14)
+  177230:	jmp    17770c <litchi_ooxml_common::mce::codec::start+0x64c>
+  177235:	mov    %r12,0x90(%rsp)
+  17723d:	mov    %r14,0x48(%rsp)
+  177242:	mov    %r13,%rcx
+  177245:	movabs $0x8000000000000001,%r13
+  17724f:	mov    0xc0(%rsp),%rax
+  177257:	mov    %rax,0x220(%rsp)
+  17725f:	mov    0xc8(%rsp),%rax
+  177267:	mov    %rax,0xe8(%rsp)
+  17726f:	movq   $0x0,0xa0(%rsp)
+  17727b:	movq   $0x8,0xa8(%rsp)
+  177287:	movq   $0x0,0xb0(%rsp)
+  177293:	mov    %r15,0x170(%rsp)
+  17729b:	mov    %rcx,0x178(%rsp)
+  1772a3:	movq   $0x1,0x120(%rsp)
+  1772af:	mov    %rbx,0x128(%rsp)
+  1772b7:	movq   $0x0,0x130(%rsp)
+  1772c3:	movq   $0x8,0x138(%rsp)
+  1772cf:	movw   $0x100,0x168(%rsp)
+  1772d9:	pxor   %xmm0,%xmm0
+  1772dd:	movdqu %xmm0,0x140(%rsp)
+  1772e6:	lea    0x290(%rsp),%rbx
+  1772ee:	lea    -0x1(%r13),%rax
+  1772f2:	mov    %rax,0x118(%rsp)
+  1772fa:	mov    %rcx,0x3a8(%rsp)
+  177302:	mov    %r15,%rdx
+  177305:	mov    %r15,0x368(%rsp)
+  17730d:	mov    %r15,%rbp
+  177310:	jmp    177382 <litchi_ooxml_common::mce::codec::start+0x2c2>
+  177312:	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  177320:	mov    0xa8(%rsp),%rax
+  177328:	lea    (%rbx,%rbx,2),%rcx
+  17732c:	shl    $0x4,%rcx
+  177330:	mov    %r14,(%rax,%rcx,1)
+  177334:	mov    %rbp,0x8(%rax,%rcx,1)
+  177339:	mov    %r13,0x10(%rax,%rcx,1)
+  17733e:	mov    %r15,0x18(%rax,%rcx,1)
+  177343:	mov    %r12,0x20(%rax,%rcx,1)
+  177348:	movb   $0x1,0x28(%rax,%rcx,1)
+  17734d:	inc    %rbx
+  177350:	mov    %rbx,0xb0(%rsp)
+  177358:	mov    0x170(%rsp),%rdx
+  177360:	mov    0x178(%rsp),%rcx
+  177368:	movabs $0x8000000000000001,%r13
+  177372:	mov    0x368(%rsp),%rbp
+  17737a:	lea    0x290(%rsp),%rbx
+  177382:	mov    %rbx,%rdi
+  177385:	lea    0x120(%rsp),%rsi
+  17738d:	call   *0x111445(%rip)        # 2887d8 <_DYNAMIC+0x5f8>
+  177393:	mov    0x290(%rsp),%r8
+  17739b:	cmp    $0x4,%r8
+  17739f:	je     17757f <litchi_ooxml_common::mce::codec::start+0x4bf>
+  1773a5:	cmp    $0x5,%r8d
+  1773a9:	je     17771e <litchi_ooxml_common::mce::codec::start+0x65e>
+  1773af:	mov    0x298(%rsp),%rdi
+  1773b7:	mov    0x2a0(%rsp),%rsi
+  1773bf:	mov    0x2a8(%rsp),%rax
+  1773c7:	mov    0x2b0(%rsp),%rcx
+  1773cf:	mov    0x178(%rsp),%rdx
+  1773d7:	mov    %rsi,%r14
+  1773da:	sub    %rdi,%r14
+  1773dd:	setb   %r10b
+  1773e1:	cmp    %rdx,%rsi
+  1773e4:	seta   %r9b
+  1773e8:	mov    0x170(%rsp),%rbp
+  1773f0:	or     %r10b,%r9b
+  1773f3:	lea    -0xe99a6(%rip),%r10        # 8da54 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x2de>
+  1773fa:	movslq (%r10,%r8,4),%r8
+  1773fe:	add    %r10,%r8
+  177401:	jmp    *%r8
+  177404:	test   %r9b,%r9b
+  177407:	jne    1788fe <litchi_ooxml_common::mce::codec::start+0x183e>
+  17740d:	mov    %rcx,%rsi
+  177410:	sub    %rax,%rsi
+  177413:	jb     1788f8 <litchi_ooxml_common::mce::codec::start+0x1838>
+  177419:	cmp    %rdx,%rcx
+  17741c:	ja     1788f8 <litchi_ooxml_common::mce::codec::start+0x1838>
+  177422:	add    %rbp,%rax
+  177425:	jmp    177440 <litchi_ooxml_common::mce::codec::start+0x380>
+  177427:	nopw   0x0(%rax,%rax,1)
+  177430:	test   %r9b,%r9b
+  177433:	jne    1788fe <litchi_ooxml_common::mce::codec::start+0x183e>
+  177439:	mov    $0x1,%eax
+  17743e:	xor    %esi,%esi
+  177440:	add    %rdi,%rbp
+  177443:	mov    0x118(%rsp),%rcx
+  17744b:	mov    %rcx,0xb8(%rsp)
+  177453:	mov    %rax,0xc0(%rsp)
+  17745b:	mov    %rsi,0xc8(%rsp)
+  177463:	mov    %rbp,0xd0(%rsp)
+  17746b:	mov    %r14,0xd8(%rsp)
+  177473:	mov    0xb0(%rsp),%rsi
+  17747b:	cmp    %rsi,0xa0(%rsp)
+  177483:	je     177524 <litchi_ooxml_common::mce::codec::start+0x464>
+  177489:	lea    0x370(%rsp),%rdi
+  177491:	mov    %rbp,%rsi
+  177494:	mov    %r14,%rdx
+  177497:	call   *0x11140b(%rip)        # 2888a8 <_DYNAMIC+0x6c8>
+  17749d:	cmpl   $0x1,0x370(%rsp)
+  1774a5:	je     1777f5 <litchi_ooxml_common::mce::codec::start+0x735>
+  1774ab:	mov    0x378(%rsp),%r15
+  1774b3:	mov    0x380(%rsp),%r12
+  1774bb:	mov    %rbx,%rdi
+  1774be:	lea    0xb8(%rsp),%rsi
+  1774c6:	mov    $0x1,%edx
+  1774cb:	call   *0x11145f(%rip)        # 288930 <_DYNAMIC+0x750>
+  1774d1:	lea    0xe(%r13),%rax
+  1774d5:	cmp    %rax,0x290(%rsp)
+  1774dd:	jne    1778b3 <litchi_ooxml_common::mce::codec::start+0x7f3>
+  1774e3:	mov    0x298(%rsp),%r14
+  1774eb:	mov    0x2a0(%rsp),%rbp
+  1774f3:	mov    0x2a8(%rsp),%r13
+  1774fb:	mov    0xb0(%rsp),%rbx
+  177503:	cmp    0xa0(%rsp),%rbx
+  17750b:	jne    177320 <litchi_ooxml_common::mce::codec::start+0x260>
+  177511:	lea    0xa0(%rsp),%rdi
+  177519:	call   *0x111ba1(%rip)        # 2890c0 <_DYNAMIC+0xee0>
+  17751f:	jmp    177320 <litchi_ooxml_common::mce::codec::start+0x260>
+  177524:	lea    (%rsi,%rsi,1),%r15
+  177528:	cmp    $0x5,%r15
+  17752c:	mov    $0x4,%eax
+  177531:	cmovb  %rax,%r15
+  177535:	mov    0xa8(%rsp),%rdx
+  17753d:	mov    $0x8,%r8d
+  177543:	mov    $0x30,%r9d
+  177549:	mov    %rbx,%rdi
+  17754c:	mov    %r15,%rcx
+  17754f:	call   16bbb0 <alloc::raw_vec::RawVecInner<A>::finish_grow>
+  177554:	cmpl   $0x1,0x290(%rsp)
+  17755c:	je     177e38 <litchi_ooxml_common::mce::codec::start+0xd78>
+  177562:	mov    0x298(%rsp),%rax
+  17756a:	mov    %rax,0xa8(%rsp)
+  177572:	mov    %r15,0xa0(%rsp)
+  17757a:	jmp    177489 <litchi_ooxml_common::mce::codec::start+0x3c9>
+  17757f:	movdqu 0x298(%rsp),%xmm0
+  177588:	mov    0x2a8(%rsp),%rax
+  177590:	movdqu %xmm0,0x4f8(%rsp)
+  177599:	mov    %rax,0x508(%rsp)
+  1775a1:	movq   $0x0,0x240(%rsp)
+  1775ad:	movq   $0x1,0x248(%rsp)
+  1775b9:	movq   $0x0,0x250(%rsp)
+  1775c5:	movq   $0x60000020,0x2a0(%rsp)
+  1775d1:	lea    0x240(%rsp),%rax
+  1775d9:	mov    %rax,0x290(%rsp)
+  1775e1:	lea    0x107a30(%rip),%rax        # 27f018 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080>
+  1775e8:	mov    %rax,0x298(%rsp)
+  1775f0:	lea    0x4f8(%rsp),%rdi
+  1775f8:	lea    0x290(%rsp),%rsi
+  177600:	call   *0x1112aa(%rip)        # 2888b0 <_DYNAMIC+0x6d0>
+  177606:	test   %al,%al
+  177608:	jne    17a7db <litchi_ooxml_common::mce::codec::start+0x371b>
+  17760e:	movdqu 0x240(%rsp),%xmm0
+  177617:	mov    0x250(%rsp),%rax
+  17761f:	lea    0x3(%r13),%rcx
+  177623:	mov    0x48(%rsp),%rdx
+  177628:	mov    %rcx,(%rdx)
+  17762b:	movdqu %xmm0,0x8(%rdx)
+  177630:	mov    %rax,0x18(%rdx)
+  177634:	mov    0x130(%rsp),%rsi
+  17763c:	test   %rsi,%rsi
+  17763f:	je     177658 <litchi_ooxml_common::mce::codec::start+0x598>
+  177641:	mov    0x138(%rsp),%rdi
+  177649:	shl    $0x4,%rsi
+  17764d:	mov    $0x8,%edx
+  177652:	call   *0x110e20(%rip)        # 288478 <_DYNAMIC+0x298>
+  177658:	mov    0x148(%rsp),%rdi
+  177660:	test   %rdi,%rdi
+  177663:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  177665:	mov    0x150(%rsp),%rsi
+  17766d:	test   %rsi,%rsi
+  177670:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  177672:	lea    0x17(,%rsi,8),%rax
+  17767a:	and    $0xfffffffffffffff0,%rax
+  17767e:	add    %rax,%rsi
+  177681:	add    $0x11,%rsi
+  177685:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  177687:	sub    %rax,%rdi
+  17768a:	mov    $0x10,%edx
+  17768f:	call   *0x110de3(%rip)        # 288478 <_DYNAMIC+0x298>
+  177695:	mov    0xb0(%rsp),%rbx
+  17769d:	test   %rbx,%rbx
+  1776a0:	je     1776e4 <litchi_ooxml_common::mce::codec::start+0x624>
+  1776a2:	mov    0xa8(%rsp),%r14
+  1776aa:	add    $0x8,%r14
+  1776ae:	dec    %r13
+  1776b1:	mov    0x110dc0(%rip),%r15        # 288478 <_DYNAMIC+0x298>
+  1776b8:	jmp    1776c9 <litchi_ooxml_common::mce::codec::start+0x609>
+  1776ba:	nopw   0x0(%rax,%rax,1)
+  1776c0:	add    $0x30,%r14
+  1776c4:	dec    %rbx
+  1776c7:	je     1776e4 <litchi_ooxml_common::mce::codec::start+0x624>
+  1776c9:	mov    -0x8(%r14),%rsi
+  1776cd:	cmp    %r13,%rsi
+  1776d0:	je     1776c0 <litchi_ooxml_common::mce::codec::start+0x600>
+  1776d2:	test   %rsi,%rsi
+  1776d5:	je     1776c0 <litchi_ooxml_common::mce::codec::start+0x600>
+  1776d7:	mov    (%r14),%rdi
+  1776da:	mov    $0x1,%edx
+  1776df:	call   *%r15
+  1776e2:	jmp    1776c0 <litchi_ooxml_common::mce::codec::start+0x600>
+  1776e4:	mov    0xa0(%rsp),%rax
+  1776ec:	test   %rax,%rax
+  1776ef:	je     17770c <litchi_ooxml_common::mce::codec::start+0x64c>
+  1776f1:	mov    0xa8(%rsp),%rdi
+  1776f9:	shl    $0x4,%rax
+  1776fd:	lea    (%rax,%rax,2),%rsi
+  177701:	mov    $0x8,%edx
+  177706:	call   *0x110d6c(%rip)        # 288478 <_DYNAMIC+0x298>
+  17770c:	add    $0x618,%rsp
+  177713:	pop    %rbx
+  177714:	pop    %r12
+  177716:	pop    %r13
+  177718:	pop    %r14
+  17771a:	pop    %r15
+  17771c:	pop    %rbp
+  17771d:	ret
+  17771e:	mov    0x130(%rsp),%rsi
+  177726:	test   %rsi,%rsi
+  177729:	je     177742 <litchi_ooxml_common::mce::codec::start+0x682>
+  17772b:	mov    0x138(%rsp),%rdi
+  177733:	shl    $0x4,%rsi
+  177737:	mov    $0x8,%edx
+  17773c:	call   *0x110d36(%rip)        # 288478 <_DYNAMIC+0x298>
+  177742:	mov    0x148(%rsp),%rdi
+  17774a:	test   %rdi,%rdi
+  17774d:	je     17777f <litchi_ooxml_common::mce::codec::start+0x6bf>
+  17774f:	mov    0x150(%rsp),%rsi
+  177757:	test   %rsi,%rsi
+  17775a:	je     17777f <litchi_ooxml_common::mce::codec::start+0x6bf>
+  17775c:	lea    0x17(,%rsi,8),%rax
+  177764:	and    $0xfffffffffffffff0,%rax
+  177768:	add    %rax,%rsi
+  17776b:	add    $0x11,%rsi
+  17776f:	je     17777f <litchi_ooxml_common::mce::codec::start+0x6bf>
+  177771:	sub    %rax,%rdi
+  177774:	mov    $0x10,%edx
+  177779:	call   *0x110cf9(%rip)        # 288478 <_DYNAMIC+0x298>
+  17777f:	mov    0x98(%rsp),%rdi
+  177787:	mov    0x10(%rdi),%rsi
+  17778b:	xor    %ecx,%ecx
+  17778d:	mov    $0x1,%eax
+  177792:	mov    $0x0,%edx
+  177797:	test   %rsi,%rsi
+  17779a:	je     17792a <litchi_ooxml_common::mce::codec::start+0x86a>
+  1777a0:	mov    0x8(%rdi),%rdi
+  1777a4:	lea    (%rsi,%rsi,8),%r8
+  1777a8:	lea    (%rdi,%r8,8),%r9
+  1777ac:	add    $0xffffffffffffffb8,%r9
+  1777b0:	mov    $0x0,%esi
+  1777b5:	test   %r9,%r9
+  1777b8:	je     17792c <litchi_ooxml_common::mce::codec::start+0x86c>
+  1777be:	lea    (%rdi,%r8,8),%rdx
+  1777c2:	mov    -0x30(%rdx),%rcx
+  1777c6:	test   %rcx,%rcx
+  1777c9:	je     1777d5 <litchi_ooxml_common::mce::codec::start+0x715>
+  1777cb:	lock incq (%rcx)
+  1777cf:	jle    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  1777d5:	mov    -0x28(%rdx),%rax
+  1777d9:	mov    -0x20(%rdx),%rsi
+  1777dd:	test   %rsi,%rsi
+  1777e0:	je     1777ec <litchi_ooxml_common::mce::codec::start+0x72c>
+  1777e2:	lock incq (%rsi)
+  1777e6:	jle    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  1777ec:	movzbl -0x18(%rdx),%edx
+  1777f0:	jmp    17792c <litchi_ooxml_common::mce::codec::start+0x86c>
+  1777f5:	lea    0x378(%rsp),%rax
+  1777fd:	movdqu (%rax),%xmm0
+  177801:	movdqa %xmm0,0x4e0(%rsp)
+  17780a:	movq   $0x0,0x240(%rsp)
+  177816:	movq   $0x1,0x248(%rsp)
+  177822:	movq   $0x0,0x250(%rsp)
+  17782e:	movq   $0x60000020,0x2a0(%rsp)
+  17783a:	lea    0x240(%rsp),%rax
+  177842:	mov    %rax,0x290(%rsp)
+  17784a:	lea    0x1077c7(%rip),%rax        # 27f018 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080>
+  177851:	mov    %rax,0x298(%rsp)
+  177859:	lea    0x4e0(%rsp),%rdi
+  177861:	lea    0x290(%rsp),%rsi
+  177869:	call   *0x111049(%rip)        # 2888b8 <_DYNAMIC+0x6d8>
+  17786f:	test   %al,%al
+  177871:	jne    17a867 <litchi_ooxml_common::mce::codec::start+0x37a7>
+  177877:	mov    0x240(%rsp),%rax
+  17787f:	movdqu 0x248(%rsp),%xmm0
+  177888:	lea    0x3(%r13),%rcx
+  17788c:	mov    0x48(%rsp),%rdx
+  177891:	mov    %rcx,(%rdx)
+  177894:	mov    %rax,0x8(%rdx)
+  177898:	movdqu %xmm0,0x10(%rdx)
+  17789d:	mov    0x130(%rsp),%rsi
+  1778a5:	test   %rsi,%rsi
+  1778a8:	jne    177641 <litchi_ooxml_common::mce::codec::start+0x581>
+  1778ae:	jmp    177658 <litchi_ooxml_common::mce::codec::start+0x598>
+  1778b3:	movups 0x290(%rsp),%xmm0
+  1778bb:	movups 0x2a0(%rsp),%xmm1
+  1778c3:	movups 0x2b0(%rsp),%xmm2
+  1778cb:	movaps %xmm2,0x5c0(%rsp)
+  1778d3:	movaps %xmm1,0x5b0(%rsp)
+  1778db:	movaps %xmm0,0x5a0(%rsp)
+  1778e3:	lea    0x240(%rsp),%rdi
+  1778eb:	lea    0x5a0(%rsp),%rsi
+  1778f3:	call   1769f0 <litchi_ooxml_common::mce::codec::xerr>
+  1778f8:	movaps 0x240(%rsp),%xmm0
+  177900:	movaps 0x250(%rsp),%xmm1
+  177908:	mov    0x48(%rsp),%rax
+  17790d:	movups %xmm1,0x10(%rax)
+  177911:	movups %xmm0,(%rax)
+  177914:	mov    0x130(%rsp),%rsi
+  17791c:	test   %rsi,%rsi
+  17791f:	jne    177641 <litchi_ooxml_common::mce::codec::start+0x581>
+  177925:	jmp    177658 <litchi_ooxml_common::mce::codec::start+0x598>
+  17792a:	xor    %esi,%esi
+  17792c:	mov    %rcx,0x60(%rsp)
+  177931:	mov    %rax,0x68(%rsp)
+  177936:	mov    %rsi,0x70(%rsp)
+  17793b:	mov    %dl,0x78(%rsp)
+  17793f:	movq   $0x0,0xf0(%rsp)
+  17794b:	movq   $0x8,0xf8(%rsp)
+  177957:	movq   $0x0,0x100(%rsp)
+  177963:	mov    0xb0(%rsp),%rax
+  17796b:	mov    $0x1,%dl
+  17796d:	test   %rax,%rax
+  177970:	je     177e75 <litchi_ooxml_common::mce::codec::start+0xdb5>
+  177976:	mov    0xa8(%rsp),%r12
+  17797e:	shl    $0x4,%rax
+  177982:	lea    (%rax,%rax,2),%r13
+  177986:	mov    $0x8,%edx
+  17798b:	xor    %ebp,%ebp
+  17798d:	xor    %ebx,%ebx
+  17798f:	jmp    1779bd <litchi_ooxml_common::mce::codec::start+0x8fd>
+  177991:	mov    (%r14),%eax
+  177994:	mov    $0x6e6c6d78,%ecx
+  177999:	xor    %ecx,%eax
+  17799b:	movzbl 0x4(%r14),%ecx
+  1779a0:	xor    $0x73,%ecx
+  1779a3:	or     %eax,%ecx
+  1779a5:	mov    0x58(%rsp),%rsi
+  1779aa:	je     177a73 <litchi_ooxml_common::mce::codec::start+0x9b3>
+  1779b0:	add    $0x30,%rbp
+  1779b4:	cmp    %rbp,%r13
+  1779b7:	je     177d5e <litchi_ooxml_common::mce::codec::start+0xc9e>
+  1779bd:	mov    0x18(%r12,%rbp,1),%r14
+  1779c2:	mov    0x20(%r12,%rbp,1),%r15
+  1779c7:	cmp    $0x5,%r15
+  1779cb:	je     177991 <litchi_ooxml_common::mce::codec::start+0x8d1>
+  1779cd:	jbe    1779b0 <litchi_ooxml_common::mce::codec::start+0x8f0>
+  1779cf:	mov    (%r14),%eax
+  1779d2:	mov    $0x6e6c6d78,%ecx
+  1779d7:	xor    %ecx,%eax
+  1779d9:	movzwl 0x4(%r14),%ecx
+  1779de:	xor    $0x3a73,%ecx
+  1779e4:	or     %eax,%ecx
+  1779e6:	jne    1779b0 <litchi_ooxml_common::mce::codec::start+0x8f0>
+  1779e8:	add    $0xfffffffffffffffa,%r15
+  1779ec:	add    $0x6,%r14
+  1779f0:	mov    %r14,%rdi
+  1779f3:	mov    %r15,%rsi
+  1779f6:	call   *0x1113cc(%rip)        # 288dc8 <_DYNAMIC+0xbe8>
+  1779fc:	test   %al,%al
+  1779fe:	je     1794f2 <litchi_ooxml_common::mce::codec::start+0x2432>
+  177a04:	cmpq   $0x0,0x10(%r12,%rbp,1)
+  177a0a:	je     1794f2 <litchi_ooxml_common::mce::codec::start+0x2432>
+  177a10:	mov    0x100(%rsp),%rsi
+  177a18:	cmp    %rsi,0xf0(%rsp)
+  177a20:	je     177cc6 <litchi_ooxml_common::mce::codec::start+0xc06>
+  177a26:	test   %r15,%r15
+  177a29:	js     177d2a <litchi_ooxml_common::mce::codec::start+0xc6a>
+  177a2f:	je     177b80 <litchi_ooxml_common::mce::codec::start+0xac0>
+  177a35:	call   *0x1109d5(%rip)        # 288410 <_DYNAMIC+0x230>
+  177a3b:	mov    $0x1,%ebx
+  177a40:	mov    $0x1,%esi
+  177a45:	mov    %r15,%rdi
+  177a48:	call   *0x1109ca(%rip)        # 288418 <_DYNAMIC+0x238>
+  177a4e:	test   %rax,%rax
+  177a51:	je     177d34 <litchi_ooxml_common::mce::codec::start+0xc74>
+  177a57:	mov    %rax,0x88(%rsp)
+  177a5f:	mov    %rax,%rdi
+  177a62:	mov    %r14,%rsi
+  177a65:	mov    %r15,%rdx
+  177a68:	call   *0x110aca(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  177a6e:	jmp    177b8d <litchi_ooxml_common::mce::codec::start+0xacd>
+  177a73:	mov    0xf0(%rsp),%r14
+  177a7b:	cmp    %rbx,%r14
+  177a7e:	je     177bec <litchi_ooxml_common::mce::codec::start+0xb2c>
+  177a84:	mov    0x10(%r12,%rbp,1),%rbx
+  177a89:	test   %rbx,%rbx
+  177a8c:	js     177d51 <litchi_ooxml_common::mce::codec::start+0xc91>
+  177a92:	je     177ad2 <litchi_ooxml_common::mce::codec::start+0xa12>
+  177a94:	mov    0x8(%r12,%rbp,1),%r14
+  177a99:	call   *0x110971(%rip)        # 288410 <_DYNAMIC+0x230>
+  177a9f:	mov    $0x1,%esi
+  177aa4:	mov    %rbx,%rdi
+  177aa7:	call   *0x11096b(%rip)        # 288418 <_DYNAMIC+0x238>
+  177aad:	test   %rax,%rax
+  177ab0:	je     17b13f <litchi_ooxml_common::mce::codec::start+0x407f>
+  177ab6:	mov    %rax,%r15
+  177ab9:	mov    %rax,%rdi
+  177abc:	mov    %r14,%rsi
+  177abf:	mov    %rbx,%rdx
+  177ac2:	call   *0x110a70(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  177ac8:	mov    0xf0(%rsp),%r14
+  177ad0:	jmp    177ad8 <litchi_ooxml_common::mce::codec::start+0xa18>
+  177ad2:	mov    $0x1,%r15d
+  177ad8:	movq   $0x0,0x120(%rsp)
+  177ae4:	movq   $0x1,0x128(%rsp)
+  177af0:	movq   $0x0,0x130(%rsp)
+  177afc:	mov    %rbx,0x138(%rsp)
+  177b04:	mov    %r15,0x140(%rsp)
+  177b0c:	mov    %rbx,0x148(%rsp)
+  177b14:	mov    0x100(%rsp),%rbx
+  177b1c:	cmp    %r14,%rbx
+  177b1f:	jne    177b2f <litchi_ooxml_common::mce::codec::start+0xa6f>
+  177b21:	lea    0xf0(%rsp),%rdi
+  177b29:	call   *0x111349(%rip)        # 288e78 <_DYNAMIC+0xc98>
+  177b2f:	mov    %r15,0x58(%rsp)
+  177b34:	mov    0xf8(%rsp),%rdx
+  177b3c:	lea    (%rbx,%rbx,2),%rax
+  177b40:	shl    $0x4,%rax
+  177b44:	movdqu 0x120(%rsp),%xmm0
+  177b4d:	movdqu 0x130(%rsp),%xmm1
+  177b56:	movdqu 0x140(%rsp),%xmm2
+  177b5f:	movdqu %xmm2,0x20(%rdx,%rax,1)
+  177b65:	movdqu %xmm1,0x10(%rdx,%rax,1)
+  177b6b:	movdqu %xmm0,(%rdx,%rax,1)
+  177b70:	inc    %rbx
+  177b73:	mov    %rbx,0x100(%rsp)
+  177b7b:	jmp    1779b0 <litchi_ooxml_common::mce::codec::start+0x8f0>
+  177b80:	mov    $0x1,%eax
+  177b85:	mov    %rax,0x88(%rsp)
+  177b8d:	mov    0x10(%r12,%rbp,1),%rbx
+  177b92:	test   %rbx,%rbx
+  177b95:	mov    0x1f8(%rsp),%rsi
+  177b9d:	js     177e2b <litchi_ooxml_common::mce::codec::start+0xd6b>
+  177ba3:	je     177c5b <litchi_ooxml_common::mce::codec::start+0xb9b>
+  177ba9:	mov    0x8(%r12,%rbp,1),%rax
+  177bae:	mov    %rax,0x1f8(%rsp)
+  177bb6:	call   *0x110854(%rip)        # 288410 <_DYNAMIC+0x230>
+  177bbc:	mov    $0x1,%esi
+  177bc1:	mov    %rbx,%rdi
+  177bc4:	call   *0x11084e(%rip)        # 288418 <_DYNAMIC+0x238>
+  177bca:	test   %rax,%rax
+  177bcd:	je     17b17d <litchi_ooxml_common::mce::codec::start+0x40bd>
+  177bd3:	mov    %rax,%r14
+  177bd6:	mov    %rax,%rdi
+  177bd9:	mov    0x1f8(%rsp),%rsi
+  177be1:	mov    %rbx,%rdx
+  177be4:	call   *0x11094e(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  177bea:	jmp    177c61 <litchi_ooxml_common::mce::codec::start+0xba1>
+  177bec:	mov    %rsi,%r15
+  177bef:	lea    (%rbx,%rbx,1),%r14
+  177bf3:	cmp    $0x5,%r14
+  177bf7:	mov    $0x4,%eax
+  177bfc:	cmovb  %rax,%r14
+  177c00:	mov    $0x8,%r8d
+  177c06:	mov    $0x30,%r9d
+  177c0c:	lea    0x120(%rsp),%rdi
+  177c14:	mov    %rbx,%rsi
+  177c17:	mov    %r14,%rcx
+  177c1a:	call   16bbb0 <alloc::raw_vec::RawVecInner<A>::finish_grow>
+  177c1f:	cmpl   $0x1,0x120(%rsp)
+  177c27:	je     1799b1 <litchi_ooxml_common::mce::codec::start+0x28f1>
+  177c2d:	mov    0x128(%rsp),%rax
+  177c35:	mov    %rax,0xf8(%rsp)
+  177c3d:	mov    %r14,0xf0(%rsp)
+  177c45:	mov    %r15,%rsi
+  177c48:	mov    0x10(%r12,%rbp,1),%rbx
+  177c4d:	test   %rbx,%rbx
+  177c50:	js     177d51 <litchi_ooxml_common::mce::codec::start+0xc91>
+  177c56:	jmp    177a92 <litchi_ooxml_common::mce::codec::start+0x9d2>
+  177c5b:	mov    $0x1,%r14d
+  177c61:	mov    %r15,0x120(%rsp)
+  177c69:	mov    0x88(%rsp),%rax
+  177c71:	mov    %rax,0x128(%rsp)
+  177c79:	mov    %r15,0x130(%rsp)
+  177c81:	mov    %rbx,0x138(%rsp)
+  177c89:	mov    %r14,0x140(%rsp)
+  177c91:	mov    %rbx,0x148(%rsp)
+  177c99:	mov    0x100(%rsp),%rbx
+  177ca1:	cmp    0xf0(%rsp),%rbx
+  177ca9:	jne    177cb9 <litchi_ooxml_common::mce::codec::start+0xbf9>
+  177cab:	lea    0xf0(%rsp),%rdi
+  177cb3:	call   *0x1111bf(%rip)        # 288e78 <_DYNAMIC+0xc98>
+  177cb9:	mov    %r14,0x1f8(%rsp)
+  177cc1:	jmp    177b34 <litchi_ooxml_common::mce::codec::start+0xa74>
+  177cc6:	lea    (%rsi,%rsi,1),%rbx
+  177cca:	cmp    $0x5,%rbx
+  177cce:	mov    $0x4,%eax
+  177cd3:	cmovb  %rax,%rbx
+  177cd7:	mov    0xf8(%rsp),%rdx
+  177cdf:	mov    $0x8,%r8d
+  177ce5:	mov    $0x30,%r9d
+  177ceb:	lea    0x120(%rsp),%rdi
+  177cf3:	mov    %rbx,%rcx
+  177cf6:	call   16bbb0 <alloc::raw_vec::RawVecInner<A>::finish_grow>
+  177cfb:	cmpl   $0x1,0x120(%rsp)
+  177d03:	je     1799b1 <litchi_ooxml_common::mce::codec::start+0x28f1>
+  177d09:	mov    0x128(%rsp),%rax
+  177d11:	mov    %rax,0xf8(%rsp)
+  177d19:	mov    %rbx,0xf0(%rsp)
+  177d21:	test   %r15,%r15
+  177d24:	jns    177a2f <litchi_ooxml_common::mce::codec::start+0x96f>
+  177d2a:	xor    %ebx,%ebx
+  177d2c:	mov    0x88(%rsp),%r15
+  177d34:	mov    $0x1,%al
+  177d36:	mov    %eax,0x84(%rsp)
+  177d3d:	mov    $0x1,%r12b
+  177d40:	mov    %rbx,%rdi
+  177d43:	mov    %r15,%rsi
+  177d46:	call   *0x1107e4(%rip)        # 288530 <_DYNAMIC+0x350>
+  177d4c:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  177d51:	xor    %edi,%edi
+  177d53:	call   *0x1107d7(%rip)        # 288530 <_DYNAMIC+0x350>
+  177d59:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  177d5e:	mov    0x60(%rsp),%rcx
+  177d63:	test   %rbx,%rbx
+  177d66:	movabs $0x8000000000000001,%r13
+  177d70:	mov    0x368(%rsp),%rbp
+  177d78:	je     177e73 <litchi_ooxml_common::mce::codec::start+0xdb3>
+  177d7e:	mov    0x100(%rsp),%rax
+  177d86:	mov    %rax,0x2a0(%rsp)
+  177d8e:	movdqu 0xf0(%rsp),%xmm0
+  177d97:	movdqa %xmm0,0x290(%rsp)
+  177da0:	mov    0x68(%rsp),%rdx
+  177da5:	mov    0x360(%rsp),%rax
+  177dad:	mov    0x18(%rax),%r8
+  177db1:	mov    $0x1,%r12b
+  177db4:	movl   $0x0,0x84(%rsp)
+  177dbf:	lea    0x120(%rsp),%rdi
+  177dc7:	lea    0x290(%rsp),%rax
+  177dcf:	mov    %rcx,%rsi
+  177dd2:	mov    %rax,%rcx
+  177dd5:	call   16fee0 <litchi_ooxml_common::mce::codec::Namespaces::with_local>
+  177dda:	mov    0x120(%rsp),%rax
+  177de2:	mov    0x128(%rsp),%r15
+  177dea:	lea    0x4(%r13),%rcx
+  177dee:	mov    0x130(%rsp),%r14
+  177df6:	cmp    %rcx,%rax
+  177df9:	jne    1788d7 <litchi_ooxml_common::mce::codec::start+0x1817>
+  177dff:	mov    0x60(%rsp),%rax
+  177e04:	test   %rax,%rax
+  177e07:	je     177e1a <litchi_ooxml_common::mce::codec::start+0xd5a>
+  177e09:	lock decq (%rax)
+  177e0d:	jne    177e1a <litchi_ooxml_common::mce::codec::start+0xd5a>
+  177e0f:	lea    0x60(%rsp),%rdi
+  177e14:	call   *0x1112d6(%rip)        # 2890f0 <_DYNAMIC+0xf10>
+  177e1a:	mov    %r15,%rcx
+  177e1d:	mov    %r15,0x60(%rsp)
+  177e22:	mov    %r14,0x68(%rsp)
+  177e27:	xor    %edx,%edx
+  177e29:	jmp    177e75 <litchi_ooxml_common::mce::codec::start+0xdb5>
+  177e2b:	xor    %edi,%edi
+  177e2d:	call   *0x1106fd(%rip)        # 288530 <_DYNAMIC+0x350>
+  177e33:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  177e38:	movdqu 0x298(%rsp),%xmm0
+  177e41:	mov    0x48(%rsp),%rcx
+  177e46:	movdqu %xmm0,(%rcx)
+  177e4a:	lea    -0xe9a56(%rip),%rax        # 8e3fb <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc85>
+  177e51:	mov    %rax,0x10(%rcx)
+  177e55:	movq   $0xe,0x18(%rcx)
+  177e5d:	mov    0x130(%rsp),%rsi
+  177e65:	test   %rsi,%rsi
+  177e68:	jne    177641 <litchi_ooxml_common::mce::codec::start+0x581>
+  177e6e:	jmp    177658 <litchi_ooxml_common::mce::codec::start+0x598>
+  177e73:	mov    $0x1,%dl
+  177e75:	mov    %edx,0x84(%rsp)
+  177e7c:	lea    0x120(%rsp),%rdi
+  177e84:	mov    $0x1,%r12b
+  177e87:	mov    0x220(%rsp),%rsi
+  177e8f:	mov    0xe8(%rsp),%rdx
+  177e97:	mov    $0x1,%r8d
+  177e9d:	call   171430 <litchi_ooxml_common::mce::codec::expand_parts>
+  177ea2:	mov    0x128(%rsp),%rdi
+  177eaa:	mov    0x130(%rsp),%rsi
+  177eb2:	mov    0x138(%rsp),%r8
+  177eba:	mov    0x140(%rsp),%r9
+  177ec2:	cmpl   $0x1,0x120(%rsp)
+  177eca:	jne    177f58 <litchi_ooxml_common::mce::codec::start+0xe98>
+  177ed0:	mov    0x48(%rsp),%rax
+  177ed5:	mov    %rdi,(%rax)
+  177ed8:	mov    %rsi,0x8(%rax)
+  177edc:	mov    %r8,0x10(%rax)
+  177ee0:	mov    %r9,0x18(%rax)
+  177ee4:	mov    $0x1,%r12b
+  177ee7:	cmpb   $0x0,0x84(%rsp)
+  177eef:	je     17958d <litchi_ooxml_common::mce::codec::start+0x24cd>
+  177ef5:	mov    0x100(%rsp),%rbx
+  177efd:	test   %rbx,%rbx
+  177f00:	je     179565 <litchi_ooxml_common::mce::codec::start+0x24a5>
+  177f06:	mov    0xf8(%rsp),%r14
+  177f0e:	add    $0x20,%r14
+  177f12:	mov    0x11055f(%rip),%r15        # 288478 <_DYNAMIC+0x298>
+  177f19:	jmp    177f2d <litchi_ooxml_common::mce::codec::start+0xe6d>
+  177f1b:	nopl   0x0(%rax,%rax,1)
+  177f20:	add    $0x30,%r14
+  177f24:	dec    %rbx
+  177f27:	je     179565 <litchi_ooxml_common::mce::codec::start+0x24a5>
+  177f2d:	mov    -0x20(%r14),%rsi
+  177f31:	test   %rsi,%rsi
+  177f34:	je     177f42 <litchi_ooxml_common::mce::codec::start+0xe82>
+  177f36:	mov    -0x18(%r14),%rdi
+  177f3a:	mov    $0x1,%edx
+  177f3f:	call   *%r15
+  177f42:	mov    -0x8(%r14),%rsi
+  177f46:	test   %rsi,%rsi
+  177f49:	je     177f20 <litchi_ooxml_common::mce::codec::start+0xe60>
+  177f4b:	mov    (%r14),%rdi
+  177f4e:	mov    $0x1,%edx
+  177f53:	call   *%r15
+  177f56:	jmp    177f20 <litchi_ooxml_common::mce::codec::start+0xe60>
+  177f58:	mov    0x98(%rsp),%rcx
+  177f60:	mov    0x10(%rcx),%rax
+  177f64:	test   %rax,%rax
+  177f67:	je     177f78 <litchi_ooxml_common::mce::codec::start+0xeb8>
+  177f69:	mov    0x8(%rcx),%rcx
+  177f6d:	lea    (%rax,%rax,8),%rdx
+  177f71:	movzbl -0x8(%rcx,%rdx,8),%ebx
+  177f76:	jmp    177f7a <litchi_ooxml_common::mce::codec::start+0xeba>
+  177f78:	mov    $0x1,%bl
+  177f7a:	cmpb   $0x0,0x78(%rsp)
+  177f7f:	je     177fda <litchi_ooxml_common::mce::codec::start+0xf1a>
+  177f81:	test   %rax,%rax
+  177f84:	je     1786a5 <litchi_ooxml_common::mce::codec::start+0x15e5>
+  177f8a:	mov    0x98(%rsp),%rcx
+  177f92:	mov    0x8(%rcx),%rcx
+  177f96:	lea    (%rax,%rax,8),%rax
+  177f9a:	lea    (%rcx,%rax,8),%rdx
+  177f9e:	add    $0xffffffffffffffb8,%rdx
+  177fa2:	test   %rdx,%rdx
+  177fa5:	je     1786a5 <litchi_ooxml_common::mce::codec::start+0x15e5>
+  177fab:	lea    (%rcx,%rax,8),%rax
+  177faf:	lea    -0x30(%rax),%rcx
+  177fb3:	mov    -0x30(%rax),%rdx
+  177fb7:	mov    -0x10(%rax),%r15
+  177fbb:	test   %rdx,%rdx
+  177fbe:	cmove  %rdx,%rcx
+  177fc2:	add    $0xfffffffffffffff0,%rax
+  177fc6:	test   %r15,%r15
+  177fc9:	cmove  %r15,%rax
+  177fcd:	test   %bl,%bl
+  177fcf:	jne    1786b1 <litchi_ooxml_common::mce::codec::start+0x15f1>
+  177fd5:	jmp    178746 <litchi_ooxml_common::mce::codec::start+0x1686>
+  177fda:	mov    %r9,0x208(%rsp)
+  177fe2:	mov    %r8,0x110(%rsp)
+  177fea:	mov    %rdi,0x210(%rsp)
+  177ff2:	mov    %rsi,0x218(%rsp)
+  177ffa:	mov    %ebx,0x204(%rsp)
+  178001:	movq   $0x0,0x228(%rsp)
+  17800d:	movq   $0x8,0x230(%rsp)
+  178019:	movq   $0x0,0x238(%rsp)
+  178025:	mov    0xb0(%rsp),%rax
+  17802d:	test   %rax,%rax
+  178030:	je     178347 <litchi_ooxml_common::mce::codec::start+0x1287>
+  178036:	mov    0xa8(%rsp),%r13
+  17803e:	lea    (%rax,%rax,2),%rbx
+  178042:	shl    $0x4,%rbx
+  178046:	add    %r13,%rbx
+  178049:	mov    0x360(%rsp),%rax
+  178051:	mov    0x20(%rax),%rax
+  178055:	mov    %rax,0x58(%rsp)
+  17805a:	xor    %r12d,%r12d
+  17805d:	mov    $0x6e6c6d78,%r15d
+  178063:	jmp    178072 <litchi_ooxml_common::mce::codec::start+0xfb2>
+  178065:	add    $0x30,%r13
+  178069:	cmp    %rbx,%r13
+  17806c:	je     178347 <litchi_ooxml_common::mce::codec::start+0x1287>
+  178072:	mov    0x18(%r13),%rsi
+  178076:	mov    0x20(%r13),%rdx
+  17807a:	cmp    $0x5,%rdx
+  17807e:	jne    17809a <litchi_ooxml_common::mce::codec::start+0xfda>
+  178080:	mov    (%rsi),%eax
+  178082:	xor    %r15d,%eax
+  178085:	movzbl 0x4(%rsi),%ecx
+  178089:	xor    $0x73,%ecx
+  17808c:	or     %eax,%ecx
+  17808e:	lea    0x120(%rsp),%rdi
+  178096:	jne    1780b7 <litchi_ooxml_common::mce::codec::start+0xff7>
+  178098:	jmp    178065 <litchi_ooxml_common::mce::codec::start+0xfa5>
+  17809a:	lea    0x120(%rsp),%rdi
+  1780a2:	jbe    1780b7 <litchi_ooxml_common::mce::codec::start+0xff7>
+  1780a4:	mov    (%rsi),%eax
+  1780a6:	xor    %r15d,%eax
+  1780a9:	movzwl 0x4(%rsi),%ecx
+  1780ad:	xor    $0x3a73,%ecx
+  1780b3:	or     %eax,%ecx
+  1780b5:	je     178065 <litchi_ooxml_common::mce::codec::start+0xfa5>
+  1780b7:	mov    0x60(%rsp),%rcx
+  1780bc:	xor    %r8d,%r8d
+  1780bf:	call   171430 <litchi_ooxml_common::mce::codec::expand_parts>
+  1780c4:	mov    0x128(%rsp),%rdi
+  1780cc:	mov    0x130(%rsp),%rax
+  1780d4:	mov    0x138(%rsp),%rbp
+  1780dc:	mov    0x140(%rsp),%r14
+  1780e4:	cmpl   $0x1,0x120(%rsp)
+  1780ec:	je     17887b <litchi_ooxml_common::mce::codec::start+0x17bb>
+  1780f2:	cmp    $0x3b,%rax
+  1780f6:	jne    178065 <litchi_ooxml_common::mce::codec::start+0xfa5>
+  1780fc:	mov    $0x3b,%edx
+  178101:	lea    -0xea5e3(%rip),%rsi        # 8db25 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x3af>
+  178108:	call   *0x11046a(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  17810e:	test   %eax,%eax
+  178110:	jne    178065 <litchi_ooxml_common::mce::codec::start+0xfa5>
+  178116:	lea    -0x9(%r14),%rax
+  17811a:	cmp    $0x9,%rax
+  17811e:	ja     17a805 <litchi_ooxml_common::mce::codec::start+0x3745>
+  178124:	lea    -0xea727(%rip),%rcx        # 8da04 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x28e>
+  17812b:	movslq (%rcx,%rax,4),%rax
+  17812f:	add    %rcx,%rax
+  178132:	jmp    *%rax
+  178134:	mov    0x0(%rbp),%rax
+  178138:	movabs $0x6c6261726f6e6749,%rcx
+  178142:	xor    %rcx,%rax
+  178145:	movzbl 0x8(%rbp),%ecx
+  178149:	xor    $0x65,%rcx
+  17814d:	jmp    178198 <litchi_ooxml_common::mce::codec::start+0x10d8>
+  17814f:	mov    0x0(%rbp),%rax
+  178153:	movabs $0x43737365636f7250,%rcx
+  17815d:	xor    %rcx,%rax
+  178160:	mov    0x6(%rbp),%rcx
+  178164:	movabs $0x746e65746e6f4373,%rdx
+  17816e:	xor    %rdx,%rcx
+  178171:	or     %rax,%rcx
+  178174:	je     1781e5 <litchi_ooxml_common::mce::codec::start+0x1125>
+  178176:	mov    0x0(%rbp),%rax
+  17817a:	movabs $0x65646e557473754d,%rcx
+  178184:	xor    %rcx,%rax
+  178187:	mov    0x6(%rbp),%rcx
+  17818b:	movabs $0x646e617473726564,%rdx
+  178195:	xor    %rdx,%rcx
+  178198:	or     %rax,%rcx
+  17819b:	je     1781e5 <litchi_ooxml_common::mce::codec::start+0x1125>
+  17819d:	jmp    17a805 <litchi_ooxml_common::mce::codec::start+0x3745>
+  1781a2:	movdqu 0x0(%rbp),%xmm0
+  1781a7:	pcmpeqb -0x1104cf(%rip),%xmm0        # 67ce0 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x460>
+  1781af:	movzwl 0x10(%rbp),%eax
+  1781b3:	movd   %eax,%xmm1
+  1781b7:	pcmpeqb -0x11039f(%rip),%xmm1        # 67e20 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x5a0>
+  1781bf:	pand   %xmm0,%xmm1
+  1781c3:	pmovmskb %xmm1,%eax
+  1781c7:	jmp    1781da <litchi_ooxml_common::mce::codec::start+0x111a>
+  1781c9:	movdqu 0x0(%rbp),%xmm0
+  1781ce:	pcmpeqb -0x1107d6(%rip),%xmm0        # 67a00 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x180>
+  1781d6:	pmovmskb %xmm0,%eax
+  1781da:	cmp    $0xffff,%eax
+  1781df:	jne    17a805 <litchi_ooxml_common::mce::codec::start+0x3745>
+  1781e5:	lea    0x30(%r13),%rax
+  1781e9:	mov    %rax,0x1f8(%rsp)
+  1781f1:	mov    0x8(%r13),%rax
+  1781f5:	mov    0x10(%r13),%rcx
+  1781f9:	lea    (%rax,%rcx,1),%rdx
+  1781fd:	movq   $0x0,0x120(%rsp)
+  178209:	mov    %rcx,0x128(%rsp)
+  178211:	mov    %rax,0x130(%rsp)
+  178219:	mov    %rcx,0x138(%rsp)
+  178221:	mov    %rax,0x140(%rsp)
+  178229:	mov    %rdx,0x148(%rsp)
+  178231:	movq   $0x0,0x150(%rsp)
+  17823d:	movw   $0x1,0x158(%rsp)
+  178247:	mov    %r12,0x88(%rsp)
+  17824f:	dec    %r12
+  178252:	lea    0x120(%rsp),%r15
+  17825a:	mov    %r15,%rdi
+  17825d:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  178262:	inc    %r12
+  178265:	test   %rax,%rax
+  178268:	jne    17825a <litchi_ooxml_common::mce::codec::start+0x119a>
+  17826a:	cmp    0x88(%rsp),%r12
+  178272:	jb     17af05 <litchi_ooxml_common::mce::codec::start+0x3e45>
+  178278:	cmp    0x58(%rsp),%r12
+  17827d:	mov    $0x6e6c6d78,%r15d
+  178283:	ja     17a8d7 <litchi_ooxml_common::mce::codec::start+0x3817>
+  178289:	mov    0x238(%rsp),%rsi
+  178291:	mov    $0x1,%edx
+  178296:	mov    $0x8,%ecx
+  17829b:	mov    $0x20,%r8d
+  1782a1:	lea    0x228(%rsp),%rdi
+  1782a9:	call   16bc60 <alloc::raw_vec::RawVecInner<A>::try_reserve>
+  1782ae:	movabs $0x8000000000000001,%rcx
+  1782b8:	cmp    %rcx,%rax
+  1782bb:	jne    17a934 <litchi_ooxml_common::mce::codec::start+0x3874>
+  1782c1:	mov    0x8(%r13),%rax
+  1782c5:	mov    %rax,0x88(%rsp)
+  1782cd:	mov    0x10(%r13),%rax
+  1782d1:	mov    %rax,0x358(%rsp)
+  1782d9:	mov    0x238(%rsp),%r13
+  1782e1:	cmp    0x228(%rsp),%r13
+  1782e9:	jne    1782f9 <litchi_ooxml_common::mce::codec::start+0x1239>
+  1782eb:	lea    0x228(%rsp),%rdi
+  1782f3:	call   *0x110e07(%rip)        # 289100 <_DYNAMIC+0xf20>
+  1782f9:	mov    0x230(%rsp),%rax
+  178301:	mov    %r13,%rcx
+  178304:	shl    $0x5,%rcx
+  178308:	mov    %rbp,(%rax,%rcx,1)
+  17830c:	mov    %r14,0x8(%rax,%rcx,1)
+  178311:	mov    0x88(%rsp),%rdx
+  178319:	mov    %rdx,0x10(%rax,%rcx,1)
+  17831e:	mov    0x358(%rsp),%rdx
+  178326:	mov    %rdx,0x18(%rax,%rcx,1)
+  17832b:	inc    %r13
+  17832e:	mov    %r13,0x238(%rsp)
+  178336:	mov    0x1f8(%rsp),%r13
+  17833e:	cmp    %rbx,%r13
+  178341:	jne    178072 <litchi_ooxml_common::mce::codec::start+0xfb2>
+  178347:	mov    $0x1,%r12b
+  17834a:	lea    0x106c6f(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  178351:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178356:	movabs $0x8000000000000001,%r13
+  178360:	movups 0x106c71(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178367:	movaps %xmm0,0x3f0(%rsp)
+  17836f:	movdqu 0x106c51(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178377:	movdqa %xmm0,0x3e0(%rsp)
+  178380:	mov    %rax,0x400(%rsp)
+  178388:	mov    %rdx,0x408(%rsp)
+  178390:	mov    0x230(%rsp),%rax
+  178398:	mov    0x238(%rsp),%rcx
+  1783a0:	shl    $0x5,%rcx
+  1783a4:	add    %rax,%rcx
+  1783a7:	mov    %rax,0x370(%rsp)
+  1783af:	mov    %rcx,0x378(%rsp)
+  1783b7:	lea    0x370(%rsp),%rdi
+  1783bf:	call   17c550 <<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find>
+  1783c4:	test   %rax,%rax
+  1783c7:	je     178933 <litchi_ooxml_common::mce::codec::start+0x1873>
+  1783cd:	mov    %rax,%rbx
+  1783d0:	mov    $0x1,%r12b
+  1783d3:	lea    0x106be6(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  1783da:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  1783df:	movups 0x106bf2(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  1783e6:	movaps %xmm0,0x2a0(%rsp)
+  1783ee:	movdqu 0x106bd2(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  1783f6:	movdqa %xmm0,0x290(%rsp)
+  1783ff:	mov    %rax,0x2b0(%rsp)
+  178407:	mov    %rdx,0x2b8(%rsp)
+  17840f:	mov    0x10(%rbx),%rax
+  178413:	mov    0x18(%rbx),%rcx
+  178417:	lea    (%rax,%rcx,1),%rdx
+  17841b:	movq   $0x0,0x120(%rsp)
+  178427:	mov    %rcx,0x128(%rsp)
+  17842f:	mov    %rax,0x130(%rsp)
+  178437:	mov    %rcx,0x138(%rsp)
+  17843f:	mov    %rax,0x140(%rsp)
+  178447:	mov    %rdx,0x148(%rsp)
+  17844f:	movq   $0x0,0x150(%rsp)
+  17845b:	movw   $0x1,0x158(%rsp)
+  178465:	lea    0x120(%rsp),%rdi
+  17846d:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  178472:	test   %rax,%rax
+  178475:	je     178926 <litchi_ooxml_common::mce::codec::start+0x1866>
+  17847b:	mov    %rax,%rbx
+  17847e:	mov    %rdx,%r15
+  178481:	mov    0x110940(%rip),%rcx        # 288dc8 <_DYNAMIC+0xbe8>
+  178488:	lea    0x290(%rsp),%r12
+  178490:	mov    0x1100e1(%rip),%rbp        # 288578 <bcmp@GLIBC_2.2.5>
+  178497:	mov    %rbx,0x460(%rsp)
+  17849f:	mov    %r15,0x468(%rsp)
+  1784a7:	mov    %rbx,%rdi
+  1784aa:	mov    %r15,%rsi
+  1784ad:	call   *%rcx
+  1784af:	test   %al,%al
+  1784b1:	je     17969e <litchi_ooxml_common::mce::codec::start+0x25de>
+  1784b7:	mov    %r12,%rdi
+  1784ba:	mov    %rbx,%rsi
+  1784bd:	mov    %r15,%rdx
+  1784c0:	call   16c150 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  1784c5:	test   %al,%al
+  1784c7:	jne    17969e <litchi_ooxml_common::mce::codec::start+0x25de>
+  1784cd:	mov    0x60(%rsp),%r14
+  1784d2:	cmp    $0x3,%r15
+  1784d6:	jne    178501 <litchi_ooxml_common::mce::codec::start+0x1441>
+  1784d8:	movzwl (%rbx),%eax
+  1784db:	xor    $0x6d78,%eax
+  1784e0:	movzbl 0x2(%rbx),%ecx
+  1784e4:	xor    $0x6c,%ecx
+  1784e7:	or     %ax,%cx
+  1784ea:	jne    178501 <litchi_ooxml_common::mce::codec::start+0x1441>
+  1784ec:	mov    $0x24,%ebx
+  1784f1:	lea    -0xeaa1e(%rip),%r14        # 8dada <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x364>
+  1784f8:	jmp    178592 <litchi_ooxml_common::mce::codec::start+0x14d2>
+  1784fd:	mov    0x28(%r14),%r14
+  178501:	test   %r14,%r14
+  178504:	je     1795fd <litchi_ooxml_common::mce::codec::start+0x253d>
+  17850a:	mov    0x20(%r14),%rax
+  17850e:	test   %rax,%rax
+  178511:	je     1784fd <litchi_ooxml_common::mce::codec::start+0x143d>
+  178513:	mov    0x18(%r14),%r13
+  178517:	shl    $0x4,%rax
+  17851b:	lea    (%rax,%rax,2),%r12
+  17851f:	jmp    178527 <litchi_ooxml_common::mce::codec::start+0x1467>
+  178521:	add    $0xffffffffffffffd0,%r12
+  178525:	je     1784fd <litchi_ooxml_common::mce::codec::start+0x143d>
+  178527:	cmp    %r15,-0x20(%r13,%r12,1)
+  17852c:	jne    178521 <litchi_ooxml_common::mce::codec::start+0x1461>
+  17852e:	mov    -0x28(%r13,%r12,1),%rdi
+  178533:	mov    %rbx,%rsi
+  178536:	mov    %r15,%rdx
+  178539:	call   *%rbp
+  17853b:	test   %eax,%eax
+  17853d:	jne    178521 <litchi_ooxml_common::mce::codec::start+0x1461>
+  17853f:	mov    -0x10(%r13,%r12,1),%r14
+  178544:	mov    -0x8(%r13,%r12,1),%rbx
+  178549:	cmp    $0x3b,%rbx
+  17854d:	jne    178580 <litchi_ooxml_common::mce::codec::start+0x14c0>
+  17854f:	mov    $0x3b,%ebx
+  178554:	mov    $0x3b,%edx
+  178559:	mov    %r14,%rdi
+  17855c:	lea    -0xeaa3e(%rip),%rsi        # 8db25 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x3af>
+  178563:	call   *%rbp
+  178565:	test   %eax,%eax
+  178567:	movabs $0x8000000000000001,%r13
+  178571:	lea    0x290(%rsp),%r12
+  178579:	jne    178592 <litchi_ooxml_common::mce::codec::start+0x14d2>
+  17857b:	jmp    17a744 <litchi_ooxml_common::mce::codec::start+0x3684>
+  178580:	movabs $0x8000000000000001,%r13
+  17858a:	lea    0x290(%rsp),%r12
+  178592:	cmpq   $0x0,0x3f0(%rsp)
+  17859b:	je     178645 <litchi_ooxml_common::mce::codec::start+0x1585>
+  1785a1:	test   %rbx,%rbx
+  1785a4:	js     178910 <litchi_ooxml_common::mce::codec::start+0x1850>
+  1785aa:	je     1785e6 <litchi_ooxml_common::mce::codec::start+0x1526>
+  1785ac:	call   *0x10fe5e(%rip)        # 288410 <_DYNAMIC+0x230>
+  1785b2:	mov    $0x1,%r15d
+  1785b8:	mov    $0x1,%esi
+  1785bd:	mov    %rbx,%rdi
+  1785c0:	call   *0x10fe52(%rip)        # 288418 <_DYNAMIC+0x238>
+  1785c6:	test   %rax,%rax
+  1785c9:	je     17b18a <litchi_ooxml_common::mce::codec::start+0x40ca>
+  1785cf:	mov    %rax,%rdi
+  1785d2:	mov    %r14,%rsi
+  1785d5:	mov    %rbx,%rdx
+  1785d8:	mov    %rax,%r14
+  1785db:	call   *0x10ff57(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  1785e1:	mov    %r14,%rax
+  1785e4:	jmp    1785eb <litchi_ooxml_common::mce::codec::start+0x152b>
+  1785e6:	mov    $0x1,%eax
+  1785eb:	mov    %rbx,0xb8(%rsp)
+  1785f3:	mov    %rax,0x58(%rsp)
+  1785f8:	mov    %rax,0xc0(%rsp)
+  178600:	mov    %rbx,0xc8(%rsp)
+  178608:	lea    0x3e0(%rsp),%rdi
+  178610:	lea    0xb8(%rsp),%rsi
+  178618:	call   16c350 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  17861d:	lea    0x120(%rsp),%rdi
+  178625:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  17862a:	mov    %rax,%rbx
+  17862d:	mov    %rdx,%r15
+  178630:	test   %rax,%rax
+  178633:	mov    0x11078e(%rip),%rcx        # 288dc8 <_DYNAMIC+0xbe8>
+  17863a:	jne    178497 <litchi_ooxml_common::mce::codec::start+0x13d7>
+  178640:	jmp    178926 <litchi_ooxml_common::mce::codec::start+0x1866>
+  178645:	mov    $0x1,%esi
+  17864a:	lea    0x3e0(%rsp),%rdi
+  178652:	lea    0x400(%rsp),%rdx
+  17865a:	xor    %ecx,%ecx
+  17865c:	call   *0x110396(%rip)        # 2889f8 <_DYNAMIC+0x818>
+  178662:	movabs $0x8000000000000001,%rcx
+  17866c:	cmp    %rcx,%rax
+  17866f:	je     1785a1 <litchi_ooxml_common::mce::codec::start+0x14e1>
+  178675:	test   %rax,%rax
+  178678:	jne    17867a <litchi_ooxml_common::mce::codec::start+0x15ba>
+  17867a:	mov    0x48(%rsp),%rcx
+  17867f:	mov    %rax,(%rcx)
+  178682:	mov    %rdx,0x8(%rcx)
+  178686:	lea    -0xea562(%rip),%rax        # 8e12b <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x9b5>
+  17868d:	mov    %rax,0x10(%rcx)
+  178691:	mov    $0x18,%eax
+  178696:	movabs $0x8000000000000001,%r13
+  1786a0:	jmp    17970b <litchi_ooxml_common::mce::codec::start+0x264b>
+  1786a5:	test   %bl,%bl
+  1786a7:	je     178753 <litchi_ooxml_common::mce::codec::start+0x1693>
+  1786ad:	xor    %eax,%eax
+  1786af:	xor    %ecx,%ecx
+  1786b1:	movdqu 0xa8(%rsp),%xmm0
+  1786ba:	mov    $0x1,%r12b
+  1786bd:	mov    0x60(%rsp),%r8
+  1786c2:	mov    0x70(%rsp),%r9
+  1786c7:	mov    %rax,0x40(%rsp)
+  1786cc:	mov    %rcx,0x38(%rsp)
+  1786d1:	mov    0x3a8(%rsp),%rax
+  1786d9:	mov    %rax,0x30(%rsp)
+  1786de:	mov    %rbp,0x28(%rsp)
+  1786e3:	mov    0x658(%rsp),%rax
+  1786eb:	mov    %rax,0x20(%rsp)
+  1786f0:	mov    0x90(%rsp),%rax
+  1786f8:	mov    %rax,0x10(%rsp)
+  1786fd:	movdqu %xmm0,(%rsp)
+  178702:	movl   $0x0,0x18(%rsp)
+  17870a:	lea    0x120(%rsp),%rdi
+  178712:	mov    0x650(%rsp),%rsi
+  17871a:	mov    0x220(%rsp),%rdx
+  178722:	mov    0xe8(%rsp),%rcx
+  17872a:	call   170640 <litchi_ooxml_common::mce::codec::write_start>
+  17872f:	lea    0x4(%r13),%rax
+  178733:	cmp    %rax,0x120(%rsp)
+  17873b:	jne    1788b2 <litchi_ooxml_common::mce::codec::start+0x17f2>
+  178741:	mov    0x60(%rsp),%r15
+  178746:	test   %r15,%r15
+  178749:	je     178753 <litchi_ooxml_common::mce::codec::start+0x1693>
+  17874b:	lock incq (%r15)
+  17874f:	jg     178756 <litchi_ooxml_common::mce::codec::start+0x1696>
+  178751:	ud2
+  178753:	xor    %r15d,%r15d
+  178756:	mov    %ebx,%ebp
+  178758:	mov    %r15,0xb8(%rsp)
+  178760:	movdqu 0x60(%rsp),%xmm0
+  178766:	movdqu 0x70(%rsp),%xmm1
+  17876c:	movdqa %xmm1,0x130(%rsp)
+  178775:	movdqa %xmm0,0x120(%rsp)
+  17877e:	lea    0x290(%rsp),%rdi
+  178786:	mov    $0x1,%ecx
+  17878b:	mov    $0x1,%r8d
+  178791:	mov    0xe8(%rsp),%r12
+  178799:	mov    %r12,%rsi
+  17879c:	xor    %edx,%edx
+  17879e:	call   16bd20 <alloc::raw_vec::RawVecInner<A>::try_allocate_in>
+  1787a3:	mov    0x298(%rsp),%rbx
+  1787ab:	cmpb   $0x0,0x290(%rsp)
+  1787b3:	jne    17ad18 <litchi_ooxml_common::mce::codec::start+0x3c58>
+  1787b9:	mov    0x2a0(%rsp),%r14
+  1787c1:	test   %r12,%r12
+  1787c4:	je     1787e2 <litchi_ooxml_common::mce::codec::start+0x1722>
+  1787c6:	mov    %r14,%rdi
+  1787c9:	mov    0x220(%rsp),%rsi
+  1787d1:	mov    %r12,%rdx
+  1787d4:	call   *0x10fd5e(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  1787da:	mov    0xe8(%rsp),%r12
+  1787e2:	movdqa 0x120(%rsp),%xmm0
+  1787eb:	movdqa 0x130(%rsp),%xmm1
+  1787f4:	movdqu %xmm1,0x538(%rsp)
+  1787fd:	movdqu %xmm0,0x528(%rsp)
+  178806:	mov    %rbx,0x510(%rsp)
+  17880e:	mov    %r14,0x518(%rsp)
+  178816:	mov    %r12,0x520(%rsp)
+  17881e:	mov    %bpl,0x550(%rsp)
+  178826:	mov    %r15,0x548(%rsp)
+  17882e:	xor    %r12d,%r12d
+  178831:	movzbl 0x10c(%rsp),%ecx
+  178839:	lea    0x510(%rsp),%rdx
+  178841:	mov    0x48(%rsp),%rdi
+  178846:	mov    0x98(%rsp),%rsi
+  17884e:	mov    0x650(%rsp),%r8
+  178856:	call   176ae0 <litchi_ooxml_common::mce::codec::close>
+  17885b:	cmpb   $0x0,0x84(%rsp)
+  178863:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  178869:	lea    0xf0(%rsp),%rdi
+  178871:	call   17c150 <core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,alloc::string::String)>>>
+  178876:	jmp    177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  17887b:	mov    0x48(%rsp),%rcx
+  178880:	mov    %rdi,(%rcx)
+  178883:	mov    %rax,0x8(%rcx)
+  178887:	mov    %rbp,0x10(%rcx)
+  17888b:	mov    %r14,0x18(%rcx)
+  17888f:	mov    $0x1,%r12b
+  178892:	movabs $0x8000000000000001,%r13
+  17889c:	mov    0x228(%rsp),%rsi
+  1788a4:	test   %rsi,%rsi
+  1788a7:	jne    17a4d8 <litchi_ooxml_common::mce::codec::start+0x3418>
+  1788ad:	jmp    177ee7 <litchi_ooxml_common::mce::codec::start+0xe27>
+  1788b2:	movdqu 0x120(%rsp),%xmm0
+  1788bb:	movdqu 0x130(%rsp),%xmm1
+  1788c4:	mov    0x48(%rsp),%rax
+  1788c9:	movdqu %xmm1,0x10(%rax)
+  1788ce:	movdqu %xmm0,(%rax)
+  1788d2:	jmp    177ee4 <litchi_ooxml_common::mce::codec::start+0xe24>
+  1788d7:	mov    0x138(%rsp),%rcx
+  1788df:	mov    0x48(%rsp),%rdx
+  1788e4:	mov    %rax,(%rdx)
+  1788e7:	mov    %r15,0x8(%rdx)
+  1788eb:	mov    %r14,0x10(%rdx)
+  1788ef:	mov    %rcx,0x18(%rdx)
+  1788f3:	jmp    179596 <litchi_ooxml_common::mce::codec::start+0x24d6>
+  1788f8:	mov    %rax,%rdi
+  1788fb:	mov    %rcx,%rsi
+  1788fe:	lea    0x10668b(%rip),%rcx        # 27ef90 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x38>
+  178905:	call   *0x10fd8d(%rip)        # 288698 <_DYNAMIC+0x4b8>
+  17890b:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  178910:	xor    %r15d,%r15d
+  178913:	mov    %r15,%rdi
+  178916:	mov    0x58(%rsp),%rsi
+  17891b:	call   *0x10fc0f(%rip)        # 288530 <_DYNAMIC+0x350>
+  178921:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  178926:	lea    0x290(%rsp),%rdi
+  17892e:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  178933:	mov    $0x1,%r12b
+  178936:	lea    0x106683(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  17893d:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178942:	movups 0x10668f(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178949:	movaps %xmm0,0x420(%rsp)
+  178951:	movdqu 0x10666f(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178959:	movdqa %xmm0,0x410(%rsp)
+  178962:	mov    %rax,0x430(%rsp)
+  17896a:	mov    %rdx,0x438(%rsp)
+  178972:	mov    0x3f8(%rsp),%rax
+  17897a:	test   %rax,%rax
+  17897d:	je     178c18 <litchi_ooxml_common::mce::codec::start+0x1b58>
+  178983:	mov    0x3e0(%rsp),%rbp
+  17898b:	movdqa 0x0(%rbp),%xmm0
+  178990:	pmovmskb %xmm0,%r12d
+  178995:	not    %r12d
+  178998:	lea    0x10(%rbp),%r13
+  17899c:	lea    0x120(%rsp),%r15
+  1789a4:	jmp    178af0 <litchi_ooxml_common::mce::codec::start+0x1a30>
+  1789a9:	and    %rdi,%rax
+  1789ac:	movdqu (%rsi,%rax,1),%xmm2
+  1789b1:	movdqa %xmm2,%xmm0
+  1789b5:	pcmpeqb %xmm1,%xmm0
+  1789b9:	pmovmskb %xmm0,%ecx
+  1789bd:	test   %ecx,%ecx
+  1789bf:	mov    %r14,%rdx
+  1789c2:	je     178a79 <litchi_ooxml_common::mce::codec::start+0x19b9>
+  1789c8:	mov    %rax,0x458(%rsp)
+  1789d0:	mov    %rdi,0x450(%rsp)
+  1789d8:	movdqa %xmm1,0x4c0(%rsp)
+  1789e1:	mov    %r8,0x448(%rsp)
+  1789e9:	movdqa %xmm2,0x4b0(%rsp)
+  1789f2:	mov    %rcx,0x358(%rsp)
+  1789fa:	tzcnt  %ecx,%ecx
+  1789fe:	add    %rax,%rcx
+  178a01:	and    %rdi,%rcx
+  178a04:	neg    %rcx
+  178a07:	lea    (%rcx,%rcx,2),%rax
+  178a0b:	cmp    -0x8(%rsi,%rax,8),%rdx
+  178a10:	jne    178a39 <litchi_ooxml_common::mce::codec::start+0x1979>
+  178a12:	lea    (%rsi,%rax,8),%rax
+  178a16:	mov    %rsi,%r15
+  178a19:	mov    -0x10(%rax),%rsi
+  178a1d:	mov    0x58(%rsp),%rdi
+  178a22:	mov    %r14,%rdx
+  178a25:	call   *0x10fb4d(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  178a2b:	mov    %r15,%rsi
+  178a2e:	mov    %r14,%rdx
+  178a31:	test   %eax,%eax
+  178a33:	je     178b90 <litchi_ooxml_common::mce::codec::start+0x1ad0>
+  178a39:	mov    0x358(%rsp),%rcx
+  178a41:	lea    -0x1(%rcx),%eax
+  178a44:	and    %cx,%ax
+  178a47:	mov    %eax,%ecx
+  178a49:	mov    0x458(%rsp),%rax
+  178a51:	mov    0x450(%rsp),%rdi
+  178a59:	movdqa 0x4c0(%rsp),%xmm1
+  178a62:	mov    0x448(%rsp),%r8
+  178a6a:	movdqa 0x4b0(%rsp),%xmm2
+  178a73:	jne    1789f2 <litchi_ooxml_common::mce::codec::start+0x1932>
+  178a79:	pcmpeqd %xmm0,%xmm0
+  178a7d:	pcmpeqb %xmm0,%xmm2
+  178a81:	pmovmskb %xmm2,%ecx
+  178a85:	test   %ecx,%ecx
+  178a87:	lea    0x120(%rsp),%r15
+  178a8f:	jne    178ae2 <litchi_ooxml_common::mce::codec::start+0x1a22>
+  178a91:	add    %r8,%rax
+  178a94:	add    $0x10,%rax
+  178a98:	add    $0x10,%r8
+  178a9c:	jmp    1789a9 <litchi_ooxml_common::mce::codec::start+0x18e9>
+  178aa1:	cmpq   $0x0,0x28(%rbx)
+  178aa6:	je     178ae2 <litchi_ooxml_common::mce::codec::start+0x1a22>
+  178aa8:	lea    0x30(%rbx),%rdi
+  178aac:	mov    0x58(%rsp),%rsi
+  178ab1:	mov    %rdx,%r14
+  178ab4:	call   16dc60 <core::hash::BuildHasher::hash_one>
+  178ab9:	mov    %rax,%rcx
+  178abc:	shr    $0x39,%rcx
+  178ac0:	mov    0x10(%rbx),%rsi
+  178ac4:	mov    0x18(%rbx),%rdi
+  178ac8:	movd   %ecx,%xmm0
+  178acc:	punpcklbw %xmm0,%xmm0
+  178ad0:	pshuflw $0x0,%xmm0,%xmm0
+  178ad5:	pshufd $0x44,%xmm0,%xmm1
+  178ada:	xor    %r8d,%r8d
+  178add:	jmp    1789a9 <litchi_ooxml_common::mce::codec::start+0x18e9>
+  178ae2:	mov    0xd0(%rbx),%rbx
+  178ae9:	test   %rbx,%rbx
+  178aec:	jne    178aa1 <litchi_ooxml_common::mce::codec::start+0x19e1>
+  178aee:	jmp    178b59 <litchi_ooxml_common::mce::codec::start+0x1a99>
+  178af0:	test   %r12w,%r12w
+  178af4:	mov    %rax,0x1f8(%rsp)
+  178afc:	jne    178b1f <litchi_ooxml_common::mce::codec::start+0x1a5f>
+  178afe:	xchg   %ax,%ax
+  178b00:	movdqa 0x0(%r13),%xmm0
+  178b06:	add    $0xfffffffffffffe80,%rbp
+  178b0d:	add    $0x10,%r13
+  178b11:	pmovmskb %xmm0,%r12d
+  178b16:	xor    $0xffff,%r12d
+  178b1d:	je     178b00 <litchi_ooxml_common::mce::codec::start+0x1a40>
+  178b1f:	tzcnt  %r12d,%eax
+  178b24:	neg    %rax
+  178b27:	lea    (%rax,%rax,2),%rax
+  178b2b:	mov    %rax,0x88(%rsp)
+  178b33:	mov    0x70(%rsp),%rbx
+  178b38:	test   %rbx,%rbx
+  178b3b:	je     178b59 <litchi_ooxml_common::mce::codec::start+0x1a99>
+  178b3d:	mov    0x88(%rsp),%rax
+  178b45:	mov    -0x10(%rbp,%rax,8),%rcx
+  178b4a:	mov    %rcx,0x58(%rsp)
+  178b4f:	mov    -0x8(%rbp,%rax,8),%rdx
+  178b54:	jmp    178aa1 <litchi_ooxml_common::mce::codec::start+0x19e1>
+  178b59:	cmpq   $0x0,0x420(%rsp)
+  178b62:	je     178bb6 <litchi_ooxml_common::mce::codec::start+0x1af6>
+  178b64:	mov    0x88(%rsp),%rax
+  178b6c:	lea    -0x18(,%rax,8),%rsi
+  178b74:	add    %rbp,%rsi
+  178b77:	mov    %r15,%rdi
+  178b7a:	call   *0x10fc50(%rip)        # 2887d0 <_DYNAMIC+0x5f0>
+  178b80:	lea    0x410(%rsp),%rdi
+  178b88:	mov    %r15,%rsi
+  178b8b:	call   16c350 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  178b90:	lea    -0x1(%r12),%eax
+  178b95:	and    %r12d,%eax
+  178b98:	mov    %eax,%r12d
+  178b9b:	mov    0x1f8(%rsp),%rax
+  178ba3:	dec    %rax
+  178ba6:	lea    0x120(%rsp),%r15
+  178bae:	jne    178af0 <litchi_ooxml_common::mce::codec::start+0x1a30>
+  178bb4:	jmp    178c18 <litchi_ooxml_common::mce::codec::start+0x1b58>
+  178bb6:	mov    $0x1,%esi
+  178bbb:	lea    0x410(%rsp),%rdi
+  178bc3:	lea    0x430(%rsp),%rdx
+  178bcb:	xor    %ecx,%ecx
+  178bcd:	call   *0x10fe25(%rip)        # 2889f8 <_DYNAMIC+0x818>
+  178bd3:	movabs $0x8000000000000001,%rcx
+  178bdd:	cmp    %rcx,%rax
+  178be0:	je     178b64 <litchi_ooxml_common::mce::codec::start+0x1aa4>
+  178be2:	test   %rax,%rax
+  178be5:	jne    178be7 <litchi_ooxml_common::mce::codec::start+0x1b27>
+  178be7:	mov    0x48(%rsp),%rcx
+  178bec:	mov    %rax,(%rcx)
+  178bef:	mov    %rdx,0x8(%rcx)
+  178bf3:	lea    -0xea821(%rip),%rax        # 8e3d9 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc63>
+  178bfa:	mov    %rax,0x10(%rcx)
+  178bfe:	movq   $0x22,0x18(%rcx)
+  178c06:	mov    $0x1,%r12b
+  178c09:	movabs $0x8000000000000001,%r13
+  178c13:	jmp    17a4ad <litchi_ooxml_common::mce::codec::start+0x33ed>
+  178c18:	mov    $0x1,%r12b
+  178c1b:	lea    0x10639e(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  178c22:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178c27:	movabs $0x8000000000000001,%r13
+  178c31:	movups 0x1063a0(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178c38:	movaps %xmm0,0x3c0(%rsp)
+  178c40:	movdqu 0x106380(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178c48:	movdqa %xmm0,0x3b0(%rsp)
+  178c51:	mov    %rax,0x3d0(%rsp)
+  178c59:	mov    %rdx,0x3d8(%rsp)
+  178c61:	mov    $0x1,%r12b
+  178c64:	lea    0x106355(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  178c6b:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178c70:	lea    0xb8(%rsp),%r14
+  178c78:	movups 0x106359(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178c7f:	movaps %xmm0,0x380(%rsp)
+  178c87:	movdqu 0x106339(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178c8f:	movdqa %xmm0,0x370(%rsp)
+  178c98:	mov    %rax,0x390(%rsp)
+  178ca0:	mov    %rdx,0x398(%rsp)
+  178ca8:	mov    $0x1,%r12b
+  178cab:	lea    0x10630e(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  178cb2:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178cb7:	movups 0x10631a(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178cbe:	movaps %xmm0,0x250(%rsp)
+  178cc6:	movdqu 0x1062fa(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178cce:	movdqa %xmm0,0x240(%rsp)
+  178cd7:	mov    %rax,0x260(%rsp)
+  178cdf:	mov    %rdx,0x268(%rsp)
+  178ce7:	mov    0x238(%rsp),%r12
+  178cef:	mov    $0x1,%al
+  178cf1:	mov    %eax,0x58(%rsp)
+  178cf5:	mov    $0x1,%al
+  178cf7:	test   %r12,%r12
+  178cfa:	je     179ab9 <litchi_ooxml_common::mce::codec::start+0x29f9>
+  178d00:	lea    0x3d0(%rsp),%rbx
+  178d08:	mov    0x230(%rsp),%r15
+  178d10:	shl    $0x5,%r12
+  178d14:	add    %r15,%r12
+  178d17:	mov    0x8(%r15),%rcx
+  178d1b:	add    $0xfffffffffffffff7,%rcx
+  178d1f:	cmp    $0x9,%rcx
+  178d23:	ja     1795d9 <litchi_ooxml_common::mce::codec::start+0x2519>
+  178d29:	mov    (%r15),%rax
+  178d2c:	lea    -0xeb307(%rip),%rdx        # 8da2c <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x2b6>
+  178d33:	movslq (%rdx,%rcx,4),%rcx
+  178d37:	add    %rdx,%rcx
+  178d3a:	jmp    *%rcx
+  178d3c:	mov    (%rax),%rcx
+  178d3f:	movabs $0x6c6261726f6e6749,%rdx
+  178d49:	xor    %rdx,%rcx
+  178d4c:	movzbl 0x8(%rax),%eax
+  178d50:	xor    $0x65,%rax
+  178d54:	or     %rcx,%rax
+  178d57:	jne    1795d9 <litchi_ooxml_common::mce::codec::start+0x2519>
+  178d5d:	add    $0x20,%r15
+  178d61:	cmp    %r12,%r15
+  178d64:	jne    178d17 <litchi_ooxml_common::mce::codec::start+0x1c57>
+  178d66:	jmp    179aad <litchi_ooxml_common::mce::codec::start+0x29ed>
+  178d6b:	movdqu (%rax),%xmm0
+  178d6f:	pcmpeqb -0x111377(%rip),%xmm0        # 67a00 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x180>
+  178d77:	pmovmskb %xmm0,%eax
+  178d7b:	cmp    $0xffff,%eax
+  178d80:	jne    1795d9 <litchi_ooxml_common::mce::codec::start+0x2519>
+  178d86:	mov    0x10(%r15),%rax
+  178d8a:	mov    0x18(%r15),%rcx
+  178d8e:	lea    (%rax,%rcx,1),%rdx
+  178d92:	movq   $0x0,0x120(%rsp)
+  178d9e:	mov    %rcx,0x128(%rsp)
+  178da6:	mov    %rax,0x130(%rsp)
+  178dae:	mov    %rcx,0x138(%rsp)
+  178db6:	mov    %rax,0x140(%rsp)
+  178dbe:	mov    %rdx,0x148(%rsp)
+  178dc6:	movq   $0x0,0x150(%rsp)
+  178dd2:	movw   $0x1,0x158(%rsp)
+  178ddc:	lea    0x120(%rsp),%rdi
+  178de4:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  178de9:	test   %rax,%rax
+  178dec:	je     178d5d <litchi_ooxml_common::mce::codec::start+0x1c9d>
+  178df2:	mov    0x60(%rsp),%rcx
+  178df7:	lea    0x290(%rsp),%rdi
+  178dff:	mov    %rax,%rsi
+  178e02:	call   173bb0 <litchi_ooxml_common::mce::codec::parse_qname_target>
+  178e07:	mov    0x290(%rsp),%rax
+  178e0f:	lea    0x298(%rsp),%rcx
+  178e17:	movups (%rcx),%xmm0
+  178e1a:	movups 0x10(%rcx),%xmm1
+  178e1e:	movaps %xmm0,0x270(%rsp)
+  178e26:	movaps %xmm1,0x280(%rsp)
+  178e2e:	cmp    %r13,%rax
+  178e31:	je     179679 <litchi_ooxml_common::mce::codec::start+0x25b9>
+  178e37:	mov    0x2b8(%rsp),%rcx
+  178e3f:	movdqa 0x270(%rsp),%xmm0
+  178e48:	movdqa 0x280(%rsp),%xmm1
+  178e51:	movdqu %xmm1,0x18(%r14)
+  178e57:	movdqu %xmm0,0x8(%r14)
+  178e5d:	mov    %rax,0xb8(%rsp)
+  178e65:	mov    %rcx,0xe0(%rsp)
+  178e6d:	cmp    0x118(%rsp),%rax
+  178e75:	mov    0xc8(%rsp),%rsi
+  178e7d:	mov    0xd0(%rsp),%rdx
+  178e85:	cmovne %rsi,%rdx
+  178e89:	cmovne 0xc0(%rsp),%rsi
+  178e92:	lea    0x3e0(%rsp),%rdi
+  178e9a:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  178e9f:	test   %al,%al
+  178ea1:	je     179884 <litchi_ooxml_common::mce::codec::start+0x27c4>
+  178ea7:	cmpq   $0x0,0x380(%rsp)
+  178eb0:	je     178f0a <litchi_ooxml_common::mce::codec::start+0x1e4a>
+  178eb2:	movdqu 0xb8(%rsp),%xmm0
+  178ebb:	movdqu 0xc8(%rsp),%xmm1
+  178ec4:	movdqu 0xd8(%rsp),%xmm2
+  178ecd:	movdqa %xmm2,0x2b0(%rsp)
+  178ed6:	movdqa %xmm1,0x2a0(%rsp)
+  178edf:	movdqa %xmm0,0x290(%rsp)
+  178ee8:	lea    0x370(%rsp),%rdi
+  178ef0:	lea    0x290(%rsp),%rsi
+  178ef8:	call   16c5d0 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  178efd:	test   %al,%al
+  178eff:	je     178ddc <litchi_ooxml_common::mce::codec::start+0x1d1c>
+  178f05:	jmp    179956 <litchi_ooxml_common::mce::codec::start+0x2896>
+  178f0a:	mov    $0x1,%esi
+  178f0f:	lea    0x370(%rsp),%rdi
+  178f17:	lea    0x390(%rsp),%rdx
+  178f1f:	xor    %ecx,%ecx
+  178f21:	call   *0x1101a1(%rip)        # 2890c8 <_DYNAMIC+0xee8>
+  178f27:	mov    %rax,%rcx
+  178f2a:	movabs $0x8000000000000001,%rax
+  178f34:	cmp    %rax,%rcx
+  178f37:	je     178eb2 <litchi_ooxml_common::mce::codec::start+0x1df2>
+  178f3d:	jmp    17b0df <litchi_ooxml_common::mce::codec::start+0x401f>
+  178f42:	mov    (%rax),%rcx
+  178f45:	movabs $0x43737365636f7250,%rdx
+  178f4f:	xor    %rdx,%rcx
+  178f52:	mov    0x6(%rax),%rdx
+  178f56:	movabs $0x746e65746e6f4373,%rsi
+  178f60:	xor    %rsi,%rdx
+  178f63:	or     %rcx,%rdx
+  178f66:	je     1792ae <litchi_ooxml_common::mce::codec::start+0x21ee>
+  178f6c:	mov    (%rax),%rcx
+  178f6f:	movabs $0x65646e557473754d,%rdx
+  178f79:	xor    %rdx,%rcx
+  178f7c:	mov    0x6(%rax),%rax
+  178f80:	movabs $0x646e617473726564,%rdx
+  178f8a:	xor    %rdx,%rax
+  178f8d:	or     %rcx,%rax
+  178f90:	jne    1795d9 <litchi_ooxml_common::mce::codec::start+0x2519>
+  178f96:	mov    %rbx,%rbp
+  178f99:	lea    0x106020(%rip),%rdi        # 27efc0 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x68>
+  178fa0:	call   180f90 <std::thread::local::LocalKey<T>::with>
+  178fa5:	movups 0x10602c(%rip),%xmm0        # 27efd8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x80>
+  178fac:	movaps %xmm0,0x2a0(%rsp)
+  178fb4:	movdqu 0x10600c(%rip),%xmm0        # 27efc8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x70>
+  178fbc:	movdqa %xmm0,0x290(%rsp)
+  178fc5:	mov    %rax,0x2b0(%rsp)
+  178fcd:	mov    %rdx,0x2b8(%rsp)
+  178fd5:	mov    0x10(%r15),%rax
+  178fd9:	mov    0x18(%r15),%rcx
+  178fdd:	lea    (%rax,%rcx,1),%rdx
+  178fe1:	movq   $0x0,0x120(%rsp)
+  178fed:	mov    %rcx,0x128(%rsp)
+  178ff5:	mov    %rax,0x130(%rsp)
+  178ffd:	mov    %rcx,0x138(%rsp)
+  179005:	mov    %rax,0x140(%rsp)
+  17900d:	mov    %rdx,0x148(%rsp)
+  179015:	movq   $0x0,0x150(%rsp)
+  179021:	movw   $0x1,0x158(%rsp)
+  17902b:	lea    0x120(%rsp),%rdi
+  179033:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  179038:	test   %rax,%rax
+  17903b:	je     1794d5 <litchi_ooxml_common::mce::codec::start+0x2415>
+  179041:	mov    %rax,%rbx
+  179044:	mov    %rdx,%r14
+  179047:	mov    %rax,0x470(%rsp)
+  17904f:	mov    %rdx,0x478(%rsp)
+  179057:	mov    %rax,%rdi
+  17905a:	mov    %rdx,%rsi
+  17905d:	call   *0x10fd65(%rip)        # 288dc8 <_DYNAMIC+0xbe8>
+  179063:	test   %al,%al
+  179065:	je     179724 <litchi_ooxml_common::mce::codec::start+0x2664>
+  17906b:	lea    0x290(%rsp),%rdi
+  179073:	mov    %rbx,%rsi
+  179076:	mov    %r14,%rdx
+  179079:	call   16c150 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  17907e:	test   %al,%al
+  179080:	jne    179724 <litchi_ooxml_common::mce::codec::start+0x2664>
+  179086:	mov    0x60(%rsp),%rdi
+  17908b:	mov    %rbx,%rsi
+  17908e:	mov    %r14,%rdx
+  179091:	call   170410 <litchi_ooxml_common::mce::codec::Namespaces::get>
+  179096:	test   %rax,%rax
+  179099:	je     1799cb <litchi_ooxml_common::mce::codec::start+0x290b>
+  17909f:	mov    %rax,%r14
+  1790a2:	mov    %rdx,%rbx
+  1790a5:	mov    0x90(%rsp),%rdi
+  1790ad:	mov    %rax,%rsi
+  1790b0:	call   *0x110052(%rip)        # 289108 <_DYNAMIC+0xf28>
+  1790b6:	test   %al,%al
+  1790b8:	jne    17902b <litchi_ooxml_common::mce::codec::start+0x1f6b>
+  1790be:	jmp    179a27 <litchi_ooxml_common::mce::codec::start+0x2967>
+  1790c3:	movdqu (%rax),%xmm0
+  1790c7:	pcmpeqb -0x1113ef(%rip),%xmm0        # 67ce0 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x460>
+  1790cf:	movzwl 0x10(%rax),%eax
+  1790d3:	movd   %eax,%xmm1
+  1790d7:	pcmpeqb -0x1112bf(%rip),%xmm1        # 67e20 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x5a0>
+  1790df:	pand   %xmm0,%xmm1
+  1790e3:	pmovmskb %xmm1,%eax
+  1790e7:	cmp    $0xffff,%eax
+  1790ec:	jne    1795d9 <litchi_ooxml_common::mce::codec::start+0x2519>
+  1790f2:	mov    0x10(%r15),%rax
+  1790f6:	mov    0x18(%r15),%rcx
+  1790fa:	lea    (%rax,%rcx,1),%rdx
+  1790fe:	movq   $0x0,0x120(%rsp)
+  17910a:	mov    %rcx,0x128(%rsp)
+  179112:	mov    %rax,0x130(%rsp)
+  17911a:	mov    %rcx,0x138(%rsp)
+  179122:	mov    %rax,0x140(%rsp)
+  17912a:	mov    %rdx,0x148(%rsp)
+  179132:	movq   $0x0,0x150(%rsp)
+  17913e:	movw   $0x1,0x158(%rsp)
+  179148:	lea    0x120(%rsp),%rdi
+  179150:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  179155:	test   %rax,%rax
+  179158:	je     178d5d <litchi_ooxml_common::mce::codec::start+0x1c9d>
+  17915e:	mov    0x60(%rsp),%rcx
+  179163:	lea    0x290(%rsp),%rdi
+  17916b:	mov    %rax,%rsi
+  17916e:	call   173bb0 <litchi_ooxml_common::mce::codec::parse_qname_target>
+  179173:	mov    0x290(%rsp),%rax
+  17917b:	lea    0x298(%rsp),%rcx
+  179183:	movups (%rcx),%xmm0
+  179186:	movups 0x10(%rcx),%xmm1
+  17918a:	movaps %xmm0,0x270(%rsp)
+  179192:	movaps %xmm1,0x280(%rsp)
+  17919a:	cmp    %r13,%rax
+  17919d:	je     179679 <litchi_ooxml_common::mce::codec::start+0x25b9>
+  1791a3:	mov    0x2b8(%rsp),%rcx
+  1791ab:	movdqa 0x270(%rsp),%xmm0
+  1791b4:	movdqa 0x280(%rsp),%xmm1
+  1791bd:	movdqu %xmm1,0x18(%r14)
+  1791c3:	movdqu %xmm0,0x8(%r14)
+  1791c9:	mov    %rax,0xb8(%rsp)
+  1791d1:	mov    %rcx,0xe0(%rsp)
+  1791d9:	cmp    0x118(%rsp),%rax
+  1791e1:	mov    0xc8(%rsp),%rdx
+  1791e9:	mov    0xc0(%rsp),%rsi
+  1791f1:	cmove  %rdx,%rsi
+  1791f5:	cmove  0xd0(%rsp),%rdx
+  1791fe:	lea    0x3e0(%rsp),%rdi
+  179206:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  17920b:	test   %al,%al
+  17920d:	je     17982e <litchi_ooxml_common::mce::codec::start+0x276e>
+  179213:	cmpq   $0x0,0x250(%rsp)
+  17921c:	je     179276 <litchi_ooxml_common::mce::codec::start+0x21b6>
+  17921e:	movdqu 0xb8(%rsp),%xmm0
+  179227:	movdqu 0xc8(%rsp),%xmm1
+  179230:	movdqu 0xd8(%rsp),%xmm2
+  179239:	movdqa %xmm2,0x2b0(%rsp)
+  179242:	movdqa %xmm1,0x2a0(%rsp)
+  17924b:	movdqa %xmm0,0x290(%rsp)
+  179254:	lea    0x240(%rsp),%rdi
+  17925c:	lea    0x290(%rsp),%rsi
+  179264:	call   16c5d0 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  179269:	test   %al,%al
+  17926b:	je     179148 <litchi_ooxml_common::mce::codec::start+0x2088>
+  179271:	jmp    1798f8 <litchi_ooxml_common::mce::codec::start+0x2838>
+  179276:	mov    $0x1,%esi
+  17927b:	lea    0x240(%rsp),%rdi
+  179283:	lea    0x260(%rsp),%rdx
+  17928b:	xor    %ecx,%ecx
+  17928d:	call   *0x10fe35(%rip)        # 2890c8 <_DYNAMIC+0xee8>
+  179293:	mov    %rax,%rcx
+  179296:	movabs $0x8000000000000001,%rax
+  1792a0:	cmp    %rax,%rcx
+  1792a3:	je     17921e <litchi_ooxml_common::mce::codec::start+0x215e>
+  1792a9:	jmp    17b0f2 <litchi_ooxml_common::mce::codec::start+0x4032>
+  1792ae:	mov    0x10(%r15),%rax
+  1792b2:	mov    0x18(%r15),%rcx
+  1792b6:	lea    (%rax,%rcx,1),%rdx
+  1792ba:	movq   $0x0,0x120(%rsp)
+  1792c6:	mov    %rcx,0x128(%rsp)
+  1792ce:	mov    %rax,0x130(%rsp)
+  1792d6:	mov    %rcx,0x138(%rsp)
+  1792de:	mov    %rax,0x140(%rsp)
+  1792e6:	mov    %rdx,0x148(%rsp)
+  1792ee:	movq   $0x0,0x150(%rsp)
+  1792fa:	movw   $0x1,0x158(%rsp)
+  179304:	lea    0x120(%rsp),%rdi
+  17930c:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  179311:	test   %rax,%rax
+  179314:	je     178d5d <litchi_ooxml_common::mce::codec::start+0x1c9d>
+  17931a:	mov    0x60(%rsp),%rcx
+  17931f:	lea    0x290(%rsp),%rdi
+  179327:	mov    %rax,%rsi
+  17932a:	call   173bb0 <litchi_ooxml_common::mce::codec::parse_qname_target>
+  17932f:	mov    0x290(%rsp),%rax
+  179337:	lea    0x298(%rsp),%rcx
+  17933f:	movups (%rcx),%xmm0
+  179342:	movups 0x10(%rcx),%xmm1
+  179346:	movaps %xmm0,0x270(%rsp)
+  17934e:	movaps %xmm1,0x280(%rsp)
+  179356:	cmp    %r13,%rax
+  179359:	je     179679 <litchi_ooxml_common::mce::codec::start+0x25b9>
+  17935f:	mov    0x2b8(%rsp),%rcx
+  179367:	movdqa 0x270(%rsp),%xmm0
+  179370:	movdqa 0x280(%rsp),%xmm1
+  179379:	movdqu %xmm1,0x18(%r14)
+  17937f:	mov    %r14,%rbp
+  179382:	movdqu %xmm0,0x8(%r14)
+  179388:	mov    %rax,0xb8(%rsp)
+  179390:	mov    %rcx,0xe0(%rsp)
+  179398:	cmp    0x118(%rsp),%rax
+  1793a0:	mov    0xc8(%rsp),%rbx
+  1793a8:	mov    0xd0(%rsp),%r14
+  1793b0:	cmovne %rbx,%r14
+  1793b4:	cmovne 0xc0(%rsp),%rbx
+  1793bd:	lea    0x3e0(%rsp),%rdi
+  1793c5:	mov    %rbx,%rsi
+  1793c8:	mov    %r14,%rdx
+  1793cb:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  1793d0:	test   %al,%al
+  1793d2:	je     17946a <litchi_ooxml_common::mce::codec::start+0x23aa>
+  1793d8:	cmpq   $0x0,0x3c0(%rsp)
+  1793e1:	je     1794a0 <litchi_ooxml_common::mce::codec::start+0x23e0>
+  1793e7:	movdqu 0xb8(%rsp),%xmm0
+  1793f0:	movdqu 0xc8(%rsp),%xmm1
+  1793f9:	movdqu 0xd8(%rsp),%xmm2
+  179402:	movdqa %xmm2,0x2b0(%rsp)
+  17940b:	movdqa %xmm1,0x2a0(%rsp)
+  179414:	movdqa %xmm0,0x290(%rsp)
+  17941d:	lea    0x3b0(%rsp),%rdi
+  179425:	lea    0x290(%rsp),%rsi
+  17942d:	call   16c5d0 <hashbrown::map::HashMap<K,V,S,A>::insert>
+  179432:	movabs $0x8000000000000001,%r13
+  17943c:	lea    0x3d0(%rsp),%rbx
+  179444:	test   %al,%al
+  179446:	jne    17ab2a <litchi_ooxml_common::mce::codec::start+0x3a6a>
+  17944c:	mov    %rbp,%r14
+  17944f:	lea    0x120(%rsp),%rdi
+  179457:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  17945c:	test   %rax,%rax
+  17945f:	jne    17931a <litchi_ooxml_common::mce::codec::start+0x225a>
+  179465:	jmp    178d5d <litchi_ooxml_common::mce::codec::start+0x1c9d>
+  17946a:	mov    0x70(%rsp),%r13
+  17946f:	test   %r13,%r13
+  179472:	je     1797b8 <litchi_ooxml_common::mce::codec::start+0x26f8>
+  179478:	lea    0x10(%r13),%rdi
+  17947c:	mov    %rbx,%rsi
+  17947f:	mov    %r14,%rdx
+  179482:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  179487:	test   %al,%al
+  179489:	jne    1793d8 <litchi_ooxml_common::mce::codec::start+0x2318>
+  17948f:	mov    0xd0(%r13),%r13
+  179496:	test   %r13,%r13
+  179499:	jne    179478 <litchi_ooxml_common::mce::codec::start+0x23b8>
+  17949b:	jmp    1797b8 <litchi_ooxml_common::mce::codec::start+0x26f8>
+  1794a0:	mov    $0x1,%esi
+  1794a5:	lea    0x3b0(%rsp),%rdi
+  1794ad:	lea    0x3d0(%rsp),%rdx
+  1794b5:	xor    %ecx,%ecx
+  1794b7:	call   *0x10fc0b(%rip)        # 2890c8 <_DYNAMIC+0xee8>
+  1794bd:	movabs $0x8000000000000001,%rcx
+  1794c7:	cmp    %rcx,%rax
+  1794ca:	je     1793e7 <litchi_ooxml_common::mce::codec::start+0x2327>
+  1794d0:	jmp    17b14c <litchi_ooxml_common::mce::codec::start+0x408c>
+  1794d5:	lea    0x290(%rsp),%rdi
+  1794dd:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  1794e2:	mov    %rbp,%rbx
+  1794e5:	lea    0xb8(%rsp),%r14
+  1794ed:	jmp    178d5d <litchi_ooxml_common::mce::codec::start+0x1c9d>
+  1794f2:	call   *0x10ef18(%rip)        # 288410 <_DYNAMIC+0x230>
+  1794f8:	mov    $0x11,%r15d
+  1794fe:	mov    $0x1,%ebx
+  179503:	mov    $0x11,%edi
+  179508:	mov    $0x1,%esi
+  17950d:	call   *0x10ef05(%rip)        # 288418 <_DYNAMIC+0x238>
+  179513:	test   %rax,%rax
+  179516:	je     177d34 <litchi_ooxml_common::mce::codec::start+0xc74>
+  17951c:	movups -0xeb46b(%rip),%xmm0        # 8e0b8 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x942>
+  179523:	movups %xmm0,(%rax)
+  179526:	movb   $0x65,0x10(%rax)
+  17952a:	movaps -0x1114b1(%rip),%xmm0        # 68080 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x800>
+  179531:	mov    $0x11,%ecx
+  179536:	movabs $0x8000000000000001,%r13
+  179540:	mov    0x48(%rsp),%rdx
+  179545:	movdqu %xmm0,(%rdx)
+  179549:	mov    %rax,0x10(%rdx)
+  17954d:	mov    %rcx,0x18(%rdx)
+  179551:	mov    $0x1,%r12b
+  179554:	mov    0x100(%rsp),%rbx
+  17955c:	test   %rbx,%rbx
+  17955f:	jne    177f06 <litchi_ooxml_common::mce::codec::start+0xe46>
+  179565:	mov    0xf0(%rsp),%rax
+  17956d:	test   %rax,%rax
+  179570:	je     17958d <litchi_ooxml_common::mce::codec::start+0x24cd>
+  179572:	mov    0xf8(%rsp),%rdi
+  17957a:	shl    $0x4,%rax
+  17957e:	lea    (%rax,%rax,2),%rsi
+  179582:	mov    $0x8,%edx
+  179587:	call   *0x10eeeb(%rip)        # 288478 <_DYNAMIC+0x298>
+  17958d:	test   %r12b,%r12b
+  179590:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  179596:	mov    0x60(%rsp),%rax
+  17959b:	test   %rax,%rax
+  17959e:	je     1795b1 <litchi_ooxml_common::mce::codec::start+0x24f1>
+  1795a0:	lock decq (%rax)
+  1795a4:	jne    1795b1 <litchi_ooxml_common::mce::codec::start+0x24f1>
+  1795a6:	lea    0x60(%rsp),%rdi
+  1795ab:	call   *0x10fb3f(%rip)        # 2890f0 <_DYNAMIC+0xf10>
+  1795b1:	mov    0x70(%rsp),%rax
+  1795b6:	test   %rax,%rax
+  1795b9:	je     177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  1795bf:	lock decq (%rax)
+  1795c3:	jne    177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  1795c9:	lea    0x70(%rsp),%rdi
+  1795ce:	call   *0x10fb24(%rip)        # 2890f8 <_DYNAMIC+0xf18>
+  1795d4:	jmp    177695 <litchi_ooxml_common::mce::codec::start+0x5d5>
+  1795d9:	mov    $0x1,%al
+  1795db:	mov    %eax,0x58(%rsp)
+  1795df:	lea    -0xeb48c(%rip),%rdi        # 8e15a <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x9e4>
+  1795e6:	lea    0x1059fb(%rip),%rdx        # 27efe8 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0x90>
+  1795ed:	mov    $0x28,%esi
+  1795f2:	call   *0x10f398(%rip)        # 288990 <_DYNAMIC+0x7b0>
+  1795f8:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  1795fd:	lea    0x460(%rsp),%rax
+  179605:	mov    %rax,0x240(%rsp)
+  17960d:	lea    0x5fcc(%rip),%rax        # 17f5e0 <<&T as core::fmt::Display>::fmt>
+  179614:	mov    %rax,0x248(%rsp)
+  17961c:	lea    0xc0(%rsp),%rdi
+  179624:	lea    -0x10dfad(%rip),%rsi        # 6b67e <anon.c687ef5a3198440029599bc58c605f4e.491.llvm.12802720401139596066+0xd4>
+  17962b:	lea    0x240(%rsp),%rdx
+  179633:	call   *0x10eedf(%rip)        # 288518 <_DYNAMIC+0x338>
+  179639:	movups 0xc0(%rsp),%xmm0
+  179641:	mov    0xd0(%rsp),%rax
+  179649:	movabs $0x8000000000000001,%r13
+  179653:	mov    0x48(%rsp),%rcx
+  179658:	mov    %r13,(%rcx)
+  17965b:	movups %xmm0,0x8(%rcx)
+  17965f:	jmp    17970b <litchi_ooxml_common::mce::codec::start+0x264b>
+  179664:	lea    0x105995(%rip),%rcx        # 27f000 <anon.6b01d6bcdea6cb0b342ce5d80a50a2ea.7.llvm.3388635054232903227+0xa8>
+  17966b:	xor    %edi,%edi
+  17966d:	mov    %rbx,%rsi
+  179670:	mov    %r13,%rdx
+  179673:	call   *0x10f01f(%rip)        # 288698 <_DYNAMIC+0x4b8>
+  179679:	movdqa 0x270(%rsp),%xmm0
+  179682:	movdqa 0x280(%rsp),%xmm1
+  17968b:	mov    0x48(%rsp),%rax
+  179690:	movdqu %xmm1,0x10(%rax)
+  179695:	movdqu %xmm0,(%rax)
+  179699:	jmp    179aa5 <litchi_ooxml_common::mce::codec::start+0x29e5>
+  17969e:	call   *0x10ed6c(%rip)        # 288410 <_DYNAMIC+0x230>
+  1796a4:	mov    $0x25,%eax
+  1796a9:	mov    %rax,0x58(%rsp)
+  1796ae:	mov    $0x1,%r15d
+  1796b4:	mov    $0x25,%edi
+  1796b9:	mov    $0x1,%esi
+  1796be:	call   *0x10ed54(%rip)        # 288418 <_DYNAMIC+0x238>
+  1796c4:	test   %rax,%rax
+  1796c7:	je     178913 <litchi_ooxml_common::mce::codec::start+0x1853>
+  1796cd:	movups -0xeb5be(%rip),%xmm0        # 8e116 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x9a0>
+  1796d4:	movups %xmm0,0x10(%rax)
+  1796d8:	movdqu -0xeb5da(%rip),%xmm0        # 8e106 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x990>
+  1796e0:	movdqu %xmm0,(%rax)
+  1796e4:	movabs $0x7869666572702065,%rcx
+  1796ee:	mov    %rcx,0x1d(%rax)
+  1796f2:	mov    0x48(%rsp),%rcx
+  1796f7:	mov    %r13,(%rcx)
+  1796fa:	movq   $0x25,0x8(%rcx)
+  179702:	mov    %rax,0x10(%rcx)
+  179706:	mov    $0x25,%eax
+  17970b:	mov    %rax,0x18(%rcx)
+  17970f:	lea    0x290(%rsp),%rdi
+  179717:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17971c:	mov    $0x1,%r12b
+  17971f:	jmp    17a4ba <litchi_ooxml_common::mce::codec::start+0x33fa>
+  179724:	call   *0x10ece6(%rip)        # 288410 <_DYNAMIC+0x230>
+  17972a:	mov    $0x2a,%ebx
+  17972f:	mov    $0x1,%r15d
+  179735:	mov    $0x2a,%edi
+  17973a:	mov    $0x1,%esi
+  17973f:	call   *0x10ecd3(%rip)        # 288418 <_DYNAMIC+0x238>
+  179745:	test   %rax,%rax
+  179748:	je     17b12e <litchi_ooxml_common::mce::codec::start+0x406e>
+  17974e:	movups -0xeb5b9(%rip),%xmm0        # 8e19c <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa26>
+  179755:	movups %xmm0,0x1a(%rax)
+  179759:	movups -0xeb5ce(%rip),%xmm0        # 8e192 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa1c>
+  179760:	movups %xmm0,0x10(%rax)
+  179764:	movdqu -0xeb5ea(%rip),%xmm0        # 8e182 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa0c>
+  17976c:	movdqu %xmm0,(%rax)
+  179770:	mov    0x48(%rsp),%rcx
+  179775:	mov    %r13,(%rcx)
+  179778:	movq   $0x2a,0x8(%rcx)
+  179780:	mov    %rax,0x10(%rcx)
+  179784:	mov    $0x2a,%ebx
+  179789:	jmp    179a94 <litchi_ooxml_common::mce::codec::start+0x29d4>
+  17978e:	lea    -0xeb377(%rip),%rdi        # 8e41e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xca8>
+  179795:	lea    0x1058c4(%rip),%rcx        # 27f060 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x48>
+  17979c:	lea    0x1058a5(%rip),%r8        # 27f048 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x30>
+  1797a3:	lea    0x57(%rsp),%rdx
+  1797a8:	mov    $0x37,%esi
+  1797ad:	call   *0x10f03d(%rip)        # 2887f0 <_DYNAMIC+0x610>
+  1797b3:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  1797b8:	call   *0x10ec52(%rip)        # 288410 <_DYNAMIC+0x230>
+  1797be:	mov    $0x32,%ebx
+  1797c3:	mov    $0x32,%edi
+  1797c8:	mov    $0x1,%esi
+  1797cd:	call   *0x10ec45(%rip)        # 288418 <_DYNAMIC+0x238>
+  1797d3:	test   %rax,%rax
+  1797d6:	je     17b194 <litchi_ooxml_common::mce::codec::start+0x40d4>
+  1797dc:	mov    %rax,%rcx
+  1797df:	movups -0xeb534(%rip),%xmm0        # 8e2b2 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb3c>
+  1797e6:	movups %xmm0,0x20(%rax)
+  1797ea:	movups -0xeb54f(%rip),%xmm0        # 8e2a2 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb2c>
+  1797f1:	movups %xmm0,0x10(%rax)
+  1797f5:	movdqu -0xeb56b(%rip),%xmm0        # 8e292 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb1c>
+  1797fd:	movdqu %xmm0,(%rax)
+  179801:	movw   $0x656c,0x30(%rax)
+  179807:	movabs $0x8000000000000001,%r13
+  179811:	mov    %r13,%rax
+  179814:	mov    $0x32,%edx
+  179819:	mov    0x48(%rsp),%rsi
+  17981e:	mov    %rax,(%rsi)
+  179821:	mov    %rbx,0x8(%rsi)
+  179825:	mov    %rcx,0x10(%rsi)
+  179829:	jmp    1798e2 <litchi_ooxml_common::mce::codec::start+0x2822>
+  17982e:	call   *0x10ebdc(%rip)        # 288410 <_DYNAMIC+0x230>
+  179834:	mov    $0x32,%ebp
+  179839:	mov    $0x32,%edi
+  17983e:	mov    $0x1,%esi
+  179843:	call   *0x10ebcf(%rip)        # 288418 <_DYNAMIC+0x238>
+  179849:	test   %rax,%rax
+  17984c:	je     17b1a9 <litchi_ooxml_common::mce::codec::start+0x40e9>
+  179852:	movups -0xeb68d(%rip),%xmm0        # 8e1cc <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa56>
+  179859:	movups %xmm0,0x20(%rax)
+  17985d:	movups -0xeb6a8(%rip),%xmm0        # 8e1bc <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa46>
+  179864:	movups %xmm0,0x10(%rax)
+  179868:	movdqu -0xeb6c4(%rip),%xmm0        # 8e1ac <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa36>
+  179870:	movdqu %xmm0,(%rax)
+  179874:	movw   $0x656c,0x30(%rax)
+  17987a:	mov    %r13,%rcx
+  17987d:	mov    $0x32,%edx
+  179882:	jmp    1798d2 <litchi_ooxml_common::mce::codec::start+0x2812>
+  179884:	call   *0x10eb86(%rip)        # 288410 <_DYNAMIC+0x230>
+  17988a:	mov    $0x30,%ebp
+  17988f:	mov    $0x30,%edi
+  179894:	mov    $0x1,%esi
+  179899:	call   *0x10eb79(%rip)        # 288418 <_DYNAMIC+0x238>
+  17989f:	test   %rax,%rax
+  1798a2:	je     17b1be <litchi_ooxml_common::mce::codec::start+0x40fe>
+  1798a8:	movups -0xeb66d(%rip),%xmm0        # 8e242 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xacc>
+  1798af:	movups %xmm0,0x20(%rax)
+  1798b3:	movups -0xeb688(%rip),%xmm0        # 8e232 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xabc>
+  1798ba:	movups %xmm0,0x10(%rax)
+  1798be:	movdqu -0xeb6a4(%rip),%xmm0        # 8e222 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xaac>
+  1798c6:	movdqu %xmm0,(%rax)
+  1798ca:	mov    %r13,%rcx
+  1798cd:	mov    $0x30,%edx
+  1798d2:	mov    0x48(%rsp),%rsi
+  1798d7:	mov    %rcx,(%rsi)
+  1798da:	mov    %rbp,0x8(%rsi)
+  1798de:	mov    %rax,0x10(%rsi)
+  1798e2:	mov    %rdx,0x18(%rsi)
+  1798e6:	lea    0xb8(%rsp),%rdi
+  1798ee:	call   17bbf0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::NamePattern>>
+  1798f3:	jmp    179aa5 <litchi_ooxml_common::mce::codec::start+0x29e5>
+  1798f8:	call   *0x10eb12(%rip)        # 288410 <_DYNAMIC+0x230>
+  1798fe:	mov    $0x23,%edi
+  179903:	mov    $0x1,%esi
+  179908:	call   *0x10eb0a(%rip)        # 288418 <_DYNAMIC+0x238>
+  17990e:	test   %rax,%rax
+  179911:	je     17b1d3 <litchi_ooxml_common::mce::codec::start+0x4113>
+  179917:	movups -0xeb730(%rip),%xmm0        # 8e1ee <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa78>
+  17991e:	movups %xmm0,0x10(%rax)
+  179922:	movdqu -0xeb74c(%rip),%xmm0        # 8e1de <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa68>
+  17992a:	movdqu %xmm0,(%rax)
+  17992e:	movl   $0x74656772,0x1f(%rax)
+  179935:	mov    0x48(%rsp),%rcx
+  17993a:	mov    %r13,(%rcx)
+  17993d:	movq   $0x23,0x8(%rcx)
+  179945:	mov    %rax,0x10(%rcx)
+  179949:	movq   $0x23,0x18(%rcx)
+  179951:	jmp    179aa5 <litchi_ooxml_common::mce::codec::start+0x29e5>
+  179956:	call   *0x10eab4(%rip)        # 288410 <_DYNAMIC+0x230>
+  17995c:	mov    $0x21,%edi
+  179961:	mov    $0x1,%esi
+  179966:	call   *0x10eaac(%rip)        # 288418 <_DYNAMIC+0x238>
+  17996c:	test   %rax,%rax
+  17996f:	je     17b1e8 <litchi_ooxml_common::mce::codec::start+0x4128>
+  179975:	movups -0xeb71a(%rip),%xmm0        # 8e262 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xaec>
+  17997c:	movups %xmm0,0x10(%rax)
+  179980:	movdqu -0xeb736(%rip),%xmm0        # 8e252 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xadc>
+  179988:	movdqu %xmm0,(%rax)
+  17998c:	movb   $0x74,0x20(%rax)
+  179990:	mov    0x48(%rsp),%rcx
+  179995:	mov    %r13,(%rcx)
+  179998:	movq   $0x21,0x8(%rcx)
+  1799a0:	mov    %rax,0x10(%rcx)
+  1799a4:	movq   $0x21,0x18(%rcx)
+  1799ac:	jmp    179aa5 <litchi_ooxml_common::mce::codec::start+0x29e5>
+  1799b1:	movdqu 0x128(%rsp),%xmm0
+  1799ba:	mov    $0x1a,%ecx
+  1799bf:	lea    -0xeb8fd(%rip),%rax        # 8e0c9 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x953>
+  1799c6:	jmp    179536 <litchi_ooxml_common::mce::codec::start+0x2476>
+  1799cb:	lea    0x470(%rsp),%rax
+  1799d3:	mov    %rax,0x270(%rsp)
+  1799db:	lea    0x5bfe(%rip),%rax        # 17f5e0 <<&T as core::fmt::Display>::fmt>
+  1799e2:	mov    %rax,0x278(%rsp)
+  1799ea:	lea    0xc0(%rsp),%rdi
+  1799f2:	lea    -0x110366(%rip),%rsi        # 69693 <anon.4ec038192fa7c8b0ce21e85c2fe0975a.826.llvm.12268877393757331420+0x4c>
+  1799f9:	lea    0x270(%rsp),%rdx
+  179a01:	call   *0x10eb11(%rip)        # 288518 <_DYNAMIC+0x338>
+  179a07:	movdqu 0xc0(%rsp),%xmm0
+  179a10:	mov    0xd0(%rsp),%rbx
+  179a18:	mov    0x48(%rsp),%rcx
+  179a1d:	mov    %r13,(%rcx)
+  179a20:	movdqu %xmm0,0x8(%rcx)
+  179a25:	jmp    179a94 <litchi_ooxml_common::mce::codec::start+0x29d4>
+  179a27:	lea    0xb8(%rsp),%rdi
+  179a2f:	mov    $0x1,%ecx
+  179a34:	mov    $0x1,%r8d
+  179a3a:	mov    %rbx,%rsi
+  179a3d:	xor    %edx,%edx
+  179a3f:	call   16bd20 <alloc::raw_vec::RawVecInner<A>::try_allocate_in>
+  179a44:	mov    0xc0(%rsp),%r15
+  179a4c:	cmpl   $0x1,0xb8(%rsp)
+  179a54:	je     17b126 <litchi_ooxml_common::mce::codec::start+0x4066>
+  179a5a:	mov    0xc8(%rsp),%r12
+  179a62:	test   %rbx,%rbx
+  179a65:	je     179a76 <litchi_ooxml_common::mce::codec::start+0x29b6>
+  179a67:	mov    %r12,%rdi
+  179a6a:	mov    %r14,%rsi
+  179a6d:	mov    %rbx,%rdx
+  179a70:	call   *0x10eac2(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  179a76:	movabs $0x8000000000000001,%r13
+  179a80:	lea    0x1(%r13),%rax
+  179a84:	mov    0x48(%rsp),%rcx
+  179a89:	mov    %rax,(%rcx)
+  179a8c:	mov    %r15,0x8(%rcx)
+  179a90:	mov    %r12,0x10(%rcx)
+  179a94:	mov    %rbx,0x18(%rcx)
+  179a98:	lea    0x290(%rsp),%rdi
+  179aa0:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  179aa5:	mov    $0x1,%r12b
+  179aa8:	jmp    17a486 <litchi_ooxml_common::mce::codec::start+0x33c6>
+  179aad:	cmpq   $0x0,0x258(%rsp)
+  179ab6:	sete   %al
+  179ab9:	cmpq   $0x0,0x428(%rsp)
+  179ac2:	mov    0x218(%rsp),%r15
+  179aca:	mov    0x210(%rsp),%r12
+  179ad2:	jne    179af2 <litchi_ooxml_common::mce::codec::start+0x2a32>
+  179ad4:	cmpq   $0x0,0x3c8(%rsp)
+  179add:	jne    179af2 <litchi_ooxml_common::mce::codec::start+0x2a32>
+  179adf:	cmpq   $0x0,0x388(%rsp)
+  179ae8:	jne    179af2 <litchi_ooxml_common::mce::codec::start+0x2a32>
+  179aea:	test   %al,%al
+  179aec:	jne    179c47 <litchi_ooxml_common::mce::codec::start+0x2b87>
+  179af2:	mov    0x70(%rsp),%rbx
+  179af7:	movq   $0x0,0x70(%rsp)
+  179b00:	movaps 0x410(%rsp),%xmm0
+  179b08:	movaps 0x420(%rsp),%xmm1
+  179b10:	movaps 0x430(%rsp),%xmm2
+  179b18:	movaps %xmm0,0x290(%rsp)
+  179b20:	movaps %xmm1,0x2a0(%rsp)
+  179b28:	movaps %xmm2,0x2b0(%rsp)
+  179b30:	movaps 0x3b0(%rsp),%xmm0
+  179b38:	movaps 0x3c0(%rsp),%xmm1
+  179b40:	movaps 0x3d0(%rsp),%xmm2
+  179b48:	movaps %xmm0,0x2c0(%rsp)
+  179b50:	movaps %xmm1,0x2d0(%rsp)
+  179b58:	movaps %xmm2,0x2e0(%rsp)
+  179b60:	movaps 0x370(%rsp),%xmm0
+  179b68:	movaps 0x380(%rsp),%xmm1
+  179b70:	movaps 0x390(%rsp),%xmm2
+  179b78:	movaps %xmm0,0x2f0(%rsp)
+  179b80:	movaps %xmm1,0x300(%rsp)
+  179b88:	movaps %xmm2,0x310(%rsp)
+  179b90:	movdqa 0x240(%rsp),%xmm0
+  179b99:	movdqa 0x250(%rsp),%xmm1
+  179ba2:	movdqa 0x260(%rsp),%xmm2
+  179bab:	movdqa %xmm2,0x340(%rsp)
+  179bb4:	movdqa %xmm1,0x330(%rsp)
+  179bbd:	movdqa %xmm0,0x320(%rsp)
+  179bc6:	movq   $0x1,0x120(%rsp)
+  179bd2:	movq   $0x1,0x128(%rsp)
+  179bde:	lea    0x130(%rsp),%rdi
+  179be6:	lea    0x290(%rsp),%rsi
+  179bee:	mov    $0xc0,%edx
+  179bf3:	call   *0x10e93f(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  179bf9:	mov    %rbx,0x1f0(%rsp)
+  179c01:	call   16fb00 <alloc::boxed::box_new_uninit>
+  179c06:	mov    %rax,%r14
+  179c09:	lea    0x120(%rsp),%rsi
+  179c11:	mov    $0xd8,%edx
+  179c16:	mov    %rax,%rdi
+  179c19:	call   *0x10e919(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  179c1f:	mov    0x70(%rsp),%rax
+  179c24:	test   %rax,%rax
+  179c27:	je     179c3a <litchi_ooxml_common::mce::codec::start+0x2b7a>
+  179c29:	lock decq (%rax)
+  179c2d:	jne    179c3a <litchi_ooxml_common::mce::codec::start+0x2b7a>
+  179c2f:	lea    0x70(%rsp),%rdi
+  179c34:	call   *0x10f4be(%rip)        # 2890f8 <_DYNAMIC+0xf18>
+  179c3a:	mov    %r14,0x70(%rsp)
+  179c3f:	movl   $0x0,0x58(%rsp)
+  179c47:	mov    0x90(%rsp),%rax
+  179c4f:	cmpq   $0x0,0x48(%rax)
+  179c54:	mov    %r12,0x490(%rsp)
+  179c5c:	mov    %r15,0x498(%rsp)
+  179c64:	mov    0x110(%rsp),%rax
+  179c6c:	mov    %rax,0x4a0(%rsp)
+  179c74:	mov    0x208(%rsp),%rax
+  179c7c:	mov    %rax,0x4a8(%rsp)
+  179c84:	je     179cf7 <litchi_ooxml_common::mce::codec::start+0x2c37>
+  179c86:	lea    0x120(%rsp),%rdi
+  179c8e:	lea    0x490(%rsp),%rsi
+  179c96:	call   17b670 <litchi_ooxml_common::mce::codec::start::{{closure}}>
+  179c9b:	movdqu 0x120(%rsp),%xmm0
+  179ca4:	movdqu 0x130(%rsp),%xmm1
+  179cad:	movdqu 0x140(%rsp),%xmm2
+  179cb6:	movdqa %xmm2,0x2b0(%rsp)
+  179cbf:	movdqa %xmm1,0x2a0(%rsp)
+  179cc8:	movdqa %xmm0,0x290(%rsp)
+  179cd1:	mov    0x118(%rsp),%rax
+  179cd9:	cmp    %rax,0x290(%rsp)
+  179ce1:	jne    179d07 <litchi_ooxml_common::mce::codec::start+0x2c47>
+  179ce3:	xor    %eax,%eax
+  179ce5:	mov    0x218(%rsp),%r15
+  179ced:	mov    0x210(%rsp),%r12
+  179cf5:	jmp    179d30 <litchi_ooxml_common::mce::codec::start+0x2c70>
+  179cf7:	lea    -0x1(%r13),%rax
+  179cfb:	mov    %rax,0x290(%rsp)
+  179d03:	xor    %eax,%eax
+  179d05:	jmp    179d30 <litchi_ooxml_common::mce::codec::start+0x2c70>
+  179d07:	mov    0x90(%rsp),%rax
+  179d0f:	lea    0x30(%rax),%rdi
+  179d13:	lea    0x290(%rsp),%rsi
+  179d1b:	call   16bef0 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  179d20:	mov    0x218(%rsp),%r15
+  179d28:	mov    0x210(%rsp),%r12
+  179d30:	mov    %al,0x78(%rsp)
+  179d34:	cmp    $0x3b,%r15
+  179d38:	jne    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  179d3a:	lea    -0xec21c(%rip),%rsi        # 8db25 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x3af>
+  179d41:	mov    $0x3b,%edx
+  179d46:	mov    %r12,%rdi
+  179d49:	call   *0x10e829(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  179d4f:	test   %eax,%eax
+  179d51:	je     179e2d <litchi_ooxml_common::mce::codec::start+0x2d6d>
+  179d57:	mov    0x98(%rsp),%rcx
+  179d5f:	mov    0x10(%rcx),%rax
+  179d63:	test   %rax,%rax
+  179d66:	je     179dd4 <litchi_ooxml_common::mce::codec::start+0x2d14>
+  179d68:	mov    0x8(%rcx),%rbx
+  179d6c:	lea    (%rax,%rax,8),%r14
+  179d70:	lea    0x1(%r13),%rax
+  179d74:	cmp    %rax,-0x48(%rbx,%r14,8)
+  179d79:	jne    179dd4 <litchi_ooxml_common::mce::codec::start+0x2d14>
+  179d7b:	cmp    $0x3b,%r15
+  179d7f:	jne    179d9e <litchi_ooxml_common::mce::codec::start+0x2cde>
+  179d81:	lea    -0xec263(%rip),%rsi        # 8db25 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x3af>
+  179d88:	mov    $0x3b,%edx
+  179d8d:	mov    %r12,%rdi
+  179d90:	call   *0x10e7e2(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  179d96:	test   %eax,%eax
+  179d98:	je     17a4f4 <litchi_ooxml_common::mce::codec::start+0x3434>
+  179d9e:	mov    0x70(%rsp),%rbx
+  179da3:	test   %rbx,%rbx
+  179da6:	je     17a3f9 <litchi_ooxml_common::mce::codec::start+0x3339>
+  179dac:	lea    0x10(%rbx),%rdi
+  179db0:	mov    %r12,%rsi
+  179db3:	mov    %r15,%rdx
+  179db6:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  179dbb:	test   %al,%al
+  179dbd:	jne    17a3dd <litchi_ooxml_common::mce::codec::start+0x331d>
+  179dc3:	mov    0xd0(%rbx),%rbx
+  179dca:	test   %rbx,%rbx
+  179dcd:	jne    179dac <litchi_ooxml_common::mce::codec::start+0x2cec>
+  179dcf:	jmp    17a3f9 <litchi_ooxml_common::mce::codec::start+0x3339>
+  179dd4:	cmp    $0x3b,%r15
+  179dd8:	jne    179df7 <litchi_ooxml_common::mce::codec::start+0x2d37>
+  179dda:	lea    -0xec2bc(%rip),%rsi        # 8db25 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x3af>
+  179de1:	mov    $0x3b,%edx
+  179de6:	mov    %r12,%rdi
+  179de9:	call   *0x10e789(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  179def:	test   %eax,%eax
+  179df1:	je     17a103 <litchi_ooxml_common::mce::codec::start+0x3043>
+  179df7:	mov    0x70(%rsp),%rbx
+  179dfc:	test   %rbx,%rbx
+  179dff:	je     179ecd <litchi_ooxml_common::mce::codec::start+0x2e0d>
+  179e05:	lea    0x10(%rbx),%rdi
+  179e09:	mov    %r12,%rsi
+  179e0c:	mov    %r15,%rdx
+  179e0f:	call   16c040 <hashbrown::map::HashMap<K,V,S,A>::contains_key>
+  179e14:	test   %al,%al
+  179e16:	jne    179eb1 <litchi_ooxml_common::mce::codec::start+0x2df1>
+  179e1c:	mov    0xd0(%rbx),%rbx
+  179e23:	test   %rbx,%rbx
+  179e26:	jne    179e05 <litchi_ooxml_common::mce::codec::start+0x2d45>
+  179e28:	jmp    179ecd <litchi_ooxml_common::mce::codec::start+0x2e0d>
+  179e2d:	mov    0x208(%rsp),%rax
+  179e35:	cmp    $0x6,%rax
+  179e39:	je     17a604 <litchi_ooxml_common::mce::codec::start+0x3544>
+  179e3f:	cmp    $0x8,%rax
+  179e43:	je     17a5b1 <litchi_ooxml_common::mce::codec::start+0x34f1>
+  179e49:	cmp    $0x10,%rax
+  179e4d:	jne    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  179e53:	mov    0x110(%rsp),%rax
+  179e5b:	movdqu (%rax),%xmm0
+  179e5f:	pcmpeqb -0x111f87(%rip),%xmm0        # 67ee0 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x660>
+  179e67:	pmovmskb %xmm0,%eax
+  179e6b:	cmp    $0xffff,%eax
+  179e70:	jne    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  179e76:	mov    0xa8(%rsp),%rsi
+  179e7e:	mov    0xb0(%rsp),%rdx
+  179e86:	mov    0x60(%rsp),%rcx
+  179e8b:	mov    0x70(%rsp),%r8
+  179e90:	movl   $0x0,(%rsp)
+  179e97:	lea    0x120(%rsp),%rdi
+  179e9f:	mov    0x90(%rsp),%r9
+  179ea7:	call   175a60 <litchi_ooxml_common::mce::codec::validate_alternate_attributes>
+  179eac:	jmp    17a65b <litchi_ooxml_common::mce::codec::start+0x359b>
+  179eb1:	mov    0x90(%rsp),%rdi
+  179eb9:	mov    %r12,%rsi
+  179ebc:	mov    %r15,%rdx
+  179ebf:	call   *0x10f243(%rip)        # 289108 <_DYNAMIC+0xf28>
+  179ec5:	test   %al,%al
+  179ec7:	je     17a1a7 <litchi_ooxml_common::mce::codec::start+0x30e7>
+  179ecd:	lea    0x120(%rsp),%rdi
+  179ed5:	mov    $0x1,%ecx
+  179eda:	mov    $0x1,%r8d
+  179ee0:	mov    0xe8(%rsp),%rbx
+  179ee8:	mov    %rbx,%rsi
+  179eeb:	xor    %edx,%edx
+  179eed:	call   16bd20 <alloc::raw_vec::RawVecInner<A>::try_allocate_in>
+  179ef2:	mov    0x128(%rsp),%r12
+  179efa:	cmpb   $0x0,0x120(%rsp)
+  179f02:	jne    17aff1 <litchi_ooxml_common::mce::codec::start+0x3f31>
+  179f08:	mov    0x130(%rsp),%r14
+  179f10:	test   %rbx,%rbx
+  179f13:	je     179f31 <litchi_ooxml_common::mce::codec::start+0x2e71>
+  179f15:	mov    %r14,%rdi
+  179f18:	mov    0x220(%rsp),%rsi
+  179f20:	mov    %rbx,%rdx
+  179f23:	call   *0x10e60f(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  179f29:	mov    0xe8(%rsp),%rbx
+  179f31:	mov    $0x1,%bpl
+  179f34:	and    0x204(%rsp),%bpl
+  179f3c:	mov    0x98(%rsp),%rsi
+  179f44:	mov    0x10(%rsi),%rdx
+  179f48:	xor    %ecx,%ecx
+  179f4a:	test   %rdx,%rdx
+  179f4d:	mov    0x10c(%rsp),%eax
+  179f54:	je     179f95 <litchi_ooxml_common::mce::codec::start+0x2ed5>
+  179f56:	mov    0x8(%rsi),%rsi
+  179f5a:	lea    (%rdx,%rdx,8),%rdi
+  179f5e:	lea    (%rsi,%rdi,8),%r8
+  179f62:	add    $0xffffffffffffffb8,%r8
+  179f66:	mov    $0x0,%r15d
+  179f6c:	test   %r8,%r8
+  179f6f:	je     179f98 <litchi_ooxml_common::mce::codec::start+0x2ed8>
+  179f71:	lea    (%rsi,%rdi,8),%r15
+  179f75:	lea    -0x30(%r15),%rcx
+  179f79:	mov    -0x30(%r15),%rsi
+  179f7d:	mov    -0x10(%r15),%rdi
+  179f81:	test   %rsi,%rsi
+  179f84:	cmove  %rsi,%rcx
+  179f88:	add    $0xfffffffffffffff0,%r15
+  179f8c:	test   %rdi,%rdi
+  179f8f:	cmove  %rdi,%r15
+  179f93:	jmp    179f98 <litchi_ooxml_common::mce::codec::start+0x2ed8>
+  179f95:	xor    %r15d,%r15d
+  179f98:	test   %bpl,%bpl
+  179f9b:	je     17a049 <litchi_ooxml_common::mce::codec::start+0x2f89>
+  179fa1:	movdqu 0xa8(%rsp),%xmm0
+  179faa:	mov    0x60(%rsp),%r8
+  179faf:	mov    0x70(%rsp),%r9
+  179fb4:	mov    %r15,0x40(%rsp)
+  179fb9:	mov    %rcx,0x38(%rsp)
+  179fbe:	mov    0x3a8(%rsp),%rax
+  179fc6:	mov    %rax,0x30(%rsp)
+  179fcb:	mov    0x368(%rsp),%rax
+  179fd3:	mov    %rax,0x28(%rsp)
+  179fd8:	mov    0x658(%rsp),%rax
+  179fe0:	mov    %rax,0x20(%rsp)
+  179fe5:	mov    0x90(%rsp),%rax
+  179fed:	mov    %rax,0x10(%rsp)
+  179ff2:	movdqu %xmm0,(%rsp)
+  179ff7:	movl   $0x1,0x18(%rsp)
+  179fff:	lea    0x120(%rsp),%rdi
+  17a007:	mov    0x650(%rsp),%rsi
+  17a00f:	mov    0x220(%rsp),%rdx
+  17a017:	mov    0xe8(%rsp),%rcx
+  17a01f:	call   170640 <litchi_ooxml_common::mce::codec::write_start>
+  17a024:	lea    0x4(%r13),%rax
+  17a028:	cmp    %rax,0x120(%rsp)
+  17a030:	jne    17a0be <litchi_ooxml_common::mce::codec::start+0x2ffe>
+  17a036:	mov    0x98(%rsp),%rax
+  17a03e:	mov    0x10(%rax),%rdx
+  17a042:	mov    0x10c(%rsp),%eax
+  17a049:	test   %rdx,%rdx
+  17a04c:	jne    17a288 <litchi_ooxml_common::mce::codec::start+0x31c8>
+  17a052:	mov    0x660(%rsp),%rcx
+  17a05a:	cmpb   $0x0,(%rcx)
+  17a05d:	je     17a285 <litchi_ooxml_common::mce::codec::start+0x31c5>
+  17a063:	mov    %r12,%rbx
+  17a066:	call   *0x10e3a4(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a06c:	mov    $0xe,%edi
+  17a071:	mov    $0x1,%esi
+  17a076:	call   *0x10e39c(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a07c:	test   %rax,%rax
+  17a07f:	je     17b1fd <litchi_ooxml_common::mce::codec::start+0x413d>
+  17a085:	movabs $0x73746f6f7220656c,%rcx
+  17a08f:	mov    %rcx,0x6(%rax)
+  17a093:	movabs $0x656c7069746c756d,%rcx
+  17a09d:	mov    %rcx,(%rax)
+  17a0a0:	mov    0x48(%rsp),%rcx
+  17a0a5:	mov    %r13,(%rcx)
+  17a0a8:	movq   $0xe,0x8(%rcx)
+  17a0b0:	mov    %rax,0x10(%rcx)
+  17a0b4:	movq   $0xe,0x18(%rcx)
+  17a0bc:	jmp    17a0e1 <litchi_ooxml_common::mce::codec::start+0x3021>
+  17a0be:	mov    %r12,%rbx
+  17a0c1:	movdqu 0x120(%rsp),%xmm0
+  17a0ca:	movdqu 0x130(%rsp),%xmm1
+  17a0d3:	mov    0x48(%rsp),%rax
+  17a0d8:	movdqu %xmm1,0x10(%rax)
+  17a0dd:	movdqu %xmm0,(%rax)
+  17a0e1:	mov    $0x1,%r12b
+  17a0e4:	test   %rbx,%rbx
+  17a0e7:	jle    17a460 <litchi_ooxml_common::mce::codec::start+0x33a0>
+  17a0ed:	mov    %rbx,%rsi
+  17a0f0:	mov    $0x1,%edx
+  17a0f5:	mov    %r14,%rdi
+  17a0f8:	call   *0x10e37a(%rip)        # 288478 <_DYNAMIC+0x298>
+  17a0fe:	jmp    17a460 <litchi_ooxml_common::mce::codec::start+0x33a0>
+  17a103:	cmpq   $0x10,0x208(%rsp)
+  17a10c:	jne    17a131 <litchi_ooxml_common::mce::codec::start+0x3071>
+  17a10e:	mov    0x110(%rsp),%rax
+  17a116:	movdqu (%rax),%xmm0
+  17a11a:	pcmpeqb -0x112242(%rip),%xmm0        # 67ee0 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x660>
+  17a122:	pmovmskb %xmm0,%eax
+  17a126:	cmp    $0xffff,%eax
+  17a12b:	je     17a891 <litchi_ooxml_common::mce::codec::start+0x37d1>
+  17a131:	call   *0x10e2d9(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a137:	mov    $0x28,%ebx
+  17a13c:	mov    $0x1,%r12d
+  17a142:	mov    $0x28,%edi
+  17a147:	mov    $0x1,%esi
+  17a14c:	call   *0x10e2c6(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a152:	test   %rax,%rax
+  17a155:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17a15b:	mov    %rax,%r14
+  17a15e:	movups -0xebda4(%rip),%xmm0        # 8e3c1 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc4b>
+  17a165:	movups %xmm0,0x10(%rax)
+  17a169:	movdqu -0xebdc0(%rip),%xmm0        # 8e3b1 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc3b>
+  17a171:	movdqu %xmm0,(%rax)
+  17a175:	movabs $0x746e65746e6f4365,%rax
+  17a17f:	mov    %rax,0x20(%r14)
+  17a183:	mov    0x48(%rsp),%rcx
+  17a188:	mov    %r13,(%rcx)
+  17a18b:	mov    $0x28,%eax
+  17a190:	mov    $0x28,%r12d
+  17a196:	mov    %rax,0x8(%rcx)
+  17a19a:	mov    %r14,0x10(%rcx)
+  17a19e:	mov    %r12,0x18(%rcx)
+  17a1a2:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17a1a7:	mov    %r12,0x120(%rsp)
+  17a1af:	mov    %r15,0x128(%rsp)
+  17a1b7:	mov    0x110(%rsp),%rax
+  17a1bf:	mov    %rax,0x130(%rsp)
+  17a1c7:	mov    0x208(%rsp),%rax
+  17a1cf:	mov    %rax,0x138(%rsp)
+  17a1d7:	lea    0x290(%rsp),%rdi
+  17a1df:	lea    0x120(%rsp),%rsi
+  17a1e7:	call   17c420 <core::option::Option<T>::get_or_insert_with>
+  17a1ec:	mov    0x70(%rsp),%rdi
+  17a1f1:	lea    0x290(%rsp),%rsi
+  17a1f9:	call   176220 <litchi_ooxml_common::mce::codec::Ctx::preserves_element>
+  17a1fe:	test   %al,%al
+  17a200:	je     17a68c <litchi_ooxml_common::mce::codec::start+0x35cc>
+  17a206:	mov    0x658(%rsp),%rax
+  17a20e:	incq   0x28(%rax)
+  17a212:	lea    0x120(%rsp),%rdi
+  17a21a:	mov    $0x1,%ecx
+  17a21f:	mov    $0x1,%r8d
+  17a225:	mov    0xe8(%rsp),%rsi
+  17a22d:	xor    %edx,%edx
+  17a22f:	call   16bd20 <alloc::raw_vec::RawVecInner<A>::try_allocate_in>
+  17a234:	mov    0x128(%rsp),%r12
+  17a23c:	cmpb   $0x0,0x120(%rsp)
+  17a244:	jne    17aff1 <litchi_ooxml_common::mce::codec::start+0x3f31>
+  17a24a:	mov    0x130(%rsp),%r14
+  17a252:	mov    0xe8(%rsp),%rbx
+  17a25a:	test   %rbx,%rbx
+  17a25d:	je     17a273 <litchi_ooxml_common::mce::codec::start+0x31b3>
+  17a25f:	mov    %r14,%rdi
+  17a262:	mov    0x220(%rsp),%rsi
+  17a26a:	mov    %rbx,%rdx
+  17a26d:	call   *0x10e2c5(%rip)        # 288538 <memcpy@GLIBC_2.14>
+  17a273:	mov    $0x1,%bpl
+  17a276:	movabs $0x8000000000000001,%r13
+  17a280:	jmp    179f34 <litchi_ooxml_common::mce::codec::start+0x2e74>
+  17a285:	movb   $0x1,(%rcx)
+  17a288:	test   %bpl,%bpl
+  17a28b:	je     17a299 <litchi_ooxml_common::mce::codec::start+0x31d9>
+  17a28d:	mov    0x60(%rsp),%rcx
+  17a292:	test   %rcx,%rcx
+  17a295:	jne    17a2a1 <litchi_ooxml_common::mce::codec::start+0x31e1>
+  17a297:	jmp    17a2ac <litchi_ooxml_common::mce::codec::start+0x31ec>
+  17a299:	test   %r15,%r15
+  17a29c:	je     17a2ac <litchi_ooxml_common::mce::codec::start+0x31ec>
+  17a29e:	mov    (%r15),%rcx
+  17a2a1:	lock incq (%rcx)
+  17a2a5:	jg     17a2ae <litchi_ooxml_common::mce::codec::start+0x31ee>
+  17a2a7:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17a2ac:	xor    %ecx,%ecx
+  17a2ae:	movdqu 0x60(%rsp),%xmm0
+  17a2b4:	movdqu 0x70(%rsp),%xmm1
+  17a2ba:	movdqu %xmm1,0x580(%rsp)
+  17a2c3:	movdqu %xmm0,0x570(%rsp)
+  17a2cc:	mov    %r12,0x558(%rsp)
+  17a2d4:	mov    %r14,0x560(%rsp)
+  17a2dc:	mov    %rbx,0x568(%rsp)
+  17a2e4:	mov    0x204(%rsp),%edx
+  17a2eb:	mov    %dl,0x598(%rsp)
+  17a2f2:	mov    %rcx,0x590(%rsp)
+  17a2fa:	movzbl %al,%ecx
+  17a2fd:	lea    0x558(%rsp),%rdx
+  17a305:	mov    0x48(%rsp),%rdi
+  17a30a:	mov    0x98(%rsp),%rsi
+  17a312:	mov    0x650(%rsp),%r8
+  17a31a:	call   176ae0 <litchi_ooxml_common::mce::codec::close>
+  17a31f:	dec    %r13
+  17a322:	cmp    %r13,0x290(%rsp)
+  17a32a:	je     17a339 <litchi_ooxml_common::mce::codec::start+0x3279>
+  17a32c:	lea    0x290(%rsp),%rdi
+  17a334:	call   17ba60 <core::ptr::drop_in_place<litchi_ooxml_common::mce::model::Name>>
+  17a339:	cmpb   $0x0,0x58(%rsp)
+  17a33e:	je     17a380 <litchi_ooxml_common::mce::codec::start+0x32c0>
+  17a340:	xor    %r12d,%r12d
+  17a343:	lea    0x240(%rsp),%rdi
+  17a34b:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a350:	xor    %r12d,%r12d
+  17a353:	lea    0x370(%rsp),%rdi
+  17a35b:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a360:	xor    %r12d,%r12d
+  17a363:	lea    0x3b0(%rsp),%rdi
+  17a36b:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a370:	xor    %r12d,%r12d
+  17a373:	lea    0x410(%rsp),%rdi
+  17a37b:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a380:	xor    %r12d,%r12d
+  17a383:	lea    0x3e0(%rsp),%rdi
+  17a38b:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a390:	mov    0x228(%rsp),%rsi
+  17a398:	test   %rsi,%rsi
+  17a39b:	je     17a3b4 <litchi_ooxml_common::mce::codec::start+0x32f4>
+  17a39d:	mov    0x230(%rsp),%rdi
+  17a3a5:	shl    $0x5,%rsi
+  17a3a9:	mov    $0x8,%edx
+  17a3ae:	call   *0x10e0c4(%rip)        # 288478 <_DYNAMIC+0x298>
+  17a3b4:	cmpb   $0x0,0x84(%rsp)
+  17a3bc:	je     17a3cb <litchi_ooxml_common::mce::codec::start+0x330b>
+  17a3be:	lea    0xf0(%rsp),%rdi
+  17a3c6:	call   17c150 <core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,alloc::string::String)>>>
+  17a3cb:	lea    0xa0(%rsp),%rdi
+  17a3d3:	call   17bd90 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Attr>>>
+  17a3d8:	jmp    17770c <litchi_ooxml_common::mce::codec::start+0x64c>
+  17a3dd:	mov    0x90(%rsp),%rdi
+  17a3e5:	mov    %r12,%rsi
+  17a3e8:	mov    %r15,%rdx
+  17a3eb:	call   *0x10ed17(%rip)        # 289108 <_DYNAMIC+0xf28>
+  17a3f1:	test   %al,%al
+  17a3f3:	je     17a6d6 <litchi_ooxml_common::mce::codec::start+0x3616>
+  17a3f9:	call   *0x10e011(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a3ff:	mov    $0x24,%ebx
+  17a404:	mov    $0x1,%r12d
+  17a40a:	mov    $0x24,%edi
+  17a40f:	mov    $0x1,%esi
+  17a414:	call   *0x10dffe(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a41a:	test   %rax,%rax
+  17a41d:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17a423:	movups -0xec0b7(%rip),%xmm0        # 8e373 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xbfd>
+  17a42a:	movups %xmm0,0x10(%rax)
+  17a42e:	movdqu -0xec0d3(%rip),%xmm0        # 8e363 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xbed>
+  17a436:	movdqu %xmm0,(%rax)
+  17a43a:	movl   $0x646c6968,0x20(%rax)
+  17a441:	mov    0x48(%rsp),%rcx
+  17a446:	mov    %r13,(%rcx)
+  17a449:	movq   $0x24,0x8(%rcx)
+  17a451:	mov    %rax,0x10(%rcx)
+  17a455:	movq   $0x24,0x18(%rcx)
+  17a45d:	mov    $0x1,%r12b
+  17a460:	mov    0x118(%rsp),%rax
+  17a468:	cmp    %rax,0x290(%rsp)
+  17a470:	je     17a47f <litchi_ooxml_common::mce::codec::start+0x33bf>
+  17a472:	lea    0x290(%rsp),%rdi
+  17a47a:	call   17ba60 <core::ptr::drop_in_place<litchi_ooxml_common::mce::model::Name>>
+  17a47f:	cmpb   $0x0,0x58(%rsp)
+  17a484:	je     17a4ba <litchi_ooxml_common::mce::codec::start+0x33fa>
+  17a486:	lea    0x240(%rsp),%rdi
+  17a48e:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a493:	lea    0x370(%rsp),%rdi
+  17a49b:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a4a0:	lea    0x3b0(%rsp),%rdi
+  17a4a8:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a4ad:	lea    0x410(%rsp),%rdi
+  17a4b5:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a4ba:	lea    0x3e0(%rsp),%rdi
+  17a4c2:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17a4c7:	mov    0x228(%rsp),%rsi
+  17a4cf:	test   %rsi,%rsi
+  17a4d2:	je     177ee7 <litchi_ooxml_common::mce::codec::start+0xe27>
+  17a4d8:	mov    0x230(%rsp),%rdi
+  17a4e0:	shl    $0x5,%rsi
+  17a4e4:	mov    $0x8,%edx
+  17a4e9:	call   *0x10df89(%rip)        # 288478 <_DYNAMIC+0x298>
+  17a4ef:	jmp    177ee7 <litchi_ooxml_common::mce::codec::start+0xe27>
+  17a4f4:	lea    (%rbx,%r14,8),%r15
+  17a4f8:	cmpq   $0x8,0x208(%rsp)
+  17a501:	je     17a958 <litchi_ooxml_common::mce::codec::start+0x3898>
+  17a507:	cmpq   $0x6,0x208(%rsp)
+  17a510:	jne    17a973 <litchi_ooxml_common::mce::codec::start+0x38b3>
+  17a516:	mov    $0x696f6843,%eax
+  17a51b:	mov    0x110(%rsp),%rcx
+  17a523:	xor    (%rcx),%eax
+  17a525:	movzwl 0x4(%rcx),%ecx
+  17a529:	xor    $0x6563,%ecx
+  17a52f:	or     %eax,%ecx
+  17a531:	jne    17a973 <litchi_ooxml_common::mce::codec::start+0x38b3>
+  17a537:	cmpb   $0x0,-0x37(%r15)
+  17a53c:	je     17ac87 <litchi_ooxml_common::mce::codec::start+0x3bc7>
+  17a542:	call   *0x10dec8(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a548:	mov    $0x15,%ebx
+  17a54d:	mov    $0x1,%r12d
+  17a553:	mov    $0x15,%edi
+  17a558:	mov    $0x1,%esi
+  17a55d:	call   *0x10deb5(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a563:	test   %rax,%rax
+  17a566:	movabs $0x8000000000000001,%r13
+  17a570:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17a576:	movdqu -0xec230(%rip),%xmm0        # 8e34e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xbd8>
+  17a57e:	movdqu %xmm0,(%rax)
+  17a582:	movabs $0x6b6361626c6c6146,%rcx
+  17a58c:	mov    %rcx,0xd(%rax)
+  17a590:	mov    0x48(%rsp),%rcx
+  17a595:	mov    %r13,(%rcx)
+  17a598:	movq   $0x15,0x8(%rcx)
+  17a5a0:	mov    %rax,0x10(%rcx)
+  17a5a4:	movq   $0x15,0x18(%rcx)
+  17a5ac:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17a5b1:	movabs $0x6b6361626c6c6146,%rax
+  17a5bb:	mov    0x110(%rsp),%rcx
+  17a5c3:	cmp    %rax,(%rcx)
+  17a5c6:	jne    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  17a5cc:	mov    0xa8(%rsp),%rsi
+  17a5d4:	mov    0xb0(%rsp),%rdx
+  17a5dc:	mov    0x60(%rsp),%rcx
+  17a5e1:	mov    0x70(%rsp),%r8
+  17a5e6:	movl   $0x2,(%rsp)
+  17a5ed:	lea    0x120(%rsp),%rdi
+  17a5f5:	mov    0x90(%rsp),%r9
+  17a5fd:	call   175a60 <litchi_ooxml_common::mce::codec::validate_alternate_attributes>
+  17a602:	jmp    17a65b <litchi_ooxml_common::mce::codec::start+0x359b>
+  17a604:	mov    $0x696f6843,%eax
+  17a609:	mov    0x110(%rsp),%rcx
+  17a611:	xor    (%rcx),%eax
+  17a613:	movzwl 0x4(%rcx),%ecx
+  17a617:	xor    $0x6563,%ecx
+  17a61d:	or     %eax,%ecx
+  17a61f:	jne    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  17a625:	mov    0xa8(%rsp),%rsi
+  17a62d:	mov    0xb0(%rsp),%rdx
+  17a635:	mov    0x60(%rsp),%rcx
+  17a63a:	mov    0x70(%rsp),%r8
+  17a63f:	movl   $0x1,(%rsp)
+  17a646:	lea    0x120(%rsp),%rdi
+  17a64e:	mov    0x90(%rsp),%r9
+  17a656:	call   175a60 <litchi_ooxml_common::mce::codec::validate_alternate_attributes>
+  17a65b:	lea    0x4(%r13),%rax
+  17a65f:	cmp    %rax,0x120(%rsp)
+  17a667:	jne    17a7a9 <litchi_ooxml_common::mce::codec::start+0x36e9>
+  17a66d:	movabs $0x8000000000000001,%r13
+  17a677:	mov    0x218(%rsp),%r15
+  17a67f:	mov    0x210(%rsp),%r12
+  17a687:	jmp    179d57 <litchi_ooxml_common::mce::codec::start+0x2c97>
+  17a68c:	mov    0x70(%rsp),%rdi
+  17a691:	lea    0x290(%rsp),%rsi
+  17a699:	call   1763a0 <litchi_ooxml_common::mce::codec::Ctx::processes>
+  17a69e:	test   %al,%al
+  17a6a0:	je     17a8ac <litchi_ooxml_common::mce::codec::start+0x37ec>
+  17a6a6:	mov    0xb0(%rsp),%rax
+  17a6ae:	test   %rax,%rax
+  17a6b1:	je     17ab05 <litchi_ooxml_common::mce::codec::start+0x3a45>
+  17a6b7:	mov    0xa8(%rsp),%r15
+  17a6bf:	shl    $0x4,%rax
+  17a6c3:	lea    (%rax,%rax,2),%r13
+  17a6c7:	xor    %ebp,%ebp
+  17a6c9:	lea    0x120(%rsp),%rbx
+  17a6d1:	jmp    17aa06 <litchi_ooxml_common::mce::codec::start+0x3946>
+  17a6d6:	mov    $0x18,%edx
+  17a6db:	xor    %ecx,%ecx
+  17a6dd:	mov    %r13,%rax
+  17a6e0:	mov    0x658(%rsp),%rsi
+  17a6e8:	incq   (%rsi,%rdx,1)
+  17a6ec:	mov    0x98(%rsp),%rdx
+  17a6f4:	mov    0x10(%rdx),%rdi
+  17a6f8:	xor    %edx,%edx
+  17a6fa:	test   %rdi,%rdi
+  17a6fd:	je     17ab8d <litchi_ooxml_common::mce::codec::start+0x3acd>
+  17a703:	mov    0x98(%rsp),%rsi
+  17a70b:	mov    0x8(%rsi),%rsi
+  17a70f:	lea    (%rdi,%rdi,8),%rdi
+  17a713:	lea    (%rsi,%rdi,8),%r8
+  17a717:	add    $0xffffffffffffffb8,%r8
+  17a71b:	test   %r8,%r8
+  17a71e:	je     17ab8d <litchi_ooxml_common::mce::codec::start+0x3acd>
+  17a724:	lea    (%rsi,%rdi,8),%rdx
+  17a728:	mov    -0x10(%rdx),%rdx
+  17a72c:	test   %rdx,%rdx
+  17a72f:	je     17ab8b <litchi_ooxml_common::mce::codec::start+0x3acb>
+  17a735:	lock incq (%rdx)
+  17a739:	jg     17ab8d <litchi_ooxml_common::mce::codec::start+0x3acd>
+  17a73f:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17a744:	call   *0x10dcc6(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a74a:	mov    $0x17,%eax
+  17a74f:	mov    %rax,0x58(%rsp)
+  17a754:	mov    $0x1,%r15d
+  17a75a:	mov    $0x17,%edi
+  17a75f:	mov    $0x1,%esi
+  17a764:	call   *0x10dcae(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a76a:	test   %rax,%rax
+  17a76d:	je     178913 <litchi_ooxml_common::mce::codec::start+0x1853>
+  17a773:	movups -0xec637(%rip),%xmm0        # 8e143 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x9cd>
+  17a77a:	movups %xmm0,(%rax)
+  17a77d:	movabs $0x656c6261726f6e67,%rcx
+  17a787:	mov    %rcx,0xf(%rax)
+  17a78b:	mov    0x48(%rsp),%rcx
+  17a790:	mov    %r13,(%rcx)
+  17a793:	movq   $0x17,0x8(%rcx)
+  17a79b:	mov    %rax,0x10(%rcx)
+  17a79f:	mov    $0x17,%eax
+  17a7a4:	jmp    17970b <litchi_ooxml_common::mce::codec::start+0x264b>
+  17a7a9:	movdqu 0x120(%rsp),%xmm0
+  17a7b2:	movdqu 0x130(%rsp),%xmm1
+  17a7bb:	mov    0x48(%rsp),%rax
+  17a7c0:	movdqu %xmm1,0x10(%rax)
+  17a7c5:	movdqu %xmm0,(%rax)
+  17a7c9:	mov    $0x1,%r12b
+  17a7cc:	movabs $0x8000000000000001,%r13
+  17a7d6:	jmp    17a460 <litchi_ooxml_common::mce::codec::start+0x33a0>
+  17a7db:	lea    -0xec3c4(%rip),%rdi        # 8e41e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xca8>
+  17a7e2:	lea    0x104877(%rip),%rcx        # 27f060 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x48>
+  17a7e9:	lea    0x104858(%rip),%r8        # 27f048 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x30>
+  17a7f0:	lea    0x57(%rsp),%rdx
+  17a7f5:	mov    $0x37,%esi
+  17a7fa:	call   *0x10dff0(%rip)        # 2887f0 <_DYNAMIC+0x610>
+  17a800:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17a805:	call   *0x10dc05(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a80b:	mov    $0x15,%edi
+  17a810:	mov    $0x1,%esi
+  17a815:	call   *0x10dbfd(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a81b:	test   %rax,%rax
+  17a81e:	je     17b215 <litchi_ooxml_common::mce::codec::start+0x4155>
+  17a824:	movups -0xec748(%rip),%xmm0        # 8e0e3 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x96d>
+  17a82b:	movups %xmm0,(%rax)
+  17a82e:	movabs $0x6574756269727474,%rcx
+  17a838:	mov    %rcx,0xd(%rax)
+  17a83c:	movabs $0x8000000000000001,%r13
+  17a846:	mov    0x48(%rsp),%rcx
+  17a84b:	mov    %r13,(%rcx)
+  17a84e:	movq   $0x15,0x8(%rcx)
+  17a856:	mov    %rax,0x10(%rcx)
+  17a85a:	movq   $0x15,0x18(%rcx)
+  17a862:	jmp    17a91b <litchi_ooxml_common::mce::codec::start+0x385b>
+  17a867:	lea    -0xec450(%rip),%rdi        # 8e41e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xca8>
+  17a86e:	lea    0x1047eb(%rip),%rcx        # 27f060 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x48>
+  17a875:	lea    0x1047cc(%rip),%r8        # 27f048 <anon.4ec509b3b879019c8589e11d6da71b0a.177.llvm.13762959564368701080+0x30>
+  17a87c:	lea    0x57(%rsp),%rdx
+  17a881:	mov    $0x37,%esi
+  17a886:	call   *0x10df64(%rip)        # 2887f0 <_DYNAMIC+0x610>
+  17a88c:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17a891:	mov    0x658(%rsp),%rax
+  17a899:	incq   (%rax)
+  17a89c:	lea    0x1(%r13),%r12
+  17a8a0:	xor    %ebx,%ebx
+  17a8a2:	xor    %r14d,%r14d
+  17a8a5:	xor    %ebp,%ebp
+  17a8a7:	jmp    179f34 <litchi_ooxml_common::mce::codec::start+0x2e74>
+  17a8ac:	mov    0x658(%rsp),%rax
+  17a8b4:	incq   0x18(%rax)
+  17a8b8:	xor    %ebp,%ebp
+  17a8ba:	movabs $0x8000000000000001,%r13
+  17a8c4:	mov    %r13,%r12
+  17a8c7:	movl   $0x0,0x204(%rsp)
+  17a8d2:	jmp    179f34 <litchi_ooxml_common::mce::codec::start+0x2e74>
+  17a8d7:	mov    $0x1,%r12b
+  17a8da:	lea    -0x112d91(%rip),%rsi        # 67b50 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x2d0>
+  17a8e1:	lea    0x120(%rsp),%rdi
+  17a8e9:	mov    $0x10,%edx
+  17a8ee:	call   177050 <litchi_ooxml_common::mce::codec::limit>
+  17a8f3:	movabs $0x8000000000000001,%r13
+  17a8fd:	movups 0x120(%rsp),%xmm0
+  17a905:	movdqu 0x130(%rsp),%xmm1
+  17a90e:	mov    0x48(%rsp),%rax
+  17a913:	movdqu %xmm1,0x10(%rax)
+  17a918:	movups %xmm0,(%rax)
+  17a91b:	mov    $0x1,%r12b
+  17a91e:	mov    0x228(%rsp),%rsi
+  17a926:	test   %rsi,%rsi
+  17a929:	jne    17a4d8 <litchi_ooxml_common::mce::codec::start+0x3418>
+  17a92f:	jmp    177ee7 <litchi_ooxml_common::mce::codec::start+0xe27>
+  17a934:	mov    0x48(%rsp),%rcx
+  17a939:	mov    %rax,(%rcx)
+  17a93c:	mov    %rdx,0x8(%rcx)
+  17a940:	lea    -0xec84f(%rip),%rax        # 8e0f8 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x982>
+  17a947:	mov    %rax,0x10(%rcx)
+  17a94b:	movq   $0xe,0x18(%rcx)
+  17a953:	jmp    17888f <litchi_ooxml_common::mce::codec::start+0x17cf>
+  17a958:	movabs $0x6b6361626c6c6146,%rax
+  17a962:	mov    0x110(%rsp),%rcx
+  17a96a:	cmp    %rax,(%rcx)
+  17a96d:	je     17abfe <litchi_ooxml_common::mce::codec::start+0x3b3e>
+  17a973:	call   *0x10da97(%rip)        # 288410 <_DYNAMIC+0x230>
+  17a979:	mov    $0x1e,%ebx
+  17a97e:	mov    $0x1,%r12d
+  17a984:	mov    $0x1e,%edi
+  17a989:	mov    $0x1,%esi
+  17a98e:	call   *0x10da84(%rip)        # 288418 <_DYNAMIC+0x238>
+  17a994:	test   %rax,%rax
+  17a997:	movabs $0x8000000000000001,%r13
+  17a9a1:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17a9a7:	movups -0xec6a0(%rip),%xmm0        # 8e30e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb98>
+  17a9ae:	movups %xmm0,0xe(%rax)
+  17a9b2:	movdqu -0xec6ba(%rip),%xmm0        # 8e300 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb8a>
+  17a9ba:	movdqu %xmm0,(%rax)
+  17a9be:	mov    0x48(%rsp),%rcx
+  17a9c3:	mov    %r13,(%rcx)
+  17a9c6:	movq   $0x1e,0x8(%rcx)
+  17a9ce:	mov    %rax,0x10(%rcx)
+  17a9d2:	movq   $0x1e,0x18(%rcx)
+  17a9da:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17a9df:	mov    (%r14),%eax
+  17a9e2:	mov    $0x63617073,%ecx
+  17a9e7:	xor    %ecx,%eax
+  17a9e9:	movzbl 0x4(%r14),%ecx
+  17a9ee:	xor    $0x65,%ecx
+  17a9f1:	or     %eax,%ecx
+  17a9f3:	je     17aa94 <litchi_ooxml_common::mce::codec::start+0x39d4>
+  17a9f9:	add    $0x30,%rbp
+  17a9fd:	cmp    %rbp,%r13
+  17aa00:	je     17ab05 <litchi_ooxml_common::mce::codec::start+0x3a45>
+  17aa06:	mov    0x18(%r15,%rbp,1),%rsi
+  17aa0b:	mov    0x20(%r15,%rbp,1),%rdx
+  17aa10:	mov    0x60(%rsp),%rcx
+  17aa15:	mov    %rbx,%rdi
+  17aa18:	xor    %r8d,%r8d
+  17aa1b:	call   171430 <litchi_ooxml_common::mce::codec::expand_parts>
+  17aa20:	mov    0x128(%rsp),%rdi
+  17aa28:	mov    0x130(%rsp),%rax
+  17aa30:	mov    0x138(%rsp),%r14
+  17aa38:	mov    0x140(%rsp),%r12
+  17aa40:	cmpl   $0x1,0x120(%rsp)
+  17aa48:	je     17ac70 <litchi_ooxml_common::mce::codec::start+0x3bb0>
+  17aa4e:	cmp    $0x24,%rax
+  17aa52:	jne    17a9f9 <litchi_ooxml_common::mce::codec::start+0x3939>
+  17aa54:	mov    $0x24,%edx
+  17aa59:	lea    -0xecf86(%rip),%rsi        # 8dada <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x364>
+  17aa60:	call   *0x10db12(%rip)        # 288578 <bcmp@GLIBC_2.2.5>
+  17aa66:	test   %eax,%eax
+  17aa68:	jne    17a9f9 <litchi_ooxml_common::mce::codec::start+0x3939>
+  17aa6a:	cmp    $0x5,%r12
+  17aa6e:	je     17a9df <litchi_ooxml_common::mce::codec::start+0x391f>
+  17aa74:	cmp    $0x4,%r12
+  17aa78:	jne    17a9f9 <litchi_ooxml_common::mce::codec::start+0x3939>
+  17aa7e:	cmpl   $0x65736162,(%r14)
+  17aa85:	je     17aa94 <litchi_ooxml_common::mce::codec::start+0x39d4>
+  17aa87:	cmpl   $0x676e616c,(%r14)
+  17aa8e:	jne    17a9f9 <litchi_ooxml_common::mce::codec::start+0x3939>
+  17aa94:	call   *0x10d976(%rip)        # 288410 <_DYNAMIC+0x230>
+  17aa9a:	mov    $0x2a,%ebx
+  17aa9f:	mov    $0x1,%r12d
+  17aaa5:	mov    $0x2a,%edi
+  17aaaa:	mov    $0x1,%esi
+  17aaaf:	call   *0x10d963(%rip)        # 288418 <_DYNAMIC+0x238>
+  17aab5:	test   %rax,%rax
+  17aab8:	movabs $0x8000000000000001,%r13
+  17aac2:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17aac8:	mov    %rax,%r14
+  17aacb:	movups -0xec731(%rip),%xmm0        # 8e3a1 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc2b>
+  17aad2:	movups %xmm0,0x1a(%rax)
+  17aad6:	movups -0xec746(%rip),%xmm0        # 8e397 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc21>
+  17aadd:	movups %xmm0,0x10(%rax)
+  17aae1:	movdqu -0xec762(%rip),%xmm0        # 8e387 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xc11>
+  17aae9:	movdqu %xmm0,(%rax)
+  17aaed:	mov    0x48(%rsp),%rcx
+  17aaf2:	mov    %r13,(%rcx)
+  17aaf5:	mov    $0x2a,%eax
+  17aafa:	mov    $0x2a,%r12d
+  17ab00:	jmp    17a196 <litchi_ooxml_common::mce::codec::start+0x30d6>
+  17ab05:	mov    0x658(%rsp),%rax
+  17ab0d:	incq   0x38(%rax)
+  17ab11:	xor    %ebp,%ebp
+  17ab13:	mov    0x118(%rsp),%r12
+  17ab1b:	movabs $0x8000000000000001,%r13
+  17ab25:	jmp    179f34 <litchi_ooxml_common::mce::codec::start+0x2e74>
+  17ab2a:	call   *0x10d8e0(%rip)        # 288410 <_DYNAMIC+0x230>
+  17ab30:	mov    $0x1f,%edi
+  17ab35:	mov    $0x1,%esi
+  17ab3a:	call   *0x10d8d8(%rip)        # 288418 <_DYNAMIC+0x238>
+  17ab40:	test   %rax,%rax
+  17ab43:	je     17b22d <litchi_ooxml_common::mce::codec::start+0x416d>
+  17ab49:	movups -0xec87d(%rip),%xmm0        # 8e2d3 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb5d>
+  17ab50:	movups %xmm0,0xf(%rax)
+  17ab54:	movdqu -0xec898(%rip),%xmm0        # 8e2c4 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb4e>
+  17ab5c:	movdqu %xmm0,(%rax)
+  17ab60:	movabs $0x8000000000000001,%r13
+  17ab6a:	mov    0x48(%rsp),%rcx
+  17ab6f:	mov    %r13,(%rcx)
+  17ab72:	movq   $0x1f,0x8(%rcx)
+  17ab7a:	mov    %rax,0x10(%rcx)
+  17ab7e:	movq   $0x1f,0x18(%rcx)
+  17ab86:	jmp    179aa5 <litchi_ooxml_common::mce::codec::start+0x29e5>
+  17ab8b:	xor    %edx,%edx
+  17ab8d:	movdqu 0x60(%rsp),%xmm0
+  17ab93:	movdqu 0x70(%rsp),%xmm1
+  17ab99:	movdqu %xmm1,0x5f8(%rsp)
+  17aba2:	movdqu %xmm0,0x5e8(%rsp)
+  17abab:	mov    %rax,0x5d0(%rsp)
+  17abb3:	mov    %cl,0x610(%rsp)
+  17abba:	mov    %rdx,0x608(%rsp)
+  17abc2:	movzbl 0x10c(%rsp),%ecx
+  17abca:	lea    0x5d0(%rsp),%rdx
+  17abd2:	mov    0x48(%rsp),%rdi
+  17abd7:	mov    0x98(%rsp),%rsi
+  17abdf:	mov    0x650(%rsp),%r8
+  17abe7:	call   176ae0 <litchi_ooxml_common::mce::codec::close>
+  17abec:	xor    %r12d,%r12d
+  17abef:	movabs $0x8000000000000001,%r13
+  17abf9:	jmp    17a460 <litchi_ooxml_common::mce::codec::start+0x33a0>
+  17abfe:	cmpb   $0x0,-0x37(%r15)
+  17ac03:	je     17acec <litchi_ooxml_common::mce::codec::start+0x3c2c>
+  17ac09:	call   *0x10d801(%rip)        # 288410 <_DYNAMIC+0x230>
+  17ac0f:	mov    $0x12,%ebx
+  17ac14:	mov    $0x1,%r12d
+  17ac1a:	mov    $0x12,%edi
+  17ac1f:	mov    $0x1,%esi
+  17ac24:	call   *0x10d7ee(%rip)        # 288418 <_DYNAMIC+0x238>
+  17ac2a:	test   %rax,%rax
+  17ac2d:	movabs $0x8000000000000001,%r13
+  17ac37:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17ac3d:	movdqu -0xec927(%rip),%xmm0        # 8e31e <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xba8>
+  17ac45:	movdqu %xmm0,(%rax)
+  17ac49:	movw   $0x6b63,0x10(%rax)
+  17ac4f:	mov    0x48(%rsp),%rcx
+  17ac54:	mov    %r13,(%rcx)
+  17ac57:	movq   $0x12,0x8(%rcx)
+  17ac5f:	mov    %rax,0x10(%rcx)
+  17ac63:	movq   $0x12,0x18(%rcx)
+  17ac6b:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17ac70:	mov    0x48(%rsp),%rcx
+  17ac75:	mov    %rdi,(%rcx)
+  17ac78:	movabs $0x8000000000000001,%r13
+  17ac82:	jmp    17a196 <litchi_ooxml_common::mce::codec::start+0x30d6>
+  17ac87:	mov    -0x40(%r15),%rax
+  17ac8b:	inc    %rax
+  17ac8e:	mov    %rax,-0x40(%r15)
+  17ac92:	mov    0x360(%rsp),%rcx
+  17ac9a:	cmp    0x28(%rcx),%rax
+  17ac9e:	jbe    17ad2e <litchi_ooxml_common::mce::codec::start+0x3c6e>
+  17aca4:	lea    -0xec964(%rip),%rsi        # 8e347 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xbd1>
+  17acab:	lea    0x120(%rsp),%rdi
+  17acb3:	mov    $0x7,%edx
+  17acb8:	call   177050 <litchi_ooxml_common::mce::codec::limit>
+  17acbd:	movabs $0x8000000000000001,%r13
+  17acc7:	movdqu 0x120(%rsp),%xmm0
+  17acd0:	movdqu 0x130(%rsp),%xmm1
+  17acd9:	mov    0x48(%rsp),%rax
+  17acde:	movdqu %xmm1,0x10(%rax)
+  17ace3:	movdqu %xmm0,(%rax)
+  17ace7:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17acec:	movb   $0x1,-0x37(%r15)
+  17acf1:	movabs $0x8000000000000001,%rax
+  17acfb:	add    $0x2,%rax
+  17acff:	cmpb   $0x0,-0x8(%r15)
+  17ad04:	je     17ad11 <litchi_ooxml_common::mce::codec::start+0x3c51>
+  17ad06:	cmpb   $0x0,-0x38(%r15)
+  17ad0b:	je     17aeb5 <litchi_ooxml_common::mce::codec::start+0x3df5>
+  17ad11:	xor    %ecx,%ecx
+  17ad13:	jmp    17a6ec <litchi_ooxml_common::mce::codec::start+0x362c>
+  17ad18:	mov    0x2a0(%rsp),%rsi
+  17ad20:	mov    %rbx,%rdi
+  17ad23:	call   *0x10d807(%rip)        # 288530 <_DYNAMIC+0x350>
+  17ad29:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17ad2e:	mov    0xa8(%rsp),%rsi
+  17ad36:	mov    0xb0(%rsp),%rdx
+  17ad3e:	lea    0x120(%rsp),%rdi
+  17ad46:	call   176850 <litchi_ooxml_common::mce::codec::attr>
+  17ad4b:	movabs $0x8000000000000001,%rcx
+  17ad55:	mov    0x120(%rsp),%rdx
+  17ad5d:	mov    0x128(%rsp),%rax
+  17ad65:	lea    0x4(%rcx),%rsi
+  17ad69:	mov    0x130(%rsp),%rcx
+  17ad71:	cmp    %rsi,%rdx
+  17ad74:	jne    17aed4 <litchi_ooxml_common::mce::codec::start+0x3e14>
+  17ad7a:	test   %rax,%rax
+  17ad7d:	je     17af49 <litchi_ooxml_common::mce::codec::start+0x3e89>
+  17ad83:	lea    (%rax,%rcx,1),%rdx
+  17ad87:	movq   $0x0,0x120(%rsp)
+  17ad93:	mov    %rcx,0x128(%rsp)
+  17ad9b:	mov    %rax,0x130(%rsp)
+  17ada3:	mov    %rcx,0x138(%rsp)
+  17adab:	mov    %rax,0x140(%rsp)
+  17adb3:	mov    %rdx,0x148(%rsp)
+  17adbb:	movq   $0x0,0x150(%rsp)
+  17adc7:	movw   $0x1,0x158(%rsp)
+  17add1:	lea    0x120(%rsp),%rdi
+  17add9:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  17adde:	test   %rax,%rax
+  17ade1:	je     17af85 <litchi_ooxml_common::mce::codec::start+0x3ec5>
+  17ade7:	mov    %rax,%r14
+  17adea:	mov    %rdx,%r12
+  17aded:	mov    $0x1,%bpl
+  17adf0:	xor    %r13d,%r13d
+  17adf3:	mov    0x10dfce(%rip),%rbx        # 288dc8 <_DYNAMIC+0xbe8>
+  17adfa:	mov    %r14,0x480(%rsp)
+  17ae02:	mov    %r12,0x488(%rsp)
+  17ae0a:	mov    %r14,%rdi
+  17ae0d:	mov    %r12,%rsi
+  17ae10:	call   *%rbx
+  17ae12:	test   %al,%al
+  17ae14:	je     17b00a <litchi_ooxml_common::mce::codec::start+0x3f4a>
+  17ae1a:	mov    0x60(%rsp),%rdi
+  17ae1f:	mov    %r14,%rsi
+  17ae22:	mov    %r12,%rdx
+  17ae25:	call   170410 <litchi_ooxml_common::mce::codec::Namespaces::get>
+  17ae2a:	test   %rax,%rax
+  17ae2d:	je     17b06d <litchi_ooxml_common::mce::codec::start+0x3fad>
+  17ae33:	mov    0x90(%rsp),%rdi
+  17ae3b:	mov    %rax,%rsi
+  17ae3e:	call   *0x10e2c4(%rip)        # 289108 <_DYNAMIC+0xf28>
+  17ae44:	and    %al,%bpl
+  17ae47:	lea    0x120(%rsp),%rdi
+  17ae4f:	call   17c1f0 <core::iter::traits::iterator::Iterator::try_fold>
+  17ae54:	mov    %rax,%r14
+  17ae57:	mov    %rdx,%r12
+  17ae5a:	dec    %r13d
+  17ae5d:	test   %rax,%rax
+  17ae60:	jne    17adfa <litchi_ooxml_common::mce::codec::start+0x3d3a>
+  17ae62:	test   %r13d,%r13d
+  17ae65:	je     17af85 <litchi_ooxml_common::mce::codec::start+0x3ec5>
+  17ae6b:	movabs $0x8000000000000001,%rax
+  17ae75:	add    $0x2,%rax
+  17ae79:	cmpb   $0x0,-0x8(%r15)
+  17ae7e:	je     17ad11 <litchi_ooxml_common::mce::codec::start+0x3c51>
+  17ae84:	xor    $0x1,%bpl
+  17ae88:	or     -0x38(%r15),%bpl
+  17ae8c:	test   $0x1,%bpl
+  17ae90:	jne    17ad11 <litchi_ooxml_common::mce::codec::start+0x3c51>
+  17ae96:	movb   $0x1,-0x38(%r15)
+  17ae9b:	movabs $0x8000000000000001,%rax
+  17aea5:	add    $0x2,%rax
+  17aea9:	mov    $0x1,%cl
+  17aeab:	mov    $0x8,%edx
+  17aeb0:	jmp    17a6e0 <litchi_ooxml_common::mce::codec::start+0x3620>
+  17aeb5:	movb   $0x1,-0x38(%r15)
+  17aeba:	movabs $0x8000000000000001,%rax
+  17aec4:	add    $0x2,%rax
+  17aec8:	mov    $0x1,%cl
+  17aeca:	mov    $0x10,%edx
+  17aecf:	jmp    17a6e0 <litchi_ooxml_common::mce::codec::start+0x3620>
+  17aed4:	mov    0x138(%rsp),%rsi
+  17aedc:	mov    0x48(%rsp),%rdi
+  17aee1:	mov    %rdx,(%rdi)
+  17aee4:	mov    %rax,0x8(%rdi)
+  17aee8:	mov    %rcx,0x10(%rdi)
+  17aeec:	mov    %rsi,0x18(%rdi)
+  17aef0:	jmp    17a7c9 <litchi_ooxml_common::mce::codec::start+0x3709>
+  17aef5:	mov    $0x1,%edi
+  17aefa:	mov    $0x5,%esi
+  17aeff:	call   *0x10d62b(%rip)        # 288530 <_DYNAMIC+0x350>
+  17af05:	mov    $0x1,%r12b
+  17af08:	lea    -0x1133bf(%rip),%rsi        # 67b50 <anon.44d5f5177f8a845437e98efc5da41c20.50.llvm.10552749273323385378+0x2d0>
+  17af0f:	lea    0x120(%rsp),%rdi
+  17af17:	mov    $0x10,%edx
+  17af1c:	call   177050 <litchi_ooxml_common::mce::codec::limit>
+  17af21:	movabs $0x8000000000000001,%r13
+  17af2b:	movaps 0x130(%rsp),%xmm0
+  17af33:	mov    0x48(%rsp),%rax
+  17af38:	movups %xmm0,0x10(%rax)
+  17af3c:	movaps 0x120(%rsp),%xmm0
+  17af44:	jmp    17a918 <litchi_ooxml_common::mce::codec::start+0x3858>
+  17af49:	lea    0x120(%rsp),%rdi
+  17af51:	call   17b790 <litchi_ooxml_common::mce::codec::start::{{closure}}>
+  17af56:	movabs $0x8000000000000001,%r13
+  17af60:	movdqu 0x120(%rsp),%xmm0
+  17af69:	movdqu 0x130(%rsp),%xmm1
+  17af72:	mov    0x48(%rsp),%rax
+  17af77:	movdqu %xmm0,(%rax)
+  17af7b:	movdqu %xmm1,0x10(%rax)
+  17af80:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17af85:	call   *0x10d485(%rip)        # 288410 <_DYNAMIC+0x230>
+  17af8b:	mov    $0xe,%ebx
+  17af90:	mov    $0x1,%r12d
+  17af96:	mov    $0xe,%edi
+  17af9b:	mov    $0x1,%esi
+  17afa0:	call   *0x10d472(%rip)        # 288418 <_DYNAMIC+0x238>
+  17afa6:	test   %rax,%rax
+  17afa9:	movabs $0x8000000000000001,%r13
+  17afb3:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17afb5:	movabs $0x7365726975716552,%rcx
+  17afbf:	mov    %rcx,0x6(%rax)
+  17afc3:	movabs $0x6552207974706d65,%rcx
+  17afcd:	mov    %rcx,(%rax)
+  17afd0:	mov    0x48(%rsp),%rcx
+  17afd5:	mov    %r13,(%rcx)
+  17afd8:	movq   $0xe,0x8(%rcx)
+  17afe0:	mov    %rax,0x10(%rcx)
+  17afe4:	movq   $0xe,0x18(%rcx)
+  17afec:	jmp    17a45d <litchi_ooxml_common::mce::codec::start+0x339d>
+  17aff1:	mov    0x130(%rsp),%rbx
+  17aff9:	mov    %r12,%rdi
+  17affc:	mov    %rbx,%rsi
+  17afff:	call   *0x10d52b(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b005:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b00a:	call   *0x10d400(%rip)        # 288410 <_DYNAMIC+0x230>
+  17b010:	mov    $0x17,%ebx
+  17b015:	mov    $0x1,%r12d
+  17b01b:	mov    $0x17,%edi
+  17b020:	mov    $0x1,%esi
+  17b025:	call   *0x10d3ed(%rip)        # 288418 <_DYNAMIC+0x238>
+  17b02b:	test   %rax,%rax
+  17b02e:	movabs $0x8000000000000001,%rdx
+  17b038:	je     17aff9 <litchi_ooxml_common::mce::codec::start+0x3f39>
+  17b03a:	movups -0xecd11(%rip),%xmm0        # 8e330 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xbba>
+  17b041:	movups %xmm0,(%rax)
+  17b044:	movabs $0x7869666572702073,%rcx
+  17b04e:	mov    %rcx,0xf(%rax)
+  17b052:	mov    0x48(%rsp),%rcx
+  17b057:	mov    %rdx,(%rcx)
+  17b05a:	movq   $0x17,0x8(%rcx)
+  17b062:	mov    %rax,0x10(%rcx)
+  17b066:	mov    $0x17,%eax
+  17b06b:	jmp    17b0d1 <litchi_ooxml_common::mce::codec::start+0x4011>
+  17b06d:	lea    0x480(%rsp),%rax
+  17b075:	mov    %rax,0x270(%rsp)
+  17b07d:	lea    0x455c(%rip),%rax        # 17f5e0 <<&T as core::fmt::Display>::fmt>
+  17b084:	mov    %rax,0x278(%rsp)
+  17b08c:	lea    0xc0(%rsp),%rdi
+  17b094:	lea    -0x10efc3(%rip),%rsi        # 6c0d8 <anon.078d224b42a2ebe9c4d5b82b86343a6d.6.llvm.7041715977520198557+0x1b1>
+  17b09b:	lea    0x270(%rsp),%rdx
+  17b0a3:	call   *0x10d46f(%rip)        # 288518 <_DYNAMIC+0x338>
+  17b0a9:	movabs $0x8000000000000001,%rcx
+  17b0b3:	movdqu 0xc0(%rsp),%xmm0
+  17b0bc:	mov    0xd0(%rsp),%rax
+  17b0c4:	mov    0x48(%rsp),%rdx
+  17b0c9:	mov    %rcx,(%rdx)
+  17b0cc:	movdqu %xmm0,0x8(%rdx)
+  17b0d1:	mov    0x48(%rsp),%rcx
+  17b0d6:	mov    %rax,0x18(%rcx)
+  17b0da:	jmp    17a7c9 <litchi_ooxml_common::mce::codec::start+0x3709>
+  17b0df:	lea    -0xece73(%rip),%rax        # 8e273 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xafd>
+  17b0e6:	test   %rcx,%rcx
+  17b0e9:	jne    17b105 <litchi_ooxml_common::mce::codec::start+0x4045>
+  17b0eb:	mov    $0x1f,%edx
+  17b0f0:	jmp    17b103 <litchi_ooxml_common::mce::codec::start+0x4043>
+  17b0f2:	lea    -0xecef8(%rip),%rax        # 8e201 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xa8b>
+  17b0f9:	test   %rcx,%rcx
+  17b0fc:	jne    17b10f <litchi_ooxml_common::mce::codec::start+0x404f>
+  17b0fe:	mov    $0x21,%edx
+  17b103:	jmp    17b117 <litchi_ooxml_common::mce::codec::start+0x4057>
+  17b105:	mov    %rdx,%rbp
+  17b108:	mov    $0x1f,%edx
+  17b10d:	jmp    17b117 <litchi_ooxml_common::mce::codec::start+0x4057>
+  17b10f:	mov    %rdx,%rbp
+  17b112:	mov    $0x21,%edx
+  17b117:	movabs $0x8000000000000001,%r13
+  17b121:	jmp    1798d2 <litchi_ooxml_common::mce::codec::start+0x2812>
+  17b126:	mov    0xc8(%rsp),%rbx
+  17b12e:	mov    %r15,%rdi
+  17b131:	mov    %rbx,%rsi
+  17b134:	call   *0x10d3f6(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b13a:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b13f:	mov    %rbx,%rsi
+  17b142:	mov    $0x1,%edi
+  17b147:	jmp    177d53 <litchi_ooxml_common::mce::codec::start+0xc93>
+  17b14c:	test   %rax,%rax
+  17b14f:	jne    17b15f <litchi_ooxml_common::mce::codec::start+0x409f>
+  17b151:	mov    $0x1d,%edx
+  17b156:	lea    -0xece7a(%rip),%rcx        # 8e2e3 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb6d>
+  17b15d:	jmp    17b16e <litchi_ooxml_common::mce::codec::start+0x40ae>
+  17b15f:	mov    %rdx,%rbx
+  17b162:	mov    $0x1d,%edx
+  17b167:	lea    -0xece8b(%rip),%rcx        # 8e2e3 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0xb6d>
+  17b16e:	movabs $0x8000000000000001,%r13
+  17b178:	jmp    179819 <litchi_ooxml_common::mce::codec::start+0x2759>
+  17b17d:	mov    %rbx,%rsi
+  17b180:	mov    $0x1,%edi
+  17b185:	jmp    177e2d <litchi_ooxml_common::mce::codec::start+0xd6d>
+  17b18a:	mov    %rbx,0x58(%rsp)
+  17b18f:	jmp    178913 <litchi_ooxml_common::mce::codec::start+0x1853>
+  17b194:	mov    $0x1,%edi
+  17b199:	mov    $0x32,%esi
+  17b19e:	call   *0x10d38c(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b1a4:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b1a9:	mov    $0x1,%edi
+  17b1ae:	mov    $0x32,%esi
+  17b1b3:	call   *0x10d377(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b1b9:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b1be:	mov    $0x1,%edi
+  17b1c3:	mov    $0x30,%esi
+  17b1c8:	call   *0x10d362(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b1ce:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b1d3:	mov    $0x1,%edi
+  17b1d8:	mov    $0x23,%esi
+  17b1dd:	call   *0x10d34d(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b1e3:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b1e8:	mov    $0x1,%edi
+  17b1ed:	mov    $0x21,%esi
+  17b1f2:	call   *0x10d338(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b1f8:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b1fd:	mov    $0x1,%edi
+  17b202:	mov    $0xe,%esi
+  17b207:	mov    %rbx,%r12
+  17b20a:	call   *0x10d320(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b210:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b215:	mov    $0x1,%r12b
+  17b218:	mov    $0x1,%edi
+  17b21d:	mov    $0x15,%esi
+  17b222:	call   *0x10d308(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b228:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b22d:	mov    $0x1,%edi
+  17b232:	mov    $0x1f,%esi
+  17b237:	call   *0x10d2f3(%rip)        # 288530 <_DYNAMIC+0x350>
+  17b23d:	jmp    178751 <litchi_ooxml_common::mce::codec::start+0x1691>
+  17b242:	jmp    17b407 <litchi_ooxml_common::mce::codec::start+0x4347>
+  17b247:	mov    %rax,%rbx
+  17b24a:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b24f:	jmp    17b28f <litchi_ooxml_common::mce::codec::start+0x41cf>
+  17b251:	mov    %rax,%rbx
+  17b254:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b259:	mov    %rax,%rbx
+  17b25c:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b261:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b266:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b26b:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b270:	mov    %rax,%rbx
+  17b273:	mov    %r14,0x70(%rsp)
+  17b278:	jmp    17b554 <litchi_ooxml_common::mce::codec::start+0x4494>
+  17b27d:	jmp    17b407 <litchi_ooxml_common::mce::codec::start+0x4347>
+  17b282:	mov    %rax,%rbx
+  17b285:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b28a:	jmp    17b3ec <litchi_ooxml_common::mce::codec::start+0x432c>
+  17b28f:	mov    %rax,%rbx
+  17b292:	xor    %r12d,%r12d
+  17b295:	jmp    17b40d <litchi_ooxml_common::mce::codec::start+0x434d>
+  17b29a:	mov    %rax,%rbx
+  17b29d:	mov    %r12,%rax
+  17b2a0:	mov    $0x1,%r12b
+  17b2a3:	test   %rax,%rax
+  17b2a6:	jle    17b40d <litchi_ooxml_common::mce::codec::start+0x434d>
+  17b2ac:	mov    %rax,%rsi
+  17b2af:	mov    $0x1,%edx
+  17b2b4:	mov    %r14,%rdi
+  17b2b7:	call   *0x10d1bb(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b2bd:	jmp    17b40d <litchi_ooxml_common::mce::codec::start+0x434d>
+  17b2c2:	mov    %rax,%rbx
+  17b2c5:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b2ca:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b2cf:	mov    %rax,%rbx
+  17b2d2:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b2d7:	mov    %rax,%rbx
+  17b2da:	mov    %r15,0x60(%rsp)
+  17b2df:	mov    %r14,0x68(%rsp)
+  17b2e4:	jmp    17b61d <litchi_ooxml_common::mce::codec::start+0x455d>
+  17b2e9:	mov    %rax,%rbx
+  17b2ec:	lea    0x120(%rsp),%rdi
+  17b2f4:	call   17bef0 <core::ptr::drop_in_place<alloc::sync::ArcInner<litchi_ooxml_common::mce::codec::DirectiveLayer>>>
+  17b2f9:	jmp    17b554 <litchi_ooxml_common::mce::codec::start+0x4494>
+  17b2fe:	call   *0x10d17c(%rip)        # 288480 <_DYNAMIC+0x2a0>
+  17b304:	jmp    17b3b8 <litchi_ooxml_common::mce::codec::start+0x42f8>
+  17b309:	jmp    17b407 <litchi_ooxml_common::mce::codec::start+0x4347>
+  17b30e:	mov    %rax,%rbx
+  17b311:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b316:	mov    %rax,%rbx
+  17b319:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b31e:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b320:	jmp    17b375 <litchi_ooxml_common::mce::codec::start+0x42b5>
+  17b322:	mov    %rax,%rbx
+  17b325:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b32a:	mov    %rax,%rbx
+  17b32d:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b332:	mov    %rax,%rbx
+  17b335:	lea    0xa0(%rsp),%rdi
+  17b33d:	call   17bd90 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Attr>>>
+  17b342:	mov    %rbx,%rdi
+  17b345:	call   27a9b0 <_Unwind_Resume@plt>
+  17b34a:	mov    %rax,%rbx
+  17b34d:	mov    0x70(%rsp),%rax
+  17b352:	test   %rax,%rax
+  17b355:	je     17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b35b:	lock decq (%rax)
+  17b35f:	jne    17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b365:	lea    0x70(%rsp),%rdi
+  17b36a:	call   *0x10dd88(%rip)        # 2890f8 <_DYNAMIC+0xf18>
+  17b370:	jmp    17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b375:	mov    %rax,%rbx
+  17b378:	lea    0xb8(%rsp),%rdi
+  17b380:	call   17bbf0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::NamePattern>>
+  17b385:	jmp    17b3e2 <litchi_ooxml_common::mce::codec::start+0x4322>
+  17b387:	mov    %rax,%rbx
+  17b38a:	jmp    17b51b <litchi_ooxml_common::mce::codec::start+0x445b>
+  17b38f:	mov    %rax,%rbx
+  17b392:	jmp    17b528 <litchi_ooxml_common::mce::codec::start+0x4468>
+  17b397:	mov    %rax,%rbx
+  17b39a:	jmp    17b535 <litchi_ooxml_common::mce::codec::start+0x4475>
+  17b39f:	jmp    17b407 <litchi_ooxml_common::mce::codec::start+0x4347>
+  17b3a1:	jmp    17b544 <litchi_ooxml_common::mce::codec::start+0x4484>
+  17b3a6:	mov    %rax,%rbx
+  17b3a9:	jmp    17b557 <litchi_ooxml_common::mce::codec::start+0x4497>
+  17b3ae:	mov    %rax,%rbx
+  17b3b1:	jmp    17b564 <litchi_ooxml_common::mce::codec::start+0x44a4>
+  17b3b6:	jmp    17b3d2 <litchi_ooxml_common::mce::codec::start+0x4312>
+  17b3b8:	mov    %rax,%rbx
+  17b3bb:	lea    0x120(%rsp),%rdi
+  17b3c3:	call   17ba60 <core::ptr::drop_in_place<litchi_ooxml_common::mce::model::Name>>
+  17b3c8:	jmp    17b603 <litchi_ooxml_common::mce::codec::start+0x4543>
+  17b3cd:	jmp    17b600 <litchi_ooxml_common::mce::codec::start+0x4540>
+  17b3d2:	mov    %rax,%rbx
+  17b3d5:	lea    0x290(%rsp),%rdi
+  17b3dd:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b3e2:	mov    $0x1,%r12b
+  17b3e5:	jmp    17b50e <litchi_ooxml_common::mce::codec::start+0x444e>
+  17b3ea:	jmp    17b3f7 <litchi_ooxml_common::mce::codec::start+0x4337>
+  17b3ec:	mov    %rax,%rbx
+  17b3ef:	mov    $0x1,%r12b
+  17b3f2:	jmp    17b564 <litchi_ooxml_common::mce::codec::start+0x44a4>
+  17b3f7:	mov    %rax,%rbx
+  17b3fa:	mov    $0x1,%r12b
+  17b3fd:	jmp    17b535 <litchi_ooxml_common::mce::codec::start+0x4475>
+  17b402:	jmp    17b5a4 <litchi_ooxml_common::mce::codec::start+0x44e4>
+  17b407:	mov    %rax,%rbx
+  17b40a:	mov    $0x1,%r12b
+  17b40d:	mov    0x118(%rsp),%rax
+  17b415:	cmp    %rax,0x290(%rsp)
+  17b41d:	je     17b507 <litchi_ooxml_common::mce::codec::start+0x4447>
+  17b423:	lea    0x290(%rsp),%rdi
+  17b42b:	call   17ba60 <core::ptr::drop_in_place<litchi_ooxml_common::mce::model::Name>>
+  17b430:	jmp    17b507 <litchi_ooxml_common::mce::codec::start+0x4447>
+  17b435:	mov    %rax,%rbx
+  17b438:	lea    0x0(,%r14,2),%rax
+  17b440:	test   %rax,%rax
+  17b443:	je     17b5a7 <litchi_ooxml_common::mce::codec::start+0x44e7>
+  17b449:	mov    $0x1,%edx
+  17b44e:	mov    %rbp,%rdi
+  17b451:	mov    %r14,%rsi
+  17b454:	call   *0x10d01e(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b45a:	jmp    17b5a7 <litchi_ooxml_common::mce::codec::start+0x44e7>
+  17b45f:	jmp    17b5a4 <litchi_ooxml_common::mce::codec::start+0x44e4>
+  17b464:	mov    %rax,%rbx
+  17b467:	lea    0x120(%rsp),%rdi
+  17b46f:	call   17b9e0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>>
+  17b474:	test   %r15,%r15
+  17b477:	je     17b48d <litchi_ooxml_common::mce::codec::start+0x43cd>
+  17b479:	lock decq (%r15)
+  17b47d:	jne    17b48d <litchi_ooxml_common::mce::codec::start+0x43cd>
+  17b47f:	lea    0xb8(%rsp),%rdi
+  17b487:	call   *0x10dc63(%rip)        # 2890f0 <_DYNAMIC+0xf10>
+  17b48d:	xor    %r12d,%r12d
+  17b490:	cmpb   $0x0,0x84(%rsp)
+  17b498:	je     17b5f9 <litchi_ooxml_common::mce::codec::start+0x4539>
+  17b49e:	jmp    17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b4a3:	jmp    17b5a4 <litchi_ooxml_common::mce::codec::start+0x44e4>
+  17b4a8:	jmp    17b4aa <litchi_ooxml_common::mce::codec::start+0x43ea>
+  17b4aa:	mov    %rax,%rbx
+  17b4ad:	mov    0x240(%rsp),%rsi
+  17b4b5:	test   %rsi,%rsi
+  17b4b8:	je     17b5a7 <litchi_ooxml_common::mce::codec::start+0x44e7>
+  17b4be:	mov    0x248(%rsp),%rdi
+  17b4c6:	mov    $0x1,%edx
+  17b4cb:	call   *0x10cfa7(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b4d1:	jmp    17b5a7 <litchi_ooxml_common::mce::codec::start+0x44e7>
+  17b4d6:	mov    %rax,%rbx
+  17b4d9:	mov    0x290(%rsp),%rsi
+  17b4e1:	test   %rsi,%rsi
+  17b4e4:	je     17b4f9 <litchi_ooxml_common::mce::codec::start+0x4439>
+  17b4e6:	mov    0x298(%rsp),%rdi
+  17b4ee:	mov    $0x1,%edx
+  17b4f3:	call   *0x10cf7f(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b4f9:	mov    %rbx,%rdi
+  17b4fc:	call   27a9b0 <_Unwind_Resume@plt>
+  17b501:	mov    %rax,%rbx
+  17b504:	mov    $0x1,%r12b
+  17b507:	cmpb   $0x0,0x58(%rsp)
+  17b50c:	je     17b557 <litchi_ooxml_common::mce::codec::start+0x4497>
+  17b50e:	lea    0x240(%rsp),%rdi
+  17b516:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b51b:	lea    0x370(%rsp),%rdi
+  17b523:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b528:	lea    0x3b0(%rsp),%rdi
+  17b530:	call   16e7a0 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b535:	lea    0x410(%rsp),%rdi
+  17b53d:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b542:	jmp    17b557 <litchi_ooxml_common::mce::codec::start+0x4497>
+  17b544:	mov    %rax,%rbx
+  17b547:	lea    0x290(%rsp),%rdi
+  17b54f:	call   16e640 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b554:	mov    $0x1,%r12b
+  17b557:	lea    0x3e0(%rsp),%rdi
+  17b55f:	call   16e900 <<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop>
+  17b564:	mov    0x228(%rsp),%rsi
+  17b56c:	test   %rsi,%rsi
+  17b56f:	jne    17b581 <litchi_ooxml_common::mce::codec::start+0x44c1>
+  17b571:	cmpb   $0x0,0x84(%rsp)
+  17b579:	jne    17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b57f:	jmp    17b5f9 <litchi_ooxml_common::mce::codec::start+0x4539>
+  17b581:	mov    0x230(%rsp),%rdi
+  17b589:	shl    $0x5,%rsi
+  17b58d:	mov    $0x8,%edx
+  17b592:	call   *0x10cee0(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b598:	cmpb   $0x0,0x84(%rsp)
+  17b5a0:	je     17b5f9 <litchi_ooxml_common::mce::codec::start+0x4539>
+  17b5a2:	jmp    17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b5a4:	mov    %rax,%rbx
+  17b5a7:	lea    0x120(%rsp),%rdi
+  17b5af:	call   17bb90 <core::ptr::drop_in_place<quick_xml::events::attributes::Attributes>>
+  17b5b4:	lea    0xa0(%rsp),%rdi
+  17b5bc:	call   17bd90 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Attr>>>
+  17b5c1:	mov    %rbx,%rdi
+  17b5c4:	call   27a9b0 <_Unwind_Resume@plt>
+  17b5c9:	mov    %rax,%rbx
+  17b5cc:	mov    $0x1,%r12b
+  17b5cf:	test   %r15,%r15
+  17b5d2:	je     17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b5d4:	mov    $0x1,%edx
+  17b5d9:	mov    0x88(%rsp),%rdi
+  17b5e1:	mov    %r15,%rsi
+  17b5e4:	call   *0x10ce8e(%rip)        # 288478 <_DYNAMIC+0x298>
+  17b5ea:	jmp    17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b5ec:	mov    %rax,%rbx
+  17b5ef:	cmpb   $0x0,0x84(%rsp)
+  17b5f7:	jne    17b606 <litchi_ooxml_common::mce::codec::start+0x4546>
+  17b5f9:	test   %r12b,%r12b
+  17b5fc:	jne    17b618 <litchi_ooxml_common::mce::codec::start+0x4558>
+  17b5fe:	jmp    17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b600:	mov    %rax,%rbx
+  17b603:	mov    $0x1,%r12b
+  17b606:	lea    0xf0(%rsp),%rdi
+  17b60e:	call   17c150 <core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,alloc::string::String)>>>
+  17b613:	test   %r12b,%r12b
+  17b616:	je     17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b618:	mov    0x60(%rsp),%r15
+  17b61d:	test   %r15,%r15
+  17b620:	je     17b633 <litchi_ooxml_common::mce::codec::start+0x4573>
+  17b622:	lock decq (%r15)
+  17b626:	jne    17b633 <litchi_ooxml_common::mce::codec::start+0x4573>
+  17b628:	lea    0x60(%rsp),%rdi
+  17b62d:	call   *0x10dabd(%rip)        # 2890f0 <_DYNAMIC+0xf10>
+  17b633:	mov    0x70(%rsp),%rax
+  17b638:	test   %rax,%rax
+  17b63b:	je     17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b63d:	lock decq (%rax)
+  17b641:	jne    17b64e <litchi_ooxml_common::mce::codec::start+0x458e>
+  17b643:	lea    0x70(%rsp),%rdi
+  17b648:	call   *0x10daaa(%rip)        # 2890f8 <_DYNAMIC+0xf18>
+  17b64e:	lea    0xa0(%rsp),%rdi
+  17b656:	call   17bd90 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Attr>>>
+  17b65b:	mov    %rbx,%rdi
+  17b65e:	call   27a9b0 <_Unwind_Resume@plt>
+  17b663:	call   *0x10ce17(%rip)        # 288480 <_DYNAMIC+0x2a0>

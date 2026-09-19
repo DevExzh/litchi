@@ -1,0 +1,66 @@
+{
+  "baseline": {
+    "native": {
+      "bytes": 65013928,
+      "sha256": "02c34ebf7e912d5a54cfcd18073e108a6a096a77ac575677df6c76aa58b5bc23",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-native"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2594926\t  60880\t    520\t2656326\t 288846\t/home/zhuhe/code/litchi-0698-bin/baseline-native\n"
+    },
+    "allocations": {
+      "bytes": 65192872,
+      "sha256": "6b24dbe45e19afc794533199f3cc2a5f701b41e3e43680c8ed69f0732166bfde",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-allocations"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2621114\t  61016\t   2904\t2685034\t 28f86a\t/home/zhuhe/code/litchi-0698-bin/baseline-allocations\n"
+    },
+    "refusal": {
+      "bytes": 64664592,
+      "sha256": "c7b5a28b72c41d9bfe1066e2a0951679d7a29b9760cb17afea6515892417fb5d",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/baseline-refusal"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2348450\t  59832\t   2272\t2410554\t 24c83a\t/home/zhuhe/code/litchi-0698-bin/baseline-refusal\n"
+    }
+  },
+  "candidate": {
+    "native": {
+      "bytes": 65016376,
+      "sha256": "2c805a413eb4bb458da46ca61b9ce4283a2797d9712ab97480b23ade9cb7ccf8",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2594502\t  60880\t    936\t2656318\t 28883e\t/home/zhuhe/code/litchi-0698-bin/candidate-native\n"
+    },
+    "allocations": {
+      "bytes": 65195320,
+      "sha256": "0f5728e5bc20d4c817b8e7cf241fded49f39a83815618be9771fd8be9eb07879",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-allocations"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2620690\t  61016\t   3320\t2685026\t 28f862\t/home/zhuhe/code/litchi-0698-bin/candidate-allocations\n"
+    },
+    "refusal": {
+      "bytes": 64667040,
+      "sha256": "0cc4810f8ba11d3f18719668ed7aa4cea7e5cba2b56c77bc755bad3ca1a311f9",
+      "size_command": [
+        "size",
+        "/home/zhuhe/code/litchi-0698-bin/candidate-refusal"
+      ],
+      "exit_code": 0,
+      "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n2348026\t  59832\t   2688\t2410546\t 24c832\t/home/zhuhe/code/litchi-0698-bin/candidate-refusal\n"
+    }
+  }
+}

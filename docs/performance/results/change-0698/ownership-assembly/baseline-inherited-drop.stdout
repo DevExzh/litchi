@@ -1,0 +1,45 @@
+
+/home/zhuhe/code/litchi-0698-bin/baseline-native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000017c5b0 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>>:
+  17c5b0:	push   %r14
+  17c5b2:	push   %rbx
+  17c5b3:	push   %rax
+  17c5b4:	mov    %rdi,%rbx
+  17c5b7:	mov    (%rdi),%rax
+  17c5ba:	test   %rax,%rax
+  17c5bd:	je     17c5ce <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+  17c5bf:	lock decq (%rax)
+  17c5c3:	jne    17c5ce <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x1e>
+  17c5c5:	mov    %rbx,%rdi
+  17c5c8:	call   *0x10ccd2(%rip)        # 2892a0 <_DYNAMIC+0xf20>
+  17c5ce:	mov    0x8(%rbx),%rax
+  17c5d2:	test   %rax,%rax
+  17c5d5:	je     17c5f1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+  17c5d7:	lock decq (%rax)
+  17c5db:	jne    17c5f1 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x41>
+  17c5dd:	add    $0x8,%rbx
+  17c5e1:	mov    %rbx,%rdi
+  17c5e4:	add    $0x8,%rsp
+  17c5e8:	pop    %rbx
+  17c5e9:	pop    %r14
+  17c5eb:	jmp    *0x10ccaf(%rip)        # 2892a0 <_DYNAMIC+0xf20>
+  17c5f1:	add    $0x8,%rsp
+  17c5f5:	pop    %rbx
+  17c5f6:	pop    %r14
+  17c5f8:	ret
+  17c5f9:	mov    %rax,%r14
+  17c5fc:	mov    0x8(%rbx),%rax
+  17c600:	test   %rax,%rax
+  17c603:	je     17c618 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+  17c605:	lock decq (%rax)
+  17c609:	jne    17c618 <core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>+0x68>
+  17c60b:	add    $0x8,%rbx
+  17c60f:	mov    %rbx,%rdi
+  17c612:	call   *0x10cc88(%rip)        # 2892a0 <_DYNAMIC+0xf20>
+  17c618:	mov    %r14,%rdi
+  17c61b:	call   27ab50 <_Unwind_Resume@plt>
+  17c620:	call   *0x10bffa(%rip)        # 288620 <_DYNAMIC+0x2a0>

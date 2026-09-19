@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0698 — refusal cost blocks borrowed inherited views
+
+[0698](0698-mce-borrowed-inherited-namespaces.md) confirms that borrowed
+`Inherited` views remove two temporary clone/drop pairs while retaining parent
+`Ctx` and child emitted-boundary ownership. Successful real one-edit medians
+improve about 2%, but duplicate-name refusal exceeds the +5% threshold in two
+measurement rounds (+15.12% and +7.84% in flagged pairs). The candidate also
+adds 128 bytes to the event handler's stack reservation. It is rejected and
+production is restored. Investigate refusal-path/code-layout cost before
+revisiting this ownership change; do not infer production gains from its
+successful-path measurements. Namespace/hoisting regression tests are retained.
+
 ## 0697 — borrow temporary inherited views before redesigning frames
 
 [0697](0697-mce-context-ownership-attribution.md) attributes current isolated
