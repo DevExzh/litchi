@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0681 — design review preserves admission and publication boundaries
+
+[0678](0678-xls-query-cache-design.md) requires occurrence-preserving XLS
+lookup, bounded candidate and retained weight, pinning and hierarchical memory
+reservations under ADRs 0003, 0005 and 0006. [0679](0679-xlsx-scanner-publication-design.md)
+preserves the existing zero-callback refusal boundary and rejects implicit
+plaintext scratch; an explicit replay API would require its own documented
+semantics. [0680](0680-docx-paragraph-memo-design.md) keeps semantic ranges in
+the DOCX owner, retains managed admissions and requires generation invalidation
+and eviction. These are design constraints for subsequent code, not evidence
+that production cache obligations are implemented. No accepted ADR was changed.
+
 ## 0675 — accepted ADR 0030 and ADR 0031 are integrated with the preservation policies
 
 Record: [0675](0675-third-wave-integration.md). The wave implements the

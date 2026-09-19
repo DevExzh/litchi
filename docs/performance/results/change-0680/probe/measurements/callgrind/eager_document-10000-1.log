@@ -1,0 +1,13 @@
+==766024== Callgrind, a call-graph generating cache profiler
+==766024== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==766024== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==766024== Command: /home/zhuhe/code/litchi-target-0680-probe/release/probe0680 eager_document 10000 1
+==766024==
+==766024== For interactive control, run 'callgrind_control -h'.
+sampled allocations=26 allocated_bytes=2558
+operation=eager_document paragraphs=10000 xml_bytes=500113 reps=1 archive_bytes=27080
+==766024==
+==766024== Events    : Ir
+==766024== Collected : 73723001
+==766024==
+==766024== I   refs:      73,723,001

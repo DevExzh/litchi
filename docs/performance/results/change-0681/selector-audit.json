@@ -1,0 +1,92 @@
+{
+  "scope": "source registry presence, not measured coverage or runtime verification",
+  "source": "tools/perf-baseline/src/lib.rs",
+  "source_sha256": "053ab3033f20a88afdabb633c57efb59f7688c346c8c1b6ab73ae3ff40d0a5b6",
+  "selectors": [
+    {
+      "selector": "doc_facade_file_open",
+      "name_occurrence_lines": [
+        2033,
+        12912
+      ]
+    },
+    {
+      "selector": "ppt_facade_file_open",
+      "name_occurrence_lines": [
+        2036,
+        12915
+      ]
+    },
+    {
+      "selector": "xls_range_source_open_all_cells",
+      "name_occurrence_lines": [
+        1978,
+        12857
+      ]
+    },
+    {
+      "selector": "xls_range_source_open_full_text",
+      "name_occurrence_lines": [
+        1979,
+        12858
+      ]
+    },
+    {
+      "selector": "docx_ordinary_save_lifecycle",
+      "name_occurrence_lines": [
+        2113,
+        13000
+      ]
+    },
+    {
+      "selector": "xlsx_ordinary_save_lifecycle",
+      "name_occurrence_lines": [
+        2125,
+        13012
+      ]
+    },
+    {
+      "selector": "pptx_ordinary_save_lifecycle",
+      "name_occurrence_lines": [
+        2137,
+        13024
+      ]
+    },
+    {
+      "selector": "xlsx_producer_medium_source_selected_cell",
+      "name_occurrence_lines": [
+        2091,
+        12971
+      ]
+    },
+    {
+      "selector": "docx_producer_source_selected_paragraph",
+      "name_occurrence_lines": [
+        2111,
+        12996
+      ]
+    },
+    {
+      "selector": "pptx_producer_source_selected_slide",
+      "name_occurrence_lines": [
+        2112,
+        12999
+      ]
+    },
+    {
+      "selector": "pptx_semantic_opened_transaction_phases",
+      "name_occurrence_lines": [
+        2250,
+        13141,
+        64876
+      ]
+    },
+    {
+      "selector": "xlsb_semantic_workbook_structure_edit_save",
+      "name_occurrence_lines": [
+        1992,
+        12870
+      ]
+    }
+  ]
+}

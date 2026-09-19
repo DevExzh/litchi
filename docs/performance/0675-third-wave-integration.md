@@ -61,10 +61,13 @@ retained as the cost of the selected preservation policy, not a latency
 speedup. The equal-length object overlay is a separate path; this control does
 not establish its before/after performance. A separate `FloatingPictures.doc`
 opened-DOC before/after observation is about +2.3% at p50 without a paired
-floor, so it also supports no latency claim. Likewise, 0672's exact stored-cell
-reservation saves allocations but records a small warm timing regression.
-These costs remain visible in their packets rather than being averaged into
-an aggregate optimization claim.
+floor, so it also supports no latency claim. The 0672 exact stored-cell reservation saves allocations and its retained
+warm POI timing pair reports 3.751% and 4.134% lower p50 latency, against a
+1.770% same-binary p50 floor. The original integration summary incorrectly
+called those positive reduction percentages a regression; the raw-sample
+recomputation is retained in [0681](results/change-0681/0672-recomputed.json).
+The noisy tails remain withheld. Per-change costs and improvements remain
+visible rather than being averaged into an aggregate optimization claim.
 
 ## Validation and cleanup
 

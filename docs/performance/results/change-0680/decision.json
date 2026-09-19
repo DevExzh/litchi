@@ -1,0 +1,82 @@
+{
+  "change": "0680",
+  "title": "bounded DOCX paragraph-index memo design",
+  "status": "design_only",
+  "performance_claim": "none",
+  "repository_revision": "389167b38c8b43c84c0d1799369e17360a59209c",
+  "scope": {
+    "owner": "litchi-docx",
+    "physical_payload_owner": "litchi-opc",
+    "excluded": ["iWork"]
+  },
+  "probe": {
+    "manifest": "docs/performance/results/change-0680/probe/Cargo.toml",
+    "operations": [
+      "eager_document",
+      "eager_document_count",
+      "eager_one_view_count",
+      "source_document",
+      "source_document_count",
+      "source_one_view_count"
+    ],
+    "repetitions": [0, 1, 5],
+    "semantic_assertion": "paragraph_count() == expected paragraph count inside every counted iteration",
+    "allocation_region": "counters snapshotted immediately before and after the measured loop",
+    "source_diagnostics": "printed after the sampled allocator delta",
+    "cargo_toml_sha256": "8897e4af659b8aadccf26bca6962095adc2f7c3f8bdfd1347315d75f0470608f",
+    "cargo_lock_sha256": "3d5e0c487282a2f93cba695ee63720ffab498985d56dff43a9939aa8b67998ee",
+    "main_rs_sha256": "e7bfcfe6faaa0d5ac0c19a758b23a314b345efa7dd3db8faeb0f34610dad860a"
+  },
+  "fixtures": [
+    {
+      "paragraphs": 200,
+      "visible_xml_bytes": 10113,
+      "archive_bytes": 1454,
+      "fresh_view_index_allocated_bytes": 6287,
+      "fresh_view_index_instructions_reps1": 906624
+    },
+    {
+      "paragraphs": 10000,
+      "visible_xml_bytes": 500113,
+      "archive_bytes": 27080,
+      "fresh_view_index_allocated_bytes": 342735,
+      "fresh_view_index_instructions_reps1": 44867496
+    }
+  ],
+  "ownership_findings": [
+    "A fresh eager DocumentPart creates a fresh paragraph OnceLock and repeats the index build.",
+    "A source payload is physically cached after one cold load, but each fresh source-backed document repeats the semantic index build.",
+    "The current managed DocumentIndexAdmission is xml_len/4+1 range slots, 24 bytes per slot plus 1024 bytes, and range slots plus 3 objects.",
+    "A package-owned semantic memo must not move PartData or physical cache ownership across the litchi-docx/litchi-opc boundary."
+  ],
+  "next_implementation": {
+    "cache": "private single-current-generation weighted clean-value DocumentIndexCache",
+    "value": "Option<Arc<ParagraphIndex>> plus typed managed admission",
+    "weight": "checked retained range bytes plus measured fixed memo/Arc envelope",
+    "clean_ceiling": "initial eight-MiB policy derived from the one-million-range safety bound",
+    "eviction": "explicit trim_clean(required_weight) on generation, admission, and pressure paths; pinned active values remain charged",
+    "oversized_value": "return to active view but bypass clean-cache publication and recompute later",
+    "diagnostics": [
+      "hits",
+      "misses",
+      "builds",
+      "clean evictions",
+      "pinned-entry drops",
+      "oversized bypasses",
+      "admission failures",
+      "clean weight",
+      "active pinned weight"
+    ]
+  },
+  "retained_evidence": [
+    "docs/performance/results/change-0680/README.md",
+    "docs/performance/results/change-0680/measurements/callgrind-summary.txt",
+    "docs/performance/results/change-0680/measurements/source-audit.txt",
+    "docs/performance/results/change-0680/probe/src/main.rs",
+    "docs/performance/results/change-0680/probe/measurements/callgrind/*.log"
+  ],
+  "raw_artifacts_removed": [
+    "docs/performance/results/change-0680/probe/measurements/callgrind/*.out",
+    "/home/zhuhe/code/litchi-target-0680-probe"
+  ]
+}

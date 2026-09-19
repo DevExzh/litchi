@@ -1,0 +1,67 @@
+Change 0680 source audit (current HEAD; revision 1)
+
+The audit was run after reading docs/adr/README.md and the accepted records
+listed in 0680-docx-paragraph-memo-design.md. Commands are shown so the facts
+can be checked against the current tree.
+
+Revision: 389167b38c8b43c84c0d1799369e17360a59209c
+Host: AMD EPYC 9R45, 32 x86_64 CPUs, Linux 7.0.0-1012-aws
+Probe hashes:
+  Cargo.toml 8897e4af659b8aadccf26bca6962095adc2f7c3f8bdfd1347315d75f0470608f
+  Cargo.lock 3d5e0c487282a2f93cba695ee63720ffab498985d56dff43a9939aa8b67998ee
+  src/main.rs e7bfcfe6faaa0d5ac0c19a758b23a314b345efa7dd3db8faeb0f34610dad860a
+
+1. Paragraph layout and per-view ownership
+
+  rg -n "struct ParagraphRange|struct ParagraphIndex|paragraph_index|from_part|paragraph_ranges" \
+    crates/litchi-docx/src/parts/document_part.rs
+
+  crates/litchi-docx/src/parts/document_part.rs:35-48
+    ParagraphRange is (u32, u32); ParagraphIndex owns Arc<[ParagraphRange]>.
+  :50-73
+    from_xml scans ranges, try_reserve(1) per range, and caps at 1,000,000.
+  :145-153
+    DocumentPart stores xml: Arc<Vec<u8>> and a per-view OnceLock.
+  :577-603
+    from_part runs visible_document_xml and creates a fresh cell; the first
+    paragraph query fills it.
+  :642-698
+    paragraph_count, paragraphs, and paragraph use the index when available;
+    other readers retain their streaming paths.
+
+2. Owning eager package
+
+  crates/litchi-docx/src/package/model.rs:132-152
+    Package has the OPC owner and mutable state but no paragraph memo.
+  :565-575
+    Package::document obtains the main part and constructs a fresh
+    DocumentPart on every call.
+
+3. Source-backed package and managed admission
+
+  crates/litchi-docx/src/source_backed.rs:104-108
+    source-backed Package has the OPC owner and execution context but no DOCX
+    semantic memo.
+  :629-684
+    Package::document reads main PartData, then creates a fresh per-view cell;
+    managed opens reserve DocumentIndexAdmission and parser admission before
+    the eager scan.
+  :2863-2885
+    DocumentIndexAdmission prices ranges as xml_len/4 + 1, 24 bytes/range plus
+    1024 bytes, and ranges + 3 objects.
+  :2926-2960
+    source-backed Document owns its payload, per-view cell, and admission.
+
+4. Physical source cache ownership
+
+  crates/litchi-opc/src/source_backed.rs:4374-4394
+    PartCache owns source-cache state and its budget context.
+  :4751-4787
+    physical entries are evicted by byte weight/entry count when unpinned;
+    externally pinned payloads are skipped.
+  :5439-5469
+    SourceBackedPackage owns the physical source, catalog, and PartCache.
+
+Conclusion: a paragraph-index memo belongs in litchi-docx package state. It must
+retain no XML and must not move PartData or physical cache reservations across
+the litchi-opc/litchi-docx boundary.

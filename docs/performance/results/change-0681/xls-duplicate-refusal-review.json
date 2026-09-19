@@ -1,0 +1,9 @@
+{
+  "source": "crates/litchi-xls/src/workbook/source.rs",
+  "sha256": "e27e35110e097555809bc89795229f945cff52d3417cf26bf770a0828cda02f9",
+  "review_finding": "TargetCell skips shared-string resolution for other coordinates but resolves every occurrence of the selected coordinate before overwriting found. A cache storing only the latest occurrence cannot preserve earlier selected-occurrence errors.",
+  "start_line": 2937,
+  "end_line": 2975,
+  "excerpt": "/// The selected-cell sink: exactly what `process_cell` did before this scan\n/// loop was shared.\nstruct TargetCell {\n    row: u16,\n    column: u16,\n    found: Option<SourceBackedCell>,\n}\n\nimpl CellSink for TargetCell {\n    #[inline]\n    fn accept(\n        &mut self,\n        record: &CellRecord,\n        scan: &ScanContext<'_>,\n        strings: &mut SharedStringResolver<'_>,\n    ) -> Result<()> {\n        scan.formatting\n            .validate_cell_xf(cell_xf_index(record))\n            .map_err(SourceBackedError::Parse)?;\n        if record.row() != self.row || record.col() != self.column {\n            return Ok(());\n        }\n        let Some(cell) =\n            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting))\n        else {\n            return Ok(());\n        };\n        let value = if let Some(string_index) = cell.shared_string_index() {\n            resolve_shared_string(scan.owner, string_index, scan.execution, strings)?\n        } else {\n            cell.value().clone()\n        };\n        self.found = Some(SourceBackedCell {\n            row: u32::from(self.row),\n            column: u32::from(self.column),\n            value,\n        });\n        Ok(())\n    }",
+  "evidence_kind": "source control-flow inspection; no runtime witness claimed"
+}

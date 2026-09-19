@@ -1,0 +1,29 @@
+Change 0680 callgrind summary
+
+Tool: Valgrind 3.26.0 callgrind, cache-sim=no, branch-sim=no, CPU 12.
+Each total below is the summary value from one profile; its matching .log is
+retained with the probe command and sampled allocator line, while the large
+raw .out profile is removed. The sampled instruction value is total(reps)
+minus total(reps=0); no package/open work is included in that delta.
+
+Columns: operation, paragraphs, reps=0, reps=1, reps=5, delta(1), delta(5),
+delta(5)/5.
+
+eager_document             200     3,399,929    3,666,314    4,724,941       266,385       1,325,012       265,002.4
+eager_document_count       200     3,400,069    4,573,078    9,260,163     1,173,009       5,860,094     1,172,018.8
+eager_one_view_count       200     3,666,151    4,572,958    4,572,650       906,807         906,499       181,299.8
+source_document            200     3,221,263    3,630,871    4,693,376       409,608       1,472,113       294,422.6
+source_document_count      200     3,221,119    4,537,409    9,227,755     1,316,290       6,006,636     1,201,327.2
+source_one_view_count      200     3,630,668    4,537,422    4,537,559       906,754         906,891       181,378.2
+
+eager_document          10000    61,696,391   73,723,001  121,821,540    12,026,610      60,125,149    12,025,029.8
+eager_document_count    10000    61,696,215  118,590,321  346,161,992    56,894,106     284,465,777    56,893,155.4
+eager_one_view_count    10000    73,723,047  118,590,401  118,590,338    44,867,354      44,867,291     8,973,458.2
+source_document         10000    58,484,787   73,681,572  121,784,066    15,196,785      63,299,279    12,659,855.8
+source_document_count   10000    58,484,703  118,564,905  346,237,135    60,080,202     287,752,432    57,550,486.4
+source_one_view_count   10000    73,681,283  118,564,823  118,564,969    44,883,540      44,883,686     8,976,737.2
+
+The one-view rows intentionally show the first build in delta(1) and the same
+process's five-call total in delta(5). The later calls do not allocate a new
+index; instruction totals for those later calls are not treated as zero-cost,
+only as within callgrind noise after the first build.

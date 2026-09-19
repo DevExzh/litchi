@@ -1,0 +1,51 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0678",
+  "title": "Bounded weighted cache design and pricing for repeated XLS worksheet queries",
+  "decision": "design only; no production change",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "scope": {
+    "primary": "private snapshot-scoped worksheet occurrence index retaining every recognized stored-cell occurrence",
+    "secondary": "SST locator eviction only after descriptor-backed rebuild proof; decoded SST value cache is a separate follow-up",
+    "admission": "two observations of one worksheet before candidate collection; publish only after a complete successful scan",
+    "budget": "proposed SourceBackedLimits::max_query_index_bytes, 2 MiB default, zero disables; resident and in-flight candidate weights are tracked separately",
+    "eviction": "deterministic weighted LRU; skip pinned entries and skip admission when all candidates are pinned"
+  },
+  "wire_pricing": {
+    "fixtures": 126,
+    "worksheet_substreams": 372,
+    "worksheet_slot_occurrences": 127072,
+    "distinct_recognized_cell_coordinates": 126152,
+    "worksheet_logical_weight_bytes": 3073536,
+    "largest_worksheet_slots": 38950,
+    "largest_worksheet_weight_bytes": 934864,
+    "admissible_sst_groups": 119,
+    "sst_logical_weight_bytes": 290520,
+    "largest_sst_weight_bytes": 127024,
+    "largest_worksheet_plus_sst_weight_bytes": 1061888,
+    "weight_formula": "worksheet: 24*occurrence_slots + 64; SST locator: 24*segments + 16*entries + 64; candidate peak additionally reserves vector capacity and scan/sort/SST scratch"
+  },
+  "semantic_rules": [
+    "Only a full worksheet scan that reaches EOF and passes the trailing freshness/cancellation fence may publish an index",
+    "No errors, partial scans, visitor failures, invalid SST values, or cancellation outcomes are cached",
+    "Every cache hit still fences the source, replays all equal-coordinate occurrences in source order, reads/parses each selected BIFF frame, validates XF, and resolves formula STRING/SST semantics",
+    "visit_cells remains the one-scan stream-order path and preserves duplicate occurrences",
+    "Candidate builds track resident and in-flight owner weight and use managed Resource::Memory reservations for retained capacity and transient scratch when an ExecutionContext is present",
+    "StreamChainHint remains operation-scoped because it borrows SharedOleFile"
+  ],
+  "evidence": {
+    "probe": "probe/xls_index_shape.py",
+    "summary": "probe/summary.json",
+    "rows": "probe/index-shape.jsonl",
+    "prior_repeated_query_price": "0605: 54016 second query adds 25 reads, 615822 bytes, 19 observations"
+  },
+  "known_gaps": [
+    "olefile extraction is a wire census and does not prove litchi-xls admission",
+    "no Rust build or production implementation was run",
+    "allocator headers, cache lock/LRU overhead, RSS, and latency remain unmeasured",
+    "SST locator eviction needs an exact descriptor-backed rebuild differential before changing mandatory catalog retention",
+    "decoded SST value retention needs a repeated-string trace and separate budget"
+  ]
+}
