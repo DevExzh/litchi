@@ -1,0 +1,10 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/statistical.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs",
+  "crates/litchi-ods/tests/ods_formula_statistical_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_statistical_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_statistical_native.rs",
+  "crates/litchi-ods/tests/ods_formula_statistical_oracle.rs"
+]
