@@ -1,0 +1,1 @@
+Error: Opc(XmlPublication { part: "/ppt/slides/slide1.xml", source: Malformed { offset: 273, detail: "position 24: duplicated attribute, previous declaration at position 7" } })

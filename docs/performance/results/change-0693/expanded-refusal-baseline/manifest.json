@@ -1,0 +1,87 @@
+{
+  "status": "built",
+  "baseline_head": "5e89851b9e9d53daec5b291672d7ac15503243c7",
+  "sources": [
+    {
+      "path": "crates/litchi-pptx/src/opened/tests.rs",
+      "candidate_sha256": "97445382b3759c0696fd4361d3239254566a70669fb3b00506658443f0cd451d",
+      "baseline_sha256": "c440ff121d6ac291bcbb418c49243d0e3b0d56f7a9b86a04e153447e3404cfd0"
+    },
+    {
+      "path": "crates/litchi-pptx/src/opened/model.rs",
+      "candidate_sha256": "5cb5a59ba6bed9e9ca626e7e9fb60f2aad182db2f44523f642d50064cf5e971d",
+      "baseline_sha256": "22e8d489990a83fba2bfefb53d1044f063104d20a64c3ba72b41364c0a59ee9b"
+    },
+    {
+      "path": "crates/litchi-pptx/src/parts/slide.rs",
+      "candidate_sha256": "41474b07156161019d8b6d72c9a43e233bdd3c0a544ab82972542d9fc60b735b",
+      "baseline_sha256": "4dd5cf594abe9854459f09f7fa5f4ac495afb720be5bcce070135d7f914436fe"
+    },
+    {
+      "path": "crates/litchi-pptx/src/parts/mod.rs",
+      "candidate_sha256": "2a3eaa07274e992a13b56fe2aa9dbc4ad24d679f6adc893029d59506f562d94c",
+      "baseline_sha256": "5ca760af4c79fe0d810509c2d7e9f265c2ae5f4d620b5d0521dd0d68b91e7955"
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/codec.rs",
+      "candidate_sha256": "3b53dd5ed53baac9557c7df46dbfffc746f8bb54b49fe5a0bbac43e344984d3c",
+      "baseline_sha256": "9f3c7e7005305e99ba73894f18b99f5c9b2e01641709cdedc130cbaff0fea18e"
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/package.rs",
+      "candidate_sha256": "8af354ae72391c9f5cf7cfefb2ae5060baf2bcb30a67eb16d57fc1a242e55d97",
+      "baseline_sha256": "a149832e0d67f32fa8bae0d6a2fc0221666fe18d79f7bbcb9a227d8dba6a3f64"
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/mod.rs",
+      "candidate_sha256": "58f06bbdcf4c8fb2889a868e50ac38a635eca0869c44472c100e1a19e5a76e8b",
+      "baseline_sha256": "669ab66120de29f11ef9d777d71f7851372f1f386c746f77259f7f0897686b70"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/package.rs",
+      "candidate_sha256": "890d751a97ae3e305993ad24db2e8e55662ceeb1be14d409542215b38c499f26",
+      "baseline_sha256": "bc0cdb86a56d087830c8ee87de101c923acb5f9c4bc39060461765e582d2664f"
+    }
+  ],
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0693/build-refusal.py",
+    "baseline"
+  ],
+  "exit_code": 0,
+  "restoration": [
+    {
+      "path": "crates/litchi-pptx/src/presentation/package.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/mod.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/package.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/notes/codec.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/parts/mod.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/parts/slide.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/opened/model.rs",
+      "restored_exact": true
+    },
+    {
+      "path": "crates/litchi-pptx/src/opened/tests.rs",
+      "restored_exact": true
+    }
+  ],
+  "restored_exact": true
+}

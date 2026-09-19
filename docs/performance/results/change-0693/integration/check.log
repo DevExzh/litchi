@@ -1,0 +1,6 @@
+HEAD 5e89851b9e9d53daec5b291672d7ac15503243c7
+$ cargo check -p litchi-pptx --all-features --all-targets --locked
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.91s
+
+exit 0

@@ -1,0 +1,262 @@
+[
+  {
+    "case": "one-real",
+    "phase": "candidate",
+    "workflow": "one",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "3",
+      "2",
+      "one"
+    ],
+    "exit_code": 0,
+    "output": "allocations/one-real-candidate.tsv",
+    "output_sha256": "2a54abf18d01b4c446ee8f47da614f43dcd5143622b9a68c18a95428858047e5",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "one-control",
+    "phase": "candidate",
+    "workflow": "one",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx",
+      "3",
+      "2",
+      "one"
+    ],
+    "exit_code": 0,
+    "output": "allocations/one-control-candidate.tsv",
+    "output_sha256": "d65790d6ac7853060a414a62e485fcb34c7946760ebf503f2f8e227a845fc3d7",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "one-generated",
+    "phase": "candidate",
+    "workflow": "one",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "generated:12x8",
+      "3",
+      "2",
+      "one"
+    ],
+    "exit_code": 0,
+    "output": "allocations/one-generated-candidate.tsv",
+    "output_sha256": "b41cf656958f6645c85024764a6c8db0309eb8ec4207bc6b47f39dd5038d4c94",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "one-notes-poi",
+    "phase": "candidate",
+    "workflow": "one",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "3",
+      "2",
+      "one"
+    ],
+    "exit_code": 0,
+    "output": "allocations/one-notes-poi-candidate.tsv",
+    "output_sha256": "01c9fd08167249b4f771b79c5e386588f6fc5cb031ca9ea4b4382fabf25c2e2f",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "one-notes-lo",
+    "phase": "candidate",
+    "workflow": "one",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "3",
+      "2",
+      "one"
+    ],
+    "exit_code": 0,
+    "output": "allocations/one-notes-lo-candidate.tsv",
+    "output_sha256": "fedf548f7b1298d027cacadc4793502ed273725ad8dd7c511c11cfdb47642d10",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "noop-real",
+    "phase": "candidate",
+    "workflow": "noop",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "3",
+      "2",
+      "noop"
+    ],
+    "exit_code": 0,
+    "output": "allocations/noop-real-candidate.tsv",
+    "output_sha256": "cf220504952962adf981603d3af3c95c07b72e82b30d02c8c2c4c4264c0fb661",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "noop-control",
+    "phase": "candidate",
+    "workflow": "noop",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx",
+      "3",
+      "2",
+      "noop"
+    ],
+    "exit_code": 0,
+    "output": "allocations/noop-control-candidate.tsv",
+    "output_sha256": "727356e9120cf79bb89861f43e539151b449759c3aad241d7c7ebfe7b933f169",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "noop-generated",
+    "phase": "candidate",
+    "workflow": "noop",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "generated:12x8",
+      "3",
+      "2",
+      "noop"
+    ],
+    "exit_code": 0,
+    "output": "allocations/noop-generated-candidate.tsv",
+    "output_sha256": "a6a7cc7939b9717ae43b21a1b20d039bb562b8bb647f74d3aab2ebd192a50fb1",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "candidate",
+    "workflow": "noop",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "3",
+      "2",
+      "noop"
+    ],
+    "exit_code": 0,
+    "output": "allocations/noop-notes-poi-candidate.tsv",
+    "output_sha256": "e92c5e8bf881a55caf0470d54066ada628c11d05705b64c4e70a3b4e50575132",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "candidate",
+    "workflow": "noop",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "3",
+      "2",
+      "noop"
+    ],
+    "exit_code": 0,
+    "output": "allocations/noop-notes-lo-candidate.tsv",
+    "output_sha256": "dad1ac2891bca381adab7ef1b60271881efad5edb632a89cca920fcdf9a0dda8",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "two-real",
+    "phase": "candidate",
+    "workflow": "two",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "3",
+      "2",
+      "two"
+    ],
+    "exit_code": 0,
+    "output": "allocations/two-real-candidate.tsv",
+    "output_sha256": "50e3662c0adf604704d7f85cecfccc6f39e4bb44e56281517d632aad53a326c6",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "two-control",
+    "phase": "candidate",
+    "workflow": "two",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx",
+      "3",
+      "2",
+      "two"
+    ],
+    "exit_code": 0,
+    "output": "allocations/two-control-candidate.tsv",
+    "output_sha256": "a65c13dee5fe4197c88ec2bd4a87fced700f25db6c10e68cc37483bc10bbe90a",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  },
+  {
+    "case": "two-generated",
+    "phase": "candidate",
+    "workflow": "two",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0693-bin/candidate-allocations",
+      "phases",
+      "generated:12x8",
+      "3",
+      "2",
+      "two"
+    ],
+    "exit_code": 0,
+    "output": "allocations/two-generated-candidate.tsv",
+    "output_sha256": "25bae02254fb679f36dcb0a96b27d06accbd73f03f13075557335b4708006e3e",
+    "binary_sha256": "5dc84ff7cd5e9cb69d04abb7385cf17e9acfa8e8b7a37cca83f60e9140a46d22"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "after_sha256": "246a3870cd9938256130f412de2c9c4ec36f38c8f7ec838c03e0609d9cb91411",
+      "before_sha256": "e3836100c13eaee212631965bd7ffb25f67e30a9d953e60686d0be937fe48fa9",
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs"
+    },
+    {
+      "after_sha256": "08216f8a928804b03f202b99578ee4ec13cdec025dc2e2e75bc455c3191f68b0",
+      "before_sha256": "2a3eaa07274e992a13b56fe2aa9dbc4ad24d679f6adc893029d59506f562d94c",
+      "path": "crates/litchi-pptx/src/parts/mod.rs"
+    },
+    {
+      "after_sha256": "c7a3c6a9e438d01e995c4bf6cdc2a423c215803c89108f534df96e23157108c6",
+      "before_sha256": "5cb5a59ba6bed9e9ca626e7e9fb60f2aad182db2f44523f642d50064cf5e971d",
+      "path": "crates/litchi-pptx/src/opened/model.rs"
+    }
+  ],
+  "patch_sha256": "f6fe63aae228425c43f4c214019fd5cb54dc07f75ff8919f10263ce1b91c1be0"
+}

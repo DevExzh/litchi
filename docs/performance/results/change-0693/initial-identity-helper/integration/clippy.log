@@ -1,0 +1,6 @@
+HEAD 5e89851b9e9d53daec5b291672d7ac15503243c7
+$ cargo clippy -p litchi-pptx --all-features --lib --no-deps --locked -- -D warnings
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.98s
+
+exit 0

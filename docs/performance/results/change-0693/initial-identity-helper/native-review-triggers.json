@@ -1,0 +1,226 @@
+[
+  {
+    "case": "one-real",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 78710,
+    "delta_pct": 7.1917664279461935
+  },
+  {
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 5360,
+    "delta_pct": 30.351075877689695
+  },
+  {
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 1751,
+    "delta_pct": 13.963317384370017
+  },
+  {
+    "case": "one-notes-poi",
+    "phase": "capture_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 21630,
+    "delta_pct": 5.264028892533986
+  },
+  {
+    "case": "one-notes-poi",
+    "phase": "clone_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 7070,
+    "delta_pct": 119.42567567567568
+  },
+  {
+    "case": "one-notes-lo",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_ns": 2310,
+    "delta_pct": 42.463235294117645
+  },
+  {
+    "case": "one-notes-lo",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_ns": 21695.5,
+    "delta_pct": 5.518145620239771
+  },
+  {
+    "case": "noop-real",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_ns": 6070,
+    "delta_pct": 10.974507322364852
+  },
+  {
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_ns": 3770,
+    "delta_pct": 20.48913043478261
+  },
+  {
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 1470,
+    "delta_pct": 6.2766865926558495
+  },
+  {
+    "case": "noop-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 6620,
+    "delta_pct": 35.72584997301673
+  },
+  {
+    "case": "noop-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 4550,
+    "delta_pct": 26.670574443141852
+  },
+  {
+    "case": "noop-control",
+    "phase": "commit_ns",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_ns": 4090,
+    "delta_pct": 6.019131714495953
+  },
+  {
+    "case": "noop-generated",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 5190,
+    "delta_pct": 20.077369439071568
+  },
+  {
+    "case": "noop-generated",
+    "phase": "capture_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 69820,
+    "delta_pct": 9.378685587020824
+  },
+  {
+    "case": "noop-generated",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_ns": 2210,
+    "delta_pct": 5.168381665107577
+  },
+  {
+    "case": "noop-generated",
+    "phase": "total_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 69760,
+    "delta_pct": 8.137317228226319
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 7060,
+    "delta_pct": 42.478941034897716
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "commit_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 4920,
+    "delta_pct": 24.773413897280967
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 3399,
+    "delta_pct": 15.519839276745355
+  },
+  {
+    "case": "noop-notes-poi",
+    "phase": "total_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 30090,
+    "delta_pct": 5.9201750278399725
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 3970,
+    "delta_pct": 21.22994652406417
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 430,
+    "delta_pct": 8.531746031746032
+  },
+  {
+    "case": "noop-notes-lo",
+    "phase": "commit_ns",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_ns": 5660,
+    "delta_pct": 34.85221674876847
+  },
+  {
+    "case": "two-control",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_ns": 4180,
+    "delta_pct": 5.130659989444097
+  },
+  {
+    "case": "two-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 4500,
+    "delta_pct": 24.52316076294278
+  },
+  {
+    "case": "two-generated",
+    "phase": "apply_ns",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_ns": 4550,
+    "delta_pct": 8.741594620557157
+  },
+  {
+    "case": "two-generated",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_ns": 6120,
+    "delta_pct": 49.71567831031682
+  }
+]

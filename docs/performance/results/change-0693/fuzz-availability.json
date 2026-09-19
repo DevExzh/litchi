@@ -1,0 +1,21 @@
+[
+  {
+    "command": [
+      "rustup",
+      "toolchain",
+      "list"
+    ],
+    "exit_code": 0,
+    "stdout": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "cargo",
+      "--list"
+    ],
+    "exit_code": 0,
+    "stdout": "Installed Commands:\n    add                  Add dependencies to a Cargo.toml manifest file\n    b                    alias: build\n    bench                Execute all benchmarks of a local package\n    build                Compile a local package and all of its dependencies\n    c                    alias: check\n    check                Check a local package and all of its dependencies for errors\n    clean                Remove artifacts that cargo has generated in the past\n    clippy               Checks a package to catch common mistakes and improve your Rust code.\n    config               Inspect configuration values\n    d                    alias: doc\n    doc                  Build a package's documentation\n    fetch                Fetch dependencies of a package from the network\n    fix                  Automatically fix lint warnings reported by rustc\n    flamegraph\n    fmt                  Formats all bin and lib files of the current crate using rustfmt.\n    generate-lockfile    Generate the lockfile for a package\n    git-checkout         REMOVED: This command has been removed\n    help                 Displays help for a cargo command\n    info                 Display information about a package\n    init                 Create a new cargo package in an existing directory\n    install              Install a Rust binary\n    lint                 alias: clippy --workspace --all-features --lib --no-deps -- -D warnings\n    llvm-cov\n    locate-project       Print a JSON representation of a Cargo.toml file's location\n    login                Log in to a registry.\n    logout               Remove an API token from the registry locally\n    metadata             Output the resolved dependencies of a package, the concrete used versions including overrides, in machine-readable format\n    miri\n    new                  Create a new cargo package at <path>\n    owner                Manage the owners of a crate on the registry\n    package              Assemble the local package into a distributable tarball\n    pkgid                Print a fully qualified package specification\n    publish              Upload a package to the registry\n    r                    alias: run\n    read-manifest        DEPRECATED: Print a JSON representation of a Cargo.toml manifest.\n    remove               Remove dependencies from a Cargo.toml manifest file\n    report               Generate and display various kinds of reports\n    rm                   alias: remove\n    run                  Run a binary or example of the local package\n    rustc                Compile a package, and pass extra options to the compiler\n    rustdoc              Build a package's documentation, using specified custom flags.\n    search               Search packages in the registry. Default registry is crates.io\n    sort\n    t                    alias: test\n    test                 Execute all unit and integration tests and build examples of a local package\n    tree                 Display a tree visualization of a dependency graph\n    uninstall            Remove a Rust binary\n    update               Update dependencies as recorded in the local lock file\n    vendor               Vendor all dependencies for a project locally\n    verify-project       DEPRECATED: Check correctness of crate manifest.\n    version              Show version information\n    yank                 Remove a pushed crate from the index\n",
+    "stderr": ""
+  }
+]
