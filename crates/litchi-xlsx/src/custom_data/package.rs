@@ -4,20 +4,23 @@
 //! the package graph, the typed `datastoreItem` properties, and bounded byte
 //! sizes; it never interprets the binary storage.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_core::Resource;
 use litchi_opc::{
-    BlobPart, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part as OpcPart,
-    TargetMode,
+    BlobPart, ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI,
+    Part as OpcPart, ReadLimits, RelationshipEdit, Relationships, TargetMode,
 };
+use quick_xml::{Reader, events::Event};
 
 use crate::connections::embedded_data::Bindings;
 use crate::error::{Error, Result, invalid};
 
 use super::codec::{
-    canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
-    validate_source_properties, write_properties,
+    XmlLimits, canonical_extension_with_limits, parse_properties_with_limits,
+    rewrite_extension_list_with_limits_and_output, rewrite_id_with_limits_and_output,
+    validate_source_properties_with_limits, write_properties_with_limits,
 };
 use super::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, PROPERTIES_CONTENT_TYPE,
@@ -25,20 +28,91 @@ use super::{
 };
 
 const MAX_STORAGES: usize = 4_096;
+const MAX_UID_UNITS: usize = 65_535;
+const MAX_PROPERTIES_XML_BYTES: usize = 4 * 1024 * 1024;
+const MAX_EXTENSION_XML_BYTES: usize = 2 * 1024 * 1024;
+const MAX_XML_STRING_BYTES: usize = 1024 * 1024;
+const MAX_XML_NODES: usize = 100_000;
+const MAX_XML_EVENTS: usize = 1_000_000;
+const MAX_XML_DEPTH: usize = 128;
+const MAX_XML_NAMESPACE_BYTES: usize = MAX_PROPERTIES_XML_BYTES;
+const MAX_XML_ATTRIBUTES: usize = MAX_XML_NODES;
 const MAX_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
+const MAX_CONNECTIONS_BYTES: usize = 16 * 1024 * 1024;
+const MAX_RELATIONSHIPS: usize = 100_000;
+const MAX_RELATIONSHIP_XML_BYTES: usize = 4 * 1024 * 1024;
+const MAX_PACKAGE_NODES: usize = 1_000_000;
+const MAX_PACKAGE_BYTES: usize = 2 * 1024 * 1024 * 1024;
+// The logical OPC aggregate ceiling is the hard publication ceiling as well.
+// Callers can still lower publication output independently; keeping the
+// defaults aligned avoids rejecting a supported source package merely because
+// its unchanged output exceeds an authoring-only 128 MiB budget. This counts
+// modeled part, content-types, and relationship XML bytes; it does not measure
+// ZIP compression or passthrough archive members.
+const MAX_OUTPUT_BYTES: usize = MAX_PACKAGE_BYTES;
+const MAX_TEMPORARY_BYTES: usize = 256 * 1024 * 1024;
+
+const fn clamp_limit(value: usize, maximum: usize) -> usize {
+    if value < maximum { value } else { maximum }
+}
+
+fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
+    Error::Allocation { resource, source }
+}
+
+fn limit(resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
+    Error::ResourceLimit(litchi_core::ResourceLimit {
+        resource,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
+}
 
 /// Bounded Custom Data resource policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     max_storages: usize,
+    max_uid_units: usize,
+    max_properties_xml_bytes: usize,
+    max_extension_xml_bytes: usize,
+    max_xml_string_bytes: usize,
+    max_xml_nodes: usize,
+    max_xml_events: usize,
+    max_xml_depth: usize,
+    max_xml_namespace_bytes: usize,
+    max_xml_attributes: usize,
     max_payload_bytes: usize,
+    max_connections_bytes: usize,
+    max_relationships: usize,
+    max_relationship_xml_bytes: usize,
+    max_package_nodes: usize,
+    max_package_bytes: usize,
+    max_output_bytes: usize,
+    max_temporary_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
             max_storages: MAX_STORAGES,
+            max_uid_units: MAX_UID_UNITS,
+            max_properties_xml_bytes: MAX_PROPERTIES_XML_BYTES,
+            max_extension_xml_bytes: MAX_EXTENSION_XML_BYTES,
+            max_xml_string_bytes: MAX_XML_STRING_BYTES,
+            max_xml_nodes: MAX_XML_NODES,
+            max_xml_events: MAX_XML_EVENTS,
+            max_xml_depth: MAX_XML_DEPTH,
+            max_xml_namespace_bytes: MAX_XML_NAMESPACE_BYTES,
+            max_xml_attributes: MAX_XML_ATTRIBUTES,
             max_payload_bytes: MAX_PAYLOAD_BYTES,
+            max_connections_bytes: MAX_CONNECTIONS_BYTES,
+            max_relationships: MAX_RELATIONSHIPS,
+            max_relationship_xml_bytes: MAX_RELATIONSHIP_XML_BYTES,
+            max_package_nodes: MAX_PACKAGE_NODES,
+            max_package_bytes: MAX_PACKAGE_BYTES,
+            max_output_bytes: MAX_OUTPUT_BYTES,
+            max_temporary_bytes: MAX_TEMPORARY_BYTES,
         }
     }
 }
@@ -49,14 +123,96 @@ impl Limits {
     pub const fn new() -> Self {
         Self {
             max_storages: MAX_STORAGES,
+            max_uid_units: MAX_UID_UNITS,
+            max_properties_xml_bytes: MAX_PROPERTIES_XML_BYTES,
+            max_extension_xml_bytes: MAX_EXTENSION_XML_BYTES,
+            max_xml_string_bytes: MAX_XML_STRING_BYTES,
+            max_xml_nodes: MAX_XML_NODES,
+            max_xml_events: MAX_XML_EVENTS,
+            max_xml_depth: MAX_XML_DEPTH,
+            max_xml_namespace_bytes: MAX_XML_NAMESPACE_BYTES,
+            max_xml_attributes: MAX_XML_ATTRIBUTES,
             max_payload_bytes: MAX_PAYLOAD_BYTES,
+            max_connections_bytes: MAX_CONNECTIONS_BYTES,
+            max_relationships: MAX_RELATIONSHIPS,
+            max_relationship_xml_bytes: MAX_RELATIONSHIP_XML_BYTES,
+            max_package_nodes: MAX_PACKAGE_NODES,
+            max_package_bytes: MAX_PACKAGE_BYTES,
+            max_output_bytes: MAX_OUTPUT_BYTES,
+            max_temporary_bytes: MAX_TEMPORARY_BYTES,
         }
     }
+
+    /// Default bounded policy as a constant for static callers.
+    pub const DEFAULT: Self = Self::new();
 
     /// Set the maximum number of storage pairs.
     #[must_use]
     pub const fn with_max_storages(mut self, value: usize) -> Self {
         self.max_storages = value;
+        self
+    }
+
+    /// Set the UID UTF-16 code-unit ceiling.
+    #[must_use]
+    pub const fn with_max_uid_units(mut self, value: usize) -> Self {
+        self.max_uid_units = value;
+        self
+    }
+
+    /// Set the complete Properties XML byte ceiling.
+    #[must_use]
+    pub const fn with_max_properties_xml_bytes(mut self, value: usize) -> Self {
+        self.max_properties_xml_bytes = value;
+        self
+    }
+
+    /// Set the direct extension XML byte ceiling.
+    #[must_use]
+    pub const fn with_max_extension_xml_bytes(mut self, value: usize) -> Self {
+        self.max_extension_xml_bytes = value;
+        self
+    }
+
+    /// Set the decoded XML string byte ceiling.
+    #[must_use]
+    pub const fn with_max_xml_string_bytes(mut self, value: usize) -> Self {
+        self.max_xml_string_bytes = value;
+        self
+    }
+
+    /// Set the XML node ceiling.
+    #[must_use]
+    pub const fn with_max_xml_nodes(mut self, value: usize) -> Self {
+        self.max_xml_nodes = value;
+        self
+    }
+
+    /// Set the XML event ceiling.
+    #[must_use]
+    pub const fn with_max_xml_events(mut self, value: usize) -> Self {
+        self.max_xml_events = value;
+        self
+    }
+
+    /// Set the XML nesting-depth ceiling.
+    #[must_use]
+    pub const fn with_max_xml_depth(mut self, value: usize) -> Self {
+        self.max_xml_depth = value;
+        self
+    }
+
+    /// Set the XML namespace-environment byte ceiling.
+    #[must_use]
+    pub const fn with_max_xml_namespace_bytes(mut self, value: usize) -> Self {
+        self.max_xml_namespace_bytes = value;
+        self
+    }
+
+    /// Set the XML per-element attribute ceiling.
+    #[must_use]
+    pub const fn with_max_xml_attributes(mut self, value: usize) -> Self {
+        self.max_xml_attributes = value;
         self
     }
 
@@ -67,25 +223,272 @@ impl Limits {
         self
     }
 
+    /// Set the connections XML byte ceiling.
+    #[must_use]
+    pub const fn with_max_connections_bytes(mut self, value: usize) -> Self {
+        self.max_connections_bytes = value;
+        self
+    }
+
+    /// Set the aggregate relationship count ceiling.
+    #[must_use]
+    pub const fn with_max_relationships(mut self, value: usize) -> Self {
+        self.max_relationships = value;
+        self
+    }
+
+    /// Set the relationship XML byte ceiling.
+    #[must_use]
+    pub const fn with_max_relationship_xml_bytes(mut self, value: usize) -> Self {
+        self.max_relationship_xml_bytes = value;
+        self
+    }
+
+    /// Set the package graph node ceiling.
+    #[must_use]
+    pub const fn with_max_package_nodes(mut self, value: usize) -> Self {
+        self.max_package_nodes = value;
+        self
+    }
+
+    /// Set the logical OPC aggregate byte ceiling across modeled parts,
+    /// content-types, and relationship XML members.
+    #[must_use]
+    pub const fn with_max_package_bytes(mut self, value: usize) -> Self {
+        self.max_package_bytes = value;
+        self
+    }
+
+    /// Set the logical OPC aggregate byte ceiling checked before publication.
+    #[must_use]
+    pub const fn with_max_output_bytes(mut self, value: usize) -> Self {
+        self.max_output_bytes = value;
+        self
+    }
+
+    /// Set the temporary replacement/staging output byte ceiling.
+    ///
+    /// This bounds newly materialized replacement XML buffers and transformed
+    /// staging output. Retained source `Arc`s and the operation's complete
+    /// allocator footprint are accounted by their own input/object limits.
+    #[must_use]
+    pub const fn with_max_temporary_bytes(mut self, value: usize) -> Self {
+        self.max_temporary_bytes = value;
+        self
+    }
+
     /// Maximum storage count after the protocol cap.
     #[must_use]
     pub const fn max_storages(self) -> usize {
-        if self.max_storages < MAX_STORAGES {
-            self.max_storages
-        } else {
-            MAX_STORAGES
-        }
+        clamp_limit(self.max_storages, MAX_STORAGES)
+    }
+
+    /// Maximum UID UTF-16 code units after the hard cap.
+    #[must_use]
+    pub const fn max_uid_units(self) -> usize {
+        clamp_limit(self.max_uid_units, MAX_UID_UNITS)
+    }
+
+    /// Maximum complete Properties XML bytes after the hard cap.
+    #[must_use]
+    pub const fn max_properties_xml_bytes(self) -> usize {
+        clamp_limit(self.max_properties_xml_bytes, MAX_PROPERTIES_XML_BYTES)
+    }
+
+    /// Maximum direct extension XML bytes after the hard cap.
+    #[must_use]
+    pub const fn max_extension_xml_bytes(self) -> usize {
+        clamp_limit(self.max_extension_xml_bytes, MAX_EXTENSION_XML_BYTES)
+    }
+
+    /// Maximum decoded XML string bytes after the hard cap.
+    #[must_use]
+    pub const fn max_xml_string_bytes(self) -> usize {
+        clamp_limit(self.max_xml_string_bytes, MAX_XML_STRING_BYTES)
+    }
+
+    /// Maximum XML nodes after the hard cap.
+    #[must_use]
+    pub const fn max_xml_nodes(self) -> usize {
+        clamp_limit(self.max_xml_nodes, MAX_XML_NODES)
+    }
+
+    /// Maximum XML events after the hard cap.
+    #[must_use]
+    pub const fn max_xml_events(self) -> usize {
+        clamp_limit(self.max_xml_events, MAX_XML_EVENTS)
+    }
+
+    /// Maximum XML depth after the hard cap.
+    #[must_use]
+    pub const fn max_xml_depth(self) -> usize {
+        clamp_limit(self.max_xml_depth, MAX_XML_DEPTH)
+    }
+
+    /// Maximum namespace-environment bytes after the hard cap.
+    #[must_use]
+    pub const fn max_xml_namespace_bytes(self) -> usize {
+        clamp_limit(self.max_xml_namespace_bytes, MAX_XML_NAMESPACE_BYTES)
+    }
+
+    /// Maximum attributes on one XML element after the hard cap.
+    #[must_use]
+    pub const fn max_xml_attributes(self) -> usize {
+        clamp_limit(self.max_xml_attributes, MAX_XML_ATTRIBUTES)
     }
 
     /// Maximum payload bytes after the protocol cap.
     #[must_use]
     pub const fn max_payload_bytes(self) -> usize {
-        if self.max_payload_bytes < MAX_PAYLOAD_BYTES {
-            self.max_payload_bytes
-        } else {
-            MAX_PAYLOAD_BYTES
-        }
+        clamp_limit(self.max_payload_bytes, MAX_PAYLOAD_BYTES)
     }
+
+    /// Maximum connections XML bytes after the hard cap.
+    #[must_use]
+    pub const fn max_connections_bytes(self) -> usize {
+        clamp_limit(self.max_connections_bytes, MAX_CONNECTIONS_BYTES)
+    }
+
+    /// Maximum aggregate relationship count after the hard cap.
+    #[must_use]
+    pub const fn max_relationships(self) -> usize {
+        clamp_limit(self.max_relationships, MAX_RELATIONSHIPS)
+    }
+
+    /// Maximum relationship XML bytes after the hard cap.
+    #[must_use]
+    pub const fn max_relationship_xml_bytes(self) -> usize {
+        clamp_limit(self.max_relationship_xml_bytes, MAX_RELATIONSHIP_XML_BYTES)
+    }
+
+    /// Maximum package graph nodes after the hard cap.
+    #[must_use]
+    pub const fn max_package_nodes(self) -> usize {
+        clamp_limit(self.max_package_nodes, MAX_PACKAGE_NODES)
+    }
+
+    /// Maximum logical OPC aggregate bytes after the hard cap.
+    #[must_use]
+    pub const fn max_package_bytes(self) -> usize {
+        clamp_limit(self.max_package_bytes, MAX_PACKAGE_BYTES)
+    }
+
+    /// Maximum logical OPC aggregate bytes checked before final publication.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        clamp_limit(self.max_output_bytes, MAX_OUTPUT_BYTES)
+    }
+
+    /// Maximum temporary replacement/staging output bytes after the hard cap.
+    #[must_use]
+    pub const fn max_temporary_bytes(self) -> usize {
+        clamp_limit(self.max_temporary_bytes, MAX_TEMPORARY_BYTES)
+    }
+}
+
+fn xml_limits(limits: Limits) -> XmlLimits {
+    xml_limits_with_output(limits, limits.max_properties_xml_bytes())
+}
+
+fn xml_limits_with_output(limits: Limits, output_bytes: usize) -> XmlLimits {
+    XmlLimits::standard()
+        .with_properties_xml_bytes(limits.max_properties_xml_bytes().min(output_bytes))
+        .with_extension_xml_bytes(limits.max_extension_xml_bytes().min(output_bytes))
+        .with_string_bytes(limits.max_xml_string_bytes())
+        .with_nodes(limits.max_xml_nodes())
+        .with_events(limits.max_xml_events())
+        .with_depth(limits.max_xml_depth())
+        .with_namespace_bytes(limits.max_xml_namespace_bytes())
+        .with_attributes(limits.max_xml_attributes())
+        .with_uid_units(limits.max_uid_units())
+}
+
+fn validate_limits(limits: Limits) -> Result<Limits> {
+    xml_limits(limits).validate().map_err(Error::from)?;
+    if limits.max_storages() == 0
+        || limits.max_package_nodes() == 0
+        || limits.max_package_bytes() == 0
+        || limits.max_output_bytes() == 0
+        || limits.max_temporary_bytes() == 0
+    {
+        return Err(invalid("Custom Data publication limits must be non-zero"));
+    }
+    Ok(limits)
+}
+
+fn validate_uid_limit(id: &str, limits: Limits) -> Result<()> {
+    let units = id.encode_utf16().count();
+    if units > limits.max_uid_units() {
+        return Err(limit(
+            Resource::InputBytes,
+            "UID UTF-16 units",
+            units,
+            limits.max_uid_units(),
+        ));
+    }
+    Ok(())
+}
+
+/// Derive an OPC read profile that retains the package caller's ceilings while
+/// lowering relationship seams to the Custom Data profile.  Content-types
+/// retain their independent OPC ceiling; a relationship limit must not reject
+/// an unrelated manifest member.  This lets the OPC reader reject an
+/// oversized retained member before it parses or materializes that member for
+/// the host owner.
+fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<ReadLimits> {
+    let current = package.read_limits();
+    let mut builder = ReadLimits::builder();
+    builder = builder.max_input_bytes(current.max_input_bytes())?;
+    builder = builder.max_archive_members(current.max_archive_members())?;
+    builder = builder.max_archive_total_entries(current.max_archive_total_entries())?;
+    builder = builder.max_archive_member_name_bytes(current.max_archive_member_name_bytes())?;
+    builder = builder.max_archive_metadata_bytes(current.max_archive_metadata_bytes())?;
+    builder = builder.max_archive_compressed_bytes(current.max_archive_compressed_bytes())?;
+    builder = builder.max_archive_entry_bytes(current.max_archive_entry_bytes())?;
+    builder = builder.max_archive_total_bytes(current.max_archive_total_bytes())?;
+    builder = builder.max_parts(current.max_parts())?;
+    builder = builder.max_part_bytes(current.max_part_bytes())?;
+    builder = builder.max_total_part_bytes(current.max_total_part_bytes())?;
+    builder = builder.max_content_types_bytes(current.max_content_types_bytes())?;
+    builder = builder.max_content_type_mappings(current.max_content_type_mappings())?;
+    builder = builder.max_relationship_parts(current.max_relationship_parts())?;
+    builder = builder.max_relationship_xml_bytes(
+        current
+            .max_relationship_xml_bytes()
+            .min(limits.max_relationship_xml_bytes()),
+    )?;
+    builder =
+        builder.max_total_relationship_xml_bytes(current.max_total_relationship_xml_bytes())?;
+    builder = builder.max_relationships_per_part(
+        current
+            .max_relationships_per_part()
+            .min(limits.max_relationships()),
+    )?;
+    builder = builder.max_total_relationships(
+        current
+            .max_total_relationships()
+            .min(limits.max_relationships()),
+    )?;
+    builder = builder.max_relationship_graph_nodes(
+        current
+            .max_relationship_graph_nodes()
+            .min(limits.max_package_nodes()),
+    )?;
+    builder = builder.max_xml_events(current.max_xml_events().min(limits.max_xml_events()))?;
+    builder =
+        builder.max_total_relationship_xml_events(current.max_total_relationship_xml_events())?;
+    builder = builder.max_xml_depth(current.max_xml_depth().min(limits.max_xml_depth()))?;
+    builder = builder.max_xml_attribute_bytes(
+        current
+            .max_xml_attribute_bytes()
+            .min(limits.max_relationship_xml_bytes()),
+    )?;
+    builder = builder.max_relationship_target_bytes(
+        current
+            .max_relationship_target_bytes()
+            .min(limits.max_relationship_xml_bytes()),
+    )?;
+    Ok(builder.build()?)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,21 +572,26 @@ impl Snapshot {
 
     /// Load all Custom Data storage pairs with explicit limits.
     pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
-        let entries = load_entries(package, limits)?;
+        let limits = validate_limits(*limits)?;
+        validate_package_limits(package, limits)?;
+        let entries = load_entries(package, &limits)?;
         let workbook = package.main_document_part()?;
-        let incoming_relationships = incoming_relationships(package, &entries)?;
-        let connections = Bindings::load(package)?;
-        connections.validate_ids(&entries.iter().map(Part::id).collect())?;
+        let incoming_relationships = incoming_relationships(package, &entries, &limits)?;
+        let read_limits = bounded_read_limits(package, limits)?;
+        let connections = Bindings::load_with_limits(package, limits, read_limits)?;
+        let ids = collect_ids(&entries, &limits)?;
+        connections.validate_ids(&ids)?;
         Ok(Self {
             entries: Arc::from(entries.into_boxed_slice()),
             source: SourceState {
-                content_types: package.source_content_types()?,
+                content_types: package.source_content_types_with_limits(read_limits)?,
                 workbook_blob: workbook.blob_arc(),
-                workbook_relationships: package.source_relationships(workbook.partname())?,
+                workbook_relationships: package
+                    .source_relationships_with_limits(workbook.partname(), read_limits)?,
                 incoming_relationships: Arc::from(incoming_relationships.into_boxed_slice()),
                 connections,
             },
-            limits: *limits,
+            limits,
         })
     }
 
@@ -255,27 +663,32 @@ impl Snapshot {
             })
     }
 
-    fn same_published_semantics(&self, entries: &[Part]) -> bool {
-        self.entries.len() == entries.len()
-            && self.entries.iter().all(|left| {
-                entries
-                    .iter()
-                    .find(|right| same_identity(left, right))
-                    .is_some_and(|right| same_value(&left.value, &right.value))
-            })
+    fn same_published_semantics(&self, entries: &[Part]) -> Result<bool> {
+        if self.entries.len() != entries.len() {
+            return Ok(false);
+        }
+        for left in self.entries.iter() {
+            let Some(right) = entries.iter().find(|right| same_identity(left, right)) else {
+                return Ok(false);
+            };
+            if !same_value(&left.value, &right.value, self.limits)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 }
 
-fn same_value(left: &CustomDataView, right: &CustomDataView) -> bool {
-    left.data == right.data
-        && left.properties.id == right.properties.id
-        && match (
-            canonical_extension(left.properties.extension_list.as_ref()),
-            canonical_extension(right.properties.extension_list.as_ref()),
-        ) {
-            (Ok(left), Ok(right)) => left == right,
-            _ => false,
-        }
+fn same_value(left: &CustomDataView, right: &CustomDataView, limits: Limits) -> Result<bool> {
+    if left.data != right.data || left.properties.id != right.properties.id {
+        return Ok(false);
+    }
+    let xml_limits = xml_limits(limits);
+    let left =
+        canonical_extension_with_limits(left.properties.extension_list.as_ref(), &xml_limits)?;
+    let right =
+        canonical_extension_with_limits(right.properties.extension_list.as_ref(), &xml_limits)?;
+    Ok(left == right)
 }
 
 /// Clone-staged Custom Data CRUD transaction.
@@ -295,13 +708,19 @@ impl<'a> Transaction<'a> {
 
     /// Start a transaction with explicit limits.
     pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
-        let before = Snapshot::load_with_limits(target, limits)?;
+        let limits = validate_limits(*limits)?;
+        let before = Snapshot::load_with_limits(target, &limits)?;
+        let mut draft = Vec::new();
+        draft
+            .try_reserve_exact(before.entries.len())
+            .map_err(|source| allocation("Custom Data transaction entries", source))?;
+        draft.extend_from_slice(&before.entries);
         Ok(Self {
-            draft: before.entries.to_vec(),
+            draft,
             connections: before.source.connections.clone(),
             target,
             before,
-            limits: *limits,
+            limits,
         })
     }
 
@@ -339,10 +758,13 @@ impl<'a> Transaction<'a> {
                 feature: "renaming a referenced Custom Data storage to the unreferencable empty UID",
             });
         }
-        let connections = self
-            .connections
-            .rebind(current.id(), candidate[index].id())?;
-        connections.validate_ids(&candidate.iter().map(Part::id).collect())?;
+        let connections = self.connections.rebind_with_limits(
+            current.id(),
+            candidate[index].id(),
+            self.limits,
+        )?;
+        let ids = collect_ids(&candidate, &self.limits)?;
+        connections.validate_ids(&ids)?;
         self.draft = candidate;
         self.connections = connections;
         Ok(true)
@@ -367,6 +789,14 @@ impl<'a> Transaction<'a> {
 
     /// Replace one inert payload without exposing package relationships.
     pub fn set_data(&mut self, index: usize, data: Vec<u8>) -> Result<bool> {
+        if data.len() > self.limits.max_payload_bytes() {
+            return Err(limit(
+                Resource::InputBytes,
+                "payload bytes",
+                data.len(),
+                self.limits.max_payload_bytes(),
+            ));
+        }
         let mut value = self
             .draft
             .get(index)
@@ -474,8 +904,11 @@ impl<'a> Transaction<'a> {
                 id.as_str()
             },
         };
-        let connections = self.connections.rebind(removed.id(), replacement)?;
-        connections.validate_ids(&candidate.iter().map(Part::id).collect())?;
+        let connections =
+            self.connections
+                .rebind_with_limits(removed.id(), replacement, self.limits)?;
+        let ids = collect_ids(&candidate, &self.limits)?;
+        connections.validate_ids(&ids)?;
         self.draft = candidate;
         self.connections = connections;
         Ok(Some(removed))
@@ -505,12 +938,22 @@ impl<'a> Transaction<'a> {
                 part: "Custom Data source closure".into(),
             });
         }
-        let mut candidate = self.target.clone();
         let content_types = transition_content_types(
             &self.before.source.content_types,
             &self.before.entries,
             &self.draft,
+            self.limits,
+            bounded_read_limits(self.target, self.limits)?,
         )?;
+        preflight_staged_output_budget(
+            self.target,
+            &self.before,
+            &self.draft,
+            &self.connections,
+            &content_types,
+            self.limits,
+        )?;
+        let mut candidate = self.target.clone();
         apply_entries(
             &mut candidate,
             self.before.entries(),
@@ -518,9 +961,20 @@ impl<'a> Transaction<'a> {
             &self.limits,
             &content_types,
         )?;
-        self.connections.publish(&mut candidate)?;
+        let connection_output_limit = if let Some(bytes) = self.connections.source_bytes_len() {
+            replacement_output_limit(&candidate, bytes, self.limits)?
+        } else {
+            self.limits.max_output_bytes()
+        };
+        self.connections.publish_with_limits(
+            &mut candidate,
+            self.limits,
+            connection_output_limit,
+        )?;
+        validate_package_limits(&candidate, self.limits)?;
+        validate_output_limits(&candidate, self.limits)?;
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_published_semantics(&self.draft)
+        if !snapshot.same_published_semantics(&self.draft)?
             || !snapshot.source.connections.same_values(&self.connections)
         {
             return Err(invalid("Custom Data publication changed staged semantics"));
@@ -584,8 +1038,11 @@ impl Patch {
         if target.is_signed() || target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
+        preflight_snapshot_output_budget(target, &self.after, self.after.limits)?;
         let mut candidate = target.clone();
         apply_snapshot(&mut candidate, &self.after)?;
+        validate_package_limits(&candidate, self.after.limits)?;
+        validate_output_limits(&candidate, self.after.limits)?;
         let resulting = Snapshot::load_with_limits(&candidate, &self.after.limits)?;
         if !resulting.same_source(&self.after) {
             return Err(invalid(
@@ -636,45 +1093,69 @@ impl Commit {
 fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
     let workbook = package.main_document_part()?;
     validate_feature_relationships(package, workbook)?;
-    let properties_parts = package
+    let mut properties_parts = Vec::new();
+    properties_parts
+        .try_reserve(limits.max_storages().min(package.part_count()))
+        .map_err(|source| allocation("Custom Data Properties parts", source))?;
+    for part in package
         .iter_parts()
         .filter(|part| part.content_type() == PROPERTIES_CONTENT_TYPE)
-        .collect::<Vec<_>>();
-    if properties_parts.len() > limits.max_storages() {
-        return Err(invalid("Custom Data storage count exceeds the size limit"));
+    {
+        if properties_parts.len() >= limits.max_storages() {
+            return Err(limit(
+                Resource::Objects,
+                "storage objects",
+                properties_parts.len().saturating_add(1),
+                limits.max_storages(),
+            ));
+        }
+        properties_parts.push(part);
     }
     let mut ids = HashSet::new();
+    ids.try_reserve(properties_parts.len())
+        .map_err(|source| allocation("Custom Data storage IDs", source))?;
     let mut data_targets = Vec::new();
     data_targets
         .try_reserve(properties_parts.len())
-        .map_err(|_| invalid("Custom Data payload target allocation failed"))?;
-    let mut entries = Vec::with_capacity(properties_parts.len());
+        .map_err(|source| allocation("Custom Data payload targets", source))?;
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(properties_parts.len())
+        .map_err(|source| allocation("Custom Data entries", source))?;
     for properties_part in properties_parts {
-        let owners = workbook
-            .rels()
-            .iter()
-            .filter(|relationship| {
-                relationship.reltype() == PROPERTIES_RELATIONSHIP_TYPE
-                    && !relationship.is_external()
-                    && relationship
-                        .target_partname()
-                        .ok()
-                        .is_some_and(|target| target.is_equivalent_to(properties_part.partname()))
-            })
-            .collect::<Vec<_>>();
-        if owners.len() != 1 {
+        let mut owner = None;
+        let mut owner_count = 0usize;
+        for relationship in workbook.rels().iter().filter(|relationship| {
+            relationship.reltype() == PROPERTIES_RELATIONSHIP_TYPE
+                && !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .ok()
+                    .is_some_and(|target| target.is_equivalent_to(properties_part.partname()))
+        }) {
+            owner_count = owner_count.saturating_add(1);
+            owner = Some(relationship);
+        }
+        if owner_count != 1 {
             return Err(invalid(format!(
                 "Custom Data Properties part '{}' must have exactly one workbook owner",
                 properties_part.partname()
             )));
         }
-        let owner = owners[0];
-        let data_relationships = properties_part
+        let owner = owner.ok_or_else(|| invalid("Custom Data workbook owner is absent"))?;
+        let mut data_relationship = None;
+        let mut data_relationship_count = 0usize;
+        for relationship in properties_part
             .rels()
             .iter()
             .filter(|relationship| relationship.reltype() == DATA_RELATIONSHIP_TYPE)
-            .collect::<Vec<_>>();
-        if data_relationships.len() != 1 || data_relationships[0].is_external() {
+        {
+            data_relationship_count = data_relationship_count.saturating_add(1);
+            data_relationship = Some(relationship);
+        }
+        if data_relationship_count != 1
+            || data_relationship.is_none_or(|relationship| relationship.is_external())
+        {
             return Err(invalid(format!(
                 "Custom Data Properties part '{}' must have one internal data relationship",
                 properties_part.partname()
@@ -689,7 +1170,8 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
                 "Custom Data Properties has an unexpected relationship",
             ));
         }
-        let data_relationship = data_relationships[0];
+        let data_relationship = data_relationship
+            .ok_or_else(|| invalid("Custom Data payload relationship is absent"))?;
         let data_target = data_relationship.target_partname()?;
         let data_part = package.get_part(&data_target)?;
         // Keep the package's actual Part identity separate from the
@@ -704,12 +1186,27 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
             )));
         }
         if data_part.blob().len() > limits.max_payload_bytes() {
-            return Err(invalid("Custom Data payload exceeds the size limit"));
+            return Err(limit(
+                Resource::InputBytes,
+                "payload bytes",
+                data_part.blob().len(),
+                limits.max_payload_bytes(),
+            ));
         }
         if !data_part.rels().is_empty() {
             return Err(invalid("Custom Data payload has outbound relationships"));
         }
-        let properties = parse_properties(properties_part.blob())?;
+        if properties_part.blob().len() > limits.max_properties_xml_bytes() {
+            return Err(limit(
+                Resource::InputBytes,
+                "Properties XML bytes",
+                properties_part.blob().len(),
+                limits.max_properties_xml_bytes(),
+            ));
+        }
+        let properties =
+            parse_properties_with_limits(properties_part.blob(), &xml_limits(*limits))?;
+        validate_uid_limit(&properties.id, *limits)?;
         if !ids.insert(properties.id.clone()) {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
@@ -738,10 +1235,16 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
                 package.source_xml_part(properties_part.partname())?,
             )),
             source_data: data_part.blob_arc(),
-            properties_relationships: Some(
-                package.source_relationships(properties_part.partname())?,
-            ),
-            data_relationships: Some(package.source_relationships(data_part.partname())?),
+            properties_relationships: Some(source_relationships_bounded(
+                package,
+                properties_part.partname(),
+                *limits,
+            )?),
+            data_relationships: Some(source_relationships_bounded(
+                package,
+                data_part.partname(),
+                *limits,
+            )?),
         });
     }
     for part in package
@@ -833,16 +1336,39 @@ fn validate_feature_relationship(
 
 fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
     if value.data.len() > limits.max_payload_bytes() {
-        return Err(invalid("Custom Data payload exceeds the size limit"));
+        return Err(limit(
+            Resource::InputBytes,
+            "payload bytes",
+            value.data.len(),
+            limits.max_payload_bytes(),
+        ));
     }
-    validate_source_properties(&value.properties)
+    validate_uid_limit(&value.properties.id, *limits)?;
+    if let Some(extension) = value.properties.extension_list.as_ref()
+        && extension.xml.len() > limits.max_extension_xml_bytes()
+    {
+        return Err(limit(
+            Resource::InputBytes,
+            "extension XML bytes",
+            extension.xml.len(),
+            limits.max_extension_xml_bytes(),
+        ));
+    }
+    validate_source_properties_with_limits(&value.properties, &xml_limits(*limits))
 }
 
 fn validate_entries(package: &OpcPackage, entries: &[Part], limits: &Limits) -> Result<()> {
     if entries.len() > limits.max_storages() {
-        return Err(invalid("Custom Data storage count exceeds the size limit"));
+        return Err(limit(
+            Resource::Objects,
+            "storage objects",
+            entries.len(),
+            limits.max_storages(),
+        ));
     }
     let mut ids = HashSet::new();
+    ids.try_reserve(entries.len())
+        .map_err(|source| allocation("Custom Data staged IDs", source))?;
     for entry in entries {
         validate_value(&entry.value, limits)?;
         if !ids.insert(entry.id().to_owned()) {
@@ -863,6 +1389,143 @@ fn validate_entries(package: &OpcPackage, entries: &[Part], limits: &Limits) -> 
     Ok(())
 }
 
+fn collect_ids<'a>(entries: &'a [Part], limits: &Limits) -> Result<HashSet<&'a str>> {
+    let mut ids = HashSet::new();
+    ids.try_reserve(entries.len().min(limits.max_storages()))
+        .map_err(|source| allocation("Custom Data IDs", source))?;
+    for entry in entries {
+        ids.insert(entry.id());
+    }
+    Ok(ids)
+}
+
+fn source_relationships_bounded(
+    package: &OpcPackage,
+    owner: &PackURI,
+    limits: Limits,
+) -> Result<OwnedRelationships> {
+    let read_limits = bounded_read_limits(package, limits)?;
+    let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+    if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
+        return Err(limit(
+            Resource::InputBytes,
+            "relationship XML bytes",
+            relationships.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
+    }
+    Ok(relationships)
+}
+
+/// Count the modeled logical OPC aggregate used by the package limits.
+///
+/// This is the sum of content-types, relationship XML, and part bytes retained
+/// by the OPC model. It is independent of ZIP compression and does not include
+/// passthrough archive members that the host does not model as parts.
+fn package_size(package: &OpcPackage, limits: Limits) -> Result<usize> {
+    let read_limits = bounded_read_limits(package, limits)?;
+    let root = PackURI::new("/").map_err(invalid)?;
+    let mut total = package
+        .source_content_types_with_limits(read_limits)?
+        .bytes()
+        .len();
+    total = total
+        .checked_add(
+            package
+                .source_relationships_with_limits(&root, read_limits)?
+                .bytes()
+                .len(),
+        )
+        .ok_or_else(|| invalid("Custom Data package byte count overflow"))?;
+    for part in package.iter_parts() {
+        total = total
+            .checked_add(part.blob().len())
+            .ok_or_else(|| invalid("Custom Data package byte count overflow"))?;
+        total = total
+            .checked_add(
+                package
+                    .source_relationships_with_limits(part.partname(), read_limits)?
+                    .bytes()
+                    .len(),
+            )
+            .ok_or_else(|| invalid("Custom Data relationship byte count overflow"))?;
+    }
+    Ok(total)
+}
+
+fn package_relationship_count(package: &OpcPackage) -> Result<usize> {
+    let mut count = package.rels().iter().count();
+    for part in package.iter_parts() {
+        count = count
+            .checked_add(part.rels().iter().count())
+            .ok_or_else(|| invalid("Custom Data relationship count overflow"))?;
+    }
+    Ok(count)
+}
+
+fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
+    if package.part_count() > limits.max_package_nodes() {
+        return Err(limit(
+            Resource::Objects,
+            "package nodes",
+            package.part_count(),
+            limits.max_package_nodes(),
+        ));
+    }
+    validate_relationship_xml_limits(package, limits)?;
+    let bytes = package_size(package, limits)?;
+    if bytes > limits.max_package_bytes() {
+        return Err(limit(
+            Resource::InputBytes,
+            "package bytes",
+            bytes,
+            limits.max_package_bytes(),
+        ));
+    }
+    let relationships = package_relationship_count(package)?;
+    if relationships > limits.max_relationships() {
+        return Err(limit(
+            Resource::Objects,
+            "relationships",
+            relationships,
+            limits.max_relationships(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_relationship_xml_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
+    let maximum = limits.max_relationship_xml_bytes();
+    let read_limits = bounded_read_limits(package, limits)?;
+    let root = PackURI::new("/").map_err(invalid)?;
+    let owners = std::iter::once(&root).chain(package.iter_parts().map(|part| part.partname()));
+    for owner in owners {
+        let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+        if relationships.bytes().len() > maximum {
+            return Err(limit(
+                Resource::InputBytes,
+                "relationship XML bytes",
+                relationships.bytes().len(),
+                maximum,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_output_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
+    let bytes = package_size(package, limits)?;
+    if bytes > limits.max_output_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "final output bytes",
+            bytes,
+            limits.max_output_bytes(),
+        ));
+    }
+    Ok(())
+}
+
 fn same_identity(left: &Part, right: &Part) -> bool {
     left.properties_part_name
         .is_equivalent_to(&right.properties_part_name)
@@ -876,13 +1539,24 @@ fn same_identity(left: &Part, right: &Part) -> bool {
 fn incoming_relationships(
     package: &OpcPackage,
     entries: &[Part],
+    limits: &Limits,
 ) -> Result<Vec<RelationshipState>> {
-    let targets = entries
-        .iter()
-        .flat_map(|entry| [&entry.properties_part_name, &entry.data_part_name])
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut targets = Vec::new();
+    targets
+        .try_reserve(entries.len().saturating_mul(2))
+        .map_err(|source| allocation("Custom Data incoming targets", source))?;
+    for entry in entries {
+        targets.push(entry.properties_part_name.clone());
+        targets.push(entry.data_part_name.clone());
+    }
     let mut values = Vec::new();
+    values
+        .try_reserve(
+            limits
+                .max_relationships()
+                .min(package_relationship_count(package)?),
+        )
+        .map_err(|source| allocation("Custom Data incoming relationships", source))?;
     let package_source = PackURI::new("/").map_err(invalid)?;
     for relationship in package.rels().iter() {
         if relationship.is_external() {
@@ -893,6 +1567,14 @@ fn incoming_relationships(
             .iter()
             .any(|candidate| candidate.is_equivalent_to(&target))
         {
+            if values.len() >= limits.max_relationships() {
+                return Err(limit(
+                    Resource::Objects,
+                    "relationships",
+                    values.len().saturating_add(1),
+                    limits.max_relationships(),
+                ));
+            }
             values.push(RelationshipState {
                 source: package_source.clone(),
                 id: relationship.r_id().to_owned(),
@@ -912,6 +1594,14 @@ fn incoming_relationships(
                 .iter()
                 .any(|candidate| candidate.is_equivalent_to(&target))
             {
+                if values.len() >= limits.max_relationships() {
+                    return Err(limit(
+                        Resource::Objects,
+                        "relationships",
+                        values.len().saturating_add(1),
+                        limits.max_relationships(),
+                    ));
+                }
                 values.push(RelationshipState {
                     source: source.partname().clone(),
                     id: relationship.r_id().to_owned(),
@@ -987,17 +1677,23 @@ fn apply_entries(
     limits: &Limits,
     content_types: &OwnedContentTypes,
 ) -> Result<()> {
-    let before_map = before
-        .iter()
-        .map(|entry| (identity_key(entry), entry))
-        .collect::<std::collections::HashMap<_, _>>();
-    let after_map = after
-        .iter()
-        .map(|entry| (identity_key(entry), entry))
-        .collect::<std::collections::HashMap<_, _>>();
+    let mut before_map = HashMap::new();
+    before_map
+        .try_reserve(before.len())
+        .map_err(|source| allocation("Custom Data before index", source))?;
+    for entry in before {
+        before_map.insert(identity_key(entry), entry);
+    }
+    let mut after_map = HashMap::new();
+    after_map
+        .try_reserve(after.len())
+        .map_err(|source| allocation("Custom Data after index", source))?;
+    for entry in after {
+        after_map.insert(identity_key(entry), entry);
+    }
     for entry in before {
         if !after_map.contains_key(&identity_key(entry)) {
-            remove_entry(package, entry)?;
+            remove_entry(package, entry, limits)?;
         }
     }
     for entry in after {
@@ -1020,32 +1716,62 @@ fn apply_entries(
                 } else if previous.value.properties.extension_list
                     == entry.value.properties.extension_list
                 {
-                    Some(rewrite_id(
+                    Some(rewrite_id_with_limits_and_output(
                         previous
                             .source_properties_proof
                             .as_ref()
                             .ok_or_else(|| invalid("missing properties source provenance"))?,
                         entry.id(),
+                        &xml_limits(*limits),
+                        limits.max_temporary_bytes(),
                     )?)
                 } else {
-                    let mut proof = rewrite_extension_list(
+                    let rewrite_limits = xml_limits(*limits);
+                    let mut proof = rewrite_extension_list_with_limits_and_output(
                         previous
                             .source_properties_proof
                             .as_ref()
                             .ok_or_else(|| invalid("missing properties source provenance"))?,
                         entry.value.properties.extension_list.as_ref(),
+                        &rewrite_limits,
+                        limits.max_temporary_bytes(),
                     )?;
                     if previous.id() != entry.id() {
-                        proof = rewrite_id(&proof, entry.id())?;
+                        proof = rewrite_id_with_limits_and_output(
+                            &proof,
+                            entry.id(),
+                            &rewrite_limits,
+                            limits.max_temporary_bytes(),
+                        )?;
                     }
                     Some(proof)
                 };
                 if let Some(proof) = proof {
+                    if proof.bytes().len() > limits.max_properties_xml_bytes() {
+                        return Err(limit(
+                            Resource::OutputBytes,
+                            "Properties XML bytes",
+                            proof.bytes().len(),
+                            limits.max_properties_xml_bytes(),
+                        ));
+                    }
                     package.try_replace_owned_xml_part(&previous.source_properties, proof)?;
                 } else {
+                    let properties = write_properties_with_limits(
+                        &entry.value.properties,
+                        &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
+                    )?;
+                    if properties.len() > limits.max_temporary_bytes() {
+                        return Err(limit(
+                            Resource::Memory,
+                            "temporary Properties bytes",
+                            properties.len(),
+                            limits.max_temporary_bytes(),
+                        ));
+                    }
                     package
                         .get_part_mut(&entry.properties_part_name)?
-                        .set_blob(write_properties(&entry.value.properties)?);
+                        .set_blob(properties);
                 };
             }
             if data_changed {
@@ -1063,8 +1789,15 @@ fn apply_entries(
             add_entry(package, entry, limits)?;
         }
     }
-    let current_content_types = package.source_content_types()?;
-    package.try_replace_content_types(current_content_types.bytes(), content_types)?;
+    let read_limits = bounded_read_limits(package, *limits)?;
+    let current_content_types = package.source_content_types_with_limits(read_limits)?;
+    if current_content_types.bytes() != content_types.bytes() {
+        package.try_replace_content_types_with_limits(
+            current_content_types.bytes(),
+            content_types,
+            read_limits,
+        )?;
+    }
     Ok(())
 }
 
@@ -1072,35 +1805,468 @@ fn transition_content_types(
     before: &OwnedContentTypes,
     before_entries: &[Part],
     after_entries: &[Part],
+    limits: Limits,
+    read_limits: ReadLimits,
 ) -> Result<OwnedContentTypes> {
-    let before_map = before_entries
-        .iter()
-        .map(|entry| (identity_key(entry), entry))
-        .collect::<std::collections::HashMap<_, _>>();
-    let after_map = after_entries
-        .iter()
-        .map(|entry| (identity_key(entry), entry))
-        .collect::<std::collections::HashMap<_, _>>();
+    let mut before_map = HashMap::new();
+    before_map
+        .try_reserve(before_entries.len())
+        .map_err(|source| allocation("Custom Data content-types before index", source))?;
+    for entry in before_entries {
+        before_map.insert(identity_key(entry), entry);
+    }
+    let mut after_map = HashMap::new();
+    after_map
+        .try_reserve(after_entries.len())
+        .map_err(|source| allocation("Custom Data content-types after index", source))?;
+    for entry in after_entries {
+        after_map.insert(identity_key(entry), entry);
+    }
     let mut removed = Vec::new();
+    removed
+        .try_reserve(before_entries.len().saturating_mul(4))
+        .map_err(|source| allocation("Custom Data removed content types", source))?;
     for entry in before_entries {
         if !after_map.contains_key(&identity_key(entry)) {
             removed.push(entry.properties_part_name.clone());
             removed.push(entry.data_part_name.clone());
+            removed.push(
+                entry
+                    .properties_part_name
+                    .rels_uri()
+                    .map_err(|error| invalid(error.to_string()))?,
+            );
+            removed.push(
+                entry
+                    .data_part_name
+                    .rels_uri()
+                    .map_err(|error| invalid(error.to_string()))?,
+            );
         }
     }
     let mut additions = Vec::new();
+    additions
+        .try_reserve(after_entries.len().saturating_mul(2))
+        .map_err(|source| allocation("Custom Data added content types", source))?;
     for entry in after_entries {
         if !before_map.contains_key(&identity_key(entry)) {
-            additions.push((&entry.properties_part_name, PROPERTIES_CONTENT_TYPE));
-            additions.push((&entry.data_part_name, DATA_CONTENT_TYPE));
+            additions.push(ContentTypeEdit {
+                part_name: &entry.properties_part_name,
+                content_type: PROPERTIES_CONTENT_TYPE,
+            });
+            additions.push(ContentTypeEdit {
+                part_name: &entry.data_part_name,
+                content_type: DATA_CONTENT_TYPE,
+            });
         }
     }
-    let maximum = litchi_opc::ReadLimits::default().max_content_types_bytes();
-    let mut result = before.without_parts(&removed, maximum)?;
-    if !additions.is_empty() {
-        result = result.with_part_overrides(&additions, maximum)?;
+    if removed.is_empty() && additions.is_empty() {
+        // Retaining an untouched source manifest must not consume the
+        // transaction's temporary-output allowance. A large manifest can
+        // remain source-backed while a payload-only edit moves its existing
+        // allocation into the candidate package.
+        return Ok(before.clone());
     }
-    Ok(result)
+    let removals = existing_content_type_removals(before, &removed, read_limits)?;
+    let plan = before.plan_edit(&additions, &removals, read_limits)?;
+    if plan.final_len() > limits.max_output_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "content-types output bytes",
+            plan.final_len(),
+            limits.max_output_bytes(),
+        ));
+    }
+    if plan.final_len() > limits.max_temporary_bytes() {
+        return Err(limit(
+            Resource::Memory,
+            "temporary content-types output bytes",
+            plan.final_len(),
+            limits.max_temporary_bytes(),
+        ));
+    }
+    Ok(plan.materialize(read_limits)?)
+}
+
+fn existing_content_type_removals(
+    source: &OwnedContentTypes,
+    candidates: &[PackURI],
+    limits: ReadLimits,
+) -> Result<Vec<PackURI>> {
+    let mut selected = Vec::new();
+    selected
+        .try_reserve(candidates.len())
+        .map_err(|source| allocation("Custom Data content-types removal selectors", source))?;
+    if candidates.is_empty() {
+        return Ok(selected);
+    }
+    let mut reader = Reader::from_reader(source.bytes());
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut events = 0usize;
+    loop {
+        events = events.saturating_add(1);
+        if events > limits.max_xml_events() {
+            return Err(limit(
+                Resource::Objects,
+                "content-types XML events",
+                events,
+                limits.max_xml_events(),
+            ));
+        }
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(error.to_string()))?;
+        let element = match event {
+            Event::Start(element) | Event::Empty(element) => element,
+            Event::Eof => break,
+            _ => continue,
+        };
+        if element.local_name().as_ref() != b"Override" {
+            continue;
+        }
+        let mut part_name = None;
+        for attribute in element.attributes().with_checks(true) {
+            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+            if attribute.key.as_ref() != b"PartName" {
+                continue;
+            }
+            if attribute.value.as_ref().len() > limits.max_xml_attribute_bytes() {
+                return Err(limit(
+                    Resource::InputBytes,
+                    "content-types XML attribute bytes",
+                    attribute.value.as_ref().len(),
+                    limits.max_xml_attribute_bytes(),
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| invalid(error.to_string()))?;
+            part_name = Some(PackURI::new(value.into_owned()).map_err(invalid)?);
+            break;
+        }
+        let Some(part_name) = part_name else {
+            continue;
+        };
+        if let Some(candidate) = candidates
+            .iter()
+            .find(|candidate| candidate.is_equivalent_to(&part_name))
+            && !selected
+                .iter()
+                .any(|existing: &PackURI| existing.is_equivalent_to(candidate))
+        {
+            selected.push(candidate.clone());
+        }
+    }
+    Ok(selected)
+}
+
+fn replacement_output_limit(
+    package: &OpcPackage,
+    replaced_bytes: usize,
+    limits: Limits,
+) -> Result<usize> {
+    let current = package_size(package, limits)?;
+    let base = current
+        .checked_sub(replaced_bytes)
+        .ok_or_else(|| invalid("Custom Data replacement source exceeds package size"))?;
+    Ok(limits.max_output_bytes().saturating_sub(base))
+}
+
+fn preflight_snapshot_output_budget(
+    package: &OpcPackage,
+    snapshot: &Snapshot,
+    limits: Limits,
+) -> Result<()> {
+    let workbook = package.main_document_part()?;
+    let workbook_name = workbook.partname();
+    let root = PackURI::new("/").map_err(invalid)?;
+    let read_limits = bounded_read_limits(package, limits)?;
+    let mut custom_names = HashSet::new();
+    custom_names
+        .try_reserve(snapshot.entries.len().saturating_mul(2))
+        .map_err(|source| allocation("Custom Data final output names", source))?;
+    for entry in snapshot.entries.iter() {
+        custom_names.insert(entry.properties_part_name.clone());
+        custom_names.insert(entry.data_part_name.clone());
+    }
+    if let Some(name) = snapshot.source.connections.source_part_name() {
+        custom_names.insert(name.clone());
+    }
+    let mut total = snapshot.source.content_types.bytes().len();
+    total = total
+        .checked_add(
+            package
+                .source_relationships_with_limits(&root, read_limits)?
+                .bytes()
+                .len(),
+        )
+        .ok_or_else(|| invalid("Custom Data final output size overflow"))?;
+    for part in package.iter_parts() {
+        if custom_names
+            .iter()
+            .any(|name| name.is_equivalent_to(part.partname()))
+            || part.partname().is_equivalent_to(workbook_name)
+        {
+            continue;
+        }
+        let relationships =
+            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        total = total
+            .checked_add(part.blob().len())
+            .and_then(|value| value.checked_add(relationships.bytes().len()))
+            .ok_or_else(|| invalid("Custom Data final output size overflow"))?;
+    }
+    total = total
+        .checked_add(snapshot.source.workbook_blob.len())
+        .and_then(|value| value.checked_add(snapshot.source.workbook_relationships.bytes().len()))
+        .ok_or_else(|| invalid("Custom Data final workbook output size overflow"))?;
+    if let Some(bytes) = snapshot.source.connections.source_bytes_len() {
+        total = total
+            .checked_add(bytes)
+            .ok_or_else(|| invalid("Custom Data final connections output size overflow"))?;
+    }
+    if let Some(bytes) = snapshot.source.connections.source_relationships_bytes_len() {
+        total = total.checked_add(bytes).ok_or_else(|| {
+            invalid("Custom Data final connections relationship output size overflow")
+        })?;
+    }
+    for entry in snapshot.entries.iter() {
+        total = total
+            .checked_add(entry.source_properties.len())
+            .and_then(|value| value.checked_add(entry.source_data.len()))
+            .and_then(|value| {
+                value.checked_add(
+                    entry
+                        .properties_relationships
+                        .as_ref()
+                        .map_or(0, |relationships| relationships.bytes().len()),
+                )
+            })
+            .and_then(|value| {
+                value.checked_add(
+                    entry
+                        .data_relationships
+                        .as_ref()
+                        .map_or(0, |relationships| relationships.bytes().len()),
+                )
+            })
+            .ok_or_else(|| invalid("Custom Data final storage output size overflow"))?;
+    }
+    check_final_output_size(total, limits)
+}
+
+fn preflight_staged_output_budget(
+    package: &OpcPackage,
+    before: &Snapshot,
+    after: &[Part],
+    connections: &Bindings,
+    content_types: &OwnedContentTypes,
+    limits: Limits,
+) -> Result<()> {
+    let workbook = package.main_document_part()?;
+    let workbook_name = workbook.partname();
+    let root = PackURI::new("/").map_err(invalid)?;
+    let read_limits = bounded_read_limits(package, limits)?;
+    let mut custom_names = HashSet::new();
+    custom_names
+        .try_reserve(before.entries.len().saturating_mul(2))
+        .map_err(|source| allocation("Custom Data staged output names", source))?;
+    for entry in before.entries.iter().chain(after.iter()) {
+        custom_names.insert(entry.properties_part_name.clone());
+        custom_names.insert(entry.data_part_name.clone());
+    }
+    if let Some(name) = before.source.connections.source_part_name() {
+        custom_names.insert(name.clone());
+    }
+    let mut total = content_types.bytes().len();
+    total = total
+        .checked_add(
+            package
+                .source_relationships_with_limits(&root, read_limits)?
+                .bytes()
+                .len(),
+        )
+        .ok_or_else(|| invalid("Custom Data staged output size overflow"))?;
+    for part in package.iter_parts() {
+        if custom_names
+            .iter()
+            .any(|name| name.is_equivalent_to(part.partname()))
+            || part.partname().is_equivalent_to(workbook_name)
+        {
+            continue;
+        }
+        let relationships =
+            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        total = total
+            .checked_add(part.blob().len())
+            .and_then(|value| value.checked_add(relationships.bytes().len()))
+            .ok_or_else(|| invalid("Custom Data staged immutable output overflow"))?;
+    }
+    let workbook_relationship_bytes = staged_workbook_relationship_len(before, after, read_limits)?;
+    total = total
+        .checked_add(workbook.blob().len())
+        .and_then(|value| value.checked_add(workbook_relationship_bytes))
+        .ok_or_else(|| invalid("Custom Data staged workbook output overflow"))?;
+    if let Some(bytes) = connections.projected_output_bytes(limits)? {
+        total = total
+            .checked_add(bytes)
+            .ok_or_else(|| invalid("Custom Data staged connections output overflow"))?;
+    }
+    if let Some(bytes) = connections.source_relationships_bytes_len() {
+        total = total.checked_add(bytes).ok_or_else(|| {
+            invalid("Custom Data staged connections relationship output overflow")
+        })?;
+    }
+    for entry in after {
+        let previous = before
+            .entries
+            .iter()
+            .find(|candidate| same_identity(candidate, entry));
+        let properties_bytes = projected_properties_len(previous, entry, limits)?;
+        let properties_relationship_bytes = if let Some(previous) = previous {
+            previous
+                .properties_relationships
+                .as_ref()
+                .map_or(0, |relationships| relationships.bytes().len())
+        } else {
+            canonical_data_relationship_len(entry, read_limits)?
+        };
+        let data_relationship_bytes = previous
+            .and_then(|candidate| candidate.data_relationships.as_ref())
+            .map_or(0, |relationships| relationships.bytes().len());
+        total = total
+            .checked_add(properties_bytes)
+            .and_then(|value| value.checked_add(entry.value.data.len()))
+            .and_then(|value| value.checked_add(properties_relationship_bytes))
+            .and_then(|value| value.checked_add(data_relationship_bytes))
+            .ok_or_else(|| invalid("Custom Data staged storage output overflow"))?;
+    }
+    check_final_output_size(total, limits)
+}
+
+fn check_final_output_size(total: usize, limits: Limits) -> Result<()> {
+    if total > limits.max_output_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "final output bytes",
+            total,
+            limits.max_output_bytes(),
+        ));
+    }
+    Ok(())
+}
+
+fn staged_workbook_relationship_len(
+    before: &Snapshot,
+    after: &[Part],
+    read_limits: ReadLimits,
+) -> Result<usize> {
+    let mut removals = Vec::new();
+    removals
+        .try_reserve(before.entries.len())
+        .map_err(|source| allocation("Custom Data workbook relationship removals", source))?;
+    for entry in before.entries.iter() {
+        if !after
+            .iter()
+            .any(|candidate| same_identity(entry, candidate))
+        {
+            removals.push(entry.workbook_relationship_id.as_str());
+        }
+    }
+    let mut additions = Vec::new();
+    additions
+        .try_reserve(after.len())
+        .map_err(|source| allocation("Custom Data workbook relationship additions", source))?;
+    for entry in after {
+        if !before
+            .entries
+            .iter()
+            .any(|candidate| same_identity(entry, candidate))
+        {
+            additions.push(RelationshipEdit {
+                id: &entry.workbook_relationship_id,
+                reltype: PROPERTIES_RELATIONSHIP_TYPE,
+                target: &entry.workbook_relationship_target,
+                mode: TargetMode::Internal,
+            });
+        }
+    }
+    let plan =
+        before
+            .source
+            .workbook_relationships
+            .plan_edit(&additions, &removals, read_limits)?;
+    Ok(plan.final_len())
+}
+
+fn canonical_data_relationship_len(entry: &Part, read_limits: ReadLimits) -> Result<usize> {
+    let mut relationships = Relationships::new(entry.properties_part_name.base_uri().to_owned());
+    relationships.add_relationship(
+        DATA_RELATIONSHIP_TYPE.into(),
+        entry.data_relationship_target.clone(),
+        entry.data_relationship_id.clone(),
+        false,
+    );
+    Ok(relationships.plan_canonical(read_limits)?.final_len())
+}
+
+fn projected_properties_len(
+    previous: Option<&Part>,
+    entry: &Part,
+    limits: Limits,
+) -> Result<usize> {
+    let Some(previous) = previous else {
+        let bytes = write_properties_with_limits(
+            &entry.value.properties,
+            &xml_limits_with_output(limits, limits.max_temporary_bytes()),
+        )?;
+        return Ok(bytes.len());
+    };
+    if previous.value.properties == entry.value.properties {
+        return Ok(previous.source_properties.len());
+    }
+    let rewrite_limits = xml_limits(limits);
+    let proof = if !entry.source_properties.is_empty()
+        && entry.source_properties != previous.source_properties
+    {
+        entry
+            .source_properties_proof
+            .as_ref()
+            .ok_or_else(|| invalid("missing properties source provenance"))?
+            .as_ref()
+            .clone()
+    } else if previous.value.properties.extension_list == entry.value.properties.extension_list {
+        rewrite_id_with_limits_and_output(
+            previous
+                .source_properties_proof
+                .as_ref()
+                .ok_or_else(|| invalid("missing properties source provenance"))?,
+            entry.id(),
+            &rewrite_limits,
+            limits.max_temporary_bytes(),
+        )?
+    } else {
+        let mut proof = rewrite_extension_list_with_limits_and_output(
+            previous
+                .source_properties_proof
+                .as_ref()
+                .ok_or_else(|| invalid("missing properties source provenance"))?,
+            entry.value.properties.extension_list.as_ref(),
+            &rewrite_limits,
+            limits.max_temporary_bytes(),
+        )?;
+        if previous.id() != entry.id() {
+            proof = rewrite_id_with_limits_and_output(
+                &proof,
+                entry.id(),
+                &rewrite_limits,
+                limits.max_temporary_bytes(),
+            )?;
+        }
+        proof
+    };
+    Ok(proof.bytes().len())
 }
 
 fn identity_key(entry: &Part) -> (PackURI, PackURI, String, String, String, String) {
@@ -1120,6 +2286,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     {
         return Err(invalid("Custom Data part already exists"));
     }
+    validate_value(&entry.value, limits)?;
     let workbook = package.main_document_part()?;
     if workbook
         .rels()
@@ -1134,15 +2301,30 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // Capture the complete owner member before adding the new edge. The
     // relationship token keeps comments, PIs, prefixes and attribute order
     // in the workbook `.rels` member when the new edge is spliced in.
-    let workbook_relationships = package.source_relationships(&workbook_name)?;
+    let read_limits = bounded_read_limits(package, *limits)?;
     let properties_xml = if entry.source_properties.is_empty() {
-        Arc::new(write_properties(&entry.value.properties)?)
+        Arc::new(write_properties_with_limits(
+            &entry.value.properties,
+            &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
+        )?)
     } else {
         Arc::clone(&entry.source_properties)
     };
-    if properties_xml.len() > 4 * 1024 * 1024 || entry.value.data.len() > limits.max_payload_bytes()
-    {
-        return Err(invalid("Custom Data output exceeds the size limit"));
+    if properties_xml.len() > limits.max_properties_xml_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "Properties XML bytes",
+            properties_xml.len(),
+            limits.max_properties_xml_bytes(),
+        ));
+    }
+    if properties_xml.len() > limits.max_temporary_bytes() {
+        return Err(limit(
+            Resource::Memory,
+            "temporary Properties bytes",
+            properties_xml.len(),
+            limits.max_temporary_bytes(),
+        ));
     }
     if let Some(proof) = &entry.source_properties_proof {
         package.try_add_owned_xml_part(proof.as_ref().clone())?;
@@ -1158,27 +2340,43 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         DATA_CONTENT_TYPE.into(),
         Arc::clone(&entry.value.data),
     )))?;
-    let properties_relationships = package.source_relationships(&entry.properties_part_name)?;
+    let properties_relationships =
+        source_relationships_bounded(package, &entry.properties_part_name, *limits)?;
+    let properties_output_limit = limits
+        .max_relationship_xml_bytes()
+        .min(limits.max_temporary_bytes());
     let properties_replacement = properties_relationships.with_relationship(
         DATA_RELATIONSHIP_TYPE,
         &entry.data_relationship_target,
         &entry.data_relationship_id,
         TargetMode::Internal,
-        usize::MAX,
+        properties_output_limit,
     )?;
-    package.try_replace_relationships(&properties_relationships, &properties_replacement)?;
+    package.try_replace_relationships_with_limits(
+        &properties_relationships,
+        &properties_replacement,
+        read_limits,
+    )?;
+    let workbook_relationships = source_relationships_bounded(package, &workbook_name, *limits)?;
+    let workbook_output_limit = limits
+        .max_relationship_xml_bytes()
+        .min(limits.max_temporary_bytes());
     let workbook_replacement = workbook_relationships.with_relationship(
         PROPERTIES_RELATIONSHIP_TYPE,
         &entry.workbook_relationship_target,
         &entry.workbook_relationship_id,
         TargetMode::Internal,
-        usize::MAX,
+        workbook_output_limit,
     )?;
-    package.try_replace_relationships(&workbook_relationships, &workbook_replacement)?;
+    package.try_replace_relationships_with_limits(
+        &workbook_relationships,
+        &workbook_replacement,
+        read_limits,
+    )?;
     Ok(())
 }
 
-fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
+fn remove_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<()> {
     let workbook = package.main_document_part()?;
     let owner = workbook
         .rels()
@@ -1205,21 +2403,47 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
         return Err(invalid("Custom Data payload relationship changed"));
     }
     let workbook_name = workbook.partname().clone();
-    let workbook_relationships = package.source_relationships(&workbook_name)?;
-    let properties_relationships = package.source_relationships(&properties_part_name)?;
-    let workbook_replacement =
-        workbook_relationships.without_relationship(&entry.workbook_relationship_id, usize::MAX)?;
-    package.try_replace_relationships(&workbook_relationships, &workbook_replacement)?;
-    let properties_replacement =
-        properties_relationships.without_relationship(&entry.data_relationship_id, usize::MAX)?;
-    package.try_replace_relationships(&properties_relationships, &properties_replacement)?;
-    if part_is_referenced(package, &entry.properties_part_name)
-        || part_is_referenced(package, &entry.data_part_name)
-    {
+    if has_unexpected_incoming_relationship(
+        package,
+        &entry.properties_part_name,
+        &workbook_name,
+        &entry.workbook_relationship_id,
+        &entry.workbook_relationship_target,
+    ) || has_unexpected_incoming_relationship(
+        package,
+        &entry.data_part_name,
+        &properties_part_name,
+        &entry.data_relationship_id,
+        &entry.data_relationship_target,
+    ) {
         return Err(invalid(
             "Custom Data part has an unexpected incoming relationship",
         ));
     }
+    let read_limits = bounded_read_limits(package, *limits)?;
+    let workbook_relationships = source_relationships_bounded(package, &workbook_name, *limits)?;
+    let properties_relationships =
+        source_relationships_bounded(package, &properties_part_name, *limits)?;
+    let workbook_output_limit = limits
+        .max_relationship_xml_bytes()
+        .min(limits.max_temporary_bytes());
+    let workbook_replacement = workbook_relationships
+        .without_relationship(&entry.workbook_relationship_id, workbook_output_limit)?;
+    let properties_output_limit = limits
+        .max_relationship_xml_bytes()
+        .min(limits.max_temporary_bytes());
+    let properties_replacement = properties_relationships
+        .without_relationship(&entry.data_relationship_id, properties_output_limit)?;
+    package.try_replace_relationships_with_limits(
+        &workbook_relationships,
+        &workbook_replacement,
+        read_limits,
+    )?;
+    package.try_replace_relationships_with_limits(
+        &properties_relationships,
+        &properties_replacement,
+        read_limits,
+    )?;
     let data_part_name = package.get_part(&entry.data_part_name)?.partname().clone();
     if !package.remove_part(&properties_part_name) || !package.remove_part(&data_part_name) {
         return Err(invalid("Custom Data part is absent"));
@@ -1227,20 +2451,35 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
     Ok(())
 }
 
-fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.rels().iter().any(|relationship| {
+fn has_unexpected_incoming_relationship(
+    package: &OpcPackage,
+    target: &PackURI,
+    expected_source: &PackURI,
+    expected_id: &str,
+    expected_target: &str,
+) -> bool {
+    if package.rels().iter().any(|relationship| {
         !relationship.is_external()
             && relationship
                 .target_partname()
                 .ok()
                 .is_some_and(|candidate| candidate.is_equivalent_to(target))
-    }) || package.iter_parts().any(|part| {
+    }) {
+        return true;
+    }
+    package.iter_parts().any(|part| {
         part.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
+            if relationship.is_external()
+                || !relationship
                     .target_partname()
                     .ok()
                     .is_some_and(|candidate| candidate.is_equivalent_to(target))
+            {
+                return false;
+            }
+            !(part.partname().is_equivalent_to(expected_source)
+                && relationship.r_id() == expected_id
+                && relationship.target_ref() == expected_target)
         })
     })
 }
@@ -1261,14 +2500,31 @@ fn apply_snapshot(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()> {
         &snapshot.limits,
         &snapshot.source.content_types,
     )?;
-    restore_relationship_provenance(package, snapshot)?;
-    snapshot.source.connections.restore(package)
+    restore_relationship_provenance(package, snapshot, snapshot.limits)?;
+    snapshot.source.connections.restore_with_limits(
+        package,
+        snapshot.limits,
+        bounded_read_limits(package, snapshot.limits)?,
+    )
 }
 
-fn restore_relationship_provenance(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()> {
+fn restore_relationship_provenance(
+    package: &mut OpcPackage,
+    snapshot: &Snapshot,
+    limits: Limits,
+) -> Result<()> {
+    let read_limits = bounded_read_limits(package, limits)?;
     let restore = |package: &mut OpcPackage, source: &OwnedRelationships| -> Result<()> {
-        let current = package.source_relationships(source.owner())?;
-        package.try_replace_relationships(&current, source)?;
+        if source.bytes().len() > limits.max_relationship_xml_bytes() {
+            return Err(limit(
+                Resource::InputBytes,
+                "relationship XML bytes",
+                source.bytes().len(),
+                limits.max_relationship_xml_bytes(),
+            ));
+        }
+        let current = source_relationships_bounded(package, source.owner(), limits)?;
+        package.try_replace_relationships_with_limits(&current, source, read_limits)?;
         Ok(())
     };
     restore(package, &snapshot.source.workbook_relationships)?;
@@ -1487,6 +2743,18 @@ mod tests {
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
         OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn default_output_ceiling_matches_package_ceiling() {
+        assert_eq!(Limits::new().max_output_bytes(), MAX_PACKAGE_BYTES);
+        assert_eq!(
+            Limits::new()
+                .with_max_output_bytes(usize::MAX)
+                .max_output_bytes(),
+            MAX_PACKAGE_BYTES
+        );
+        assert_eq!(Limits::new().with_max_output_bytes(1).max_output_bytes(), 1);
     }
 
     #[test]

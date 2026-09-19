@@ -1,0 +1,46 @@
+Diff in /tmp/litchi-custom-data-completion/crates/litchi-xlsx/tests/drawing_svg_read.rs:546:
+     let foreign_picture = foreign_source.picture(0).unwrap();
+     assert!(matches!(foreign_picture.svg_owner(), SvgOwnerState::None));
+     let picture_bytes = foreign_picture.picture_bytes(&foreign).unwrap();
+[31m-    assert!(picture_bytes
+[m[31m-        .windows(b"pmc:AlternateContent".len())
+[m[31m-        .any(|window| window == b"pmc:AlternateContent"));
+[m[31m-    assert!(picture_bytes
+[m[31m-        .windows(b"pmc:Ignorable=\"future\"".len())
+[m[31m-        .any(|window| window == b"pmc:Ignorable=\"future\""));
+[m[32m+    assert!(
+[m[32m+        picture_bytes
+[m[32m+            .windows(b"pmc:AlternateContent".len())
+[m[32m+            .any(|window| window == b"pmc:AlternateContent")
+[m[32m+    );
+[m[32m+    assert!(
+[m[32m+        picture_bytes
+[m[32m+            .windows(b"pmc:Ignorable=\"future\"".len())
+[m[32m+            .any(|window| window == b"pmc:Ignorable=\"future\"")
+[m[32m+    );
+[m }
+
+ #[test]
+Diff in /tmp/litchi-custom-data-completion/crates/litchi-xlsx/tests/drawing_svg_read.rs:664:
+         .get_part(&PackURI::new(SHEET).unwrap())
+         .unwrap()
+         .blob();
+[31m-    assert!(retained
+[m[31m-        .windows(b"pmc:AlternateContent".len())
+[m[31m-        .any(|window| window == b"pmc:AlternateContent"));
+[m[31m-    assert!(retained
+[m[31m-        .windows(b"pmc:Ignorable=\"x\"".len())
+[m[31m-        .any(|window| window == b"pmc:Ignorable=\"x\""));
+[m[32m+    assert!(
+[m[32m+        retained
+[m[32m+            .windows(b"pmc:AlternateContent".len())
+[m[32m+            .any(|window| window == b"pmc:AlternateContent")
+[m[32m+    );
+[m[32m+    assert!(
+[m[32m+        retained
+[m[32m+            .windows(b"pmc:Ignorable=\"x\"".len())
+[m[32m+            .any(|window| window == b"pmc:Ignorable=\"x\"")
+[m[32m+    );
+[m }
+
+ #[test]

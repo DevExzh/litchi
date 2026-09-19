@@ -25,6 +25,7 @@ pub(crate) fn value_span(xml: &[u8], raw: &[u8]) -> Result<Range<usize>> {
     Ok(start..end)
 }
 
+#[cfg(test)]
 pub(crate) fn escaped_xstring(value: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(value.len());
     append_escaped_xstring_direct(&mut output, value);

@@ -1,0 +1,17 @@
+{
+  "source_root": "/tmp/litchi-custom-data-completion",
+  "base_commit": "1d39eea516248c758b8ea429c879a4a3245e4fbb",
+  "selected_files": {
+    "crates/litchi-xlsx/src/custom_data/codec.rs": "2327abe6360268daf187c4450197a68f3a5c52b7fb65da4a5243da6387b4ca2f",
+    "crates/litchi-xlsx/src/custom_data/package.rs": "172e46e468b0f28fad9d295552be690fd6bd59e3e2876752c3f8bba28de60ddb",
+    "crates/litchi-xlsx/src/connections/codec.rs": "53d589040f6257863c95d941fd6fb473cc74938ff8a38b5fe0c683161c11afa1",
+    "crates/litchi-xlsx/src/connections/embedded_data.rs": "0d0a8407724d4ba4c53e2613b547ff227268ac88f8b3e3003bd5d6038663a815",
+    "crates/litchi-xlsx/src/connections/package.rs": "b80d06b403b9853b440852cfe745a78c670edcea257d507c47ccf85b292744b4",
+    "crates/litchi-xlsx/src/package.rs": "e2217aa8fdab4fa1b7348c2705f8deb0f09094cbdf4fc8a05da654870025f277",
+    "crates/litchi-xlsx/src/source_attributes.rs": "a7bbb80dacbe68140b33b76edaca5f4a1ea067bfff96a689ba62618a01ba0950",
+    "crates/litchi-xlsx/tests/custom_data_limits.rs": "39cc38b4090e16915a2acf435d64613ab18abf5f23a881b9a0fa2ffb1701c54c",
+    "crates/litchi-ooxml-common/src/custom_data/codec.rs": "b6da3e21e23e66afbdc2b9b549bcb4e1e3c9bfa09a9a2f4e432dbd542083a1b0",
+    "crates/litchi-ooxml-common/tests/custom_data.rs": "e8720fcc2c0600b729579a3d8a7560e0b40f7a2daee06b2dccf0168c4923c32a",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

@@ -1,0 +1,431 @@
+{
+  "gates": {
+    "xlsx-tests": {
+      "passed": 1860,
+      "failed": 0,
+      "ignored": 0
+    },
+    "opc-tests": {
+      "passed": 619,
+      "failed": 0,
+      "ignored": 1
+    },
+    "common-tests": {
+      "passed": 302,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "performance": {
+    "samples": 450,
+    "reported_medians_verified": true,
+    "diagnostic_hashes_verified": true,
+    "comparisons": {
+      "large-noop-commit-save": {
+        "elapsed_ns": {
+          "baseline": 46480054,
+          "candidate": 52818458,
+          "ratio": 1.136368258091955
+        },
+        "requested_bytes": {
+          "baseline": 61078721,
+          "candidate": 64069149,
+          "ratio": 1.0489602262627602
+        },
+        "allocation_calls": {
+          "baseline": 559220,
+          "candidate": 598688,
+          "ratio": 1.0705768749329423
+        },
+        "peak_live_delta": {
+          "baseline": 12121003,
+          "candidate": 12121809,
+          "ratio": 1.0000664961472248
+        },
+        "rss_kib": {
+          "baseline": 19640,
+          "candidate": 20408,
+          "ratio": 1.0391038696537678
+        }
+      },
+      "large-payload-replacement": {
+        "elapsed_ns": {
+          "baseline": 91217660,
+          "candidate": 106112932,
+          "ratio": 1.1632937306218993
+        },
+        "requested_bytes": {
+          "baseline": 118819322,
+          "candidate": 126522899,
+          "ratio": 1.0648343793781285
+        },
+        "allocation_calls": {
+          "baseline": 1112991,
+          "candidate": 1212222,
+          "ratio": 1.0891570551783438
+        },
+        "peak_live_delta": {
+          "baseline": 13115084,
+          "candidate": 13116280,
+          "ratio": 1.0000911927060474
+        },
+        "rss_kib": {
+          "baseline": 21516,
+          "candidate": 21748,
+          "ratio": 1.0107826733593606
+        }
+      },
+      "large-read": {
+        "elapsed_ns": {
+          "baseline": 22926921,
+          "candidate": 26038282,
+          "ratio": 1.1357077559607764
+        },
+        "requested_bytes": {
+          "baseline": 30439339,
+          "candidate": 31934553,
+          "ratio": 1.049121106079209
+        },
+        "allocation_calls": {
+          "baseline": 278284,
+          "candidate": 298018,
+          "ratio": 1.0709131678429231
+        },
+        "peak_live_delta": {
+          "baseline": 10676156,
+          "candidate": 10676572,
+          "ratio": 1.0000389653354635
+        },
+        "rss_kib": {
+          "baseline": 17840,
+          "candidate": 17824,
+          "ratio": 0.9991031390134529
+        }
+      },
+      "large-remove-inverse": {
+        "elapsed_ns": {
+          "baseline": 141946988,
+          "candidate": 164784839,
+          "ratio": 1.1608900007092788
+        },
+        "requested_bytes": {
+          "baseline": 175944228,
+          "candidate": 187895356,
+          "ratio": 1.0679256610793735
+        },
+        "allocation_calls": {
+          "baseline": 1704192,
+          "candidate": 1857546,
+          "ratio": 1.0899863395673728
+        },
+        "peak_live_delta": {
+          "baseline": 13275572,
+          "candidate": 13276768,
+          "ratio": 1.0000900902801024
+        },
+        "rss_kib": {
+          "baseline": 20656,
+          "candidate": 20928,
+          "ratio": 1.013168086754454
+        }
+      },
+      "large-rename-binding-rewrite": {
+        "elapsed_ns": {
+          "baseline": 92902609,
+          "candidate": 107863121,
+          "ratio": 1.161034358034014
+        },
+        "requested_bytes": {
+          "baseline": 118475216,
+          "candidate": 126176529,
+          "ratio": 1.0650035784699476
+        },
+        "allocation_calls": {
+          "baseline": 1122280,
+          "candidate": 1221621,
+          "ratio": 1.0885171258509463
+        },
+        "peak_live_delta": {
+          "baseline": 12477471,
+          "candidate": 12478667,
+          "ratio": 1.0000958527573416
+        },
+        "rss_kib": {
+          "baseline": 20676,
+          "candidate": 20908,
+          "ratio": 1.0112207390210872
+        }
+      },
+      "medium-noop-commit-save": {
+        "elapsed_ns": {
+          "baseline": 11201294,
+          "candidate": 12884601,
+          "ratio": 1.150277905392002
+        },
+        "requested_bytes": {
+          "baseline": 14366009,
+          "candidate": 15147189,
+          "ratio": 1.05437696718692
+        },
+        "allocation_calls": {
+          "baseline": 136530,
+          "candidate": 146994,
+          "ratio": 1.0766424961546912
+        },
+        "peak_live_delta": {
+          "baseline": 2459575,
+          "candidate": 2460381,
+          "ratio": 1.0003276988910685
+        },
+        "rss_kib": {
+          "baseline": 7120,
+          "candidate": 7112,
+          "ratio": 0.998876404494382
+        }
+      },
+      "medium-payload-replacement": {
+        "elapsed_ns": {
+          "baseline": 22138217,
+          "candidate": 26200373,
+          "ratio": 1.1834906578068143
+        },
+        "requested_bytes": {
+          "baseline": 28438013,
+          "candidate": 30461190,
+          "ratio": 1.0711434023185797
+        },
+        "allocation_calls": {
+          "baseline": 271003,
+          "candidate": 297626,
+          "ratio": 1.0982387648845215
+        },
+        "peak_live_delta": {
+          "baseline": 2508860,
+          "candidate": 2510056,
+          "ratio": 1.0004767105378538
+        },
+        "rss_kib": {
+          "baseline": 7356,
+          "candidate": 7364,
+          "ratio": 1.0010875475802066
+        }
+      },
+      "medium-read": {
+        "elapsed_ns": {
+          "baseline": 5626517,
+          "candidate": 6444250,
+          "ratio": 1.1453355601698174
+        },
+        "requested_bytes": {
+          "baseline": 7153519,
+          "candidate": 7544109,
+          "ratio": 1.0546010991233825
+        },
+        "allocation_calls": {
+          "baseline": 67875,
+          "candidate": 73107,
+          "ratio": 1.0770828729281767
+        },
+        "peak_live_delta": {
+          "baseline": 2292248,
+          "candidate": 2292664,
+          "ratio": 1.0001814812358871
+        },
+        "rss_kib": {
+          "baseline": 6860,
+          "candidate": 6844,
+          "ratio": 0.997667638483965
+        }
+      },
+      "medium-remove-inverse": {
+        "elapsed_ns": {
+          "baseline": 34325415,
+          "candidate": 40275049,
+          "ratio": 1.1733302860285884
+        },
+        "requested_bytes": {
+          "baseline": 42078167,
+          "candidate": 45197703,
+          "ratio": 1.0741366894617819
+        },
+        "allocation_calls": {
+          "baseline": 412490,
+          "candidate": 453386,
+          "ratio": 1.0991442216781013
+        },
+        "peak_live_delta": {
+          "baseline": 2548532,
+          "candidate": 2549728,
+          "ratio": 1.0004692897715233
+        },
+        "rss_kib": {
+          "baseline": 7372,
+          "candidate": 7356,
+          "ratio": 0.9978296256104178
+        }
+      },
+      "medium-rename-binding-rewrite": {
+        "elapsed_ns": {
+          "baseline": 22648829,
+          "candidate": 26707595,
+          "ratio": 1.1792042317066371
+        },
+        "requested_bytes": {
+          "baseline": 28866398,
+          "candidate": 30897295,
+          "ratio": 1.0703550543438083
+        },
+        "allocation_calls": {
+          "baseline": 273428,
+          "candidate": 300161,
+          "ratio": 1.0977697968020832
+        },
+        "peak_live_delta": {
+          "baseline": 2591391,
+          "candidate": 2592587,
+          "ratio": 1.0004615281908442
+        },
+        "rss_kib": {
+          "baseline": 7632,
+          "candidate": 7620,
+          "ratio": 0.9984276729559748
+        }
+      },
+      "small-noop-commit-save": {
+        "elapsed_ns": {
+          "baseline": 1587338,
+          "candidate": 1874158,
+          "ratio": 1.1806924549150843
+        },
+        "requested_bytes": {
+          "baseline": 1918354,
+          "candidate": 2063128,
+          "ratio": 1.0754678229357042
+        },
+        "allocation_calls": {
+          "baseline": 18408,
+          "candidate": 20398,
+          "ratio": 1.1081051716644936
+        },
+        "peak_live_delta": {
+          "baseline": 316806,
+          "candidate": 317612,
+          "ratio": 1.0025441437346514
+        },
+        "rss_kib": {
+          "baseline": 4504,
+          "candidate": 4532,
+          "ratio": 1.0062166962699823
+        }
+      },
+      "small-payload-replacement": {
+        "elapsed_ns": {
+          "baseline": 3078105,
+          "candidate": 3851728,
+          "ratio": 1.2513309325055513
+        },
+        "requested_bytes": {
+          "baseline": 4196572,
+          "candidate": 4588950,
+          "ratio": 1.0934996468546232
+        },
+        "allocation_calls": {
+          "baseline": 35770,
+          "candidate": 41177,
+          "ratio": 1.1511601901034387
+        },
+        "peak_live_delta": {
+          "baseline": 513617,
+          "candidate": 514397,
+          "ratio": 1.0015186413222303
+        },
+        "rss_kib": {
+          "baseline": 4800,
+          "candidate": 5060,
+          "ratio": 1.0541666666666667
+        }
+      },
+      "small-read": {
+        "elapsed_ns": {
+          "baseline": 803644,
+          "candidate": 946294,
+          "ratio": 1.177503969419295
+        },
+        "requested_bytes": {
+          "baseline": 949575,
+          "candidate": 1021962,
+          "ratio": 1.0762309454229524
+        },
+        "allocation_calls": {
+          "baseline": 9087,
+          "candidate": 10082,
+          "ratio": 1.1094970837460107
+        },
+        "peak_live_delta": {
+          "baseline": 297902,
+          "candidate": 298318,
+          "ratio": 1.001396432383804
+        },
+        "rss_kib": {
+          "baseline": 4316,
+          "candidate": 4556,
+          "ratio": 1.0556070435588507
+        }
+      },
+      "small-remove-inverse": {
+        "elapsed_ns": {
+          "baseline": 4692472,
+          "candidate": 5837457,
+          "ratio": 1.2440046525583957
+        },
+        "requested_bytes": {
+          "baseline": 5510520,
+          "candidate": 6094591,
+          "ratio": 1.1059919934960767
+        },
+        "allocation_calls": {
+          "baseline": 53826,
+          "candidate": 61871,
+          "ratio": 1.1494630847545795
+        },
+        "peak_live_delta": {
+          "baseline": 332849,
+          "candidate": 334045,
+          "ratio": 1.0035932209500404
+        },
+        "rss_kib": {
+          "baseline": 4552,
+          "candidate": 4572,
+          "ratio": 1.0043936731107206
+        }
+      },
+      "small-rename-binding-rewrite": {
+        "elapsed_ns": {
+          "baseline": 3174015,
+          "candidate": 3950798,
+          "ratio": 1.2447319877190246
+        },
+        "requested_bytes": {
+          "baseline": 4250631,
+          "candidate": 4653641,
+          "ratio": 1.0948118055883937
+        },
+        "allocation_calls": {
+          "baseline": 36193,
+          "candidate": 41710,
+          "ratio": 1.152432790871163
+        },
+        "peak_live_delta": {
+          "baseline": 525472,
+          "candidate": 526252,
+          "ratio": 1.0014843797576274
+        },
+        "rss_kib": {
+          "baseline": 5032,
+          "candidate": 5076,
+          "ratio": 1.0087440381558028
+        }
+      }
+    }
+  }
+}

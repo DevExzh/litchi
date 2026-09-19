@@ -9,6 +9,7 @@ use super::model::{
     TextImportProperties, TextQualifier, WebQueryProperties, WebTableSelector, validate,
 };
 use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
+use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::sheet::Result;
 use quick_xml::{
     Reader, XmlVersion,
@@ -82,6 +83,113 @@ impl Connections {
         }
         project(&parse_dom(x.as_ref())?)
     }
+
+    /// Parse one connections part under a caller-selected byte ceiling.
+    ///
+    /// The normal public parser retains its historical fixed profile.  The
+    /// Custom Data owner uses this bounded entry point for graph admission so
+    /// MCE preprocessing and the typed DOM never see a member larger than the
+    /// host profile or the immutable 16 MiB parser ceiling.
+    pub(super) fn parse_with_limits(
+        xml: &[u8],
+        max_bytes: usize,
+        max_nodes: usize,
+        max_events: usize,
+        max_depth: usize,
+        max_string_bytes: usize,
+        max_namespace_bytes: usize,
+        max_attributes: usize,
+        max_temporary_bytes: usize,
+    ) -> XlsxResult<Self> {
+        let maximum = max_bytes.min(MAX_XML_BYTES);
+        let nodes = max_nodes.min(MAX_DOM_NODES);
+        // Preserve a caller's zero-event profile. The first lexical event
+        // must be refused rather than silently widening the request.
+        let events = max_events;
+        let depth = max_depth.min(MAX_DOM_DEPTH);
+        if xml.len() > maximum {
+            return Err(connection_limit(
+                xml.len(),
+                maximum,
+                "connections input XML bytes",
+            ));
+        }
+        preflight_xml_with_limits(
+            xml,
+            nodes,
+            events,
+            depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+        )?;
+        let without_pi = strip_processing_instructions_with_limit(xml, max_temporary_bytes)?;
+        let mce_output_limit = if contains_mce_markup(without_pi.as_ref()) {
+            maximum.min(max_temporary_bytes)
+        } else {
+            maximum
+        };
+        let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+            without_pi.as_ref(),
+            &litchi_ooxml_common::mce::Capabilities::default(),
+            &litchi_ooxml_common::mce::Limits {
+                max_input_bytes: maximum,
+                max_output_bytes: mce_output_limit,
+                max_depth: depth,
+                max_namespace_bindings: max_attributes.min(4096),
+                max_directive_tokens: events.min(4096),
+                max_choices_per_alternate: events.min(1024),
+            },
+        )
+        .map_err(|error| {
+            let mapped = map_mce_error(
+                error,
+                maximum,
+                mce_output_limit,
+                depth,
+                max_attributes.min(4096),
+                events.min(4096),
+                events.min(1024),
+                "connections",
+            );
+            if mce_output_limit < maximum
+                && matches!(
+                    mapped,
+                    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::OutputBytes,
+                        ..
+                    })
+                )
+            {
+                temporary_limit(
+                    mce_output_limit.saturating_add(1),
+                    mce_output_limit,
+                    "connections MCE output bytes",
+                )
+            } else {
+                mapped
+            }
+        })?;
+        if processed.xml.len() > maximum {
+            return Err(xml_resource_limit(
+                litchi_core::Resource::OutputBytes,
+                processed.xml.len(),
+                maximum,
+                "connections processed XML bytes",
+            ));
+        }
+        let root = parse_dom_with_limits(
+            processed.xml.as_ref(),
+            nodes,
+            events,
+            depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+        )
+        .map_err(|error| XlsxError::Invalid(error.to_string()))?;
+        project(&root).map_err(|error| XlsxError::Invalid(error.to_string()))
+    }
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
         let ns = if strict {
@@ -101,6 +209,315 @@ impl Connections {
         x.push_str("</connections>")?;
         Ok(x.finish())
     }
+}
+
+fn connection_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
+    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::InputBytes,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
+}
+
+fn temporary_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
+    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::Memory,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
+}
+
+fn xml_resource_limit(
+    resource: litchi_core::Resource,
+    observed: usize,
+    maximum: usize,
+    name: &'static str,
+) -> XlsxError {
+    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+        resource,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
+}
+
+pub(super) fn map_mce_error(
+    error: litchi_ooxml_common::mce::Error,
+    input_bytes: usize,
+    output_bytes: usize,
+    depth: usize,
+    namespace_bindings: usize,
+    directive_tokens: usize,
+    choices: usize,
+    scope: &'static str,
+) -> XlsxError {
+    let litchi_ooxml_common::mce::Error::LimitExceeded(resource) = &error else {
+        return XlsxError::MarkupCompatibility(error);
+    };
+    let (kind, maximum) = match resource.as_str() {
+        "input bytes" => (litchi_core::Resource::InputBytes, input_bytes),
+        "output bytes" => (litchi_core::Resource::OutputBytes, output_bytes),
+        "depth" => (litchi_core::Resource::Depth, depth),
+        "namespace bindings" => (litchi_core::Resource::Objects, namespace_bindings),
+        "directive tokens" => (litchi_core::Resource::Objects, directive_tokens),
+        "choices" => (litchi_core::Resource::Objects, choices),
+        _ => return XlsxError::MarkupCompatibility(error),
+    };
+    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+        resource: kind,
+        observed: maximum.saturating_add(1) as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {scope} MCE {resource}")),
+    })
+}
+
+/// Admit the borrowed lexical shape before any PI copy, MCE expansion, or
+/// namespace resolver is allowed to allocate state. The DOM parser repeats
+/// these checks while constructing its owned projection.
+pub(super) fn preflight_xml_with_limits(
+    xml: &[u8],
+    max_nodes: usize,
+    max_events: usize,
+    max_depth: usize,
+    max_string_bytes: usize,
+    max_namespace_bytes: usize,
+    max_attributes: usize,
+) -> XlsxResult<()> {
+    std::str::from_utf8(xml).map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    let mut stack = Vec::<usize>::new();
+    let mut nodes = 0usize;
+    let mut events = 0usize;
+    let mut namespace_bytes = 0usize;
+    loop {
+        events = events.checked_add(1).ok_or_else(|| {
+            xml_resource_limit(
+                litchi_core::Resource::Objects,
+                usize::MAX,
+                max_events,
+                "XML events",
+            )
+        })?;
+        if events > max_events {
+            return Err(xml_resource_limit(
+                litchi_core::Resource::Objects,
+                events,
+                max_events,
+                "XML events",
+            ));
+        }
+        match reader.read_event() {
+            Ok(Event::Start(element)) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    xml_resource_limit(
+                        litchi_core::Resource::Objects,
+                        usize::MAX,
+                        max_nodes,
+                        "XML nodes",
+                    )
+                })?;
+                if nodes > max_nodes {
+                    return Err(xml_resource_limit(
+                        litchi_core::Resource::Objects,
+                        nodes,
+                        max_nodes,
+                        "XML nodes",
+                    ));
+                }
+                let prospective_depth = stack.len().saturating_add(1);
+                if prospective_depth > max_depth {
+                    return Err(xml_resource_limit(
+                        litchi_core::Resource::Depth,
+                        prospective_depth,
+                        max_depth,
+                        "XML depth",
+                    ));
+                }
+                let local_namespace_bytes = preflight_element(
+                    &element,
+                    namespace_bytes,
+                    max_string_bytes,
+                    max_namespace_bytes,
+                    max_attributes,
+                )?;
+                namespace_bytes = namespace_bytes
+                    .checked_add(local_namespace_bytes)
+                    .ok_or_else(|| {
+                        xml_resource_limit(
+                            litchi_core::Resource::InputBytes,
+                            usize::MAX,
+                            max_namespace_bytes,
+                            "XML namespace bytes",
+                        )
+                    })?;
+                stack.push(local_namespace_bytes);
+            },
+            Ok(Event::Empty(element)) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    xml_resource_limit(
+                        litchi_core::Resource::Objects,
+                        usize::MAX,
+                        max_nodes,
+                        "XML nodes",
+                    )
+                })?;
+                if nodes > max_nodes {
+                    return Err(xml_resource_limit(
+                        litchi_core::Resource::Objects,
+                        nodes,
+                        max_nodes,
+                        "XML nodes",
+                    ));
+                }
+                let prospective_depth = stack.len().saturating_add(1);
+                if prospective_depth > max_depth {
+                    return Err(xml_resource_limit(
+                        litchi_core::Resource::Depth,
+                        prospective_depth,
+                        max_depth,
+                        "XML depth",
+                    ));
+                }
+                preflight_element(
+                    &element,
+                    namespace_bytes,
+                    max_string_bytes,
+                    max_namespace_bytes,
+                    max_attributes,
+                )?;
+            },
+            Ok(Event::End(_)) => {
+                let local = stack
+                    .pop()
+                    .ok_or_else(|| XlsxError::Invalid("unexpected closing element".into()))?;
+                namespace_bytes = namespace_bytes.checked_sub(local).ok_or_else(|| {
+                    XlsxError::Invalid("XML namespace byte count underflow".into())
+                })?;
+            },
+            Ok(Event::Text(text)) => preflight_payload(text.as_ref(), max_string_bytes)?,
+            Ok(Event::CData(text)) => preflight_payload(text.as_ref(), max_string_bytes)?,
+            Ok(Event::Comment(text)) => preflight_payload(text.as_ref(), max_string_bytes)?,
+            Ok(Event::PI(text)) => preflight_payload(text.as_ref(), max_string_bytes)?,
+            Ok(Event::GeneralRef(text)) => preflight_payload(text.as_ref(), max_string_bytes)?,
+            Ok(Event::DocType(_)) => return Err(XlsxError::Invalid("DTDs are rejected".into())),
+            Ok(Event::Decl(_)) => {},
+            Ok(Event::Eof) => break,
+            Err(error) => return Err(XlsxError::Invalid(xml_error(error).to_string())),
+        }
+    }
+    if !stack.is_empty() {
+        return Err(XlsxError::Invalid("unterminated XML".into()));
+    }
+    Ok(())
+}
+
+pub(super) fn contains_mce_markup(xml: &[u8]) -> bool {
+    const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+    xml.windows(MCE_NAMESPACE.len())
+        .any(|window| window == MCE_NAMESPACE)
+}
+
+fn preflight_payload(bytes: &[u8], maximum: usize) -> XlsxResult<()> {
+    if bytes.len() > maximum {
+        return Err(xml_resource_limit(
+            litchi_core::Resource::InputBytes,
+            bytes.len(),
+            maximum,
+            "XML string bytes",
+        ));
+    }
+    Ok(())
+}
+
+fn preflight_element(
+    element: &BytesStart<'_>,
+    inherited_namespace_bytes: usize,
+    max_string_bytes: usize,
+    max_namespace_bytes: usize,
+    max_attributes: usize,
+) -> XlsxResult<usize> {
+    if element.name().as_ref().len() > max_string_bytes {
+        return Err(xml_resource_limit(
+            litchi_core::Resource::InputBytes,
+            element.name().as_ref().len(),
+            max_string_bytes,
+            "XML element name bytes",
+        ));
+    }
+    let mut local_namespace_bytes = 0usize;
+    let mut attribute_count = 0usize;
+    for attribute in element.attributes().with_checks(false) {
+        let attribute = attribute.map_err(|error| XlsxError::Invalid(error.to_string()))?;
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            xml_resource_limit(
+                litchi_core::Resource::Objects,
+                usize::MAX,
+                max_attributes,
+                "XML attributes",
+            )
+        })?;
+        if attribute_count > max_attributes {
+            return Err(xml_resource_limit(
+                litchi_core::Resource::Objects,
+                attribute_count,
+                max_attributes,
+                "XML attributes",
+            ));
+        }
+        if attribute.key.as_ref().len() > max_string_bytes {
+            return Err(xml_resource_limit(
+                litchi_core::Resource::InputBytes,
+                attribute.key.as_ref().len(),
+                max_string_bytes,
+                "XML attribute name bytes",
+            ));
+        }
+        if attribute.value.as_ref().len() > max_string_bytes {
+            return Err(xml_resource_limit(
+                litchi_core::Resource::InputBytes,
+                attribute.value.as_ref().len(),
+                max_string_bytes,
+                "XML attribute value bytes",
+            ));
+        }
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            let prefix_bytes = key.strip_prefix(b"xmlns:").map_or(0, |prefix| prefix.len());
+            local_namespace_bytes = local_namespace_bytes
+                .checked_add(prefix_bytes)
+                .and_then(|value| value.checked_add(attribute.value.as_ref().len()))
+                .ok_or_else(|| {
+                    xml_resource_limit(
+                        litchi_core::Resource::InputBytes,
+                        usize::MAX,
+                        max_namespace_bytes,
+                        "XML namespace bytes",
+                    )
+                })?;
+        }
+    }
+    let total = inherited_namespace_bytes
+        .checked_add(local_namespace_bytes)
+        .ok_or_else(|| {
+            xml_resource_limit(
+                litchi_core::Resource::InputBytes,
+                usize::MAX,
+                max_namespace_bytes,
+                "XML namespace bytes",
+            )
+        })?;
+    if total > max_namespace_bytes {
+        return Err(xml_resource_limit(
+            litchi_core::Resource::InputBytes,
+            total,
+            max_namespace_bytes,
+            "XML namespace bytes",
+        ));
+    }
+    Ok(local_namespace_bytes)
 }
 
 fn strip_processing_instructions<'a>(xml: &'a [u8]) -> Result<Cow<'a, [u8]>> {
@@ -143,31 +560,150 @@ fn strip_processing_instructions<'a>(xml: &'a [u8]) -> Result<Cow<'a, [u8]>> {
     }
 }
 
+/// Strip inert processing instructions while bounding the owned intermediate.
+pub(super) fn strip_processing_instructions_with_limit<'a>(
+    xml: &'a [u8],
+    max_temporary_bytes: usize,
+) -> XlsxResult<Cow<'a, [u8]>> {
+    let mut reader = Reader::from_reader(xml);
+    let mut output: Option<Vec<u8>> = None;
+    let mut cursor = 0usize;
+    loop {
+        let start = reader.buffer_position() as usize;
+        match reader.read_event() {
+            Ok(Event::PI(_)) => {
+                let end = reader.buffer_position() as usize;
+                if start < cursor || end < start || end > xml.len() {
+                    return Err(XlsxError::Invalid(
+                        "invalid processing-instruction source span".into(),
+                    ));
+                }
+                let bytes = output.get_or_insert_with(Vec::new);
+                let segment = &xml[cursor..start];
+                let output_len = bytes.len().checked_add(segment.len()).ok_or_else(|| {
+                    temporary_limit(
+                        usize::MAX,
+                        max_temporary_bytes,
+                        "connections PI-filter bytes",
+                    )
+                })?;
+                if output_len > max_temporary_bytes {
+                    return Err(temporary_limit(
+                        output_len,
+                        max_temporary_bytes,
+                        "connections PI-filter bytes",
+                    ));
+                }
+                bytes
+                    .try_reserve_exact(segment.len())
+                    .map_err(|source| XlsxError::Allocation {
+                        resource: "Custom Data connections PI-filter output",
+                        source,
+                    })?;
+                bytes.extend_from_slice(segment);
+                cursor = end;
+            },
+            Ok(Event::Eof) => break,
+            Ok(_) => {},
+            Err(error) => return Err(XlsxError::Invalid(xml_error(error).to_string())),
+        }
+    }
+    let Some(mut bytes) = output else {
+        return Ok(Cow::Borrowed(xml));
+    };
+    let segment = &xml[cursor..];
+    let output_len = bytes.len().checked_add(segment.len()).ok_or_else(|| {
+        temporary_limit(
+            usize::MAX,
+            max_temporary_bytes,
+            "connections PI-filter bytes",
+        )
+    })?;
+    if output_len > max_temporary_bytes {
+        return Err(temporary_limit(
+            output_len,
+            max_temporary_bytes,
+            "connections PI-filter bytes",
+        ));
+    }
+    bytes
+        .try_reserve_exact(segment.len())
+        .map_err(|source| XlsxError::Allocation {
+            resource: "Custom Data connections PI-filter output",
+            source,
+        })?;
+    bytes.extend_from_slice(segment);
+    Ok(Cow::Owned(bytes))
+}
+
 pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
+    parse_dom_with_limits(
+        xml,
+        MAX_DOM_NODES,
+        MAX_DOM_NODES.saturating_mul(4),
+        MAX_DOM_DEPTH,
+        MAX_STRING_BYTES,
+        MAX_XML_BYTES,
+        MAX_DOM_NODES,
+    )
+}
+
+pub(super) fn parse_dom_with_limits(
+    xml: &[u8],
+    max_nodes: usize,
+    max_events: usize,
+    max_depth: usize,
+    max_string_bytes: usize,
+    max_namespace_bytes: usize,
+    max_attributes: usize,
+) -> Result<Node> {
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut rd = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
     let mut count = 0;
+    let mut events = 0usize;
     loop {
         let d = rd.decoder();
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("connections XML event count overflow"))?;
+        if events > max_events {
+            return Err(invalid("connections XML event limit exceeded"));
+        }
         match rd.read_event() {
             Ok(Event::Start(e)) => {
                 count += 1;
-                if count > MAX_DOM_NODES || stack.len() >= MAX_DOM_DEPTH {
+                if count > max_nodes || stack.len().saturating_add(1) > max_depth {
                     return Err(invalid("connections XML resource limit exceeded"));
                 }
                 stack
                     .try_reserve(1)
                     .map_err(|_source| invalid("connections XML stack allocation failed"))?;
-                stack.push(make(&e, d, &stack)?);
+                stack.push(make(
+                    &e,
+                    d,
+                    &stack,
+                    max_depth,
+                    max_namespace_bytes,
+                    max_attributes,
+                    max_string_bytes,
+                )?);
             },
             Ok(Event::Empty(e)) => {
                 count += 1;
-                if count > MAX_DOM_NODES {
+                if count > max_nodes || stack.len().saturating_add(1) > max_depth {
                     return Err(invalid("connections node limit exceeded"));
                 }
-                let n = make(&e, d, &stack)?;
+                let n = make(
+                    &e,
+                    d,
+                    &stack,
+                    max_depth,
+                    max_namespace_bytes,
+                    max_attributes,
+                    max_string_bytes,
+                )?;
                 attach(&mut stack, &mut root, n)?;
             },
             Ok(Event::End(_)) => {
@@ -177,7 +713,13 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 attach(&mut stack, &mut root, n)?;
             },
             Ok(Event::Text(t)) => {
+                if t.as_ref().len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
                 let v = t.decode().map_err(xml_error)?.into_owned();
+                if v.len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
                 if let Some(n) = stack.last_mut() {
                     n.content
                         .try_reserve(1)
@@ -188,6 +730,9 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::CData(t)) => {
+                if t.as_ref().len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
                 if let Some(n) = stack.last_mut() {
                     n.content
                         .try_reserve(1)
@@ -199,6 +744,9 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::Comment(t)) => {
+                if t.as_ref().len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
                 if let Some(n) = stack.last_mut() {
                     n.content
                         .try_reserve(1)
@@ -209,13 +757,18 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::GeneralRef(t)) => {
+                if t.as_ref().len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
+                let value = litchi_ooxml_common::xml::decode_xml_reference(&t)?;
+                if value.len() > max_string_bytes {
+                    return Err(invalid("connections XML string limit exceeded"));
+                }
                 if let Some(n) = stack.last_mut() {
                     n.content
                         .try_reserve(1)
                         .map_err(|_source| invalid("connections XML content allocation failed"))?;
-                    n.content.push(Content::Text(
-                        litchi_ooxml_common::xml::decode_xml_reference(&t)?,
-                    ));
+                    n.content.push(Content::Text(value));
                 } else {
                     return Err(invalid("entity outside connections"));
                 }
@@ -238,27 +791,59 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
     }
     root.ok_or_else(|| invalid("missing connections root"))
 }
-fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
-    let q = std::str::from_utf8(e.name().as_ref())
+fn make(
+    e: &BytesStart<'_>,
+    d: Decoder,
+    stack: &[Node],
+    max_depth: usize,
+    max_namespace_bytes: usize,
+    max_attributes: usize,
+    max_string_bytes: usize,
+) -> Result<Node> {
+    let raw_name = e.name();
+    if raw_name.as_ref().len() > max_string_bytes {
+        return Err(invalid("connections XML string limit exceeded"));
+    }
+    let q = std::str::from_utf8(raw_name.as_ref())
         .map_err(xml_error)?
         .to_string();
+    let namespace_limits = NamespaceLimits::new(max_depth, max_attributes, max_namespace_bytes);
     let mut context = stack
         .last()
         .map(|node| node.context.clone())
-        .unwrap_or_else(namespace_root);
+        .unwrap_or_else(|| NamespaceContext::root(namespace_limits));
     let mut raw = Vec::new();
     for a in e.attributes().with_checks(true) {
         let a = a.map_err(xml_error)?;
+        if raw.len() >= max_attributes {
+            return Err(invalid("connections XML attribute limit exceeded"));
+        }
+        if a.value.as_ref().len() > max_string_bytes {
+            return Err(invalid("connections XML string limit exceeded"));
+        }
+        if a.key.as_ref().len() > max_string_bytes {
+            return Err(invalid("connections XML string limit exceeded"));
+        }
+        let qualified = std::str::from_utf8(a.key.as_ref()).map_err(xml_error)?;
+        let value = a
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
+            .map_err(xml_error)?;
+        if value.as_ref().len() > max_string_bytes {
+            return Err(invalid("connections XML string limit exceeded"));
+        }
+        if qualified == "xmlns" || qualified.starts_with("xmlns:") {
+            let prefix = qualified.strip_prefix("xmlns:").unwrap_or("");
+            let namespace_bytes = prefix
+                .len()
+                .checked_add(value.len())
+                .ok_or_else(|| invalid("connections XML namespace byte count overflow"))?;
+            if namespace_bytes > max_namespace_bytes {
+                return Err(invalid("connections XML namespace byte limit exceeded"));
+            }
+        }
         raw.try_reserve(1)
             .map_err(|_source| invalid("connections XML attribute allocation failed"))?;
-        raw.push((
-            std::str::from_utf8(a.key.as_ref())
-                .map_err(xml_error)?
-                .to_string(),
-            a.decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
-                .map_err(xml_error)?
-                .into_owned(),
-        ));
+        raw.push((qualified.to_owned(), value.into_owned()));
     }
     context = context.child(raw.iter().filter_map(|(qualified, value)| {
         if qualified == "xmlns" || qualified.starts_with("xmlns:") {
@@ -271,6 +856,9 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         }
     }))?;
     let (pr, lo) = split(&q)?;
+    if lo.len() > max_string_bytes {
+        return Err(invalid("connections XML string limit exceeded"));
+    }
     let local = lo.to_string();
     let ns = resolve(&context, pr)?;
     let mut attrs = Vec::new();
@@ -282,6 +870,9 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
             continue;
         }
         let (pr, lo) = split(&q)?;
+        if lo.len() > max_string_bytes {
+            return Err(invalid("connections XML string limit exceeded"));
+        }
         let ans = if pr.is_empty() {
             Arc::from("")
         } else {
