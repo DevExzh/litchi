@@ -1,0 +1,11 @@
+{
+  "denominator": "median of four leg medians of isolated all-sequence time; not capture latency",
+  "ratios": {
+    "presentation": 0.0333295652294252,
+    "slides": 0.9643265137596886,
+    "slide11": 0.43162114097756454,
+    "sum_individual_over_full": 0.9807616635919171,
+    "sum_groups_over_full": 0.9976560789891138
+  },
+  "max_leg_median_spread_pct": 2.717584103207238
+}

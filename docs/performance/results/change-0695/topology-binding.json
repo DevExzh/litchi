@@ -1,0 +1,7 @@
+{
+  "pptx_git_tree": {
+    "829bed696500c8ad2f461156985ff1bcf075346f": "8020ce6821568c49c80a683ac471ec269081146b",
+    "df44030d613d7d7e3856cc0494834e414cdb788a": "8020ce6821568c49c80a683ac471ec269081146b"
+  },
+  "statement": "The complete PPTX source tree is byte-identical between the 0693 committed production source and current0694. Shared MCE ownership changed in0694; historical trace timings are not reused."
+}
