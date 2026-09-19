@@ -1,0 +1,12 @@
+{
+  "cargo_fuzz": null,
+  "toolchain_command": [
+    "rustup",
+    "toolchain",
+    "list"
+  ],
+  "exit_code": 0,
+  "stdout": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+  "stderr": "",
+  "claim": "No fuzz or Miri execution claimed."
+}

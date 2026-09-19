@@ -1,0 +1,9 @@
+[
+  {
+    "case": "generated-12x8-valid",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 17.485388613664156,
+    "delta_ns": 111921
+  }
+]

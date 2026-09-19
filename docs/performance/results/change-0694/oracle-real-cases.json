@@ -1,0 +1,65 @@
+[
+  {
+    "family": "docx",
+    "case": {
+      "id": "real-0001",
+      "input_len": 56460,
+      "input_sha256": "6e49e65633198df1573b4e36e52510d3e2583b91727cf0ba19e9694df1359281",
+      "mutation": {
+        "kind": "identity"
+      },
+      "ordinal": 5,
+      "origin": {
+        "archive": "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
+        "archive_sha256": "9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89",
+        "kind": "docx",
+        "member": "word/numbering.xml",
+        "source_len": 56460,
+        "source_sha256": "6e49e65633198df1573b4e36e52510d3e2583b91727cf0ba19e9694df1359281"
+      },
+      "path": "cases/real-0001.xml"
+    }
+  },
+  {
+    "family": "xlsx",
+    "case": {
+      "id": "real-0032",
+      "input_len": 19886,
+      "input_sha256": "ec53f80ddf7b34efe638308f6a623f983c3542e256a9e64e76b294f97fe737df",
+      "mutation": {
+        "kind": "identity"
+      },
+      "ordinal": 160,
+      "origin": {
+        "archive": "libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx",
+        "archive_sha256": "b10c917495578a5f0238ec4f4c0d8cd457d8afda602cd23edc3642be6b0ee577",
+        "kind": "xlsx",
+        "member": "xl/worksheets/sheet1.xml",
+        "source_len": 19886,
+        "source_sha256": "ec53f80ddf7b34efe638308f6a623f983c3542e256a9e64e76b294f97fe737df"
+      },
+      "path": "cases/real-0032.xml"
+    }
+  },
+  {
+    "family": "pptx",
+    "case": {
+      "id": "real-0014",
+      "input_len": 2906,
+      "input_sha256": "cc06f2bc43cea0190b691412c099fbb849f02820007845973470468311d65c16",
+      "mutation": {
+        "kind": "identity"
+      },
+      "ordinal": 70,
+      "origin": {
+        "archive": "libreoffice-core/oox/qa/unit/data/import-mce.pptx",
+        "archive_sha256": "20b39ce6708e980fe16fd0946dabe5d08d5ab29f36edd9e05aedbb334eb07253",
+        "kind": "pptx",
+        "member": "ppt/slides/slide1.xml",
+        "source_len": 2906,
+        "source_sha256": "cc06f2bc43cea0190b691412c099fbb849f02820007845973470468311d65c16"
+      },
+      "path": "cases/real-0014.xml"
+    }
+  }
+]

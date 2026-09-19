@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## 0694 — avoid ordinary MCE element-name ownership
+
+[0694](0694-mce-borrowed-element-names.md) follows a fresh 12.48% MCE `start`
+self profile. Borrowing expanded names until extension/preservation lookup
+needs ownership removes 46,490 allocation calls per real edit. Real one-edit
+phase totals improve 4.12–5.26%, with marker-free controls near baseline.
+The existing hash lookup and full QName validation remain; no cache is added.
+Phase-tail flags and +10.41% page faults remain explicit; RSS is nearly flat.
+Synthetic nonmatching extension profiles cost 2–6%; real-part controls show
+roughly −2% to +4% medians plus one disclosed large tail outlier.
+MCE `start` still accounts for 11.60% self samples. Price remaining presentation
+passes by actual byte/cycle weight before introducing broader reuse.
+
+## 0693 — capture-local notes proofs remove another slide MCE pass
+
+[0693](0693-pptx-capture-notes-proof.md) reuses notes-root classification only
+for the exact borrowed source slice, preserving fallback and validation order.
+Real one-edit phase totals improve about 29%, with 31→18 MCE calls per capture.
+Certain late refusals cost 44–49 µs more; optional proof storage adds 24 logical
+bytes per catalog slot on the measured host. Five presentation passes and one
+per slide remain. These are scoped observations, with no registered claim.
+
 ## 0692 — one redundant PPTX slide pass removed
 
 [0692](0692-pptx-capture-name-projection.md) reuses each temporary MCE result
