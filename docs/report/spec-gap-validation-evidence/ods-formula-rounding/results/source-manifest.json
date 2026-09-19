@@ -1,0 +1,43 @@
+{
+  "after": {
+    "dirty_status_bytes": 1427012,
+    "dirty_status_sha256": "db639e0df141d18d36b544d30c562edc1e94123e5a70933e8f1dbaf43a42f810",
+    "git_head": "49904ad33f35544a79c180157248c2834ab4f136",
+    "source_sha256": {
+      "crates/litchi-core/Cargo.toml": "f269d5d26b041dca9d589342f3b0f3cdd796ea4c9afb72b09bf9b1933001d8ac",
+      "crates/litchi-ods/Cargo.toml": "8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1",
+      "crates/litchi-ods/src/codec/formula/evaluation.rs": "6eab8e35a69fa806f43c2be8fcd7a338c93ddef55837819223ac20a1da685fa3",
+      "crates/litchi-ods/src/codec/formula/evaluation/rounding.rs": "f0bdde7dad0e5d07fe2edb493be3bb8451d157b9617af87e10c34d1a1b7cdf46",
+      "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "35d441d137123348f7b57a7fbb222e960c7e4bc5137eeeec25077c45bf581187",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "fcc077c551bba2ce5fa66207b8b952541f33c9f4e2e48f67668c4b211d806388",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/Cargo.lock": "76eac25fb3243da87786f439dd91cb858ab3edb3c0e6d42a7704a0103f4144d6",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/Cargo.toml": "cba861807f6502344137c5c24ed4a602a4527a946d0baff0e92d4f9e2b29d9b2",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/src/main.rs": "3bc58d8956e92ca514be0fae36e97e04dd0c542eefeaf44e368a3f49c17c3950",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/run_profile.py": "0cb22e4685fe1a124bb0a09ace8ba388da3a2349f86fb1b05c173c401f95fbc1",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/summarize.py": "8af5012484315dfe77de48bb181112d2d959187562626ea14c7046434e4de79c",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/verify.py": "fc11302aa6058101fa43f7e666e1ff2f0946be8c02545b5a5eed3fa4284e4847"
+    }
+  },
+  "before": {
+    "dirty_status_bytes": 1427012,
+    "dirty_status_sha256": "db639e0df141d18d36b544d30c562edc1e94123e5a70933e8f1dbaf43a42f810",
+    "git_head": "49904ad33f35544a79c180157248c2834ab4f136",
+    "source_sha256": {
+      "crates/litchi-core/Cargo.toml": "f269d5d26b041dca9d589342f3b0f3cdd796ea4c9afb72b09bf9b1933001d8ac",
+      "crates/litchi-ods/Cargo.toml": "8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1",
+      "crates/litchi-ods/src/codec/formula/evaluation.rs": "6eab8e35a69fa806f43c2be8fcd7a338c93ddef55837819223ac20a1da685fa3",
+      "crates/litchi-ods/src/codec/formula/evaluation/rounding.rs": "f0bdde7dad0e5d07fe2edb493be3bb8451d157b9617af87e10c34d1a1b7cdf46",
+      "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "35d441d137123348f7b57a7fbb222e960c7e4bc5137eeeec25077c45bf581187",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "fcc077c551bba2ce5fa66207b8b952541f33c9f4e2e48f67668c4b211d806388",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/Cargo.lock": "76eac25fb3243da87786f439dd91cb858ab3edb3c0e6d42a7704a0103f4144d6",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/Cargo.toml": "cba861807f6502344137c5c24ed4a602a4527a946d0baff0e92d4f9e2b29d9b2",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/harness/src/main.rs": "3bc58d8956e92ca514be0fae36e97e04dd0c542eefeaf44e368a3f49c17c3950",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/run_profile.py": "0cb22e4685fe1a124bb0a09ace8ba388da3a2349f86fb1b05c173c401f95fbc1",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/summarize.py": "8af5012484315dfe77de48bb181112d2d959187562626ea14c7046434e4de79c",
+      "docs/report/spec-gap-validation-evidence/ods-formula-rounding/verify.py": "fc11302aa6058101fa43f7e666e1ff2f0946be8c02545b5a5eed3fa4284e4847"
+    }
+  },
+  "binary_sha256": "179fa1d74b003dfcc80b44c7f8b1bc63e57b185c0105ea3d667b2c62c8865db4",
+  "source_hashes_unchanged": true,
+  "unchanged": true
+}

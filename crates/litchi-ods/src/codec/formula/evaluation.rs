@@ -9,9 +9,13 @@
 //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
 //! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
 //! `ARABIC` and `ROMAN` conversions.  It also carries the complete section
-//! 6.8 complex-number family as a distinguished scalar value.  References,
-//! arrays, names, labels, and other functions are reported as typed capability
-//! refusals in this scalar profile.
+//! 6.8 complex-number family as a distinguished scalar value, and the complete
+//! OpenFormula 1.4 section 6.17 rounding family (`CEILING`, `INT`, `FLOOR`,
+//! `MROUND`, `ROUND`, `ROUNDDOWN`, `ROUNDUP`, and `TRUNC`).  Rounding uses the
+//! normative sign, mode, tie, and decimal-place rules, while retaining the
+//! finite-`f64` Number profile described below.  References, arrays, names,
+//! labels, and other functions are reported as typed capability refusals in
+//! this scalar profile.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -57,6 +61,17 @@
 //!   this profile returns an empty text for zero, maps `TRUE`/`FALSE` format
 //!   values to formats 0/4.  Formats 0 through 3 use their permitted
 //!   subtractive chunks; format 4 uses a bounded shortest-valid construction.
+//! * section 6.17's `CEILING` and `FLOOR` enforce the non-zero same-sign
+//!   constraint and support omitted/empty significance and mode parameters;
+//!   `MROUND` chooses the greater value on an exact tie and reports
+//!   `#DIV/0!` for an undefined zero multiple.  `ROUND` accepts a Number
+//!   `Digits` value, including fractional values; `ROUNDDOWN`, `ROUNDUP`, and
+//!   `TRUNC` use the profile's truncation-toward-zero conversion to Integer.
+//!   Integer digit counts quantize the input's shortest round-trip decimal
+//!   representation before conversion back to `f64`, without epsilon snapping.
+//!   Fractional `ROUND` digits use binary floating-point scales, following the
+//!   Number signature and power expression despite the specification's
+//!   conflicting statement that nonpositive digits always yield integers.
 //!
 //! A successful text result keeps its memory reservation in
 //! [`EvaluatedScalar`](crate::codec::formula::evaluation::EvaluatedScalar) until that result is dropped. Borrowed source strings
@@ -97,6 +112,7 @@
 pub mod complex;
 mod radix;
 mod roman;
+mod rounding;
 pub mod value;
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
@@ -835,6 +851,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if rounding::is_rounding_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -920,6 +940,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if roman::is_roman_function(name) {
             return roman::apply(self, node, name);
+        }
+        if rounding::is_rounding_function(name) {
+            return rounding::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
