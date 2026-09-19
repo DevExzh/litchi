@@ -1,0 +1,41 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "docs/performance/results/change-0684/probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 88.79891636304092
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "docs/performance/results/change-0684/allocation-probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 60.94942714693025
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "docs/performance/results/change-0684/repeat-probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 60.57531508198008
+  }
+]

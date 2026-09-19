@@ -1,0 +1,160 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cpu/cycles/P'
+# Event count (approx.): 18389160739
+#
+# Overhead  Command         Shared Object     Symbol                                                                                                  
+# ........  ..............  ................  ........................................................................................................
+#
+    67.64%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::next_chain_sector
+            |          
+            |--62.63%--next_chain_sector (inlined)
+            |          |          
+            |          |--32.46%--0x4ca42
+            |          |          0x264
+            |          |          
+            |          |--23.61%--0x3bcd4
+            |          |          0x1dd
+            |          |          
+            |           --0.91%--0x3
+            |          
+             --5.01%--get<u32> (inlined)
+                       get<u32, usize> (inlined)
+                       next_chain_sector (inlined)
+                       0x4ca42
+                       0x264
+
+     6.01%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::directory_name::directory_name_data
+            |          
+            |--2.12%--triple<[u16; 32]> (inlined)
+            |          len<[u16; 32]> (inlined)
+            |          extend_from_slice<[u16; 32]> (inlined)
+            |          directory_name_data (inlined)
+            |          0x72006f0056
+            |          
+            |--1.54%--from_iter<[u16; 32], core::str::iter::EncodeUtf16> (inlined)
+            |          collect<core::str::iter::EncodeUtf16, smallvec::SmallVec<[u16; 32]>> (inlined)
+            |          directory_name_data (inlined)
+            |          |          
+            |           --1.06%--0x7fa54220ffff
+            |          
+            |--0.75%--directory_name_data (inlined)
+            |          
+             --0.67%--spilled<[u16; 32]> (inlined)
+                       |          
+                        --0.63%--triple<[u16; 32]> (inlined)
+                                  len<[u16; 32]> (inlined)
+                                  extend_from_slice<[u16; 32]> (inlined)
+                                  directory_name_data (inlined)
+                                  0x72006f0056
+
+     5.75%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::query_cell
+            |          
+            |--0.79%--lock (inlined)
+            |          lock<litchi_xls::workbook::query_cache::CacheState> (inlined)
+            |          lock (inlined)
+            |          lookup (inlined)
+            |          query_cell (inlined)
+            |          
+            |--0.72%--map_err<litchi_cfb::shared::SharedOleStreamCursor, litchi_cfb::file::OleError, litchi_xls::workbook::source::SourceBackedError, fn(litchi_cfb::file::OleError) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          0x18007f
+            |          
+            |--0.60%--drop<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global> (inlined)
+            |          drop_in_place<alloc::sync::Arc<litchi_xls::workbook::query_cache::WorksheetCellIndex, alloc::alloc::Global>> (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          
+             --0.58%--replay_indexed_cell (inlined)
+                       query_cell (inlined)
+                       cell (inlined)
+                       cell_by_index (inlined)
+                       0x10
+
+     5.58%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted
+            |          
+             --5.17%--cursor_chain_sector (inlined)
+                       stream_cursor_at_hinted (inlined)
+                       |          
+                       |--3.46%--0x1dd
+                       |          
+                        --1.18%--0x3bcd4
+
+     4.45%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleStreamCursor::read_exact
+            |          
+            |--2.88%--branch<litchi_cfb::shared::SharedOleStreamCursorState, litchi_cfb::file::OleError> (inlined)
+            |          read_from_state (inlined)
+            |          {closure#0} (inlined)
+            |          read_exact (inlined)
+            |          |          
+            |           --0.94%--0x6
+            |          
+            |--0.70%--{closure#0} (inlined)
+            |          read_exact (inlined)
+            |          0x6
+            |          
+             --0.67%--map<(), litchi_cfb::file::OleError, (litchi_cfb::shared::SharedOleStreamCursorState, u64), litchi_cfb::shared::{impl#10}::finish_cursor_operation::{closure_env#0}<(litchi_cfb::shared::SharedOleStreamCursorState, u64)>> (inlined)
+                       finish_cursor_operation<(litchi_cfb::shared::SharedOleStreamCursorState, u64)> (inlined)
+                       read_exact (inlined)
+
+     2.12%  xls0684-repeat  xls0684-repeat    [.] litchi_cfb::shared::SharedOleFile::find_entry
+            |          
+             --2.02%--map_err<litchi_cfb::directory_name::DirectoryNameData, litchi_cfb::directory_name::DirectoryNameError, litchi_cfb::file::OleError, litchi_cfb::shared::{impl#10}::find_child_by_name::{closure_env#0}> (inlined)
+                       find_child_by_name (inlined)
+                       find_entry (inlined)
+                       |          
+                        --1.44%--0xa
+                                  |          
+                                   --0.55%--0x400005d68b1867f
+
+     1.44%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::records::SstCursor::read_characters
+            |          
+             --1.23%--map_err<alloc::string::String, alloc::string::FromUtf16Error, litchi_xls::error::Error, litchi_xls::records::{impl#13}::read_characters::{closure_env#0}> (inlined)
+                       read_characters (inlined)
+
+     0.91%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::cell::Cell::from_record_with_formula_context
+            |
+            ---from_record_with_formula_context (inlined)
+
+     0.87%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::resolve_shared_string
+            |          
+             --0.75%--map_err<litchi_cfb::shared::SharedOleStreamCursor, litchi_cfb::file::OleError, litchi_xls::workbook::source::SourceBackedError, fn(litchi_cfb::file::OleError) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+                       resolve_shared_string_inner (inlined)
+                       resolve_shared_string (inlined)
+                       0x9
+
+     0.84%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::target_cell_value
+            |
+            ---target_cell_value (inlined)
+               0x7
+               |          
+                --0.63%--0x400005d68b1867f
+
+     0.82%  xls0684-repeat  xls0684-repeat    [.] litchi_xls::workbook::source::SourceBackedWorkbook::worksheet_by_index
+            |
+            ---atomic_add<usize, usize> (inlined)
+               fetch_add (inlined)
+               clone<litchi_xls::workbook::source::SourceInner, alloc::alloc::Global> (inlined)
+               {closure#1} (inlined)
+               map<usize, litchi_xls::workbook::source::SourceBackedWorksheet, litchi_xls::workbook::source::{impl#17}::worksheet_by_index::{closure#0}::{closure_env#1}> (inlined)
+               {closure#0} (inlined)
+               metadata<core::option::Option<litchi_xls::workbook::source::SourceBackedWorksheet>, litchi_xls::workbook::source::{impl#17}::worksheet_by_index::{closure_env#0}> (inlined)
+               worksheet_by_index (inlined)
+               cell_value_by_index (inlined)
+               0x7
+
+     0.67%  xls0684-repeat  xls0684-repeat    [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+     0.50%  xls0684-repeat  libc.so.6         [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

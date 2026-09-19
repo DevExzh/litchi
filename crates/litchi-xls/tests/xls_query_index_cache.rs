@@ -840,6 +840,119 @@ fn cloned_workbooks_share_the_snapshot_cache_but_reopened_ones_do_not() {
 }
 
 #[test]
+fn a_warm_index_keeps_alternating_first_last_missing_and_random_values_identical() {
+    let bytes = large_numeric_workbook(4_000);
+    let coordinates = [
+        (1_u32, 0_u32),
+        (4_000, 0),
+        (50_000, 7),
+        (2_048, 0),
+        (4_000, 0),
+        (1, 0),
+        (1_234, 0),
+    ];
+
+    let enabled_source = Arc::new(CountingSource::new(bytes.clone()));
+    let enabled_owner = SourceBackedWorkbook::from_read_at(enabled_source.clone()).unwrap();
+    let enabled_sheet = enabled_owner.worksheet_by_index(0).unwrap().unwrap();
+    // The second observation completes the worksheet scan and publishes the
+    // immutable index, including its worksheet BOF chain checkpoint.
+    assert_eq!(
+        enabled_sheet.cell_value(2_000, 0).unwrap(),
+        Some(CellValue::Float(2_000.0))
+    );
+    assert_eq!(
+        enabled_sheet.cell_value(2_000, 0).unwrap(),
+        Some(CellValue::Float(2_000.0))
+    );
+    let mut enabled = Vec::new();
+    for &(row, column) in &coordinates {
+        enabled.push(measure_query(&enabled_source, &enabled_sheet, row, column));
+    }
+
+    let disabled_source = Arc::new(CountingSource::new(bytes));
+    let disabled_owner = SourceBackedWorkbook::from_read_at_with_limits(
+        disabled_source.clone(),
+        SourceBackedLimits::default().with_max_query_index_bytes(0),
+    )
+    .unwrap();
+    let disabled_sheet = disabled_owner.worksheet_by_index(0).unwrap().unwrap();
+    let mut disabled = Vec::new();
+    for &(row, column) in &coordinates {
+        disabled.push(measure_query(
+            &disabled_source,
+            &disabled_sheet,
+            row,
+            column,
+        ));
+    }
+
+    let enabled_values = enabled
+        .iter()
+        .map(|(value, _, _)| value.clone())
+        .collect::<Vec<_>>();
+    let disabled_values = disabled
+        .iter()
+        .map(|(value, _, _)| value.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(enabled_values, disabled_values);
+    assert_eq!(enabled_values[0], Some(CellValue::Float(1.0)));
+    assert_eq!(enabled_values[1], Some(CellValue::Float(4_000.0)));
+    assert_eq!(enabled_values[2], None);
+    assert_eq!(enabled_values[3], Some(CellValue::Float(2_048.0)));
+
+    let enabled_bytes: usize = enabled.iter().map(|(_, bytes, _)| *bytes).sum();
+    let disabled_bytes: usize = disabled.iter().map(|(_, bytes, _)| *bytes).sum();
+    assert!(
+        enabled_bytes < disabled_bytes,
+        "warm indexed replays should read less than alternating cold scans: enabled={enabled_bytes}, disabled={disabled_bytes}"
+    );
+    assert_eq!(
+        enabled[2].1, 0,
+        "indexed missing targets should read no worksheet bytes"
+    );
+    assert_eq!(
+        enabled[2].2, 0,
+        "indexed missing targets should issue no reads"
+    );
+}
+
+#[test]
+fn cloned_handles_can_replay_warm_index_concurrently_with_local_hints() {
+    let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
+    let owner = SourceBackedWorkbook::from_read_at(source).unwrap();
+    let warm_sheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    assert_eq!(
+        warm_sheet.cell_value(2_000, 0).unwrap(),
+        Some(CellValue::Float(2_000.0))
+    );
+    assert_eq!(
+        warm_sheet.cell_value(2_000, 0).unwrap(),
+        Some(CellValue::Float(2_000.0))
+    );
+
+    let first_sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+    let last_sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+    let random_sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+    let missing_sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+    let first = std::thread::spawn(move || first_sheet.cell_value(1, 0));
+    let last = std::thread::spawn(move || last_sheet.cell_value(4_000, 0));
+    let random = std::thread::spawn(move || random_sheet.cell_value(1_234, 0));
+    let missing = std::thread::spawn(move || missing_sheet.cell_value(50_000, 7));
+
+    assert_eq!(first.join().unwrap().unwrap(), Some(CellValue::Float(1.0)));
+    assert_eq!(
+        last.join().unwrap().unwrap(),
+        Some(CellValue::Float(4_000.0))
+    );
+    assert_eq!(
+        random.join().unwrap().unwrap(),
+        Some(CellValue::Float(1_234.0))
+    );
+    assert_eq!(missing.join().unwrap().unwrap(), None);
+}
+
+#[test]
 fn a_managed_memory_refusal_falls_back_without_changing_the_query_result() {
     let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();

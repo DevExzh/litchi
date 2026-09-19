@@ -1,0 +1,12 @@
+{
+  "timestamp_utc": "2026-09-19T14:05:44.491882+00:00",
+  "removed": [
+    "/home/zhuhe/code/litchi-0685-before",
+    "/home/zhuhe/code/litchi-target-0685-before",
+    "/home/zhuhe/code/litchi-target-0685-after",
+    "/home/zhuhe/code/litchi-0685-profile"
+  ],
+  "all_absent": true,
+  "baseline_worktree_verified_clean": true,
+  "retained": "source/binary hashes, raw timing/counters, profile text and exact commands"
+}

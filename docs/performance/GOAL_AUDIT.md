@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0685 — measured worksheet-prefix reuse with explicit small-route costs
+
+[0685](0685-xls-worksheet-chain-checkpoints.md) completes the fixed worksheet-start
+checkpoint experiment and retains it after independent correctness/performance
+review. Six quality gates pass, including 1,870 CFB/XLS tests and 61 facade
+tests. The 126-fixture differential and all 24 counted route outcomes/read
+counts/freshness fences match. Foreign/expired identities, FAT/MiniFAT, corrupt
+chains, source changes and nonmonotonic/concurrent queries are covered.
+
+Larger repeated queries improve, while tiny missing open-plus-three regresses
+5.12–5.65% and formula-refusal query phases 5–11%. All individual results and
+review triggers remain retained. These costs prevent a general XLS claim;
+tiny/refusal admission, SST/within-sheet traversal, physical cold-cache and
+concurrent scaling remain open. OLE2/OOXML work continues; iWork is excluded.
+
 ## 0684 — XLS repeated queries with explicit construction and retention costs
 
 [0684](0684-xls-occurrence-query-index.md) completes the bounded worksheet

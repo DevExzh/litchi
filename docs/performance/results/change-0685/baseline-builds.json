@@ -1,0 +1,41 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-0685-before/docs/performance/results/change-0684/probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 88.17741262400523
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-0685-before/docs/performance/results/change-0684/allocation-probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.6877622338943183
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-0685-before/docs/performance/results/change-0684/repeat-probe/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.41450965497642756
+  }
+]

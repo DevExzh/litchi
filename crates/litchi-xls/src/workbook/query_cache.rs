@@ -5,6 +5,7 @@
 //! entry, and the memory reservations carried by the index remain charged for
 //! exactly the same lifetime.
 
+use litchi_cfb::StreamChainCheckpoint;
 use litchi_core::{ExecutionContext, Reservation, Resource, SourceVersion};
 use std::collections::VecDeque;
 use std::mem::size_of;
@@ -13,7 +14,8 @@ use std::sync::{Arc, Mutex};
 /// Logical charge for one retained worksheet occurrence slot.
 pub(crate) const SLOT_WEIGHT: u64 = 24;
 /// Logical charge for one worksheet index entry and its LRU metadata.
-pub(crate) const INDEX_OVERHEAD: u64 = 128;
+pub(crate) const INDEX_OVERHEAD: u64 = 192;
+const CACHE_OVERHEAD: u64 = 128;
 const INITIAL_SLOT_CAPACITY: usize = 8;
 
 /// One occurrence of a stored BIFF cell in worksheet stream order.
@@ -36,6 +38,7 @@ pub(crate) struct CellSlot {
 #[derive(Debug)]
 pub(crate) struct WorksheetCellIndex {
     pub(crate) expected_version: SourceVersion,
+    pub(crate) chain_checkpoint: Option<StreamChainCheckpoint>,
     pub(crate) slots: Vec<CellSlot>,
     _reservations: Vec<Reservation>,
 }
@@ -89,7 +92,7 @@ fn cache_metadata_weight_from_capacities(
         .ok()?
         .checked_mul(size_of::<usize>() as u64)?;
     let hotness = u64::try_from(hotness).ok()?;
-    INDEX_OVERHEAD
+    CACHE_OVERHEAD
         .checked_add(entries)?
         .checked_add(lru)?
         .checked_add(hotness)
@@ -195,6 +198,7 @@ impl QueryIndexCache {
             execution,
             slots: Vec::new(),
             reservations: Vec::new(),
+            chain_checkpoint: None,
             reserved_weight: 0,
             active: true,
         };
@@ -276,6 +280,7 @@ impl QueryIndexCache {
         }
         let index = Arc::new(WorksheetCellIndex {
             expected_version,
+            chain_checkpoint: candidate.chain_checkpoint.take(),
             slots,
             _reservations: reservations,
         });
@@ -328,11 +333,18 @@ pub(crate) struct IndexCandidate<'a> {
     execution: Option<&'a ExecutionContext>,
     slots: Vec<CellSlot>,
     reservations: Vec<Reservation>,
+    chain_checkpoint: Option<StreamChainCheckpoint>,
     reserved_weight: u64,
     active: bool,
 }
 
 impl IndexCandidate<'_> {
+    pub(crate) fn set_chain_checkpoint(&mut self, checkpoint: StreamChainCheckpoint) {
+        if self.active {
+            self.chain_checkpoint = Some(checkpoint);
+        }
+    }
+
     /// Records one occurrence.  Allocation or cache-budget refusal abandons
     /// only the optional candidate; the caller keeps scanning for its result.
     pub(crate) fn push(&mut self, slot: CellSlot) {
@@ -479,6 +491,7 @@ impl IndexCandidate<'_> {
 
     fn abandon(&mut self) {
         if self.active {
+            self.chain_checkpoint = None;
             let slots = std::mem::take(&mut self.slots);
             let reservations = std::mem::take(&mut self.reservations);
             drop(slots);
@@ -493,6 +506,7 @@ impl IndexCandidate<'_> {
 impl Drop for IndexCandidate<'_> {
     fn drop(&mut self) {
         if self.active {
+            self.chain_checkpoint = None;
             let slots = std::mem::take(&mut self.slots);
             let reservations = std::mem::take(&mut self.reservations);
             drop(slots);
@@ -557,6 +571,7 @@ mod tests {
     fn index(version: u64, reservations: Vec<Reservation>) -> Arc<WorksheetCellIndex> {
         Arc::new(WorksheetCellIndex {
             expected_version: SourceVersion::new(version, 0),
+            chain_checkpoint: None,
             slots: Vec::new(),
             _reservations: reservations,
         })
@@ -718,7 +733,7 @@ mod tests {
             .and_then(|size| size.checked_add(size_of::<usize>()))
             .unwrap();
         assert!(u64::try_from(retained).unwrap() <= INDEX_OVERHEAD);
-        assert!((size_of::<QueryIndexCache>() + arc_header) as u64 <= INDEX_OVERHEAD);
+        assert!((size_of::<QueryIndexCache>() + arc_header) as u64 <= CACHE_OVERHEAD);
         assert!(size_of::<CellSlot>() as u64 <= SLOT_WEIGHT);
     }
 

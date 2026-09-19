@@ -34,7 +34,7 @@ pub use overlay::{
 };
 pub use shared::{
     BufferedOleStreamCursor, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor,
-    StreamChainHint,
+    StreamChainCheckpoint, StreamChainHint,
 };
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};

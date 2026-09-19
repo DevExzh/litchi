@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index",
+  "route": "prepared",
+  "mode": "file",
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/15228.xls",
+  "input_bytes": 692224,
+  "input_sha256": "ceb03c0228ad73cc382ea3d4e98223fcb6406887936f0e89b9acd2c8eb87d8fe",
+  "worksheet": 0,
+  "first_row": 1,
+  "first_column": 1,
+  "second_row": 73,
+  "second_column": 0,
+  "warmups": 1,
+  "samples": 1,
+  "source_scope": "counted positional file ReadAt; logical reads and unioned ranges; physical I/O not measured",
+  "timing_scope": "query/visitor elapsed_ns excludes semantic projection and digest work; total_elapsed_ns includes route setup for diagnostics",
+  "digest_scope": "compact value projection and visitor digest are outside the measured query/visitor call",
+  "fresh_snapshot_per_sample": true,
+  "records": [
+    {
+      "sample": 1,
+      "total_elapsed_ns": 98911,
+      "open": {
+        "elapsed_ns": 76611,
+        "metrics": {
+          "read_calls": 39,
+          "read_bytes": 42520,
+          "version_calls": 16,
+          "len_calls": 1,
+          "range_union_bytes": 42520
+        },
+        "outcome": {
+          "status": "ok",
+          "row": null,
+          "column": null,
+          "projection": null,
+          "error": null
+        }
+      },
+      "query_phases": [
+        {
+          "label": "q1",
+          "elapsed_ns": 6730,
+          "metrics": {
+            "read_calls": 5,
+            "read_bytes": 4642,
+            "version_calls": 8,
+            "len_calls": 0,
+            "range_union_bytes": 4632
+          },
+          "outcome": {
+            "status": "value",
+            "row": 1,
+            "column": 1,
+            "projection": "string:7:5865e88c6a5deea6",
+            "error": null
+          }
+        },
+        {
+          "label": "q2-build-trigger",
+          "elapsed_ns": 7790,
+          "metrics": {
+            "read_calls": 5,
+            "read_bytes": 4645,
+            "version_calls": 8,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 73,
+            "column": 0,
+            "projection": "string:10:16701a4fda859638",
+            "error": null
+          }
+        },
+        {
+          "label": "q3-warm-repeat-q1",
+          "elapsed_ns": 1860,
+          "metrics": {
+            "read_calls": 3,
+            "read_bytes": 24,
+            "version_calls": 6,
+            "len_calls": 0,
+            "range_union_bytes": 0
+          },
+          "outcome": {
+            "status": "value",
+            "row": 1,
+            "column": 1,
+            "projection": "string:7:5865e88c6a5deea6",
+            "error": null
+          }
+        }
+      ],
+      "visit": null
+    }
+  ]
+}

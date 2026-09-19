@@ -2900,6 +2900,10 @@ fn validate_worksheet_bof(payload: &[u8]) -> Result<()> {
 /// loop over this trait keeps the selected-cell path exactly as it was while
 /// giving the whole-sheet walk **one** validated scan instead of one per cell.
 trait CellSink {
+    /// Observes the already-validated seek to the worksheet start. Only an
+    /// optional index builder retains its position; ordinary sinks do nothing.
+    fn started(&mut self, _chain: &StreamChainHint<'_>) {}
+
     /// Consumes one parsed cell record.
     ///
     /// Every implementation validates the record's XF index first, for every
@@ -2983,6 +2987,12 @@ struct TargetCell<'a, const COLLECT_INDEX: bool> {
 }
 
 impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
+    fn started(&mut self, chain: &StreamChainHint<'_>) {
+        if COLLECT_INDEX && let Some(index) = self.index.as_mut() {
+            index.set_chain_checkpoint(chain.checkpoint());
+        }
+    }
+
     #[inline]
     fn accept(
         &mut self,
@@ -3184,6 +3194,7 @@ fn scan_worksheet<S: CellSink>(
         execution,
         &mut sheet_chain,
     )?;
+    sink.started(&sheet_chain);
     let mut first = true;
     loop {
         let frame = scan.next_frame()?;
@@ -3519,7 +3530,10 @@ fn replay_indexed_cell(
         .map(String::as_str)
         .collect::<Vec<_>>();
     let mut strings = SharedStringResolver::new(owner, &refs);
-    let mut chain = owner.cfb.chain_hint();
+    let mut chain = index.chain_checkpoint.as_ref().map_or_else(
+        || owner.cfb.chain_hint(),
+        |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),
+    );
     let mut found = None;
     for slot in index.slots_for(row, column) {
         if let Some(context) = execution {
