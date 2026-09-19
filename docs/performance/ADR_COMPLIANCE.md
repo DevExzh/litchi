@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0686 — intrinsic admission proof preserves transient retries
+
+[0686](0686-xls-oversized-index-admission.md) changes only XLS cache admission
+and tests, with no dependency or unsafe-code change (ADRs 0001/0002/0024).
+Under ADRs 0003/0006, complete successful scans and final source/execution
+fences precede learning; errors, values and partial results are never memoized.
+Ordinary scanning, source identity and indexed replay remain unchanged.
+
+For ADR 0005, growth is bounded before one normal reservation attempt; any
+failed charge abandons the candidate. Allocator excess remains charged.
+The existing hotness table stores an intrinsic oversized sentinel without a
+new allocation. The lower bound excludes spare capacity and transient or pinned
+pressure, which remain retryable. Fixed/index charges remain 128/192 bytes.
+Higher build peaks, newly retained indexes and RSS costs are disclosed; logical
+admission is not an allocator/RSS bound. Accepted ADRs remain unchanged.
+
 ## 0685 — immutable checkpoints preserve reader identity and source fences
 
 [0685](0685-xls-worksheet-chain-checkpoints.md) keeps opaque chain state in CFB

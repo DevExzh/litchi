@@ -1,0 +1,25 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 11K of event 'cpu/cycles/P'
+# Event count (approx.): 50322769862
+#
+# Overhead  Command          Shared Object               Symbol                                                                                                     
+# ........  ...............  ..........................  ...........................................................................................................
+#
+    64.54%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::source::query_cell
+    23.69%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::query_cache::IndexCandidate::push
+     3.46%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_cfb::shared::SharedOleStreamCursor::read_exact
+     3.14%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::source::WorksheetScan::next_frame
+     1.86%  xls-index-retry  libc.so.6                   [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+     1.05%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::source::WorksheetScan::skip_payload
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

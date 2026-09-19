@@ -1,0 +1,11 @@
+[package]
+name = "xls0686-generate"
+version = "0.1.0"
+edition = "2024"
+publish = false
+[workspace]
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-cfb = { path = "../../../../../crates/litchi-cfb" }
+[profile.release]
+debug = 2

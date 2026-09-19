@@ -1,0 +1,12 @@
+[package]
+name = "xls0686-alloc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+[workspace]
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-xls = { path = "../../../../../crates/litchi-xls" }
+serde_json = "1"
+[profile.release]
+debug = 2

@@ -252,6 +252,32 @@ fn large_numeric_workbook(count: u16) -> Vec<u8> {
     cfb_with_workbook(&insert_before_worksheet_eof(&original, &extra))
 }
 
+fn large_malformed_formula_workbook(count: u16) -> Vec<u8> {
+    let original = workbook_stream(fixture("Simple.xls"));
+    let mut extra = Vec::new();
+    // This target-specific UTF-16 refusal is invisible while a different
+    // numeric target is selected, so a successful scan can learn that the
+    // worksheet index is intrinsically too large before this target is read.
+    extra.extend_from_slice(&formula_frame(50_000, 4));
+    extra.extend_from_slice(&formula_string_frame(&[1, 0, 1, 0x00, 0xD8]));
+    for row in 1..=count {
+        extra.extend_from_slice(&number_frame(row, 0, f64::from(row)));
+    }
+    cfb_with_workbook(&insert_before_worksheet_eof(&original, &extra))
+}
+
+fn large_malformed_tail_workbook(count: u16) -> Vec<u8> {
+    let original = workbook_stream(fixture("Simple.xls"));
+    let mut extra = Vec::new();
+    for row in 1..=count {
+        extra.extend_from_slice(&number_frame(row, 0, f64::from(row)));
+    }
+    // The malformed recognized frame is after all valid cells, ensuring that
+    // a candidate can never publish a partial index before the refusal.
+    extra.extend_from_slice(&frame_bytes(0x0203, &[0, 0, 0, 0, 1, 0]));
+    cfb_with_workbook(&insert_before_worksheet_eof(&original, &extra))
+}
+
 fn duplicate_out_of_range_workbook() -> Vec<u8> {
     let original = workbook_stream(fixture("Simple.xls"));
     let (row, column) = {
@@ -576,6 +602,120 @@ fn a_tiny_cache_budget_falls_back_without_changing_query_values() {
 }
 
 #[test]
+fn an_intrinsically_oversize_index_stays_on_the_cold_path_after_learning() {
+    let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
+    // Keep the fixed worksheet-cache metadata admissible while making the
+    // complete occurrence table provably too large for the immutable cache
+    // ceiling.  The first two queries include the successful scan that learns
+    // the lower-bound sentinel; later queries must still return the ordinary
+    // scan result rather than a partial or error-derived index hit.
+    let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    for _ in 0..4 {
+        let (value, bytes, reads) = measure_query(&source, &worksheet, 3_999, 0);
+        assert_eq!(value, Some(CellValue::Float(3_999.0)));
+        assert!(bytes > 0 && reads > 0, "oversize index must keep scanning");
+    }
+
+    for _ in 0..2 {
+        let (value, bytes, reads) = measure_query(&source, &worksheet, 50_000, 7);
+        assert_eq!(value, None);
+        assert!(
+            bytes > 0 && reads > 0,
+            "an intrinsically oversize index must not turn a missing cell into a warm hit"
+        );
+    }
+}
+
+#[test]
+fn an_oversize_index_sentinel_keeps_the_source_version_fence() {
+    let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
+    let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    // The second successful scan learns the intrinsic-size sentinel.
+    assert_eq!(
+        worksheet.cell_value(3_999, 0).unwrap(),
+        Some(CellValue::Float(3_999.0))
+    );
+    assert_eq!(
+        worksheet.cell_value(3_999, 0).unwrap(),
+        Some(CellValue::Float(3_999.0))
+    );
+
+    source.clear_measurement();
+    source.bump();
+    let error = worksheet.cell_value(3_999, 0).unwrap_err();
+    assert!(matches!(error, SourceBackedError::SourceChanged { .. }));
+    assert_eq!(
+        source.read_count(),
+        0,
+        "the sentinel must not bypass the leading freshness fence"
+    );
+}
+
+#[test]
+fn an_oversize_index_keeps_target_formula_refusals_source_backed() {
+    let source = Arc::new(CountingSource::new(large_malformed_formula_workbook(4_000)));
+    let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    // Selecting a valid numeric cell leaves the malformed formula unselected,
+    // so the successful second scan learns the worksheet-size sentinel.
+    assert_eq!(
+        worksheet.cell_value(3_999, 0).unwrap(),
+        Some(CellValue::Float(3_999.0))
+    );
+    assert_eq!(
+        worksheet.cell_value(3_999, 0).unwrap(),
+        Some(CellValue::Float(3_999.0))
+    );
+
+    for _ in 0..2 {
+        source.clear_measurement();
+        let error = worksheet.cell_value(50_000, 4).unwrap_err();
+        assert!(
+            error.to_string().contains("UTF-16 decoding error"),
+            "unexpected target-specific formula refusal: {error:?}"
+        );
+        assert!(
+            source.read_count() > 0,
+            "the malformed result must be re-read instead of being cached as an error"
+        );
+    }
+}
+
+#[test]
+fn a_failed_oversize_scan_does_not_publish_a_partial_index() {
+    let source = Arc::new(CountingSource::new(large_malformed_tail_workbook(4_000)));
+    let limits = SourceBackedLimits::default().with_max_query_index_bytes(1_024);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    let mut first_error: Option<String> = None;
+    let mut first_bytes = None;
+    let mut first_reads = None;
+    for _ in 0..3 {
+        source.clear_measurement();
+        let error = worksheet.cell_value(3_999, 0).unwrap_err();
+        if let Some(first) = &first_error {
+            assert_eq!(error.to_string(), first.as_str());
+            assert_eq!(source.bytes_read(), first_bytes.unwrap());
+            assert_eq!(source.read_count(), first_reads.unwrap());
+        } else {
+            first_error = Some(error.to_string());
+            first_bytes = Some(source.bytes_read());
+            first_reads = Some(source.read_count());
+        }
+        assert!(source.bytes_read() > 0 && source.read_count() > 0);
+    }
+}
+
+#[test]
 fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
     let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
@@ -603,9 +743,9 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
 }
 
 #[test]
-fn zero_one_mib_and_two_mib_budgets_keep_results_identical() {
-    // This corpus has tens of thousands of retained cell occurrences and is
-    // large enough to cross the priced 1 MiB/2 MiB worksheet-index boundary.
+fn zero_half_one_and_two_mib_budgets_keep_results_identical() {
+    // Its 38,950 occurrences fit within 1 MiB with bounded final growth,
+    // although the former doubling step required 65,536 slots.
     let bytes = fixture("54016.xls");
     let measure = |budget| {
         let source = Arc::new(CountingSource::new(bytes.clone()));
@@ -619,6 +759,7 @@ fn zero_one_mib_and_two_mib_budgets_keep_results_identical() {
     };
 
     let (zero_first, zero_second, zero_third, zero_bytes, zero_reads) = measure(0);
+    let (half_first, half_second, half_third, half_bytes, half_reads) = measure(1 << 19);
     let (one_first, one_second, one_third, one_bytes, one_reads) = measure(1 << 20);
     let (two_first, two_second, two_third, two_bytes, two_reads) = measure(2 << 20);
     assert_eq!(zero_first, zero_second);
@@ -628,17 +769,20 @@ fn zero_one_mib_and_two_mib_budgets_keep_results_identical() {
     assert_eq!(two_first, two_second);
     assert_eq!(two_second, two_third);
 
-    // The 54016 worksheet's occurrence slots charge more than one MiB at the
-    // design's 24-byte logical weight, but fit below two MiB.  A cache refusal
-    // is an optimization fallback, so the value differential is the hard
-    // assertion and the I/O distinction is a useful admission witness.
+    assert_eq!(half_first, half_second);
+    assert_eq!(half_second, half_third);
+    assert_eq!(zero_first, half_first);
+    assert_eq!(zero_first, one_first);
+    assert_eq!(zero_first, two_first);
+
+    // The intrinsic lower bound exceeds 512 KiB: learning that bound must
+    // leave the complete source-backed scan intact. Both larger budgets now
+    // admit an identical occurrence index and replay the same source ranges.
     assert!(zero_bytes > 0 && zero_reads > 0);
-    assert!(one_bytes > 0 && one_reads > 0);
-    assert!(
-        two_bytes < one_bytes / 2,
-        "2 MiB should admit this index while 1 MiB falls back: one={one_bytes}, two={two_bytes}"
-    );
-    assert!(two_reads < one_reads);
+    assert_eq!((half_bytes, half_reads), (zero_bytes, zero_reads));
+    assert_eq!((one_bytes, one_reads), (two_bytes, two_reads));
+    assert!(one_bytes < zero_bytes / 2);
+    assert!(one_reads < zero_reads);
 }
 
 #[test]

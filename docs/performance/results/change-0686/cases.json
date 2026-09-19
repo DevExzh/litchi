@@ -1,0 +1,106 @@
+[
+  {
+    "case": "54016-stored-0",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 0
+  },
+  {
+    "case": "54016-stored-524288",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 524288
+  },
+  {
+    "case": "54016-stored-1048576",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 1048576
+  },
+  {
+    "case": "54016-stored-2097152",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 2097152
+  },
+  {
+    "case": "54016-missing-1048576",
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "row": 0,
+    "column": 108,
+    "sheet": 0,
+    "budget": 1048576
+  },
+  {
+    "case": "Plan1-stored-32768",
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 32768
+  },
+  {
+    "case": "Plan1-stored-2097152",
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 2097152
+  },
+  {
+    "case": "Simple-stored-450",
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 450
+  },
+  {
+    "case": "Simple-stored-2097152",
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 0,
+    "budget": 2097152
+  },
+  {
+    "case": "Simple-missing-2097152",
+    "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+    "row": 0,
+    "column": 1,
+    "sheet": 0,
+    "budget": 2097152
+  },
+  {
+    "case": "formula-refusal-2097152",
+    "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+    "row": 0,
+    "column": 0,
+    "sheet": 6,
+    "budget": 2097152
+  },
+  {
+    "case": "synthetic-70000-default",
+    "path": "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "budget": 2097152
+  },
+  {
+    "case": "synthetic-100000-default",
+    "path": "docs/performance/results/change-0686/fixtures/numeric-100000.xls",
+    "sheet": 0,
+    "row": 0,
+    "column": 0,
+    "budget": 2097152
+  }
+]

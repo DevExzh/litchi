@@ -1,0 +1,3 @@
+PASS final quality/build/corpus/profile bindings; test counts: {'tests': {'passed': 1881, 'failed': 0, 'ignored': 2}, 'facade': {'passed': 61, 'failed': 0, 'ignored': 0}}
+PASS archived pre-review source/check bindings; archived candidate is not the retained implementation
+PASS two-run generated fixture hashes and independent full-visitor counts/digests for both sources

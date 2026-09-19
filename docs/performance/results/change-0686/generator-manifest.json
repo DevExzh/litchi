@@ -1,0 +1,45 @@
+{
+  "commands": [
+    {
+      "command": [
+        "/home/zhuhe/code/litchi-target-0686-after/release/xls0686-generate",
+        "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0686/fixtures"
+      ],
+      "exit_code": 0,
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0686/fixtures/numeric-70000.xls\t70001\t1275392\n/home/zhuhe/code/litchi/docs/performance/results/change-0686/fixtures/numeric-100000.xls\t100001\t1819648\n"
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi-target-0686-after/release/xls0686-generate",
+        "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "/home/zhuhe/code/litchi-0686-profile/generator-repeat"
+      ],
+      "exit_code": 0,
+      "stdout": "/home/zhuhe/code/litchi-0686-profile/generator-repeat/numeric-70000.xls\t70001\t1275392\n/home/zhuhe/code/litchi-0686-profile/generator-repeat/numeric-100000.xls\t100001\t1819648\n"
+    }
+  ],
+  "binary_sha256": "a138498e93ad18586cb725de4de33049b92c291776285de819396bd09bbfa382",
+  "template": {
+    "test-data/poi/test-data/spreadsheet/Simple.xls": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a"
+  },
+  "generator_sha256": {
+    "docs/performance/results/change-0686/generator/Cargo.lock": "ddf2f624a41075ca6ba246a19c6242580d6cb222bdfd9aa3fd9e98913141f1e4",
+    "docs/performance/results/change-0686/generator/Cargo.toml": "37ac16c93f75be58b9dcb91eb40ebef7306408e7a9940cb9deb21a5f10d0a4b7",
+    "docs/performance/results/change-0686/generator/README.md": "4772cf369993f801fcebce2c2f26466538b5442ba31e19051243003a9414da7c",
+    "docs/performance/results/change-0686/generator/src/main.rs": "c997e62662dcb8619744926fe428d7d60ad7540a8dbb34d321dbd271234daa31"
+  },
+  "files": {
+    "docs/performance/results/change-0686/fixtures/numeric-70000.xls": {
+      "sha256": "a74fcc0f3c8e40587c98d9f254af136303f6983def556ddb54ae1fed54302252",
+      "bytes": 1275392,
+      "first_sheet_occurrences": 70001
+    },
+    "docs/performance/results/change-0686/fixtures/numeric-100000.xls": {
+      "sha256": "e319dc6b5dd61460cb993b7296871c4d0a75a0aeb739ad90578e8715b42b0e30",
+      "bytes": 1819648,
+      "first_sheet_occurrences": 100001
+    }
+  },
+  "identical_two_runs": true
+}

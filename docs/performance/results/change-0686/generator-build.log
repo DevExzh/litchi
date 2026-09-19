@@ -1,0 +1,21 @@
+   Compiling syn v3.0.6
+   Compiling hybrid-array v0.4.15
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.2.2
+   Compiling serde_derive v1.0.229
+   Compiling block-buffer v0.12.1
+   Compiling zerocopy v0.8.57
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.20
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling chrono v0.4.45
+   Compiling serde_json v1.0.151
+   Compiling thiserror v2.0.20
+   Compiling sha2 v0.11.0
+   Compiling syn v2.0.119
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling zerocopy-derive v0.8.57
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling xls0686-generate v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0686/generator)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.41s

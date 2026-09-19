@@ -1,0 +1,19 @@
+{
+  "removed_owned_paths": [
+    "/home/zhuhe/code/litchi-0686-before",
+    "/home/zhuhe/code/litchi-target-0686-before",
+    "/home/zhuhe/code/litchi-target-0686-after",
+    "/home/zhuhe/code/litchi-0686-profile"
+  ],
+  "baseline_tracked_changes": false,
+  "baseline_untracked_files_checked": [
+    "docs/performance/results/change-0686/allocation-probe/Cargo.toml",
+    "docs/performance/results/change-0686/allocation-probe/README.md",
+    "docs/performance/results/change-0686/allocation-probe/src/main.rs",
+    "docs/performance/results/change-0686/probe/Cargo.toml",
+    "docs/performance/results/change-0686/probe/README.md",
+    "docs/performance/results/change-0686/probe/src/lib.rs",
+    "docs/performance/results/change-0686/probe/src/main.rs"
+  ],
+  "unrelated_worktrees_untouched": true
+}

@@ -1,0 +1,1 @@
+{"allocated_bytes":5438530,"allocation_calls":31,"budget":2097152,"callbacks":0,"column":0,"deallocated_bytes":2162388,"deallocation_calls":8,"mode":"file","operation":"q2","outcome":"value:String(\"replaceMe\")","peak_live_delta":2162310,"retained_live_delta":9,"row":0,"worksheet":0}

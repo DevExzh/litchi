@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0686 — bounded index growth and proven oversized retries
+
+[0686](0686-xls-oversized-index-admission.md) admits indexes that fit between
+geometric capacity steps and suppresses collection only after a successful full
+scan proves intrinsic storage exceeds the immutable local limit. Measured
+open-plus-eight medians fall about 75% for 54016 at 1 MiB, 78% for generated
+70,001 cells at the default limit, and 31% for generated 100,001 cells that
+continue scanning. These are scoped warm-file observations, not global claims.
+
+Construction requests, peak memory and successful-index retention increase;
+several build phases regress 5–8%, formula-refusal phases roughly 6–9%, and
+short 512 KiB process RSS rises 7.21%. All triggers remain in the packet.
+SST/within-sheet traversal, tiny/no-benefit admission and refusal overhead
+remain open. No registered claim or coverage promotion follows this batch.
+
 ## 0685 — worksheet-start checkpoints remove a repeated CFB prefix walk
 
 [0685](0685-xls-worksheet-chain-checkpoints.md) retains one immutable weakly
@@ -8428,7 +8443,7 @@ the accepted decisions are no longer listed as awaiting an owner.
 
 | Priority | Remaining work | Required proof or design |
 | ---: | --- | --- |
-| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. [0685](0685-xls-worksheet-chain-checkpoints.md) adds immutable worksheet-start checkpoints; the new warm profile still attributes 53.07% self samples to chain traversal. SST/within-sheet traversal, tiny/no-benefit admission, refusal overhead and below-capacity retries remain open. |
+| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. [0685](0685-xls-worksheet-chain-checkpoints.md) adds immutable worksheet-start checkpoints; the new warm profile still attributes 53.07% self samples to chain traversal. [0686](0686-xls-oversized-index-admission.md) bounds geometric growth and suppresses intrinsically oversized retries after complete scans. SST/within-sheet traversal, tiny/no-benefit admission and refusal overhead remain open. |
 | 2 | XLSX selected scanner's retained record vector | [0683](0683-xlsx-selected-record-compaction.md) implements compact records and exact SST staging, with an additional profiled escape-search optimization. Direct owning-result construction and managed semantic-vector admission remain open; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the callback contract. |
 | 3 | DOCX cache breadth and remaining per-view work | [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo with scoped fresh-view gains, pressure reclamation and replacement/rollback tests; its measured hot-query regression was removed by direct index ownership. Extend producer/concurrent/cold measurements and attribute remaining MCE visibility work before broader claims. |
 | 4 | XLS framing fusion and full SST locator scan | Preserve the coverage proof, validation order and malformed-input boundaries; pointer scratch removal does not eliminate the full scan; [0668](0668-xls-query-residues.md). |
