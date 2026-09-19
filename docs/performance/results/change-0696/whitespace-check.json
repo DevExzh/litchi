@@ -1,0 +1,748 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "exit_code": 2,
+  "disposition": "Only byte-preserved XML corpus and raw tool output have whitespace findings; authored source and documentation pass.",
+  "exceptions": [
+    {
+      "path": "docs/performance/results/change-0696/assembly/baseline-start.txt",
+      "sha256": "c8a56554da2b5256ae7dfde763b5f6e5474c224acdbeab840db78fb22fa8a273"
+    },
+    {
+      "path": "docs/performance/results/change-0696/assembly/candidate-start.txt",
+      "sha256": "4928f65da7a47f333d5b7502c774c3ed8a163734e8e9f13106d23f243a689fde"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-real-controls/docx.xml",
+      "sha256": "6e49e65633198df1573b4e36e52510d3e2583b91727cf0ba19e9694df1359281"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-real-controls/pptx.xml",
+      "sha256": "cc06f2bc43cea0190b691412c099fbb849f02820007845973470468311d65c16"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-real-controls/xlsx.xml",
+      "sha256": "ec53f80ddf7b34efe638308f6a623f983c3542e256a9e64e76b294f97fe737df"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0000-directives.xml",
+      "sha256": "71441a4e98eb8e57e39282db6ef2e6f4b84cff6bace622f0f54bde9960d59123"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0000-duplicate.xml",
+      "sha256": "3be2800fafaece4bf8b1a707c366d90e424b416323dce548d540e8ec27fd99ad"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0000-qname.xml",
+      "sha256": "cf733391b4287ff24fde9447bed53ceb39838a7fd1f83866dda21f800f5b1d07"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0000-unbound.xml",
+      "sha256": "1d8ef7e735700c79594e2ec2e48a9c96abf15a84767c829f84b1ff7e4a89a85c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0000.xml",
+      "sha256": "dc2ed8f108807bee66d18e5ca6bc40ec62423c972f5e19ab8d6cbc3da30168d8"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0001-directives.xml",
+      "sha256": "e86f8fdaedaa7e194e02338e3d46567b3c4b96016bba4fed5e949857df72c42d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0001-duplicate.xml",
+      "sha256": "1e7752ad749c316a0ad5c960ebad0e6498858e04619462e5f8d0be5b0830e8c7"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0001-qname.xml",
+      "sha256": "ddf7a92b6117dd087c9991aa0cdf9b8ad45f04d43277a439428b7b9f2c9ffffe"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0001-unbound.xml",
+      "sha256": "6bb6300278b92a67544baf979481ba1165f8944ffc7994063bfe3c6ceacb3e40"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0001.xml",
+      "sha256": "6e49e65633198df1573b4e36e52510d3e2583b91727cf0ba19e9694df1359281"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0002-directives.xml",
+      "sha256": "914a610837a85c3d741f71ab7a639fa49d05b3d760c21d1ab099daf795aa0097"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0002-duplicate.xml",
+      "sha256": "b5eda032cb5d6d0a055e882348b6ee0adf57d21b03153671605c3120bb07fdff"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0002-qname.xml",
+      "sha256": "ecdb0087feb758b83ef995fe8987bb48b36710810a48271bb821b239f5a34799"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0002-unbound.xml",
+      "sha256": "a39eb224157c512329c0cb3e8ca3331ab4181031997e70d7871ad60643f4d030"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0002.xml",
+      "sha256": "02d8c49a10113216edae8f7abb78968e1a73a4123131f821ddd4b50f3ddc778c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0004-directives.xml",
+      "sha256": "bbce0ac6d3deaf6b6045a28f9d26c85c5eae07bde8a2b898307d08e3c72e6a85"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0004-duplicate.xml",
+      "sha256": "f377e3d364d94e64a0957519396d07436ea1c1d423544b2ae1df78aecab08e86"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0004-qname.xml",
+      "sha256": "d8089dff2da83feac28fae8fac7d1d9ddb7daceb1688616dc148122373b26864"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0004-unbound.xml",
+      "sha256": "14623aae0b68340acf47a05a15f1fe13d038dd5a607cbd3af365322aedd2182d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0004.xml",
+      "sha256": "3f5f6baf6e8bbb3739fff8bd2fee2776b2747a52e6089a95fd147a9b718b9d5b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0005-directives.xml",
+      "sha256": "6eb6e5f5994ed6d537937c7eca94b52a1df428dc1759cc6f078f8e4cd2037c39"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0005-duplicate.xml",
+      "sha256": "ef0ee3ed3f0fa57788126e9a3b673de58063e604606eac0c71bc1f7eed7d0f5c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0005-qname.xml",
+      "sha256": "cca1d19ae89ec8ef6541654e07284083d803e180fbce4e4aaf8f795e9f94d3c1"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0005-unbound.xml",
+      "sha256": "7fcb8055a16ea48569f9859e82836a660f5fb915982820e9c56006970d7d24c4"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0005.xml",
+      "sha256": "260c91c3e7674ca51c4745f7492ea4aeeaf30eb45e93c282ca3939adb2d84573"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0006-directives.xml",
+      "sha256": "a2cc0d37cfe4c9d8a0e48a62d13930bb913d5a5928c7de7d018be96c568dbd8d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0006-duplicate.xml",
+      "sha256": "d0940de21d1b23dcc780070a6dde24a5ca2f218a1d7d356771e512c2a2de880c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0006-qname.xml",
+      "sha256": "efee5a3df564db445279458645febee94962af3193257b5e6d37f090b5b8ed03"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0006-unbound.xml",
+      "sha256": "a8ab31a721d47ee4f19a55733d697cd548bdeba7329dead03697fa4c7628db5f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0006.xml",
+      "sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0007-directives.xml",
+      "sha256": "a2449791e8c8850180e38a28a4cfd8eac267d5252f7f128b46f716553d7d7d04"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0007-duplicate.xml",
+      "sha256": "25192821c84d0f86604aee1faf63f2d27cec39d9e3b14480bd3028b15c78e7fa"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0007-qname.xml",
+      "sha256": "3f8673a5ce85ade34a2c83c7150647280a9d2e9612b64ee2035c5a1f246d83fc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0007-unbound.xml",
+      "sha256": "f616afebe4433f057dfa6c2afd7f1b8119be21303abbfcd5f7c6dc85f7e4b4a9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0007.xml",
+      "sha256": "504f4220ee9ec6f124fd3ec18daf763873e0a12ddf6bc87c84a1741939c94982"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0008-directives.xml",
+      "sha256": "4de7f12680c2669f2fe675842ea21f70287769aeda971f01ab04e6d91b769954"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0008-duplicate.xml",
+      "sha256": "d24ff4b8776edbaa217c36d04321f9d8137a2f36e903587b7ccc5746ea34801a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0008-qname.xml",
+      "sha256": "802ef0e91c2dbed7c3760a3573619b12f9d92d9dfee6c9ed0c53c9aee98b6787"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0008-unbound.xml",
+      "sha256": "16b75d243f7e72603bffd6076f9b88dc81bed5e6855251dba0b8656a5fac3e44"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0008.xml",
+      "sha256": "7673c424e5caf93de822959d7ecceabb0a468addf775fb9d5d756699c711224b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0009-directives.xml",
+      "sha256": "318b4c5d3b1cd222244ed2c05a53a56e75a09cd6bacec563e2de0b72da9289f3"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0009-duplicate.xml",
+      "sha256": "4e14c656bdc7f176a43db67dc0eee41983b5abf8dd24869e72561afc28acc2bc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0009-qname.xml",
+      "sha256": "68f08052815a9fcecab0883cbd87c0cb521c56052991cfc8f8ca97b29888a9d0"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0009-unbound.xml",
+      "sha256": "12e362bc41db8ed852b96a40b7b3ee9dd194962016fa5285195fa374cd216052"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0009.xml",
+      "sha256": "f6eee25f8ba8e674e6ebed1d50e4fd6e9665dc1d1a2a3a05fbb463ebb8106c98"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0011-directives.xml",
+      "sha256": "252762f18956cf87e815a27fe534681e80476ba4c9c69ba4bd1adfb4fe5816fc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0011-duplicate.xml",
+      "sha256": "5c6b2d54f625e894019528e0ca9fc73c05c2207664450619c4d1a399e51d49d1"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0011-qname.xml",
+      "sha256": "aa7ab5fb57f7229c6968930cf623d468eac03138a3b7831f8e7d5bce204ff988"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0011-unbound.xml",
+      "sha256": "df3ec8f8bcd728f0605d7d704b87b2a61a7e44692bf12cc90fe89aa0a9ef95fc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0011.xml",
+      "sha256": "35c49f6079d8ec8baed2b880a74b19c04d3db569d2cafeac617d32bb13573779"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0012-directives.xml",
+      "sha256": "f365cd7528aaf2b412f99fef632c949cf3044715c9ca83d05cd3192d3b3aefa0"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0012-duplicate.xml",
+      "sha256": "ccdaff253753104f8f0d6fb277393b72bc76b376c153554a075408a5944bdc64"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0012-qname.xml",
+      "sha256": "33cc0bd0574bb7cec06a1fa68ae0fe3227fc25531693444fcfd800c842fcf930"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0012-unbound.xml",
+      "sha256": "33c5489272fca8098f2aff7793b3ec1d16c5cc97b67d2719f6eceb7ee762923b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0012.xml",
+      "sha256": "5914f8339c00e6edc954bc3b9133deecc3044dbe50add522d75907ebcc07b510"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0013-directives.xml",
+      "sha256": "a81eb7bbc907194055066246256e2ec810f21c1fd81f87bed34a5264e480de5c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0013-duplicate.xml",
+      "sha256": "8bd10d17c439078409c57e41fa8f80a7fd562f6ba0aad6072747edd52285001b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0013-qname.xml",
+      "sha256": "a177159f93dd8824e19bdc711adbe3357fef84c938a391b2025f7bb64ab515f2"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0013-unbound.xml",
+      "sha256": "e5fe18b1655a8aa1e7b9eaf26f556a702257bf97e9b5c00f25d2fbf9024c30b6"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0013.xml",
+      "sha256": "e95f98f0d6f46862443bf27f87956698e13145132ee5ca8edbeb8590481d7cf9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0014-directives.xml",
+      "sha256": "9538e86a4a22a07746b95a1405b65e4e99166d37957b9a64593bbadd7ceb5853"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0014-duplicate.xml",
+      "sha256": "02029b45499e11dbc00a1f8524a5d99b209271d40236b5d87096412fd3e5a559"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0014-qname.xml",
+      "sha256": "b5b3debe34daa65923384b6545cd2b62d59beb3adf786bf2ece3c57cf0e12c62"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0014-unbound.xml",
+      "sha256": "4464117fb94540b6572aab5fd281afc3a997661e4e020c36450a3dad797e207f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0014.xml",
+      "sha256": "cc06f2bc43cea0190b691412c099fbb849f02820007845973470468311d65c16"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0015-directives.xml",
+      "sha256": "8445b018b54dfbd40e01135cc6c2eeb5232cd988bc3e80d7e9bbb8e78e957b3e"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0015-duplicate.xml",
+      "sha256": "8080c36ce0930e2bd3bc342cf4c3e04c9dc905c62cc9d3b49e790b736b090b46"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0015-qname.xml",
+      "sha256": "0c30fd0446993f68089ff7899619e8bbe152dd6072448b93572a559e037b28c2"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0015-unbound.xml",
+      "sha256": "785d24a042127e9fbd637929aed3d006e335aefb6fb872c65394072908a63aeb"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0015.xml",
+      "sha256": "ef7a8fd94e801c7a951e1b0131fd30e3c0cd43b7b9f12a6b93a54c23e0a90de2"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0016-directives.xml",
+      "sha256": "c5350ba7c7cc7ef63b3eb5eedd670d4590d33f40f41e49c9c255185fe1771730"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0016-duplicate.xml",
+      "sha256": "6a18ff0d4dad838083a92083f5844d974fd6047a93cf1acc34a73c9094db4faa"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0016-qname.xml",
+      "sha256": "33268c0bbb1d12e50e9d96eece476cc2fa22a4f0b6a665838e1fd10bed291ce6"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0016-unbound.xml",
+      "sha256": "5768251203340eca9f710386eb76cfb4ac9f21ce11750900e73e9f426c6638c0"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0016.xml",
+      "sha256": "2e14f266e517565cf08216d2d9a267422c604f4a824cce09db95b7b9b73ef6cc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0017-directives.xml",
+      "sha256": "fa41345f93f24c74dfb617e2c9c6a92201307dc7e40be141e0322f76aaa70758"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0017-duplicate.xml",
+      "sha256": "703ae45032f98f68527bcd1d9c7774894693df3b63e0c29519b34dce98bbc3d7"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0017-qname.xml",
+      "sha256": "1444b0d6f5fdb2f15ad9eed685fc0fc2c2c701221a12338b85a501ef9c33d5c6"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0017-unbound.xml",
+      "sha256": "31cb49821343b0fb99759a61c2401e95909131c3616be790d0db31683f2d15a1"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0017.xml",
+      "sha256": "ac63d6c61bf4f68cc4395d12cc2dacb3328024a3ca789fcb556f39888a728281"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0018-directives.xml",
+      "sha256": "c439bc470a78d4c3e70b3c8adfe690fc8213939b1e7f21efca50d60c1929b178"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0018-duplicate.xml",
+      "sha256": "7c4b50d5c0174146e5f29ef31a802820d1c87b858826221d3c60ac44b8c47acb"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0018-qname.xml",
+      "sha256": "ad62da1d4abf56da9fba943dbf71a0a004039d0ee142f60f35b93a171ce1a5a9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0018-unbound.xml",
+      "sha256": "d6109991160110fc4654397636a512363e703771a52cd557f54dbf537d103b15"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0018.xml",
+      "sha256": "1ab8d5a4927ea673e957e014db438df6743aa419afdac5f7832c66f613666ac3"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0019-directives.xml",
+      "sha256": "8dae5f18f2f22bd3d7e1ed18da14fea7ef8658d427b0dc33681f3aba46dfdb32"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0019-duplicate.xml",
+      "sha256": "3761e0e6c97d5a37b777730a334371c008418efe10b073fefb54344e14e23c58"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0019-qname.xml",
+      "sha256": "4b019f8477fce131c85e9d9576e8e3b51d629d005c1c0e7b93fb5fb376f629c6"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0019-unbound.xml",
+      "sha256": "93631ebb3e9b62faf09c349297cdd406c3606ee716b74126ff7dca37153ed4d5"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0019.xml",
+      "sha256": "77ea14a31b6580fc867467e40781a36e2356c61ab984aa409709cf7caebeedf9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0020-directives.xml",
+      "sha256": "f241cd5d5ba5b2ef324ba32671e6f667dd4806b9b550c3667a110a0cca61dac5"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0020-duplicate.xml",
+      "sha256": "b2c8da21a24dec4ba405bc591ec19dffd5ff76f4ddb0c1da93f37a06e5c5fe19"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0020-qname.xml",
+      "sha256": "df196edd860e8f05aad2c7db56c30c608bd16d539dd8e91f1866654f35e5f660"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0020-unbound.xml",
+      "sha256": "462fec7df72845973668a3dedd0bb4b30498def67c800a0d9606eaf12e495fa0"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0020.xml",
+      "sha256": "8693b852bf26fd9a4a0f7cec5343159966fb133e1d293ce3e0f3f93780edb39d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0021-directives.xml",
+      "sha256": "1d6e66096af223ca98516acc763a4740293360d5b348685e8a89b953f549572b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0021-duplicate.xml",
+      "sha256": "0aba9779f5440e3db4710d0a5243f14a64d8b713b97d64c989d7711d76ca2b3f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0021-qname.xml",
+      "sha256": "9c30c6a3b7b9f2e0db7a65db643a2b5c3f793f0097e20d0671305318754deabf"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0021-unbound.xml",
+      "sha256": "961869bb955785fadf4b4ae7d1008e2838311f631de9de271548b3ac527f09d4"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0021.xml",
+      "sha256": "9891c01af1aa2794437fac337b633c30371f7052e7b2353b08c9973e45f4008c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0022-directives.xml",
+      "sha256": "94c3f083263d17dec1d87fc17fed7af2d81252fb5f5e146d3217d1d24b0c565e"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0022-duplicate.xml",
+      "sha256": "e1f3037ed51c4fc6989e4faee175e1490dbaf746da80165edf5d733bff62f3c4"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0022-qname.xml",
+      "sha256": "bb118f3d3174b79b34c53884fcadad2599eba6580bf5b7a8419af1c72b32e76e"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0022-unbound.xml",
+      "sha256": "6668395c81ef52cab1f071ca785e447fe9c742200988e34692ae5602b97b56a7"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0022.xml",
+      "sha256": "778e055abb0e7678505c72b6168e31cf710871ff37773af479828179eacc49aa"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0023-directives.xml",
+      "sha256": "e53c62e8d4ffc055c713e1bc4529edb2f29e88016a2f3cde96a24b675c39835f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0023-duplicate.xml",
+      "sha256": "19f6f58dad9169a481e8b777872ffe421136acbe7e5d515f7055be31de9b779a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0023-qname.xml",
+      "sha256": "c60ff2c1c25d6ccddef2833d95426083d657e021051c4620b955bee44e580568"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0023-unbound.xml",
+      "sha256": "3fc7d3518a1c6d8714acd84588b4a5e5e97004bcf46006046ade651aa306dc7d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0023.xml",
+      "sha256": "6ac00d26fabb3a47b74a14cbbae7be54114585bc18f48b51a7f58bf712ccae96"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0024-directives.xml",
+      "sha256": "77ff7c9bd4cc3dad9bd4ecc4dbb90ccef12a9a5c7501d019702163ad20f1461a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0024-duplicate.xml",
+      "sha256": "d18e045388bf6c0e7c21bbbcb32ecb6d7eee718a29a379a26834829d03b40548"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0024-qname.xml",
+      "sha256": "75f173d7e8a1fcb6e30e0d780aa58b426d6d8df26f46de91970d62315fa02fab"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0024-unbound.xml",
+      "sha256": "15916e64223ffbba5494ad36986c99ac892c8816075c6b93c3570d79ea03eef8"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0024.xml",
+      "sha256": "02e6380738d05fcaa8da0b4f78a2fe96d15560970a37e96e5768e94fde516e09"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0025-directives.xml",
+      "sha256": "72fe9b3680301291ad53f3550cdf3875ecc054e632e7ba3ffd2e0cd492baffa2"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0025-duplicate.xml",
+      "sha256": "b29bfad7185f200999e53faf69f445d4a1d10fdfda4fe3b6f18813bef6277b4e"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0025-qname.xml",
+      "sha256": "ce1c21f07e8cd9a081269b57128e9cd8855d4d5ed77bedca1c01f5c96f7055fa"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0025-unbound.xml",
+      "sha256": "da731988a18d75d26aa2c4382b198ac539efd55b5878140e812940babad3e6cf"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0025.xml",
+      "sha256": "0b418f6e80c728a7f7e9e0e79ccfe2a7addef0b931523831b8232cd6abcfb78d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0026-directives.xml",
+      "sha256": "c10d3031152dce7f77f7b9c54861edfd9b1983e81358185619270cff81f0c1da"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0026-duplicate.xml",
+      "sha256": "6cb8d16a7756da08ade2cb48f1abb40cbb4853fc95b894f7bdba2464fda5187f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0026-qname.xml",
+      "sha256": "a17efdf4e9b273b885068187735d33b15ccf399806640c3ef60059e2a55594ba"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0026-unbound.xml",
+      "sha256": "c94f0083b5c1537cbff1217bd691404d9033fdb5aa27c2dfef5360a328082acc"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0026.xml",
+      "sha256": "ae500d32f790e3bdfda3fc0c6e0b878b2dc7de9712015ea10ba8b9c204e2e54d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0027-directives.xml",
+      "sha256": "685a2792646f3de91ab106a2afbb40cb8596f9e57823c7a8f7643918898ce936"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0027-duplicate.xml",
+      "sha256": "058344db51d6bd6928f0efafb1ec7a1da9e748403432c86e0d5564a8e141949a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0027-qname.xml",
+      "sha256": "f787861890a0c089a6a9b37a25771dd22f5645a5968b3ff9ec5001379052604f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0027-unbound.xml",
+      "sha256": "df664d8895b93eb63e40f8250bcebb18ae1310d3958fdda92da75ced6392e907"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0027.xml",
+      "sha256": "7a438439346c45094c107e9bf8dfc7ebf2522ceb148c009217d430fdf3306cc0"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0028-directives.xml",
+      "sha256": "7f39979c08e874cecccc34ea39054edb1fc4723de57be6ca68fde89b7309faa6"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0028-duplicate.xml",
+      "sha256": "0fa45bd504b2fcd8f11df35933542bb82cab441c00e94219d5a66783a17e4400"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0028-qname.xml",
+      "sha256": "67b2de505dd7ce963e1483f151bd89d2cce869620140c51acfb8eb9b33bd5c65"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0028-unbound.xml",
+      "sha256": "ead08b0c045abc97a0f6db0e31a3da8d3bf1d1a4914f25aad7a119a8d7e5af88"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0028.xml",
+      "sha256": "df14ed406ed9919ca0a96e3592c668f260f2e7d434e40e7ee8cb30e6bc32442f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0029-directives.xml",
+      "sha256": "dfc4fc8a84781faeac5532455c8570342f5b56f07eb69b1658f3c2a2f0f53f11"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0029-duplicate.xml",
+      "sha256": "f5476032ad02eefd0c2f58e1ec9e7ed15d87208a0cbad686efde36e134a07eae"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0029-qname.xml",
+      "sha256": "18b9122d06f58690ca41fe0db54050202a8ca7e839ac5d30b8c91006cbd70eba"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0029-unbound.xml",
+      "sha256": "950c369acfe1012735dff780f3f3163698193683f39c78016ac3401eaa0f26d4"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0029.xml",
+      "sha256": "9c5a121dcf65ce355adeceea2fc59a58eb9e96e4e40b4255c57f31d2631446c9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0030-directives.xml",
+      "sha256": "af4a3bb63d25d5ca2b9519b8ce06cd1b6c93a93ae5d967c8939b2dc9a494fbc9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0030-duplicate.xml",
+      "sha256": "0327ed099fc49a61ba4be248977c62fb6344aadea7436694b946d690fd09ba37"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0030-qname.xml",
+      "sha256": "9454772117c10447dae91cc3d69513a37e4fb75b1a5f69e302e47aac46bb8952"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0030-unbound.xml",
+      "sha256": "a967ac8478c0f298846233b9abf241e3d1d0398a61020f6a2a16c1a3f68aaf47"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0030.xml",
+      "sha256": "9497626d79e45212cfdda8d24c236e3d6b83fd9da16a4b8b945bd21403c0fa92"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0031-directives.xml",
+      "sha256": "ad45d850eb04928900653ac484a162c6021712a5e24d5f52d822ee1a2d8fd1fa"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0031-duplicate.xml",
+      "sha256": "170a14cec26bdb0480b60a82e8a2907b1c25ccbff5f457973bf263c34fd60e37"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0031-qname.xml",
+      "sha256": "8b8507417c9576090c60cf1add9bfd387332e079adf18bc5e4ff798ff94d66e7"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0031-unbound.xml",
+      "sha256": "3596ce77563740a517bb0d7e27be82f201fc838e5665c2aac87782dc4c6371a1"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0031.xml",
+      "sha256": "3df1e9c3858d77152dfd1dd5a965acff0db69083fc3929d03014de4e86b77399"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0032-directives.xml",
+      "sha256": "f359cf61a3b2df6cb713c27a44ef62920b60bf6b957a3f31b0cbad370bcb00ac"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0032-duplicate.xml",
+      "sha256": "2ee81027bbc2629291e4c98c483b78f6994fd7a6a5ce027daf22c77a6ef6c1c3"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0032-qname.xml",
+      "sha256": "a868aace429c11904321ec5885cd449cdb55e690b3096145e205a9638fa4f00a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0032-unbound.xml",
+      "sha256": "df1d47a4088cb797b2104d1b927754901ab4e1bacfc30090e6368b9fcc2b019a"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0032.xml",
+      "sha256": "ec53f80ddf7b34efe638308f6a623f983c3542e256a9e64e76b294f97fe737df"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0033-directives.xml",
+      "sha256": "91927903005bde39dcd563071e56032804a2ce89ab6aa352ef2c845f99f94569"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0033-duplicate.xml",
+      "sha256": "ce0a8742c55c6a1b1053d3663dece361f92765f0deb09857874039c92e0bbdb8"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0033-qname.xml",
+      "sha256": "14677ccdf6fede9537b8ac9b30ef3369b43506c80cf8fadd6299f8fddbe94470"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0033-unbound.xml",
+      "sha256": "eecb234686bf77e96c1b5668e24188f63eca657ded220aa1e415487e6aff2691"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0033.xml",
+      "sha256": "9de4fa1d864eecac6af07961e425070a1e3b71f427598415cfed4b9570292e06"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0034-directives.xml",
+      "sha256": "1c42cc9ee3487a1301e2762891c9697606ccff9dae497c511368c88ea5c472c7"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0034-duplicate.xml",
+      "sha256": "e57bb468e41ef79d461f47c8f4f877659ed78a5b6c2c2837920209bece2072bb"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0034-qname.xml",
+      "sha256": "dd2dc70f3c51e161b57bd1d3b21eae98dd29df6de44300d9b837a9e42b63747f"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0034-unbound.xml",
+      "sha256": "4f36ad0a0c57f4bffb5ba95a70e2398d92fbea965d783e722181f436749b423d"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0034.xml",
+      "sha256": "a118061d450d6c0f64379703ece237f20fe729e454583138ab562d735a9eceb9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0035-directives.xml",
+      "sha256": "24f3f73734f03c55d6719669de476b0ed17bb9374d8b54f458bcc8c5cf8a340c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0035-duplicate.xml",
+      "sha256": "22989c21cd8df9babceb5666a82122ccca7460734461c14b29b0164214ff0c1b"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0035-qname.xml",
+      "sha256": "4e1162ba8da79bce4637c5154298d99e228116daad3f052254ab94050bf7b5a9"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0035-unbound.xml",
+      "sha256": "eddda24db16bc57f9a50c433c4086af312aaabca2d98facdeec424c51b506586"
+    },
+    {
+      "path": "docs/performance/results/change-0696/oracle-results/cases/real-0035.xml",
+      "sha256": "566a7a75637e845af8b3f13c8199452ebbb69da6a5cc6415e8f27d85590dd835"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/baseline/counters-10.txt",
+      "sha256": "95441b69bc9c9eaeb4fad6ec4bbd7fc70731062257a83d79f55b5cbcfed3f18e"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/baseline/counters-210.txt",
+      "sha256": "d3312da8786c5ad769e9dafde7f18f8d5237e3e7ce634acbeac5013e07f8029c"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/baseline/inclusive-symbols.txt",
+      "sha256": "9e0270747121d81e389f66b83cca9128fa1994e01de0f14bbd0a4cf4595c4ae3"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/baseline/self-symbols.txt",
+      "sha256": "dd183a6c3125bbd5920aa02c80eb0135bdc8207083be11c9b0bc1aeb17363058"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/candidate/counters-10.txt",
+      "sha256": "8914faef4995f12cb35d0b6e8609d2cfec395994b7f0efdb1d8630f6e5aebc53"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/candidate/counters-210.txt",
+      "sha256": "703164bced473c5a2905835e0ce8542586e213ee4760a967ebb9a72a48881a24"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/candidate/inclusive-symbols.txt",
+      "sha256": "5641a2a8e93635cc983e957b582e3428d24ac5d989bf9dd4d0c3c96d3cd30bd3"
+    },
+    {
+      "path": "docs/performance/results/change-0696/profile/candidate/self-symbols.txt",
+      "sha256": "48285f0bb73c17b00c95b5bdbaa88135343cebc90cad10e7b689b6d78568d747"
+    },
+    {
+      "path": "docs/performance/results/change-0696/tests-focused.log",
+      "sha256": "1385212746d5fbfa73c9a18495e7a9a0909d132f67d819d5a13bbde583cca872"
+    }
+  ]
+}

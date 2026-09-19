@@ -1,0 +1,110 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cpu/cycles/P'
+# Event count (approx.): 22951128426
+#
+# Children      Self  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                                                       
+# ........  ........  ...............  ....................  .............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    12.11%    12.11%  baseline-native  baseline-native       [.] litchi_ooxml_common::mce::codec::start
+     5.88%     5.88%  baseline-native  baseline-native       [.] sha2::sha256::x86_sha::compress
+     5.53%     5.53%  baseline-native  libc.so.6             [.] __memcmp_evex_movbe
+            |          
+             --5.34%--__memcmp_evex_movbe
+
+     3.38%     3.38%  baseline-native  baseline-native       [.] quick_xml::events::attributes::IterState::next
+     3.27%     3.27%  baseline-native  baseline-native       [.] zlib_rs::inflate::inflate_fast_help
+     3.23%     3.23%  baseline-native  baseline-native       [.] core::str::converts::from_utf8
+     3.17%     3.17%  baseline-native  baseline-native       [.] litchi_pptx::notes::codec::scan_processed_xml
+     3.15%     2.90%  baseline-native  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |          
+             --2.86%--__memmove_avx512_unaligned_erms
+
+     2.82%     2.82%  baseline-native  baseline-native       [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>
+     2.80%     2.80%  baseline-native  baseline-native       [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     2.42%     2.42%  baseline-native  baseline-native       [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     2.36%     2.36%  baseline-native  libc.so.6             [.] malloc
+            |          
+             --2.25%--__libc_malloc (inlined)
+                       |          
+                        --1.23%--tcache_get (inlined)
+                                  tcache_get_n (inlined)
+
+     2.36%     0.00%  baseline-native  libc.so.6             [.] __libc_malloc (inlined)
+            |
+            ---__libc_malloc (inlined)
+               |          
+                --1.27%--tcache_get (inlined)
+                          tcache_get_n (inlined)
+
+     1.86%     1.86%  baseline-native  baseline-native       [.] litchi_ooxml_common::mce::codec::close
+     1.84%     1.84%  baseline-native  baseline-native       [.] litchi_pptx::notes::codec::inspect_element
+     1.82%     1.82%  baseline-native  baseline-native       [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     1.77%     1.77%  baseline-native  baseline-native       [.] zlib_rs::inflate::inftrees::inflate_table
+     1.71%     1.71%  baseline-native  baseline-native       [.] litchi_ooxml_common::xml_name::validation::is_ncname
+     1.67%     1.67%  baseline-native  baseline-native       [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     1.60%     1.60%  baseline-native  baseline-native       [.] zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch
+     1.44%     1.44%  baseline-native  baseline-native       [.] zlib_rs::inflate::inflate
+     1.44%     1.44%  baseline-native  baseline-native       [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     1.42%     1.42%  baseline-native  baseline-native       [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+     1.36%     0.00%  baseline-native  [unknown]             [.] 0xffffffff9e800bb7
+            |
+            ---0xffffffff9e800bb7
+               0xffffffff9ff1e2e3
+
+     1.36%     0.00%  baseline-native  [unknown]             [.] 0xffffffff9ff1e2e3
+            |
+            ---0xffffffff9ff1e2e3
+
+     1.36%     1.36%  baseline-native  baseline-native       [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     1.29%     0.79%  baseline-native  libc.so.6             [.] _int_malloc
+     1.27%     1.27%  baseline-native  baseline-native       [.] quick_xml::reader::state::ReaderState::emit_start
+     1.27%     0.00%  baseline-native  libc.so.6             [.] tcache_get (inlined)
+            |
+            ---tcache_get (inlined)
+               tcache_get_n (inlined)
+
+     1.27%     0.00%  baseline-native  libc.so.6             [.] tcache_get_n (inlined)
+            |
+            ---tcache_get_n (inlined)
+
+     1.25%     0.23%  baseline-native  libc.so.6             [.] __memset_avx512_unaligned_erms
+            |          
+             --1.23%--__memset_avx512_unaligned_erms
+
+     1.21%     0.15%  baseline-native  libc.so.6             [.] __libc_malloc2
+            |          
+             --1.19%--__libc_malloc2
+                       |          
+                        --1.06%--_int_malloc
+
+     1.21%     1.21%  baseline-native  baseline-native       [.] litchi_ooxml_common::mce::codec::write_start
+     1.17%     1.17%  baseline-native  baseline-native       [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     1.11%     0.04%  baseline-native  libc.so.6             [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+
+     1.09%     1.09%  baseline-native  baseline-native       [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     1.06%     1.06%  baseline-native  libc.so.6             [.] cfree@GLIBC_2.2.5
+     1.06%     0.00%  baseline-native  libc.so.6             [.] __libc_free (inlined)
+            |
+            ---__libc_free (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

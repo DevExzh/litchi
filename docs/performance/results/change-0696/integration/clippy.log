@@ -1,0 +1,24 @@
+HEAD 442f2dd7f10b00dee9459df750f23860b0f03f40
+$ cargo clippy -p litchi-pptx -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx --all-features --lib --no-deps --locked -- -D warnings
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.62s
+
+exit 0

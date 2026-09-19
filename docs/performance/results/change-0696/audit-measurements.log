@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "docs/performance/results/change-0696/audit.py", line 634, in validate_oracle_builds
+    stop(f"oracle {phase} probe binding mismatch")
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "docs/performance/results/change-0696/audit.py", line 60, in stop
+    raise AssertionError(message)
+AssertionError: oracle baseline probe binding mismatch

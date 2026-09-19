@@ -1,0 +1,15 @@
+probe	0696
+mode	prefix
+source	/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+source_archive_bytes	108164
+source_archive_sha256	aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0
+stage	capture
+iterations	10
+completed	10
+290400860		cycles	64961545	100.00		
+1056076431		instructions	64961545	100.00		
+211579965		branches	64961545	100.00		
+1205857		branch-misses	64961545	100.00		
+339831		cache-misses	64961545	100.00		
+1993		page-faults	64961545	100.00		
+64.96	msec	task-clock	64961545	100.00		

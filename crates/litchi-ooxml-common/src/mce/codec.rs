@@ -778,7 +778,9 @@ fn start(
             local_namespaces.push((p.into(), a.value.as_ref().to_owned()));
         }
     }
-    c.ns = c.ns.with_local(local_namespaces, lim)?;
+    if !local_namespaces.is_empty() {
+        c.ns = c.ns.with_local(local_namespaces, lim)?;
+    }
     let (namespace, local) = expand_parts(q, &c.ns, true)?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {

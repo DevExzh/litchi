@@ -1,0 +1,12 @@
+{
+  "baseline_binary_sha256": "57053f4772c6fd995fe59b07cbdb7a4e05509ba76d8af2642ca26945311ff5b3",
+  "candidate_binary_sha256": "d2423c0c17c81cdd9df3718cee14c1d953a5d0bdbc64d63ff17854f3a30061bd",
+  "case_count": 192,
+  "corpus_sha256": "a6f8abb6b2c504defa6bd879bcb6e31392a690976ba941d1e4d9a082f1bebf16",
+  "invocation_count": 1920,
+  "mismatch_count": 0,
+  "mismatches": [],
+  "probe": "0696-mce-oracle",
+  "profile_count": 5,
+  "schema": 1
+}

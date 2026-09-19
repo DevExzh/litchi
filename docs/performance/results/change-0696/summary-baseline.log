@@ -1,0 +1,3 @@
+Native summary: 156 leg/phase records across 13 cases
+Native comparisons: 78 explicit A/A or candidate pairs
+Baseline-only run: emitted a0/a1 drift pairs; candidate comparisons await compare legs.
