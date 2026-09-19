@@ -1,0 +1,12 @@
+{
+  "removed_paths": {
+    "/tmp/litchi-ods-discrete-math": true,
+    "/tmp/litchi-ods-discrete-math-target": true,
+    "/tmp/litchi-ods-discrete-baseline-2c5q65o6": true,
+    "/var/tmp/litchi-ods-discrete-baseline-782339a2c-2ckmkbmm": true,
+    "/var/tmp/litchi-ods-discrete-candidate-final-n599dxsp": true
+  },
+  "retained_evidence_has_no_target_or_python_cache": true,
+  "shared_default_target_preserved": true,
+  "native_reproduction_temporary_tree_cleaned": true
+}

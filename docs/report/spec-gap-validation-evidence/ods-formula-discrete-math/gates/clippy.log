@@ -1,0 +1,16 @@
+    Checking simd-adler32 v0.3.10
+    Checking hashbrown v0.16.1
+    Checking bumpalo v3.20.3
+    Checking equivalent v1.0.2
+    Checking log v0.4.29
+    Checking typed-path v0.12.3
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-ods-discrete-math/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/tmp/litchi-ods-discrete-math/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/tmp/litchi-ods-discrete-math/crates/litchi-core)
+    Checking zopfli v0.8.3
+    Checking indexmap v2.11.4
+    Checking xml-minifier v0.1.0 (/tmp/litchi-ods-discrete-math/crates/xml-minifier)
+    Checking zip v8.6.0
+    Checking litchi-odf-common v0.0.1 (/tmp/litchi-ods-discrete-math/crates/litchi-odf-common)
+    Checking litchi-ods v0.0.1 (/tmp/litchi-ods-discrete-math/crates/litchi-ods)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.87s

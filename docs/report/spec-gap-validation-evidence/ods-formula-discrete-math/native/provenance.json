@@ -1,0 +1,221 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/mathematical/fods/combin.fods": "9f2bc28672f667c6cf6a5afa4d89e31c2f987889cebade3e8229e8b4b941d9d2",
+    "sc/qa/unit/data/functions/mathematical/fods/combina.fods": "8cf4550435496d4f1795e469e6cdaf414208242f91bddf1e83380c89b2238883",
+    "sc/qa/unit/data/functions/mathematical/fods/fact.fods": "9dae997bf49154a0e6af2d3e2b427bf5343da5959cbc572d42c87415fe1b2d21",
+    "sc/qa/unit/data/functions/addin/fods/factdouble.fods": "f83e8e25078a931f0d03158d7b352d788ef987ce636a271be4a045979fa30361",
+    "sc/qa/unit/data/functions/mathematical/fods/gcd.fods": "0f1128e4feb8d71a668a7891610c706a7a5b15179769a60f67197699e331975f",
+    "sc/qa/unit/data/functions/mathematical/fods/lcm.fods": "172c48459d37ddefcedab1a80ec7de37d459e2ee35bcb0d7d785a58aed51991e",
+    "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods": "51e0365074e07a7bea78bf9bc08a90adf935ad1e876b607da031ba938cfacdfc",
+    "sc/qa/unit/data/functions/mathematical/fods/even.fods": "fc921dac533b8120b5f34a10ffd35c253c1bb3c3dd9b33e003b23c1cf3f5f0de",
+    "sc/qa/unit/data/functions/mathematical/fods/odd.fods": "f9739ce9bc10662c728e48a2575953bd1728df751f73f66ed0c1379ef51577de",
+    "sc/qa/unit/data/functions/addin/fods/delta.fods": "25811b8e2c8a7ff58aec6375129fa6e8e39ce50105300fe14e82ea776b3e921b",
+    "sc/qa/unit/data/functions/addin/fods/gestep.fods": "054d059c8edcc56f80ad78a8a8b8a8a33ff13adfafa854c4e84b212608bdb4f6"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from the exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 77,
+  "selected_functions": [
+    "COMBIN",
+    "COMBINA",
+    "DELTA",
+    "EVEN",
+    "FACT",
+    "FACTDOUBLE",
+    "GCD",
+    "GESTEP",
+    "LCM",
+    "MULTINOMIAL",
+    "ODD"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "COMBINA",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=COMBINA(0;0)",
+      "cached": "0",
+      "kind": "contract_divergence",
+      "reason": "LibreOffice caches COMBINA(0;0) as 0; the selected evaluator contract defines the zero/zero case as 1, so this host variance is excluded from numeric corroboration."
+    },
+    {
+      "function": "COMBIN",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+      "sheet": "Sheet2",
+      "row": 12,
+      "column": 1,
+      "formula": "of:=COMBIN(12;)",
+      "cached": "1",
+      "kind": "contract_divergence",
+      "reason": "The fixture omits number_chosen; omitted-argument defaulting is outside the selected two-argument contract."
+    },
+    {
+      "function": "COMBIN",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=COMBIN(1;2)",
+      "kind": "domain_exclusion",
+      "reason": "The fixture has number_chosen greater than number; the selected binomial domain requires number_chosen <= number, so its formula error is excluded from numeric cache corroboration."
+    },
+    {
+      "function": "COMBINA",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=COMBINA(1;2)",
+      "kind": "domain_exclusion",
+      "reason": "The fixture has number_chosen greater than number; the selected strict COMBINA domain requires number_chosen <= number, so its formula error is excluded from numeric cache corroboration."
+    },
+    {
+      "function": "COMBINA",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+      "sheet": "Sheet2",
+      "row": 12,
+      "column": 1,
+      "formula": "of:=COMBINA(12;)",
+      "cached": "1",
+      "kind": "contract_divergence",
+      "reason": "The fixture omits number_chosen; omitted-argument defaulting is outside the selected two-argument contract."
+    },
+    {
+      "function": "MULTINOMIAL",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=MULTINOMIAL([.G7];[.H7];[.I7])",
+      "cached": "6.18970023101455E+026",
+      "reference_cell": {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "formula": "of:=2^30"
+      },
+      "kind": "formula_cell_input",
+      "reason": "The first referenced operand is an upstream formula cell (G7 of:=2^30); the bounded native resolver refuses formula-cell inputs rather than evaluating or importing its cache."
+    },
+    {
+      "function": "LCM",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+      "sheet": "Sheet2",
+      "row": 8,
+      "column": 1,
+      "formula": "of:=LCM(1.2;2.4)",
+      "cached": "2",
+      "kind": "contract_divergence",
+      "reason": "The native cache accepts fractional LCM operands, while the resolved LCM contract rejects non-integer inputs; the host result is retained only as an explicit variance."
+    },
+    {
+      "function": "LCM",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=LCM(1.2;3.6)",
+      "cached": "3",
+      "kind": "contract_divergence",
+      "reason": "The native cache accepts fractional LCM operands, while the resolved LCM contract rejects non-integer inputs; the host result is retained only as an explicit variance."
+    },
+    {
+      "function": "LCM",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+      "sheet": "Sheet2",
+      "row": 11,
+      "column": 1,
+      "formula": "of:=LCM([.L1];[.M1])",
+      "cached": "2",
+      "reference_cells": [
+        {
+          "sheet": "Sheet2",
+          "row": 1,
+          "column": 12,
+          "type": "number",
+          "value": "1.2"
+        },
+        {
+          "sheet": "Sheet2",
+          "row": 1,
+          "column": 13,
+          "type": "number",
+          "value": "2.4"
+        }
+      ],
+      "kind": "contract_divergence",
+      "reason": "The native cache accepts fractional LCM operands from literal references, while the resolved LCM contract rejects non-integer inputs; the host result is retained only as an explicit variance."
+    },
+    {
+      "function": "GCD",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+      "sheet": "Sheet2",
+      "row": 37,
+      "column": 1,
+      "formula": "of:=GCD(6;{2;4})",
+      "cached": "2",
+      "kind": "unsupported_dependency",
+      "reason": "The forced-array operand is outside this bounded scalar/reference native fixture; no array cache is promoted without the corresponding discrete sequence contract."
+    },
+    {
+      "function": "LCM",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+      "sheet": "Sheet2",
+      "row": 37,
+      "column": 1,
+      "formula": "of:=LCM(6;{2;4})",
+      "cached": "12",
+      "kind": "unsupported_dependency",
+      "reason": "The forced-array operand is outside this bounded scalar/reference native fixture; no array cache is promoted without the corresponding discrete sequence contract."
+    },
+    {
+      "function": "GESTEP",
+      "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=GESTEP([.G7];[.H7])",
+      "kind": "unsupported_dependency",
+      "reason": "The referenced input includes the fixture's literal text cell G7 and the native formula is an error; ordinary Number conversion yields a formula error in the resolved GESTEP contract, so this nonnumeric case remains an explicit exclusion."
+    },
+    {
+      "function": "GESTEP",
+      "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+      "sheet": "Sheet2",
+      "row": 10,
+      "column": 1,
+      "formula": "of:=GESTEP([.H7];[.G7])",
+      "kind": "unsupported_dependency",
+      "reason": "The referenced input includes the fixture's literal text cell G7 and the native formula is an error; ordinary Number conversion yields a formula error in the resolved GESTEP contract, so this nonnumeric case remains an explicit exclusion."
+    },
+    {
+      "function": "GESTEP",
+      "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+      "sheet": "Sheet2",
+      "row": 11,
+      "column": 1,
+      "formula": "of:=GESTEP(\"dog\";0)",
+      "kind": "contract_divergence",
+      "reason": "The fixture supplies text as the number operand and records a formula error; the resolved GESTEP contract uses ordinary Number conversion, and no logical-valued GESTEP case exists in the pinned source."
+    },
+    {
+      "function": "DELTA",
+      "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+      "sheet": "Sheet2",
+      "row": 11,
+      "column": 1,
+      "formula": "of:=DELTA(\"dog\";0)",
+      "kind": "contract_divergence",
+      "reason": "The fixture supplies text as the number operand and records a formula error; ordinary Number conversion yields a formula error in the resolved DELTA contract, so this nonnumeric case remains an explicit exclusion."
+    }
+  ],
+  "coverage_notes": {
+    "gestep_text": "Pinned GESTEP rows 9-11 contain text/error inputs and remain explicit exclusions; ordinary Number conversion yields a formula error, and no logical-valued GESTEP input is present in the source fixture.",
+    "multinomial_fractional": "Pinned MULTINOMIAL row 19 uses fractional operands (3.4 and 2.3) and is retained; its cached 10 agrees with the resolved raw-sum-before-floor contract, although this pair does not distinguish that rule from per-argument flooring."
+  }
+}

@@ -27,6 +27,13 @@
 //! The four remaining reducers consume forced arrays with equal row and
 //! column counts; a scalar operand is a one-by-one array and is never
 //! broadcast across a larger matrix.
+//! The discrete reducer family adds `GCD` and `LCM` over streamed
+//! `NumberSequenceList` values and `MULTINOMIAL` over a `NumberSequence`;
+//! three-dimensional references remain one admissible reference while an
+//! explicit reference union is rejected for `MULTINOMIAL`. `COMBIN`,
+//! `COMBINA`, `FACT`, `FACTDOUBLE`, `EVEN`, `ODD`, `DELTA`, and `GESTEP` use
+//! the scalar bridge and broadcast elementwise when their arguments are
+//! arrays.
 //!
 //! Both profiles support all 26 complex-number functions through
 //! [`Value::Complex`]. `IMSUM` and `IMPRODUCT` consume arrays and ordered

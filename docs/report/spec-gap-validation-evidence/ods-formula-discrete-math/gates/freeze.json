@@ -1,0 +1,18 @@
+{
+  "base_commit": "782339a2c467ba77def74839066ba9f9ef7eb67d",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "6d16a3502e5c07675f11d3b237046cf32ed0eb2da62906632c0404082f146a7e",
+    "crates/litchi-ods/src/codec/formula/evaluation/discrete.rs": "0b4a6f85b2e1c9131f4a9d62752da0bc59549a39cf8e320ea5a912240f437af9",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "ae78ec73d5e99783602ffcd6c97fba32f452c4571c6dd7849e9667866acb59f2",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/aggregate.rs": "ef77863ad9fed2a6f869df0ed5f819ed30ba1a5163b9017acd4dd9f3b7fb3874",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "36fa84a7821639434b4f2a47db9025b16bcec937ab567cff29f2a9ea809ddbdc",
+    "crates/litchi-ods/tests/ods_formula_discrete_math.rs": "5a6383b5e74797ef55ace6ebbc01fc74ae7914f833bd9f248bebf9b0697cec36",
+    "crates/litchi-ods/tests/ods_formula_discrete_math_arrays.rs": "67727c69c11638beed7e49530ba09a68b299427977ef73a58a82a37434649363",
+    "crates/litchi-ods/tests/ods_formula_discrete_native.rs": "ba920f0e587e9211117c33b339138516b271384cb6fde816e92eec1491ad631b",
+    "crates/litchi-ods/tests/ods_formula_discrete_oracle.rs": "57b6faa1f08c3449250e93585dce9b11ed7c4f1ceb3c83111ae9dd73e890ef50",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/numeric-goldens.json": "acd0d68388e404d498e2810be3307d11c751eb47f1c989965d17fe9f2701e62b",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/cached-results.json": "cf13ae7aa07b3145125f89380849f5337b1eee5bbea04662a11253cd7ecf05e9",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/provenance.json": "9250d1ff02a422637962ec04c44f84702c2725098ac869d7f75f03f3db4ed50c",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

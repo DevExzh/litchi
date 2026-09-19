@@ -1,0 +1,47 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/performance/verify.py",
+    "--candidate-root",
+    "/tmp/litchi-ods-discrete-math",
+    "--candidate-freeze",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/gates/freeze.json",
+    "--expected-warmups",
+    "3",
+    "--expected-samples",
+    "15"
+  ],
+  "corrected_discrete_names": [
+    "combin",
+    "combina",
+    "fact",
+    "factdouble",
+    "gcd",
+    "lcm",
+    "multinomial",
+    "even",
+    "odd",
+    "delta",
+    "gestep"
+  ],
+  "correction": "one in-memory DISCRETE_NAMES entry: gstep -> gestep",
+  "module_file": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/performance/verify.py",
+  "original_discrete_names": [
+    "combin",
+    "combina",
+    "fact",
+    "factdouble",
+    "gcd",
+    "lcm",
+    "multinomial",
+    "even",
+    "odd",
+    "delta",
+    "gstep"
+  ],
+  "return_code": 0,
+  "status": "ok",
+  "stdout": "{\"baseline_records\": 330, \"candidate_base\": \"782339a2c467ba77def74839066ba9f9ef7eb67d\", \"candidate_records\": 1530, \"status\": \"ok\"}\n",
+  "verify_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/performance/verify.py",
+  "verify_sha256_expected": "bd69fffcdaacbb7c8d464e5fcc72c7617bd08070771678fd7ec350756e9f33fc",
+  "verify_sha256_observed": "bd69fffcdaacbb7c8d464e5fcc72c7617bd08070771678fd7ec350756e9f33fc"
+}
