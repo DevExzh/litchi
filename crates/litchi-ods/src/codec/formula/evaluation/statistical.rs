@@ -11,7 +11,7 @@
 use super::numerics::{NumericAggregate, NumericOperation};
 use super::{EvaluationFailure, EvaluationResult, Evaluator, Node, ScalarError, WorkingValue};
 
-/// The nine statistical reducers implemented by this batch.
+/// The seventeen statistical reducers implemented by the statistical evaluator.
 ///
 /// This type is private to the formula evaluator and its resolver-aware child
 /// modules.  Keeping the function identity here gives both profiles one
@@ -28,6 +28,14 @@ pub(super) enum StatisticalFunction {
     Maximum,
     MinimumA,
     MaximumA,
+    Variance,
+    VarianceA,
+    VarianceP,
+    VariancePA,
+    StandardDeviation,
+    StandardDeviationA,
+    StandardDeviationP,
+    StandardDeviationPA,
 }
 
 impl StatisticalFunction {
@@ -51,6 +59,22 @@ impl StatisticalFunction {
             Self::MinimumA
         } else if name.eq_ignore_ascii_case("MAXA") {
             Self::MaximumA
+        } else if name.eq_ignore_ascii_case("VAR") {
+            Self::Variance
+        } else if name.eq_ignore_ascii_case("VARA") {
+            Self::VarianceA
+        } else if name.eq_ignore_ascii_case("VARP") {
+            Self::VarianceP
+        } else if name.eq_ignore_ascii_case("VARPA") {
+            Self::VariancePA
+        } else if name.eq_ignore_ascii_case("STDEV") {
+            Self::StandardDeviation
+        } else if name.eq_ignore_ascii_case("STDEVA") {
+            Self::StandardDeviationA
+        } else if name.eq_ignore_ascii_case("STDEVP") {
+            Self::StandardDeviationP
+        } else if name.eq_ignore_ascii_case("STDEVPA") {
+            Self::StandardDeviationPA
         } else {
             return None;
         })
@@ -63,15 +87,28 @@ impl StatisticalFunction {
             Self::Minimum | Self::MinimumA => NumericOperation::Minimum,
             Self::Maximum | Self::MaximumA => NumericOperation::Maximum,
             Self::CountA | Self::CountBlank => NumericOperation::Count,
+            Self::Variance | Self::VarianceA => NumericOperation::SampleVariance,
+            Self::VarianceP | Self::VariancePA => NumericOperation::PopulationVariance,
+            Self::StandardDeviation | Self::StandardDeviationA => {
+                NumericOperation::SampleStandardDeviation
+            },
+            Self::StandardDeviationP | Self::StandardDeviationPA => {
+                NumericOperation::PopulationStandardDeviation
+            },
         }
     }
 
-    pub(super) const fn is_average(self) -> bool {
-        matches!(self, Self::Average | Self::AverageA)
-    }
-
     pub(super) const fn is_a(self) -> bool {
-        matches!(self, Self::AverageA | Self::MinimumA | Self::MaximumA)
+        matches!(
+            self,
+            Self::AverageA
+                | Self::MinimumA
+                | Self::MaximumA
+                | Self::VarianceA
+                | Self::VariancePA
+                | Self::StandardDeviationA
+                | Self::StandardDeviationPA
+        )
     }
 
     pub(super) const fn is_count(self) -> bool {
@@ -87,7 +124,22 @@ impl StatisticalFunction {
     }
 
     pub(super) const fn includes_text(self) -> bool {
-        matches!(self, Self::AverageA | Self::MinimumA | Self::MaximumA)
+        self.is_a()
+    }
+
+    pub(super) const fn empty_error(self) -> Option<ScalarError> {
+        match self {
+            Self::Average | Self::AverageA => Some(ScalarError::DivisionByZero),
+            Self::Variance
+            | Self::VarianceA
+            | Self::VarianceP
+            | Self::VariancePA
+            | Self::StandardDeviation
+            | Self::StandardDeviationA
+            | Self::StandardDeviationP
+            | Self::StandardDeviationPA => Some(ScalarError::Value),
+            _ => None,
+        }
     }
 
     pub(super) const fn zero_when_empty(self) -> bool {
@@ -98,7 +150,7 @@ impl StatisticalFunction {
     }
 }
 
-/// Return whether `name` is one of the nine core statistical reducers.
+/// Return whether `name` is one of the core statistical reducers.
 pub(super) fn is_statistical_function(name: &str) -> bool {
     StatisticalFunction::from_name(name).is_some()
 }
@@ -169,11 +221,14 @@ impl StatisticalKernel {
             return Ok(self.count as f64);
         }
         let result = self.numeric.result()?;
-        match (self.function.is_average(), result) {
-            (true, Some(value)) => Ok(value),
-            (true, None) => Err(ScalarError::DivisionByZero),
-            (false, Some(value)) => {
-                if value == 0.0 {
+        if result.is_none() {
+            if let Some(error) = self.function.empty_error() {
+                return Err(error);
+            }
+        }
+        match result {
+            Some(value) => {
+                if self.function.zero_when_empty() && value == 0.0 {
                     Ok(0.0)
                 } else {
                     Ok(value)
@@ -181,7 +236,7 @@ impl StatisticalKernel {
             },
             // MIN/MAX and their A variants use the specified zero identity
             // when no Number was admitted.
-            (false, None) => Ok(0.0),
+            None => Ok(0.0),
         }
     }
 }
@@ -221,8 +276,8 @@ pub(super) fn apply<'a>(
     }
 
     if count == 0 {
-        if function.is_average() {
-            return evaluator.push_value(WorkingValue::Error(ScalarError::DivisionByZero));
+        if let Some(error) = function.empty_error() {
+            return evaluator.push_value(WorkingValue::Error(error));
         }
         // COUNT/COUNTA and MIN/MAX have a useful zero identity in this
         // bounded profile.  The ODF text permits an Error or zero for the

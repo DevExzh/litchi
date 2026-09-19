@@ -1,0 +1,9 @@
+{
+  "commit": "55e147bfa0676ce6ecdc609efc682b98568b8a5f",
+  "unrelated_tracked_changes": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md"
+  ],
+  "gate_lock_source": "../ods-formula-statistical-reducers/gates/Cargo.lock"
+}

@@ -19,10 +19,12 @@
 //! scalar-profile capability refusal and are evaluated by the value VM. It
 //! also evaluates the nine core statistical reducers (`COUNT`, `COUNTA`,
 //! `COUNTBLANK`, `AVERAGE`, `AVERAGEA`, `MIN`, `MAX`, `MINA`, and `MAXA`) for
-//! scalar sequence arguments; their reference and reference-list forms stay
-//! in the value VM, where cells can be streamed without materializing a
-//! range. It also carries the complete section 6.8 complex-number family as a
-//! distinguished scalar value, the complete
+//! scalar sequence arguments, plus the variance and standard-deviation
+//! reducers (`VAR`, `VARA`, `VARP`, `VARPA`, `STDEV`, `STDEVA`, `STDEVP`,
+//! and `STDEVPA`). Their reference and reference-list forms stay in the value
+//! VM, where cells can be streamed without materializing a range. It also
+//! carries the complete section 6.8 complex-number family as a distinguished
+//! scalar value, the complete
 //! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
 //! `ACOSH`, `ACOT`, `ACOTH`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `COS`,
 //! `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DEGREES`, `PI`, `RADIANS`, `SEC`,

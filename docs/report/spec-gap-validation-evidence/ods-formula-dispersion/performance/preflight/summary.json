@@ -1,0 +1,19 @@
+{
+  "mode": "preflight-only",
+  "phase": "evaluate",
+  "timed_samples": false,
+  "candidate_cases": 103,
+  "candidate_exit_code": 0,
+  "baseline_commit": "55e147bfa0676ce6ecdc609efc682b98568b8a5f",
+  "baseline_control_cases": 17,
+  "baseline_exit_code": 0,
+  "resolver_read_bounds_checked": [
+    "list-dispersion-var",
+    "list-dispersion-varp",
+    "list-dispersion-stdevp",
+    "resource-dispersion-*",
+    "3d-dispersion-*",
+    "nested-projected-dispersion-*"
+  ],
+  "lockfile": "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/gates/Cargo.lock"
+}

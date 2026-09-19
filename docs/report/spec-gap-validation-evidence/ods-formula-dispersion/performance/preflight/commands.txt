@@ -1,0 +1,7 @@
+# Candidate isolated worktree
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/harness/Cargo.toml --release
+ods-formula-dispersion-performance --phase evaluate --preflight-only
+
+# Detached baseline worktree at 55e147bfa0676ce6ecdc609efc682b98568b8a5f
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/harness/Cargo.toml --release
+ods-formula-dispersion-performance --case <each of the 17 CONTROL_CASES> --phase evaluate --preflight-only

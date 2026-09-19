@@ -1,0 +1,9 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/statistical.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs",
+  "crates/litchi-ods/tests/ods_formula_dispersion_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_dispersion_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_dispersion_native.rs",
+  "crates/litchi-ods/tests/ods_formula_dispersion_oracle.rs"
+]
