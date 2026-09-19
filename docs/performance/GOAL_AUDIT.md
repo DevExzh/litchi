@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0687 — measured shared CFB name construction with explicit tradeoffs
+
+[0687](0687-cfb-ascii-directory-keys.md) uses bounded inline ASCII directory
+keys after unchanged validation, retaining the general Unicode path. Four new
+differential tests cover keys, errors, ASCII combinations and UTF-16 boundaries.
+Six CFB/XLS/facade gates and DOC/PPT consumer tests pass: 4,392 tests passed,
+27 existing ignored. Real/generated XLS differentials, all counted I/O and
+all 96 query-allocation groups match exactly.
+
+Independent review weighs stored-query and tiny-workflow gains against
+45365-2 construction/workflow regressions, code/stack growth and RSS flags.
+A rejected candidate's large open regression remains archived. Cold-device,
+remote, cross-platform and concurrency performance are still unproven; no
+registered claim or coverage row is promoted. OLE2/OOXML continue; iWork is
+excluded, and the broader GOAL remains active.
+
 ## 0686 — bounded growth and completed-scan retry admission
 
 [0686](0686-xls-oversized-index-admission.md) retains bounded candidate growth

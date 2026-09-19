@@ -1,0 +1,208 @@
+diff --git a/crates/litchi-cfb/src/directory_name.rs b/crates/litchi-cfb/src/directory_name.rs
+index 5bf459b05..0e5062da7 100644
+--- a/crates/litchi-cfb/src/directory_name.rs
++++ b/crates/litchi-cfb/src/directory_name.rs
+@@ -80,6 +80,19 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
+         return Err(DirectoryNameError::ForbiddenCharacter(character));
+     }
+ 
++    if name.is_ascii() && name.len() <= MAX_DIRECTORY_NAME_CODE_UNITS {
++        let mut utf16 = [0u16; 32];
++        let mut comparison = [0u16; 32];
++        for (index, &byte) in name.as_bytes().iter().enumerate() {
++            utf16[index] = u16::from(byte);
++            comparison[index] = u16::from(byte.to_ascii_uppercase());
++        }
++        return Ok(DirectoryNameData {
++            utf16: SmallVec::from_buf_and_len(utf16, name.len()),
++            comparison: SmallVec::from_buf_and_len(comparison, name.len()),
++        });
++    }
++
+     let utf16: SmallVec<[u16; 32]> = name.encode_utf16().collect();
+     if utf16.len() > MAX_DIRECTORY_NAME_CODE_UNITS {
+         return Err(DirectoryNameError::TooLong(utf16.len()));
+@@ -97,6 +110,60 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
+ mod tests {
+     use super::{DirectoryNameData, DirectoryNameError, directory_name_data, simple_uppercase};
+ 
++    /// The pre-optimization construction expressed without any ASCII
++    /// specialization.  Differential tests below keep this small reference
++    /// independent of the production fast path while still using the CFB
++    /// rule for single-code-point uppercase mappings.
++    fn general_reference(name: &str) -> Result<(Vec<u16>, Vec<u16>), DirectoryNameError> {
++        if name.is_empty() {
++            return Err(DirectoryNameError::Empty);
++        }
++        if name.contains('\0') {
++            return Err(DirectoryNameError::ContainsNul);
++        }
++        if let Some(character) = name
++            .chars()
++            .find(|character| ['/', '\\', ':', '!'].contains(character))
++        {
++            return Err(DirectoryNameError::ForbiddenCharacter(character));
++        }
++
++        let utf16: Vec<u16> = name.encode_utf16().collect();
++        if utf16.len() > super::MAX_DIRECTORY_NAME_CODE_UNITS {
++            return Err(DirectoryNameError::TooLong(utf16.len()));
++        }
++
++        let mut comparison = Vec::with_capacity(utf16.len());
++        for character in name.chars().map(unicode_simple_uppercase) {
++            let mut encoded = [0u16; 2];
++            comparison.extend_from_slice(character.encode_utf16(&mut encoded));
++        }
++        Ok((utf16, comparison))
++    }
++
++    fn assert_matches_general_reference(name: &str) {
++        let actual = directory_name_data(name);
++        let expected = general_reference(name);
++        match (actual, expected) {
++            (Ok(actual), Ok((expected_utf16, expected_comparison))) => {
++                assert_eq!(
++                    actual.utf16.as_slice(),
++                    expected_utf16.as_slice(),
++                    "UTF-16 for {name:?}"
++                );
++                assert_eq!(
++                    actual.comparison.as_slice(),
++                    expected_comparison.as_slice(),
++                    "comparison key for {name:?}"
++                );
++            },
++            (Err(actual), Err(expected)) => assert_eq!(actual, expected, "error for {name:?}"),
++            (actual, expected) => panic!(
++                "fast path and general reference disagree for {name:?}: actual={actual:?}, expected={expected:?}"
++            ),
++        }
++    }
++
+     fn unicode_simple_uppercase(character: char) -> char {
+         let mut uppercase = character.to_uppercase();
+         let first = uppercase.next().unwrap_or(character);
+@@ -159,6 +226,122 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn ascii_construction_matches_the_general_reference_for_every_byte_and_pair() {
++        // Every one-byte and two-byte ASCII name is small enough to keep this
++        // exhaustive while covering NUL, all four forbidden bytes, controls,
++        // DEL, and every ordinary byte at both positions.
++        for byte in 0_u8..=0x7f {
++            let name = String::from_utf8(vec![byte]).unwrap();
++            assert_matches_general_reference(&name);
++        }
++        for first in 0_u8..=0x7f {
++            for second in 0_u8..=0x7f {
++                let name = String::from_utf8(vec![first, second]).unwrap();
++                assert_matches_general_reference(&name);
++            }
++        }
++    }
++
++    #[test]
++    fn ascii_length_boundaries_match_the_general_reference() {
++        // Include every length through two units past the limit so that both
++        // the fixed-array admission boundary and the general too-long path
++        // are exercised for every ASCII byte.
++        for length in 0..=super::MAX_DIRECTORY_NAME_CODE_UNITS + 2 {
++            for byte in 0_u8..=0x7f {
++                let name = String::from_utf8(vec![byte; length]).unwrap();
++                assert_matches_general_reference(&name);
++            }
++        }
++
++        // Exercise every byte at every position around the fixed-array
++        // boundary, including a late NUL or forbidden character that must be
++        // reported before an over-length refusal.
++        for length in [3, 30, 31, 32, 33] {
++            for position in 0..length {
++                for byte in 0_u8..=0x7f {
++                    let mut bytes = vec![b'a'; length];
++                    bytes[position] = byte;
++                    let name = String::from_utf8(bytes).unwrap();
++                    assert_matches_general_reference(&name);
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn validation_precedence_matches_the_general_reference() {
++        let mut cases = vec![
++            (String::new(), DirectoryNameError::Empty),
++            ("\0/".to_owned(), DirectoryNameError::ContainsNul),
++            ("/\0".to_owned(), DirectoryNameError::ContainsNul),
++            (
++                "a!b/c".to_owned(),
++                DirectoryNameError::ForbiddenCharacter('!'),
++            ),
++            (
++                "a:/\\b".to_owned(),
++                DirectoryNameError::ForbiddenCharacter(':'),
++            ),
++            (
++                format!("/{}", "a".repeat(super::MAX_DIRECTORY_NAME_CODE_UNITS)),
++                DirectoryNameError::ForbiddenCharacter('/'),
++            ),
++            (
++                format!("{}:", "a".repeat(super::MAX_DIRECTORY_NAME_CODE_UNITS)),
++                DirectoryNameError::ForbiddenCharacter(':'),
++            ),
++            (
++                format!("\0{}", "a".repeat(super::MAX_DIRECTORY_NAME_CODE_UNITS)),
++                DirectoryNameError::ContainsNul,
++            ),
++            (
++                "a".repeat(super::MAX_DIRECTORY_NAME_CODE_UNITS + 1),
++                DirectoryNameError::TooLong(super::MAX_DIRECTORY_NAME_CODE_UNITS + 1),
++            ),
++        ];
++        for (name, expected) in cases.drain(..) {
++            assert_eq!(
++                directory_name_data(&name),
++                Err(expected.clone()),
++                "name={name:?}"
++            );
++            assert_eq!(
++                general_reference(&name),
++                Err(expected),
++                "reference name={name:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn unicode_and_utf16_length_boundaries_match_the_general_reference() {
++        let mut names = vec![
++            "é".to_owned(),
++            "😀".to_owned(),
++            "ßstraße".to_owned(),
++            "ﬃle".to_owned(),
++            "ſtream".to_owned(),
++            "İstanbul".to_owned(),
++            "σςΣ".to_owned(),
++            "雪だるま".to_owned(),
++            "a/é".to_owned(),
++            "😀\\雪".to_owned(),
++        ];
++
++        names.push(format!("{}é", "a".repeat(30)));
++        names.push(format!("{}é", "a".repeat(31)));
++        names.push(format!("{}😀", "a".repeat(29)));
++        names.push(format!("{}😀", "a".repeat(30)));
++        names.push(format!("{}雪", "a".repeat(30)));
++        names.push(format!("{}雪", "a".repeat(31)));
++
++        for name in names {
++            assert_matches_general_reference(&name);
++        }
++    }
++
+     #[test]
+     fn refusals_are_unchanged() {
+         assert_eq!(directory_name_data(""), Err(DirectoryNameError::Empty));

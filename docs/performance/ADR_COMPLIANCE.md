@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0687 — bounded ASCII keys preserve CFB name semantics
+
+[0687](0687-cfb-ascii-directory-keys.md) stays in the shared CFB owner with no
+public API, dependency, unsafe-code, cache or retained-state change (ADRs
+0001/0002/0024). Under ADRs 0003/0006, exact UTF-16 and comparison keys retain
+stream identity/order and serialized names. Empty, NUL, forbidden-character
+and exact UTF-16 length refusals retain precedence; Unicode uses the existing
+path. Source fences and reader/writer validation remain unchanged.
+
+For ADR 0005 the short branch admits at most 31 bytes into fixed 32-unit
+arrays; it allocates no heap storage. Existing inline return layouts and
+resource policies remain. The measured helper stack grows 128 bytes and code
+807 bytes, with RSS and 45365-2 latency costs explicitly reviewed alongside
+query gains. No process-memory bound, concurrency claim or ADR amendment is
+made. Accepted ADR hashes remain unchanged.
+
 ## 0686 — intrinsic admission proof preserves transient retries
 
 [0686](0686-xls-oversized-index-admission.md) changes only XLS cache admission

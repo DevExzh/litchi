@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index-budget",
+  "input_path": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "input_bytes": 165888,
+  "input_sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+  "worksheet": 0,
+  "row": 301,
+  "column": 10,
+  "max_query_index_bytes": 2097152,
+  "queries_requested": 8,
+  "open_elapsed_ns": 75660,
+  "open_metrics": {
+    "read_calls": 16,
+    "read_bytes": 110242,
+    "version_calls": 18,
+    "len_calls": 1
+  },
+  "open_error": null,
+  "queries": [
+    {
+      "ordinal": 0,
+      "elapsed_ns": 27740,
+      "metrics": {
+        "read_calls": 7,
+        "read_bytes": 40549,
+        "version_calls": 10,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 1,
+      "elapsed_ns": 55670,
+      "metrics": {
+        "read_calls": 7,
+        "read_bytes": 40549,
+        "version_calls": 10,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 2,
+      "elapsed_ns": 1530,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 3,
+      "elapsed_ns": 860,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 4,
+      "elapsed_ns": 620,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 5,
+      "elapsed_ns": 500,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 6,
+      "elapsed_ns": 530,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 7,
+      "elapsed_ns": 460,
+      "metrics": {
+        "read_calls": 2,
+        "read_bytes": 32,
+        "version_calls": 5,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "empty",
+        "error": null
+      },
+      "agrees_with_first": true
+    }
+  ],
+  "all_queries_agree": true,
+  "timing_scope": "elapsed_ns is a diagnostic around one selected query; source counters are the primary comparison and include only the counted owned ReadAt",
+  "source_scope": "counted immutable in-memory ReadAt with stable SourceVersion(684,0); no filesystem or physical-I/O result"
+}
