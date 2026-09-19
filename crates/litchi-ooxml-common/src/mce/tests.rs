@@ -253,6 +253,82 @@ mod preservation_tests {
             Err(Error::LimitExceeded(_))
         ));
     }
+
+    #[test]
+    fn inherited_namespaces_survive_an_empty_scope_and_an_empty_default_reset() {
+        let source = format!(
+            r#"<r xmlns:mc="{MC}" xmlns="urn:default" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveElements="x:item" mc:PreserveAttributes="x:keep"><scope><x:item x:keep="yes" x:drop="no"/><reset xmlns=""><plain/></reset></scope></r>"#
+        );
+        let (actual, report) = run(&source).expect("inherited namespace scope remains valid");
+        assert_eq!(
+            actual,
+            format!(
+                r#"<r xmlns:mc="{MC}" xmlns="urn:default" xmlns:x="urn:ext"><scope><x:item x:keep="yes"></x:item><reset xmlns=""><plain></plain></reset></scope></r>"#
+            )
+        );
+        assert_eq!(
+            report,
+            Report {
+                ignored_attributes: 4,
+                preserved_elements: 1,
+                preserved_attributes: 1,
+                ..Report::default()
+            }
+        );
+    }
+
+    #[test]
+    fn empty_namespace_scopes_accept_the_exact_inherited_binding_bound() {
+        let source =
+            format!(r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext"><scope><x:item/></scope></r>"#);
+        // The implicit xml binding counts alongside the two declarations.
+        let exact = Limits {
+            max_namespace_bindings: 3,
+            ..Limits::default()
+        };
+        let (actual, report) = run_with(&source, &Capabilities::new(), &exact)
+            .expect("descendants without declarations do not consume the bound");
+        assert_eq!(
+            actual,
+            format!(r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext"><scope><x:item></x:item></scope></r>"#)
+        );
+        assert_eq!(report, Report::default());
+
+        let under = Limits {
+            max_namespace_bindings: 2,
+            ..exact
+        };
+        assert!(matches!(
+            run_with(&source, &Capabilities::new(), &under),
+            Err(Error::LimitExceeded(message)) if message == "namespace bindings"
+        ));
+    }
+
+    #[test]
+    fn same_element_namespace_bindings_resolve_before_qname_and_directive_refusals() {
+        let valid = format!(r#"<x:item xmlns:x="urn:x" xmlns:mc="{MC}"/>"#);
+        let (actual, report) = run(&valid).expect("same-element namespace binding");
+        assert_eq!(
+            actual,
+            format!(r#"<x:item xmlns:x="urn:x" xmlns:mc="{MC}"></x:item>"#)
+        );
+        assert_eq!(report, Report::default());
+
+        let invalid_element =
+            format!(r#"<x:bad:element xmlns:x="urn:x" xmlns:mc="{MC}" mc:NotARealDirective="1"/>"#);
+        assert!(matches!(
+            run(&invalid_element),
+            Err(Error::NonConformant(message))
+                if message == "invalid QName: invalid XML QName 'x:bad:element'"
+        ));
+
+        let valid_element =
+            format!(r#"<x:element xmlns:x="urn:x" xmlns:mc="{MC}" mc:NotARealDirective="1"/>"#);
+        assert!(matches!(
+            run(&valid_element),
+            Err(Error::NonConformant(message)) if message == "unknown MCE attribute"
+        ));
+    }
 }
 
 #[cfg(test)]

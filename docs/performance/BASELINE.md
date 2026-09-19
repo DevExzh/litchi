@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0696 — empty MCE namespace installation comparison
+
+[0696](0696-mce-empty-namespace-installation.md) retains a fresh 7,800-sample
+13-workflow AA/ABBA matrix. Real one-edit phase totals move from
+11.736–11.768 ms to 10.973–10.976 ms (−6.50 to −6.72%). Allocation counts,
+requested bytes and measured live bytes are identical across all 78 case/phase
+comparisons. Open-plus-capture cycles/task clock improve about 4.26% with
+nearly flat instructions. Native code grows 260 bytes; phase tails and 2.55–3.86% declaration-heavy costs
+remain explicit. These are warm scoped edit phases, excluding full save latency.
+
 ## 0695 — current per-member PPTX MCE attribution
 
 [0695](0695-pptx-mce-work-weight.md) retains 12,800 four-execution native batch

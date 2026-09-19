@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0696 — skip redundant empty namespace installation
+
+[0696](0696-mce-empty-namespace-installation.md) guards the empty local namespace
+list in MCE `start`. Native assembly confirms removal of an atomic owner
+increment/decrement pair on inherited scopes. Real one-edit phase totals improve
+6.50–6.72%; no-op and two-edit totals also improve. All allocation/live metrics
+match; `.text` grows 260 bytes and eleven phase-tail flags remain explicit.
+Shared `start` still accounts for 9.28% of open-plus-capture self samples.
+The outlined nonempty helper costs 2.55–3.86% on declaration-heavy controls;
+mixed inherited children improve. Retain the common-path gain with that cost
+explicit before considering broader frame/context changes.
+
 ## 0695 — weight remaining MCE work before presentation reuse
 
 [0695](0695-pptx-mce-work-weight.md) prices the exact retained 18-call capture

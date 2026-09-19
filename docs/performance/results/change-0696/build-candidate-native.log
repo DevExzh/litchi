@@ -1,0 +1,5 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling probe0696 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0696/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 55.47s
