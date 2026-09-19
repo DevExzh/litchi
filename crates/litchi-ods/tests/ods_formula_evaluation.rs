@@ -299,10 +299,15 @@ fn source_and_forced_recalculation_marker_survive_evaluation() {
 fn context_dependent_features_are_explicit_capability_refusals() {
     assert_unsupported("=[.A1]", UnsupportedKind::Reference);
     assert_unsupported("=[.A1:.B2]", UnsupportedKind::Reference);
+    assert_unsupported("=SUMIF([.A1];1)", UnsupportedKind::Reference);
     assert_unsupported("={1;2|3}", UnsupportedKind::Array);
     assert_unsupported("=Named", UnsupportedKind::NamedExpression);
     assert_unsupported("='Column Label'", UnsupportedKind::Label);
-    assert_unsupported("=SUMIF(1;1)", UnsupportedKind::Function);
+    let expression = parse("=SUMIF(1;1)");
+    let (_budget, _cancellation, context) = execution("ods-formula-conditional-constant");
+    let result = evaluate(&expression, &context, &EvaluationLimits::default())
+        .expect("a conditional aggregate with a constant range is a formula value");
+    assert_eq!(formula_error(&result), ScalarError::Value);
 }
 
 #[test]

@@ -123,7 +123,7 @@ use super::{
 };
 use crate::codec::formula::{
     expression::ArrayDimensions,
-    reference::{Address, Reference},
+    reference::{Address, EndpointValue, Reference},
 };
 use litchi_core::{Budget, ExecutionContext, Reservation, Resource, ResourceLimit, SourceVersion};
 use std::{
@@ -144,6 +144,8 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // consuming operator/function chooses a target type.
 mod aggregate;
 mod complex;
+mod conditional;
+mod criteria;
 mod database;
 #[allow(dead_code)]
 mod geometry;
@@ -1517,6 +1519,11 @@ enum ValueFrame<'a> {
     VisitArgument(super::Node<'a>),
     /// Visit an Array/ForceArray argument without scalar projection.
     VisitMatrixArgument(super::Node<'a>),
+    /// Visit a Criterion argument without inheriting a lazy projected-cell
+    /// demand. Criteria are scalar expressions even when the enclosing value
+    /// evaluation is in matrix mode; direct arrays and multicell references
+    /// remain first-class values and are rejected by the conditional kernel.
+    VisitConditionalArgument(super::Node<'a>),
     /// Visit TRANSPOSE's array argument without inheriting a caller's
     /// per-cell projection, while retaining the caller's scalar/matrix mode.
     VisitTransposeArgument(super::Node<'a>),
@@ -1897,6 +1904,9 @@ where
                 ValueFrame::VisitScalar(node) => self.visit_scalar(node)?,
                 ValueFrame::VisitArgument(node) => self.visit_argument(node)?,
                 ValueFrame::VisitMatrixArgument(node) => self.visit_matrix_argument(node)?,
+                ValueFrame::VisitConditionalArgument(node) => {
+                    self.visit_conditional_argument(node)?
+                },
                 ValueFrame::VisitTransposeArgument(node) => self.visit_transpose_argument(node)?,
                 ValueFrame::VisitScalarArgument(node) => self.visit_scalar_argument(node)?,
                 ValueFrame::RestoreArgumentContext => self.restore_argument_context()?,
@@ -2296,6 +2306,10 @@ where
         self.enter_argument_context(node, Mode::Matrix)
     }
 
+    fn visit_conditional_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        self.enter_argument_context(node, Mode::Scalar)
+    }
+
     fn visit_transpose_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
         // A lazy matrix branch uses scalar execution to request one output
         // coordinate. Its Array-typed argument still belongs to the enclosing
@@ -2536,6 +2550,7 @@ where
             || name.eq_ignore_ascii_case("OR")
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
+            || conditional::is_conditional_function(name)
             || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
             if let Some(value) = self.demand_cache_get(node)? {
@@ -2562,6 +2577,14 @@ where
                 } else {
                     ValueFrame::VisitMatrixArgument(child)
                 }
+            } else if conditional::is_range_argument(name, index, node.child_count()) {
+                // Conditional aggregates consume ranges as references. Keep
+                // their first-class area geometry intact even when the outer
+                // expression is in scalar mode or is being projected one
+                // cell at a time by a lazy matrix branch.
+                ValueFrame::VisitMatrixArgument(child)
+            } else if conditional::is_conditional_function(name) {
+                ValueFrame::VisitConditionalArgument(child)
             } else if aggregate::is_matrix_aggregate_function(name) {
                 ValueFrame::VisitMatrixArgument(child)
             } else if self.projection.is_some()
@@ -3037,6 +3060,9 @@ where
             super::Kind::Function { name } if aggregate::is_aggregate_function(name) => {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if conditional::is_conditional_function(name) => {
+                self.cacheable_conditional_branch(node)
+            },
             super::Kind::Function { name } if database::is_database_function(name) => {
                 for index in 0..node.child_count() {
                     self.scalar.charge_work(1)?;
@@ -3142,6 +3168,200 @@ where
                         nodes.push(child);
                     }
                 },
+            }
+        }
+        Ok(true)
+    }
+
+    /// Check whether a conditional reducer is invariant under an enclosing
+    /// projected matrix demand. Range slots are first-class matrix arguments,
+    /// but a computed criterion runs in the surrounding scalar mode after its
+    /// projection is cleared. A multi-cell reference inside ordinary scalar
+    /// arithmetic can therefore implicitly intersect at the current output
+    /// coordinate. Keep that case out of the demand cache while retaining
+    /// cache reuse for literals, singleton references, and sequence reducers
+    /// such as `"<"&SUM(reference)`.
+    fn cacheable_conditional_branch(&mut self, node: super::Node<'expr>) -> EvaluationResult<bool> {
+        let Some(name) = node.function_name() else {
+            return Ok(false);
+        };
+        let count = node.child_count();
+        for index in 0..count {
+            let Some(child) = node.child(index) else {
+                return Ok(false);
+            };
+            if conditional::is_range_argument(name, index, count) {
+                if !self.cacheable_matrix_branch(child)? {
+                    return Ok(false);
+                }
+            } else if !self.cacheable_conditional_criterion(child)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Iteratively classify one computed Criterion expression. `full_reference`
+    /// is set only while visiting an argument of a sequence/matrix reducer
+    /// that consumes a reference's complete geometry. It deliberately does
+    /// not flow through ordinary operators, whose scalar mode may project a
+    /// multi-cell reference at the current output position.
+    fn cacheable_conditional_criterion(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<bool> {
+        let mut reservation = None;
+        let mut nodes = Vec::new();
+        ensure_capacity(
+            &mut nodes,
+            &mut reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value conditional criterion cacheability frames",
+        )?;
+        nodes.push((root, true));
+        while let Some((node, full_reference)) = nodes.pop() {
+            self.scalar.charge_work(1)?;
+            match node.kind() {
+                super::Kind::Number
+                | super::Kind::String
+                | super::Kind::Error
+                | super::Kind::Missing => {},
+                super::Kind::Reference(reference) => {
+                    let invariant = match reference {
+                        Reference::Error => true,
+                        Reference::Source { .. } => false,
+                        Reference::Local(address) => match address {
+                            Address::Cell(endpoint)
+                                if matches!(&endpoint.value, EndpointValue::Cell(_)) =>
+                            {
+                                true
+                            },
+                            Address::Cell(_)
+                            | Address::Cells(_, _)
+                            | Address::Columns(_, _)
+                            | Address::Rows(_, _) => full_reference,
+                        },
+                    };
+                    if !invariant {
+                        return Ok(false);
+                    }
+                },
+                super::Kind::Parenthesized => {
+                    let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "conditional criterion parentheses are empty",
+                    ))?;
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        1,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value conditional criterion cacheability frames",
+                    )?;
+                    nodes.push((child, full_reference));
+                },
+                super::Kind::Prefix(_) | super::Kind::Postfix(_) => {
+                    let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "conditional criterion unary operand is missing",
+                    ))?;
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        1,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value conditional criterion cacheability frames",
+                    )?;
+                    nodes.push((child, false));
+                },
+                super::Kind::Infix(operator) => {
+                    if matches!(
+                        operator,
+                        super::InfixOperator::Range
+                            | super::InfixOperator::Intersection
+                            | super::InfixOperator::Union
+                    ) {
+                        return Ok(false);
+                    }
+                    let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "conditional criterion left operand is missing",
+                    ))?;
+                    let right = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                        "conditional criterion right operand is missing",
+                    ))?;
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        2,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value conditional criterion cacheability frames",
+                    )?;
+                    nodes.push((right, false));
+                    nodes.push((left, false));
+                },
+                super::Kind::Array(_) | super::Kind::ArrayRow => {
+                    let count = node.child_count();
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        count,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value conditional criterion cacheability frames",
+                    )?;
+                    for index in (0..count).rev() {
+                        let Some(child) = node.child(index) else {
+                            return Ok(false);
+                        };
+                        nodes.push((child, false));
+                    }
+                },
+                super::Kind::Function { name } => {
+                    if conditional::is_conditional_function(name) {
+                        // The nested reducer has its own range/criterion
+                        // argument contexts; keep this outer cache decision
+                        // conservative rather than sharing a context-sensitive
+                        // result across projected positions.
+                        return Ok(false);
+                    }
+                    let full_arguments = aggregate::is_aggregate_function(name)
+                        || complex::is_complex_sequence_function(name)
+                        || name.eq_ignore_ascii_case("AND")
+                        || name.eq_ignore_ascii_case("OR")
+                        // MUNIT's size argument is scalar and may project a
+                        // multicell reference at the current output cell.
+                        // The other matrix functions consume complete arrays.
+                        || Self::matrix_function(name).is_some_and(
+                            |function| !matches!(function, MatrixFunction::Unit),
+                        );
+                    let count = node.child_count();
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        count,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value conditional criterion cacheability frames",
+                    )?;
+                    for index in (0..count).rev() {
+                        let Some(child) = node.child(index) else {
+                            return Ok(false);
+                        };
+                        nodes.push((child, full_arguments));
+                    }
+                },
+                super::Kind::NamedExpression { .. }
+                | super::Kind::QuotedLabel { .. }
+                | super::Kind::AutomaticIntersection => return Ok(false),
             }
         }
         Ok(true)
@@ -3742,6 +3962,7 @@ where
                     if let super::Kind::Function { name } = node.kind() {
                         if complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
+                            || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
                             // Database functions, IMSUM and IMPRODUCT reduce their complete
@@ -4651,6 +4872,7 @@ where
                             || name.eq_ignore_ascii_case("OR")
                             || complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
+                            || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
                             continue;
@@ -6129,6 +6351,20 @@ where
                 }
             }
             let value = database::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if conditional::is_conditional_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = conditional::apply(self, name, &arguments)?;
             if cacheable {
                 self.demand_cache_put(node, &value)?;
             }

@@ -32,10 +32,16 @@ remain typed evaluation failures; cached formulas are never recalculated.
 
 Text criteria use case-sensitive, whole-cell literal matching. Whitespace is
 significant. Wildcards, regular expressions, substring matching, ambient locale,
-and textual date conversion are disabled. Finite numeric text uses the existing
-locale-independent parser. Already numeric date/time serials compare as Numbers.
-An Empty criterion reference converts to numeric zero; explicit `"="` matches
-Empty records, and `"=0"` does not match Empty records.
+and textual date conversion are disabled. Only non-empty Text criteria with an
+explicit operator prefix (`=`, `<>`, `<`, `<=`, `>`, or `>=`) use the existing
+locale-independent finite-number parser. A bare numeric-looking Text criterion
+remains Text and therefore matches Text candidates rather than Number
+candidates. Already numeric date/time serials compare as Numbers. An Empty
+criterion reference converts to numeric zero; explicit `"="` matches Empty
+records, and `"=0"` does not match Empty records.
+
+The shared database/conditional matcher regression for this distinction is
+recorded in the [criterion text profile evidence](criteria-text-profile.md).
 
 ## Results and arithmetic
 

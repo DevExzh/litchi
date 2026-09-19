@@ -187,6 +187,7 @@ pub(super) fn eager<'a>(
         ]
         .iter()
         .any(|function| name.eq_ignore_ascii_case(function))
+        && !super::super::is_conditional_aggregate_function(name)
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }

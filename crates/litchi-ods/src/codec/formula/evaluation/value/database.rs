@@ -21,12 +21,12 @@
 //! formula error.  Formula values encountered through the resolver remain a
 //! typed provider refusal; this layer never uses an inert cached formula.
 
+use super::criteria::{CriterionMatcher, CriterionValue, compile_criterion, criterion_matches};
 use super::{
     EvaluationFailure, EvaluationResult, Resolver, RuntimeArea, RuntimeArrayValue, RuntimeElement,
     RuntimeValue, ScalarError, ValueEvaluator, WorkingValue, ensure_capacity,
 };
 use litchi_core::{Reservation, Resource};
-use std::cmp::Ordering;
 
 use super::super::numerics::{NumericAggregate, NumericOperation};
 
@@ -261,7 +261,7 @@ impl<'source, 'expr> RectSource<'source, 'expr> {
                         .ok_or(EvaluationFailure::InvalidExpression(
                             "database array cell is missing",
                         ))?;
-                Ok(DbCell::from_element(element))
+                Ok(CriterionValue::from_element(element))
             },
             Self::Reference(area) => {
                 let read = evaluator.read_reference_cell(
@@ -282,70 +282,14 @@ impl<'source, 'expr> RectSource<'source, 'expr> {
                         )));
                     }
                 }
-                DbCell::from_cell_read(read)
+                CriterionValue::from_cell_read(read)
             },
-            Self::Scalar(value) => Ok(DbCell::from_runtime_value(value)),
+            Self::Scalar(value) => Ok(CriterionValue::from_runtime_value(value)),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum DbCell<'a> {
-    Empty,
-    Number(f64),
-    Logical(bool),
-    Text(&'a str),
-    Error(ScalarError),
-    Complex,
-}
-
-impl<'a> DbCell<'a> {
-    fn from_element(element: &'a RuntimeElement<'_>) -> Self {
-        match element {
-            RuntimeElement::Empty => Self::Empty,
-            RuntimeElement::Missing => Self::Error(ScalarError::NotAvailable),
-            RuntimeElement::Present(WorkingValue::Number(value)) => Self::Number(*value),
-            RuntimeElement::Present(WorkingValue::Logical(value)) => Self::Logical(*value),
-            RuntimeElement::Present(WorkingValue::Text(value)) => Self::Text(value.text.as_ref()),
-            RuntimeElement::Present(WorkingValue::Error(error)) => Self::Error(*error),
-            RuntimeElement::Present(WorkingValue::Complex(_)) => Self::Complex,
-        }
-    }
-
-    fn from_runtime_value(value: &'a RuntimeValue<'_>) -> Self {
-        match value {
-            RuntimeValue::Empty | RuntimeValue::Missing => Self::Empty,
-            RuntimeValue::Scalar(WorkingValue::Number(value)) => Self::Number(*value),
-            RuntimeValue::Scalar(WorkingValue::Logical(value)) => Self::Logical(*value),
-            RuntimeValue::Scalar(WorkingValue::Text(value)) => Self::Text(value.text.as_ref()),
-            RuntimeValue::Scalar(WorkingValue::Error(error)) => Self::Error(*error),
-            RuntimeValue::Scalar(WorkingValue::Complex(_)) => Self::Complex,
-            RuntimeValue::Array(_) | RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => {
-                Self::Error(ScalarError::Value)
-            },
-        }
-    }
-
-    fn from_cell_read(read: super::CellRead<'a>) -> EvaluationResult<Self> {
-        Ok(match read {
-            super::CellRead::Empty => Self::Empty,
-            super::CellRead::Number(value) if value.is_finite() => Self::Number(value),
-            super::CellRead::Number(_) => Self::Error(ScalarError::Number),
-            super::CellRead::Logical(value) => Self::Logical(value),
-            super::CellRead::Text(value) => Self::Text(value),
-            super::CellRead::Error(error) => Self::Error(error),
-            super::CellRead::Unsupported => {
-                return Err(EvaluationFailure::Unsupported(
-                    super::super::UnsupportedKind::CellValue,
-                ));
-            },
-        })
-    }
-
-    fn is_empty(self) -> bool {
-        matches!(self, Self::Empty)
-    }
-}
+type DbCell<'a> = CriterionValue<'a>;
 
 /// Header values and source geometry retained during one query.  `headers`
 /// contains only the first row, never the complete database table.
@@ -393,24 +337,6 @@ impl<'source, 'expr> DatabasePlan<'source, 'expr> {
     fn rows(&self) -> usize {
         self.source.rows()
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum CriterionOperator {
-    Equal,
-    NotEqual,
-    Less,
-    LessEqual,
-    Greater,
-    GreaterEqual,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum CriterionMatcher<'a> {
-    Empty(CriterionOperator),
-    Number(CriterionOperator, f64),
-    Logical(CriterionOperator, bool),
-    Text(CriterionOperator, &'a str),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -751,139 +677,6 @@ where
             (Some(left), Some(right)) if left == right => {},
             _ => return Ok(false),
         }
-    }
-}
-
-fn compile_criterion<'source, 'scalar, 'exec, 'position, R>(
-    evaluator: &mut ValueEvaluator<'_, 'scalar, 'exec, 'position, R>,
-    value: DbCell<'source>,
-) -> EvaluationResult<Result<CriterionMatcher<'source>, ScalarError>>
-where
-    R: Resolver + ?Sized,
-{
-    match value {
-        DbCell::Empty => Ok(Ok(CriterionMatcher::Number(CriterionOperator::Equal, 0.0))),
-        DbCell::Number(value) => Ok(Ok(CriterionMatcher::Number(
-            CriterionOperator::Equal,
-            value,
-        ))),
-        DbCell::Logical(value) => Ok(Ok(CriterionMatcher::Logical(
-            CriterionOperator::Equal,
-            value,
-        ))),
-        DbCell::Error(error) => Ok(Err(error)),
-        DbCell::Complex => Ok(Err(ScalarError::Value)),
-        DbCell::Text(text) => {
-            evaluator.scalar.charge_bytes(text.len())?;
-            let (operator, rhs) = criterion_parts(text);
-            if rhs.is_empty() {
-                return Ok(Ok(CriterionMatcher::Empty(operator)));
-            }
-            if let Ok(number) = fast_float2::parse::<f64, _>(rhs)
-                && number.is_finite()
-            {
-                return Ok(Ok(CriterionMatcher::Number(operator, number)));
-            }
-            Ok(Ok(CriterionMatcher::Text(operator, rhs)))
-        },
-    }
-}
-
-fn criterion_parts(value: &str) -> (CriterionOperator, &str) {
-    if let Some(rest) = value.strip_prefix(">=") {
-        (CriterionOperator::GreaterEqual, rest)
-    } else if let Some(rest) = value.strip_prefix("<=") {
-        (CriterionOperator::LessEqual, rest)
-    } else if let Some(rest) = value.strip_prefix("<>") {
-        (CriterionOperator::NotEqual, rest)
-    } else if let Some(rest) = value.strip_prefix('>') {
-        (CriterionOperator::Greater, rest)
-    } else if let Some(rest) = value.strip_prefix('<') {
-        (CriterionOperator::Less, rest)
-    } else if let Some(rest) = value.strip_prefix('=') {
-        (CriterionOperator::Equal, rest)
-    } else {
-        (CriterionOperator::Equal, value)
-    }
-}
-
-fn criterion_matches<'scalar, 'exec, 'position, R>(
-    evaluator: &mut ValueEvaluator<'_, 'scalar, 'exec, 'position, R>,
-    matcher: CriterionMatcher<'_>,
-    candidate: DbCell<'_>,
-) -> EvaluationResult<Result<bool, ScalarError>>
-where
-    R: Resolver + ?Sized,
-{
-    if let DbCell::Error(error) = candidate {
-        return Ok(Err(error));
-    }
-    let result = match matcher {
-        CriterionMatcher::Empty(operator) => match operator {
-            CriterionOperator::Equal => candidate.is_empty(),
-            CriterionOperator::NotEqual => !candidate.is_empty(),
-            CriterionOperator::Less
-            | CriterionOperator::LessEqual
-            | CriterionOperator::Greater
-            | CriterionOperator::GreaterEqual => false,
-        },
-        CriterionMatcher::Number(operator, expected) => match candidate {
-            DbCell::Number(actual) => compare_numbers(operator, actual, expected),
-            DbCell::Empty | DbCell::Logical(_) | DbCell::Text(_) | DbCell::Complex => {
-                matches!(operator, CriterionOperator::NotEqual)
-            },
-            DbCell::Error(_) => unreachable!("formula errors are handled above"),
-        },
-        CriterionMatcher::Logical(operator, expected) => match candidate {
-            DbCell::Logical(actual) => compare_booleans(operator, actual, expected),
-            DbCell::Empty | DbCell::Number(_) | DbCell::Text(_) | DbCell::Complex => {
-                matches!(operator, CriterionOperator::NotEqual)
-            },
-            DbCell::Error(_) => unreachable!("formula errors are handled above"),
-        },
-        CriterionMatcher::Text(operator, expected) => match candidate {
-            DbCell::Text(actual) => {
-                evaluator.scalar.charge_bytes(
-                    actual
-                        .len()
-                        .checked_add(expected.len())
-                        .unwrap_or(usize::MAX),
-                )?;
-                compare_text(operator, actual, expected)
-            },
-            DbCell::Empty | DbCell::Number(_) | DbCell::Logical(_) | DbCell::Complex => {
-                matches!(operator, CriterionOperator::NotEqual)
-            },
-            DbCell::Error(_) => unreachable!("formula errors are handled above"),
-        },
-    };
-    Ok(Ok(result))
-}
-
-fn compare_numbers(operator: CriterionOperator, left: f64, right: f64) -> bool {
-    match operator {
-        CriterionOperator::Equal => left == right,
-        CriterionOperator::NotEqual => left != right,
-        CriterionOperator::Less => left < right,
-        CriterionOperator::LessEqual => left <= right,
-        CriterionOperator::Greater => left > right,
-        CriterionOperator::GreaterEqual => left >= right,
-    }
-}
-
-fn compare_booleans(operator: CriterionOperator, left: bool, right: bool) -> bool {
-    compare_numbers(operator, u8::from(left) as f64, u8::from(right) as f64)
-}
-
-fn compare_text(operator: CriterionOperator, left: &str, right: &str) -> bool {
-    let ordering = left.cmp(right);
-    match operator {
-        CriterionOperator::Equal => ordering == Ordering::Equal,
-        CriterionOperator::NotEqual => ordering != Ordering::Equal,
-        CriterionOperator::Less => ordering == Ordering::Less,
-        CriterionOperator::LessEqual => ordering != Ordering::Greater,
-        CriterionOperator::Greater => ordering == Ordering::Greater,
-        CriterionOperator::GreaterEqual => ordering != Ordering::Less,
     }
 }
 
