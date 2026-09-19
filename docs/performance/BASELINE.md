@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0691 — native opened-PPTX MCE baseline
+
+[0691](0691-pptx-repeated-mce-baseline.md) separates native phase timing from
+allocator and identity instrumentation. Four 100-sample process legs on each
+of five inputs put the real 13-slide edit phases at 22.69–22.81 ms median and
+the marker counterfactual at 7.52–7.57 ms. The trace confirms 44 MCE calls over
+819,319 bytes in one capture. Source open, save and reopen are outside timers;
+there is no candidate or before/after speedup claim. Raw tails, bootstrap
+intervals, allocations, profiles, output hashes and limitations are retained.
+
 ## Changes 0568-0571: worksheet, container and OOXML open baselines
 
 The [0568 packet](results/change-0568/README.md) re-establishes the source-backed XLS baseline after change 0565 — open and list at 53 logical reads, one-cell at 319 — and records the post-change counterparts, 53 and 61. It also measures this host's same-binary noise floor **in the same quiet window as the result**: p50 4.10%, mean 4.60%, p95 7.33%, p99 13.70%, with zero A/A review triggers. That is the figure against which the batch's single p99 trigger should be read. Quiescence was verified before the run rather than assumed: the pinned core at 99.67% idle and a one-minute load average of 3.21, reached after waiting 340 seconds.

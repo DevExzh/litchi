@@ -1,0 +1,17 @@
+{
+  "cases": [
+    [
+      "real",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx"
+    ]
+  ],
+  "diagnostic_only": true,
+  "model_trace": true,
+  "operations": [
+    "capture"
+  ],
+  "profile": "baseline",
+  "schema": "litchi-0691-trace-v1",
+  "status": "started",
+  "timing_evidence": false
+}

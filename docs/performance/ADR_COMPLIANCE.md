@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0691 — PPTX measurement and private reuse design
+
+[0691](0691-pptx-repeated-mce-baseline.md) verifies all 33 unchanged constraint
+hashes, separates temporary measurement instrumentation from native results,
+and restores every production byte. The design preserves ADR 0003 publication
+and immutable-source semantics, ADR 0005 bounded ownership, and ADR 0006
+validation/error ordering. It does not repurpose the cross-slide-copy archive
+limit as an XML-cache budget. No API, cache, dependency or production behavior
+changes in this baseline batch; implementation proof remains follow-up work.
+
 ## 0690 — lookup-only borrowed CFB ASCII keys
 
 [0690](0690-cfb-borrowed-directory-lookups.md) removes temporary original and

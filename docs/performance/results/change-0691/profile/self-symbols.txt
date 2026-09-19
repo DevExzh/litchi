@@ -1,0 +1,176 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+
+#
+# Total Lost Samples: 0
+#
+# Samples: 9K of event 'cpu/cycles/P'
+# Event count (approx.): 42398134018
+#
+# Overhead  Command  Shared Object         Symbol                                                                                                                
+# ........  .......  ....................  ......................................................................................................................
+#
+    20.07%  native   native                [.] litchi_ooxml_common::mce::codec::start
+     5.62%  native   libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     4.79%  native   native                [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Inherited>
+     4.14%  native   native                [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     3.51%  native   native                [.] sha2::sha256::x86_sha::compress
+     3.07%  native   native                [.] quick_xml::events::attributes::IterState::next
+     2.95%  native   libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+                --0.16%--memcpy (inlined)
+                          _int_realloc
+                          __libc_realloc (inlined)
+
+     2.91%  native   native                [.] litchi_ooxml_common::mce::codec::write_start
+     2.61%  native   native                [.] litchi_ooxml_common::mce::codec::close
+     2.60%  native   native                [.] core::ptr::drop_in_place<litchi_ooxml_common::mce::codec::Ctx>
+     2.36%  native   native                [.] litchi_ooxml_common::xml_name::validation::is_ncname
+     2.26%  native   native                [.] core::str::converts::from_utf8
+     2.02%  native   native                [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     1.97%  native   libc.so.6             [.] malloc
+            |          
+            |--1.12%--__libc_malloc (inlined)
+            |          
+             --0.83%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __libc_malloc (inlined)
+
+     1.90%  native   native                [.] zlib_rs::inflate::inflate_fast_help
+     1.86%  native   native                [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     1.41%  native   native                [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     1.36%  native   native                [.] litchi_ooxml_common::mce::codec::BoundedOutput::reserve
+     1.32%  native   native                [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     1.29%  native   native                [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     1.25%  native   native                [.] quick_xml::reader::state::ReaderState::emit_start
+     1.18%  native   native                [.] litchi_pptx::notes::codec::scan_xml
+     1.18%  native   native                [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     1.08%  native   native                [.] litchi_ooxml_common::mce::codec::expand_parts
+     1.05%  native   native                [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     1.04%  native   native                [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     1.02%  native   native                [.] zlib_rs::inflate::inflate
+     0.99%  native   native                [.] zlib_rs::inflate::inftrees::inflate_table
+     0.99%  native   native                [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+     0.94%  native   native                [.] litchi_pptx::notes::codec::inspect_element
+     0.93%  native   native                [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     0.90%  native   libc.so.6             [.] _int_malloc
+            |          
+             --0.78%--_int_malloc
+                       |          
+                       |--0.59%--__libc_malloc2
+                       |          
+                        --0.19%--_int_realloc
+                                  __libc_realloc (inlined)
+
+     0.85%  native   libc.so.6             [.] cfree@GLIBC_2.2.5
+            |          
+            |--0.70%--__libc_free (inlined)
+            |          
+             --0.15%--tcache_put_n (inlined)
+                       tcache_put (inlined)
+                       __libc_free (inlined)
+
+     0.82%  native   native                [.] litchi_ooxml_common::xml_name::validation::is_qualified_name
+     0.75%  native   native                [.] quick_xml::escape::normalize_attribute_value
+     0.74%  native   native                [.] zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch
+     0.60%  native   native                [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+     0.49%  native   native                [.] std::thread::local::LocalKey<T>::with
+     0.46%  native   native                [.] core::ops::function::FnOnce::call_once
+     0.44%  native   native                [.] litchi_ooxml_common::mce::codec::expand
+     0.44%  native   libc.so.6             [.] _int_free_merge_chunk
+            |          
+            |--0.33%--_int_free_create_chunk (inlined)
+            |          _int_free_merge_chunk
+            |          _int_free_chunk
+            |          
+             --0.10%--_int_free_merge_chunk
+                       _int_free_chunk
+
+     0.42%  native   native                [.] litchi_pptx::notes::resolved
+     0.38%  native   native                [.] quick_xml::reader::state::ReaderState::emit_end
+     0.34%  native   native                [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+     0.33%  native   native                [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.31%  native   native                [.] alloc::raw_vec::RawVecInner<A>::try_allocate_in
+     0.29%  native   native                [.] quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+     0.28%  native   [unknown]             [k] 0xffffffff9e800ef0
+            |
+            ---0xffffffff9e800ef0
+
+     0.28%  native   native                [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.26%  native   native                [.] __rustc::__rust_alloc
+     0.25%  native   native                [.] quick_xml::name::NamespaceResolver::resolve_prefix
+     0.25%  native   libc.so.6             [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk (inlined)
+               |          
+                --0.18%--_int_malloc
+                          |          
+                           --0.12%--__libc_malloc2
+
+     0.24%  native   native                [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.24%  native   native                [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.24%  native   native                [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+     0.23%  native   native                [.] quick_xml::escape::unescape
+     0.22%  native   native                [.] quick_xml::name::NamespaceResolver::push
+     0.21%  native   [unknown]             [k] 0xffffffff9efed639
+            |
+            ---0xffffffff9efed639
+               0xffffffff9ec1a367
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               |          
+                --0.14%--__memset_avx512_unaligned_erms
+
+     0.20%  native   native                [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+     0.20%  native   native                [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw
+     0.18%  native   libc.so.6             [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.18%  native   native                [.] __rustc::__rdl_alloc
+     0.17%  native   libc.so.6             [.] __libc_malloc2
+            |
+            ---__libc_malloc2
+
+     0.16%  native   libc.so.6             [.] _int_free_maybe_trim
+            |
+            ---_int_free_maybe_trim
+               _int_free_chunk
+
+     0.16%  native   native                [.] alloc::raw_vec::RawVec<T,A>::grow_one
+     0.16%  native   native                [.] litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice
+     0.15%  native   native                [.] soapberry_zip::office::LazyArchiveReader::read_shared_with_reader
+     0.15%  native   native                [.] crc32fast::specialized::pclmulqdq::calculate_avx512
+     0.15%  native   native                [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.15%  native   libc.so.6             [.] _int_realloc
+            |
+            ---_int_realloc
+               __libc_realloc (inlined)
+
+     0.14%  native   native                [.] core::hash::BuildHasher::hash_one
+     0.14%  native   native                [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.14%  native   native                [.] quick_xml::name::QName::decompose
+     0.13%  native   native                [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.11%  native   native                [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     0.11%  native   native                [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.10%  native   native                [.] <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find
+     0.10%  native   native                [.] litchi_opc::packuri::PackURI::validate_percent_encoding
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

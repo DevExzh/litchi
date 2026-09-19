@@ -1,0 +1,20 @@
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/presentation.xml visible_ptr=0x63435933bb40 visible_len=793 arc_struct_ptr=0x63435934be30 arc_bytes_ptr=0x63435933bb40 arc_len=793 alias=true
+LITCHI0691_CODEC call=0 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x63435936c360 output_len=853 mode=owned status=ok
+LITCHI0691_MODEL profile=baseline stage=capture_begin parts=23
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/presentation.xml visible_ptr=0x63435933bb40 visible_len=793 arc_struct_ptr=0x63435934be30 arc_bytes_ptr=0x63435933bb40 arc_len=793 alias=true
+LITCHI0691_CODEC call=1 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x63435936c840 output_len=853 mode=owned status=ok
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/presentation.xml visible_ptr=0x63435933bb40 visible_len=793 arc_struct_ptr=0x63435934be30 arc_bytes_ptr=0x63435933bb40 arc_len=793 alias=true
+LITCHI0691_CODEC call=2 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x634359332620 output_len=853 mode=owned status=ok
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/presentation.xml visible_ptr=0x63435933bb40 visible_len=793 arc_struct_ptr=0x63435934be30 arc_bytes_ptr=0x63435933bb40 arc_len=793 alias=true
+LITCHI0691_CODEC call=3 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x634359331050 output_len=853 mode=owned status=ok
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/slides/slide1.xml visible_ptr=0x634359365f50 visible_len=1664 arc_struct_ptr=0x63435934bf20 arc_bytes_ptr=0x634359365f50 arc_len=1664 alias=true
+LITCHI0691_CODEC call=4 profile=baseline stage=prefix:real:capture input_ptr=0x634359365f50 input_len=1664 output_ptr=0x63435932dfd0 output_len=1821 mode=owned status=ok
+LITCHI0691_PART profile=baseline stage=process_part uri=/ppt/slides/slide1.xml visible_ptr=0x634359365f50 visible_len=1664 arc_struct_ptr=0x63435934bf20 arc_bytes_ptr=0x634359365f50 arc_len=1664 alias=true
+LITCHI0691_CODEC call=5 profile=baseline stage=prefix:real:capture input_ptr=0x634359365f50 input_len=1664 output_ptr=0x63435932dfd0 output_len=1821 mode=owned status=ok
+LITCHI0691_CODEC call=6 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x63435932dfd0 output_len=853 mode=owned status=ok
+LITCHI0691_CODEC call=7 profile=baseline stage=prefix:real:capture input_ptr=0x63435933bb40 input_len=793 output_ptr=0x63435932e870 output_len=853 mode=owned status=ok
+LITCHI0691_CODEC call=8 profile=baseline stage=prefix:real:capture input_ptr=0x634359365f50 input_len=1664 output_ptr=0x634359345750 output_len=1821 mode=owned status=ok
+LITCHI0691_CODEC call=9 profile=baseline stage=prefix:real:capture input_ptr=0x6343593665e0 input_len=4424 output_ptr=0x634359345750 output_len=4831 mode=owned status=ok
+LITCHI0691_CODEC call=10 profile=baseline stage=prefix:real:capture input_ptr=0x634359367d90 input_len=6632 output_ptr=0x634359367d90 output_len=6632 mode=borrow status=ok
+LITCHI0691_CODEC call=11 profile=baseline stage=prefix:real:capture input_ptr=0x6343593403d0 input_len=1460 output_ptr=0x634359345f80 output_len=1589 mode=owned status=ok
+LITCHI0691_MODEL profile=baseline stage=capture_success parts=23 slides=1

@@ -1,0 +1,21 @@
+[
+  {
+    "case": "real",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0691/release/probe0691",
+      "prefix",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+      "capture",
+      "1"
+    ],
+    "count": 1,
+    "exit_code": 0,
+    "operation": "capture",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+    "stderr_sha256": "391b8ae0cdbbe42f3d67e0e83b694ca49ccc2dfa6a161800764dc1522bce819b",
+    "stdout_sha256": "d03c3f743e9d5259470b3520b872d9b06c31471d52f0d63c06461e36a0c9125a"
+  }
+]

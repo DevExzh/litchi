@@ -1,0 +1,59 @@
+[
+  {
+    "name": "claims-structural",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "exit_code": 0,
+    "seconds": 0.04544894699938595
+  },
+  {
+    "name": "report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.052349530975334346
+  },
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.046484571998007596
+  },
+  {
+    "name": "non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "exit_code": 0,
+    "seconds": 4.038265823968686
+  }
+]

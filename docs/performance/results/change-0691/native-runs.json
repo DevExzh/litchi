@@ -1,0 +1,422 @@
+[
+  {
+    "case": "real",
+    "leg": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.599362983019091,
+    "output": "native/real-0.tsv",
+    "output_sha256": "b71ad6710c0a467c047ff12685652fbf9acd6744b98fa110b62768e166bf052c",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+  },
+  {
+    "case": "control",
+    "leg": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.9489477609749883,
+    "output": "native/control-0.tsv",
+    "output_sha256": "9af9de17d83ac41d634d7799a00f086a24e255e22b2f7fc4c24c743da0962c20",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+  },
+  {
+    "case": "generated",
+    "leg": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "generated:12x8",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2600876180222258,
+    "output": "native/generated-0.tsv",
+    "output_sha256": "45cab8dfc47827f74be7336512beaece7411b52a11a5a623605cd7e04aa6492a",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": null
+  },
+  {
+    "case": "notes-poi",
+    "leg": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.14805851900018752,
+    "output": "native/notes-poi-0.tsv",
+    "output_sha256": "f8b0a9a3a91fca75191538fbb6cfe9f0deb3b46563a9ec9d53f39047c768cf59",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+  },
+  {
+    "case": "notes-lo",
+    "leg": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2187808530870825,
+    "output": "native/notes-lo-0.tsv",
+    "output_sha256": "4bdddf18bb8f69d86f901781e6a6cd987045c17ccb735932cf795964dd2f6f8d",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+  },
+  {
+    "case": "notes-lo",
+    "leg": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.21726082602981478,
+    "output": "native/notes-lo-1.tsv",
+    "output_sha256": "c58429cf846585f8100e26f5048bf5f2dbfe916f3c62205f62523c1907b82eeb",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+  },
+  {
+    "case": "notes-poi",
+    "leg": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.1482693200232461,
+    "output": "native/notes-poi-1.tsv",
+    "output_sha256": "b9a92108ce023019ca88c1b4fa7ff2ac6d8a5ac429840cc54a0098f67ee5bd11",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+  },
+  {
+    "case": "generated",
+    "leg": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "generated:12x8",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2611210730392486,
+    "output": "native/generated-1.tsv",
+    "output_sha256": "3724a095daabff01a478e155f82f48abeaeff3cb3d894008fbddd90b9ce1cf4b",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": null
+  },
+  {
+    "case": "control",
+    "leg": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.9450919320806861,
+    "output": "native/control-1.tsv",
+    "output_sha256": "5d49ee11a4c49802fc54c4846716d0a2fbf39582e10e6401f14fbf2952410ea1",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+  },
+  {
+    "case": "real",
+    "leg": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.599877495900728,
+    "output": "native/real-1.tsv",
+    "output_sha256": "a1c97444109c8a05c9d6c16e435073e0273f892e013425d3d7e9bc1e6e972233",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+  },
+  {
+    "case": "real",
+    "leg": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.5910523938946426,
+    "output": "native/real-2.tsv",
+    "output_sha256": "157ea7b7a9402b402ddd79c89b498bac1388eaac665a8fedf77713d36128e82f",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+  },
+  {
+    "case": "control",
+    "leg": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.9452635530615225,
+    "output": "native/control-2.tsv",
+    "output_sha256": "a5c77a31b3461031efd32c70c5d6c12f82f52b8a826aa6ca84f79dfb3fe1a2fb",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+  },
+  {
+    "case": "generated",
+    "leg": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "generated:12x8",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2611465029185638,
+    "output": "native/generated-2.tsv",
+    "output_sha256": "4ec1e366e09a88a821829608bc2758c4f41504f0d13d82aff75800b0cd821a05",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": null
+  },
+  {
+    "case": "notes-poi",
+    "leg": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.14850086101796478,
+    "output": "native/notes-poi-2.tsv",
+    "output_sha256": "831c5a687a1cc72303ec49a3116e5cf0e51fd920093bee8614ce69403ea54387",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+  },
+  {
+    "case": "notes-lo",
+    "leg": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.218380791018717,
+    "output": "native/notes-lo-2.tsv",
+    "output_sha256": "c6050388e12e50e430cd65fcf775825a82b1934aa5c816e89f180d9ead08f5cf",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+  },
+  {
+    "case": "notes-lo",
+    "leg": 3,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.21757317695301026,
+    "output": "native/notes-lo-3.tsv",
+    "output_sha256": "aba1755949ef6be506117676ec7ea189d760224897e8dc6789c9fdab449dddfb",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+  },
+  {
+    "case": "notes-poi",
+    "leg": 3,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.1496106960112229,
+    "output": "native/notes-poi-3.tsv",
+    "output_sha256": "29184a9b62aef04d349e0b4b91ff6053d3b9048f1798d36113c524e9b0fd5637",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+  },
+  {
+    "case": "generated",
+    "leg": 3,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "generated:12x8",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2622664379887283,
+    "output": "native/generated-3.tsv",
+    "output_sha256": "e9a56e2afe3b2297d3e8ce8d34a9103b961ea2c56b0f46f031b28ee5bf2e3d3c",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": null
+  },
+  {
+    "case": "control",
+    "leg": 3,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.944594050059095,
+    "output": "native/control-3.tsv",
+    "output_sha256": "1edf5d1baa98258d47dbb74bcc9a5ae6fbaa97c2b655dedbdb7211befdc0097d",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+  },
+  {
+    "case": "real",
+    "leg": 3,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0691-bin/native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.591048614005558,
+    "output": "native/real-3.tsv",
+    "output_sha256": "974e5199f30e020fa546e2343377ab624d7b152e31f331e3c3446a3a15e93974",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "5af615646f9bbe9cf6cf0f6785d8b963b0f52bf07a156856d263b82bed716a65",
+    "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+  }
+]

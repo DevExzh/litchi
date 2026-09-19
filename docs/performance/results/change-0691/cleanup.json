@@ -1,0 +1,33 @@
+{
+  "completed_utc": "2026-09-19T18:09:53.390182+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0691",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0691-bin",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0691-profile",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0691/marker-control.pptx",
+      "kind": "reproducible marker-control archive",
+      "sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0691/initial/marker-control.pptx",
+      "kind": "reproducible marker-control archive",
+      "sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "removed": true
+    }
+  ],
+  "preserved": "preexisting shared targets, workspace Cargo.lock and unrelated worktrees"
+}

@@ -1,0 +1,19 @@
+   Compiling probe0691 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0691/probe)
+error[E0277]: `Metrics` doesn't implement `Debug`
+   --> src/main.rs:212:5
+    |
+210 | #[derive(Clone, Copy, Debug)]
+    |                       ----- in this derive macro expansion
+211 | struct AllocationReport {
+212 |     capture: counting_allocator::Metrics,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Debug` is not implemented for `Metrics`
+    |
+    = note: add `#[derive(Debug)]` to `Metrics` or manually `impl Debug for Metrics`
+help: consider annotating `Metrics` with `#[derive(Debug)]`
+    |
+ 41 +     #[derive(Debug)]
+ 42 |     pub struct Metrics {
+    |
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `probe0691` (bin "probe0691") due to 1 previous error

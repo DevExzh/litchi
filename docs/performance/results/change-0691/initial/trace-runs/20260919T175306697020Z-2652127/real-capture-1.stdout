@@ -1,0 +1,8 @@
+probe	0691
+mode	prefix
+source	/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
+source_archive_bytes	24629
+source_archive_sha256	16faaaffa35304df654bc20927570d1812d5fdf085d0ecd253cd4c272a913610
+stage	capture
+iterations	1
+completed	1
