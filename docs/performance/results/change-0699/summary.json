@@ -1,0 +1,2374 @@
+[
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34455.5,
+      "mean_ns": 34707.77,
+      "p95_ns": 34830,
+      "p99_ns": 40670,
+      "min_ns": 34160,
+      "max_ns": 43310
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 35040.0,
+      "mean_ns": 35315.206666666665,
+      "p95_ns": 35480,
+      "p99_ns": 42381,
+      "min_ns": 34650,
+      "max_ns": 44131
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34950.0,
+      "mean_ns": 35188.473333333335,
+      "p95_ns": 35230,
+      "p99_ns": 41600,
+      "min_ns": 34690,
+      "max_ns": 42900
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34930.0,
+      "mean_ns": 35276.636666666665,
+      "p95_ns": 36941,
+      "p99_ns": 42050,
+      "min_ns": 34560,
+      "max_ns": 53670
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 4,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 37620.0,
+      "mean_ns": 37930.65,
+      "p95_ns": 38080,
+      "p99_ns": 45230,
+      "min_ns": 37360,
+      "max_ns": 48850
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 5,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34400.0,
+      "mean_ns": 34605.17,
+      "p95_ns": 34641,
+      "p99_ns": 40080,
+      "min_ns": 34170,
+      "max_ns": 41210
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 6,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34540.0,
+      "mean_ns": 34869.636666666665,
+      "p95_ns": 34910,
+      "p99_ns": 41420,
+      "min_ns": 34190,
+      "max_ns": 62600
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 7,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34950.0,
+      "mean_ns": 35218.57,
+      "p95_ns": 35251,
+      "p99_ns": 41370,
+      "min_ns": 34610,
+      "max_ns": 56330
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 8,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34720.0,
+      "mean_ns": 34982.67333333333,
+      "p95_ns": 35000,
+      "p99_ns": 41751,
+      "min_ns": 34440,
+      "max_ns": 43801
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 9,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 35020.5,
+      "mean_ns": 35268.206666666665,
+      "p95_ns": 35360,
+      "p99_ns": 41870,
+      "min_ns": 34691,
+      "max_ns": 43451
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 10,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34910.5,
+      "mean_ns": 35131.24,
+      "p95_ns": 35240,
+      "p99_ns": 41220,
+      "min_ns": 34610,
+      "max_ns": 42640
+    }
+  },
+  {
+    "mode": "case",
+    "case": "early-name-error",
+    "leg": 11,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34520.0,
+      "mean_ns": 34740.236666666664,
+      "p95_ns": 34900,
+      "p99_ns": 40590,
+      "min_ns": 34150,
+      "max_ns": 41500
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 150101.0,
+      "mean_ns": 151365.50666666665,
+      "p95_ns": 158321,
+      "p99_ns": 162101,
+      "min_ns": 148321,
+      "max_ns": 185260
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 151895.5,
+      "mean_ns": 152648.27666666667,
+      "p95_ns": 159311,
+      "p99_ns": 161281,
+      "min_ns": 148431,
+      "max_ns": 185451
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 153251.0,
+      "mean_ns": 154020.85,
+      "p95_ns": 161611,
+      "p99_ns": 163831,
+      "min_ns": 149721,
+      "max_ns": 164831
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 150885.5,
+      "mean_ns": 151811.30333333334,
+      "p95_ns": 158301,
+      "p99_ns": 160701,
+      "min_ns": 149070,
+      "max_ns": 163801
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 4,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 152416.0,
+      "mean_ns": 153389.38,
+      "p95_ns": 159200,
+      "p99_ns": 163851,
+      "min_ns": 150530,
+      "max_ns": 176801
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 5,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 151095.5,
+      "mean_ns": 152045.63666666666,
+      "p95_ns": 158031,
+      "p99_ns": 161670,
+      "min_ns": 148730,
+      "max_ns": 173761
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 6,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 147680.0,
+      "mean_ns": 148657.26,
+      "p95_ns": 154331,
+      "p99_ns": 156161,
+      "min_ns": 146831,
+      "max_ns": 170871
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 7,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 151396.0,
+      "mean_ns": 152382.64333333334,
+      "p95_ns": 157761,
+      "p99_ns": 161451,
+      "min_ns": 149730,
+      "max_ns": 172001
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 8,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 149311.0,
+      "mean_ns": 150359.26666666666,
+      "p95_ns": 156610,
+      "p99_ns": 158851,
+      "min_ns": 147791,
+      "max_ns": 169960
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 9,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 149470.0,
+      "mean_ns": 150463,
+      "p95_ns": 156661,
+      "p99_ns": 160060,
+      "min_ns": 147421,
+      "max_ns": 169741
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 10,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 154061.0,
+      "mean_ns": 154996.09,
+      "p95_ns": 160680,
+      "p99_ns": 163281,
+      "min_ns": 150531,
+      "max_ns": 177241
+    }
+  },
+  {
+    "mode": "case",
+    "case": "late-root-error-mce",
+    "leg": 11,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 150051.0,
+      "mean_ns": 151138.27,
+      "p95_ns": 157211,
+      "p99_ns": 160011,
+      "min_ns": 148991,
+      "max_ns": 162611
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 248546.0,
+      "mean_ns": 250291.85333333333,
+      "p95_ns": 257502,
+      "p99_ns": 260142,
+      "min_ns": 246082,
+      "max_ns": 284742
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250451.5,
+      "mean_ns": 251010.42333333334,
+      "p95_ns": 259552,
+      "p99_ns": 263081,
+      "min_ns": 243762,
+      "max_ns": 267031
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 251671.0,
+      "mean_ns": 253531.9,
+      "p95_ns": 261371,
+      "p99_ns": 267232,
+      "min_ns": 246431,
+      "max_ns": 274132
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250321.5,
+      "mean_ns": 250650.98666666666,
+      "p95_ns": 258951,
+      "p99_ns": 263861,
+      "min_ns": 244151,
+      "max_ns": 268481
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 4,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 248331.0,
+      "mean_ns": 250240.92666666667,
+      "p95_ns": 257082,
+      "p99_ns": 262701,
+      "min_ns": 245811,
+      "max_ns": 309771
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 5,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 246287.0,
+      "mean_ns": 248658.08,
+      "p95_ns": 256361,
+      "p99_ns": 261842,
+      "min_ns": 243782,
+      "max_ns": 324001
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 6,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250076.5,
+      "mean_ns": 251783.20333333334,
+      "p95_ns": 258961,
+      "p99_ns": 261452,
+      "min_ns": 245431,
+      "max_ns": 275252
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 7,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250441.5,
+      "mean_ns": 251914.26,
+      "p95_ns": 258931,
+      "p99_ns": 261492,
+      "min_ns": 245321,
+      "max_ns": 309752
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 8,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 246696.0,
+      "mean_ns": 248301.11333333334,
+      "p95_ns": 255281,
+      "p99_ns": 259241,
+      "min_ns": 243681,
+      "max_ns": 271281
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 9,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250616.5,
+      "mean_ns": 252181.69,
+      "p95_ns": 259161,
+      "p99_ns": 262791,
+      "min_ns": 247911,
+      "max_ns": 282041
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 10,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 252511.0,
+      "mean_ns": 254292.83,
+      "p95_ns": 261171,
+      "p99_ns": 266461,
+      "min_ns": 250361,
+      "max_ns": 272881
+    }
+  },
+  {
+    "mode": "case",
+    "case": "small-valid",
+    "leg": 11,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 247137.0,
+      "mean_ns": 249309.29666666666,
+      "p95_ns": 256271,
+      "p99_ns": 262561,
+      "min_ns": 244861,
+      "max_ns": 272082
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "early-name-error",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34961.0,
+      "mean_ns": 35256.20333333333,
+      "p95_ns": 35201,
+      "p99_ns": 41950,
+      "min_ns": 34670,
+      "max_ns": 57660
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "early-name-error",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 35060.0,
+      "mean_ns": 35336.03666666667,
+      "p95_ns": 35341,
+      "p99_ns": 43111,
+      "min_ns": 34761,
+      "max_ns": 43921
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "early-name-error",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 37910.0,
+      "mean_ns": 38121.62,
+      "p95_ns": 38200,
+      "p99_ns": 43950,
+      "min_ns": 37551,
+      "max_ns": 44440
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "early-name-error",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+      ],
+      "expected_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ],
+      "observed_error_debug": [
+        "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 34610.0,
+      "mean_ns": 35566.24,
+      "p95_ns": 44380,
+      "p99_ns": 44590,
+      "min_ns": 34291,
+      "max_ns": 44970
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "generated-12x8-valid",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "40992"
+      ],
+      "authoring_base_archive_sha256": [
+        "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+      ],
+      "prepared_input_graph_sha256": [
+        "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+      ],
+      "expected_error_debug": [
+        "ok (slides=12, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 632178.0,
+      "mean_ns": 632619.4733333334,
+      "p95_ns": 641133,
+      "p99_ns": 643353,
+      "min_ns": 622433,
+      "max_ns": 652024
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "generated-12x8-valid",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "40992"
+      ],
+      "authoring_base_archive_sha256": [
+        "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+      ],
+      "prepared_input_graph_sha256": [
+        "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+      ],
+      "expected_error_debug": [
+        "ok (slides=12, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 625228.0,
+      "mean_ns": 624792.9533333334,
+      "p95_ns": 631393,
+      "p99_ns": 636503,
+      "min_ns": 616233,
+      "max_ns": 696073
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "generated-12x8-valid",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "40992"
+      ],
+      "authoring_base_archive_sha256": [
+        "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+      ],
+      "prepared_input_graph_sha256": [
+        "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+      ],
+      "expected_error_debug": [
+        "ok (slides=12, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 641994.0,
+      "mean_ns": 641429.39,
+      "p95_ns": 647863,
+      "p99_ns": 652833,
+      "min_ns": 632503,
+      "max_ns": 660754
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "generated-12x8-valid",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "40992"
+      ],
+      "authoring_base_archive_sha256": [
+        "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+      ],
+      "prepared_input_graph_sha256": [
+        "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+      ],
+      "expected_error_debug": [
+        "ok (slides=12, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 627818.5,
+      "mean_ns": 626863.6066666667,
+      "p95_ns": 633223,
+      "p99_ns": 636403,
+      "min_ns": 618393,
+      "max_ns": 647453
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 73265.5,
+      "mean_ns": 73810.09,
+      "p95_ns": 79290,
+      "p99_ns": 81150,
+      "min_ns": 72561,
+      "max_ns": 87891
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 72451.0,
+      "mean_ns": 72981.35666666667,
+      "p95_ns": 78391,
+      "p99_ns": 79770,
+      "min_ns": 71941,
+      "max_ns": 91271
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 74640.5,
+      "mean_ns": 75071.26333333334,
+      "p95_ns": 80270,
+      "p99_ns": 82730,
+      "min_ns": 73951,
+      "max_ns": 87630
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 72240.5,
+      "mean_ns": 72690.72333333333,
+      "p95_ns": 78101,
+      "p99_ns": 78811,
+      "min_ns": 71630,
+      "max_ns": 80770
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship-mce",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 143726.0,
+      "mean_ns": 144800.97333333333,
+      "p95_ns": 151851,
+      "p99_ns": 154031,
+      "min_ns": 142671,
+      "max_ns": 156101
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship-mce",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 142240.5,
+      "mean_ns": 144264.83333333334,
+      "p95_ns": 149440,
+      "p99_ns": 202541,
+      "min_ns": 140320,
+      "max_ns": 222491
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship-mce",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 143380.5,
+      "mean_ns": 144226,
+      "p95_ns": 150051,
+      "p99_ns": 151991,
+      "min_ns": 141720,
+      "max_ns": 152601
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-missing-relationship-mce",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+      ],
+      "expected_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ],
+      "observed_error_debug": [
+        "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 141141.0,
+      "mean_ns": 142046.69666666666,
+      "p95_ns": 147691,
+      "p99_ns": 149751,
+      "min_ns": 140131,
+      "max_ns": 152541
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 80040.5,
+      "mean_ns": 80661.59333333334,
+      "p95_ns": 86611,
+      "p99_ns": 89130,
+      "min_ns": 79231,
+      "max_ns": 99270
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 79551.0,
+      "mean_ns": 80254.25666666667,
+      "p95_ns": 86410,
+      "p99_ns": 89641,
+      "min_ns": 78771,
+      "max_ns": 103510
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 82665.5,
+      "mean_ns": 83174.40333333334,
+      "p95_ns": 88501,
+      "p99_ns": 89131,
+      "min_ns": 81840,
+      "max_ns": 92910
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 79510.5,
+      "mean_ns": 80198.59333333334,
+      "p95_ns": 85670,
+      "p99_ns": 87650,
+      "min_ns": 78910,
+      "max_ns": 120831
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error-mce",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 150775.5,
+      "mean_ns": 152004.44333333333,
+      "p95_ns": 158311,
+      "p99_ns": 161631,
+      "min_ns": 149400,
+      "max_ns": 205661
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error-mce",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 149615.5,
+      "mean_ns": 150727.69666666666,
+      "p95_ns": 157961,
+      "p99_ns": 159731,
+      "min_ns": 148061,
+      "max_ns": 163381
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error-mce",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 151051.0,
+      "mean_ns": 151976.77333333335,
+      "p95_ns": 157751,
+      "p99_ns": 160051,
+      "min_ns": 149510,
+      "max_ns": 171651
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "late-root-error-mce",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide part does not have a p:sld root\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 148425.5,
+      "mean_ns": 149497.63333333333,
+      "p95_ns": 155190,
+      "p99_ns": 158181,
+      "min_ns": 147131,
+      "max_ns": 167541
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "mixed-conformance",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 116705.5,
+      "mean_ns": 117484.70666666667,
+      "p95_ns": 123870,
+      "p99_ns": 125440,
+      "min_ns": 115230,
+      "max_ns": 135720
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "mixed-conformance",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 115215.5,
+      "mean_ns": 116032.63,
+      "p95_ns": 121810,
+      "p99_ns": 123681,
+      "min_ns": 114500,
+      "max_ns": 129110
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "mixed-conformance",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 118945.5,
+      "mean_ns": 119716.25,
+      "p95_ns": 125531,
+      "p99_ns": 127801,
+      "min_ns": 117931,
+      "max_ns": 133191
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "mixed-conformance",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"slide conformance differs from presentation\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 115180.5,
+      "mean_ns": 115966.2,
+      "p95_ns": 121650,
+      "p99_ns": 123781,
+      "min_ns": 114381,
+      "max_ns": 127051
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "notes-invalid-tail",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+      ],
+      "expected_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ],
+      "observed_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 234701.0,
+      "mean_ns": 236085.98666666666,
+      "p95_ns": 243111,
+      "p99_ns": 245341,
+      "min_ns": 231381,
+      "max_ns": 249581
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "notes-invalid-tail",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+      ],
+      "expected_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ],
+      "observed_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 229421.0,
+      "mean_ns": 230941.55666666667,
+      "p95_ns": 237501,
+      "p99_ns": 240111,
+      "min_ns": 227841,
+      "max_ns": 256751
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "notes-invalid-tail",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+      ],
+      "expected_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ],
+      "observed_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 236751.5,
+      "mean_ns": 238226.92,
+      "p95_ns": 244821,
+      "p99_ns": 247411,
+      "min_ns": 235131,
+      "max_ns": 249441
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "notes-invalid-tail",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+      ],
+      "expected_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ],
+      "observed_error_debug": [
+        "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 235991.0,
+      "mean_ns": 237499.56666666668,
+      "p95_ns": 243551,
+      "p99_ns": 246661,
+      "min_ns": 234811,
+      "max_ns": 253702
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 22562490.0,
+      "mean_ns": 22583861.953333333,
+      "p95_ns": 22693611,
+      "p99_ns": 22877261,
+      "min_ns": 22529149,
+      "max_ns": 23040542
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 22556904.0,
+      "mean_ns": 22572377.31,
+      "p95_ns": 22671320,
+      "p99_ns": 22744890,
+      "min_ns": 22523260,
+      "max_ns": 22832071
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 22551324.0,
+      "mean_ns": 22559281.5,
+      "p95_ns": 22616469,
+      "p99_ns": 22716362,
+      "min_ns": 22517149,
+      "max_ns": 22797021
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "32713"
+      ],
+      "authoring_base_archive_sha256": [
+        "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+      ],
+      "prepared_input_graph_sha256": [
+        "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+      ],
+      "expected_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ],
+      "observed_error_debug": [
+        "Invalid(\"invalid sld root or namespace\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 22702641.5,
+      "mean_ns": 26272730.976666667,
+      "p95_ns": 30104218,
+      "p99_ns": 30270428,
+      "min_ns": 22531451,
+      "max_ns": 30437500
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "small-valid",
+    "leg": 0,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 246566.0,
+      "mean_ns": 248226.14666666667,
+      "p95_ns": 255251,
+      "p99_ns": 260441,
+      "min_ns": 244671,
+      "max_ns": 265732
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "small-valid",
+    "leg": 1,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 246581.5,
+      "mean_ns": 248113.04,
+      "p95_ns": 254912,
+      "p99_ns": 256361,
+      "min_ns": 244641,
+      "max_ns": 259422
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "small-valid",
+    "leg": 2,
+    "phase": "candidate",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 251131.5,
+      "mean_ns": 252617.32666666666,
+      "p95_ns": 258591,
+      "p99_ns": 262641,
+      "min_ns": 249321,
+      "max_ns": 270721
+    }
+  },
+  {
+    "mode": "matrix",
+    "case": "small-valid",
+    "leg": 3,
+    "phase": "baseline",
+    "metadata": {
+      "authoring_base_archive_bytes": [
+        "31554"
+      ],
+      "authoring_base_archive_sha256": [
+        "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+      ],
+      "prepared_input_graph_sha256": [
+        "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+      ],
+      "expected_error_debug": [
+        "ok (slides=2, first_name=\"Slide 256\")"
+      ]
+    },
+    "stats": {
+      "samples": 300,
+      "p50_ns": 250761.5,
+      "mean_ns": 251429.78333333333,
+      "p95_ns": 259912,
+      "p99_ns": 268372,
+      "min_ns": 245281,
+      "max_ns": 273512
+    }
+  }
+]

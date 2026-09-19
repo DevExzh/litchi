@@ -1,0 +1,10 @@
+probe	0699-refusal
+case	early-name-error
+mode	profile
+iterations	1000
+prepared_input_graph_sha256	a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce
+expected_error_debug	Decode(Malformed("position 24: duplicated attribute, previous declaration at position 7"))
+successful_captures	0
+refused_captures	1000
+assertion_checksum_sha256	f73e6327bb1211b8b4aba3997f776191a1db231bd5d22e33514650dcabf1cbdd
+all_iterations_passed	true

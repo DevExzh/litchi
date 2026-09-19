@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0699 — marker-free refusal diagnostic baseline
+
+[0699](0699-marker-free-refusal-attribution.md) retains 22,800 diagnostic
+captures with balanced isolated-case legs and the original full matrix.
+The rejected codec reproduces isolated and matrix early-error costs of +9.36%
+and +9.53% in flagged pairs. Source tracing shows this fixture bypasses the
+modified MCE start handler. In the marker-search processor, 257/261 baseline
+instruction samples fall in its 59-byte comparison/window loop. These are
+fresh diagnostic binaries; production remains unchanged and 0698 stays rejected.
+
 ## 0698 — rejected borrowed inherited namespace experiment
 
 [0698](0698-mce-borrowed-inherited-namespaces.md) rejects the borrowed-view

@@ -1,0 +1,20 @@
+[
+  {
+    "phase": "baseline",
+    "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+    "symbol_samples": 261,
+    "loop_first_address": 1298864,
+    "loop_last_address": 1298895,
+    "loop_samples": 257,
+    "loop_fraction_of_symbol_samples": 0.9846743295019157
+  },
+  {
+    "phase": "candidate",
+    "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+    "symbol_samples": 290,
+    "loop_first_address": 1298752,
+    "loop_last_address": 1298783,
+    "loop_samples": 288,
+    "loop_fraction_of_symbol_samples": 0.993103448275862
+  }
+]

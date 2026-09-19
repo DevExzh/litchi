@@ -1,0 +1,6 @@
+{
+  "baseline-late-root-error-mce.data": "073bb4d7e52656e18dc41196b68c33643d8e2568f3d962838924ba97add22910",
+  "baseline-early-name-error.data": "f6ccec3c2cc1f2e3d12b3f95dcf643bf43be7755a8ada4e6e9e44e500d79796a",
+  "candidate-early-name-error.data": "23ec3a6e9f5e372b790771e4be860c2576952a62a8aea20c9811bef4e9923f61",
+  "candidate-late-root-error-mce.data": "d6a795f70ef5475a6f72bfc3053b1dac1d12de7eef992ff84b7179f079bf0ab0"
+}

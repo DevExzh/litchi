@@ -1,0 +1,60 @@
+[
+  {
+    "phase": "baseline",
+    "name": "nm",
+    "command": [
+      "nm",
+      "-S",
+      "-C",
+      "/home/zhuhe/code/litchi-0699-bin/baseline"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d",
+    "stdout": "symbols/baseline-nm.txt",
+    "stdout_sha256": "dd02002979097a5e201b91f31c6d38200f50d1db0bb2071e0398dc36b5d695f1",
+    "stderr": ""
+  },
+  {
+    "phase": "baseline",
+    "name": "size",
+    "command": [
+      "size",
+      "-A",
+      "/home/zhuhe/code/litchi-0699-bin/baseline"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "d9213f3091db4ab86db81ea7ab85577a240919c422032809cbf964a443383f0d",
+    "stdout": "symbols/baseline-size.txt",
+    "stdout_sha256": "ff07e35bd7541533f59b04c0556ba61c58b5e7173183ac676d5abd05f1597534",
+    "stderr": ""
+  },
+  {
+    "phase": "candidate",
+    "name": "nm",
+    "command": [
+      "nm",
+      "-S",
+      "-C",
+      "/home/zhuhe/code/litchi-0699-bin/candidate"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610",
+    "stdout": "symbols/candidate-nm.txt",
+    "stdout_sha256": "80c9564e3eb87403313d47d4ef357216013b38298f59f8e1aeabeaea3e019c49",
+    "stderr": ""
+  },
+  {
+    "phase": "candidate",
+    "name": "size",
+    "command": [
+      "size",
+      "-A",
+      "/home/zhuhe/code/litchi-0699-bin/candidate"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "5744d6189ef03f5c6cfc58a0c10ef86d757ff50f43ad40c69c20ffdc3d815610",
+    "stdout": "symbols/candidate-size.txt",
+    "stdout_sha256": "5d8d4a87173eb9955e81349d28f1247d18d8d9c8580d82ecd3f643ac7400daf9",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,121 @@
+{
+  "unit": "counts except task-clock milliseconds",
+  "rows": [
+    {
+      "phase": "baseline",
+      "repeat": 0,
+      "per_iteration": {
+        "cycles": 156338.8969,
+        "instructions": 587221.1092,
+        "branches": 127519.8735,
+        "branch-misses": 237.0159,
+        "cache-misses": 2.5113,
+        "page-faults": 0.0,
+        "task-clock": 0.034812
+      }
+    },
+    {
+      "phase": "candidate",
+      "repeat": 0,
+      "per_iteration": {
+        "cycles": 157750.5819,
+        "instructions": 586769.5314,
+        "branches": 127436.0661,
+        "branch-misses": 252.833,
+        "cache-misses": 1.8963,
+        "page-faults": 0.0002,
+        "task-clock": 0.035127
+      }
+    },
+    {
+      "phase": "baseline",
+      "repeat": 1,
+      "per_iteration": {
+        "cycles": 155938.9665,
+        "instructions": 587280.3032,
+        "branches": 127527.7053,
+        "branch-misses": 255.3571,
+        "cache-misses": 1.8346,
+        "page-faults": 0.0003,
+        "task-clock": 0.034733
+      }
+    },
+    {
+      "phase": "candidate",
+      "repeat": 1,
+      "per_iteration": {
+        "cycles": 158051.3729,
+        "instructions": 586921.1341,
+        "branches": 127458.4115,
+        "branch-misses": 263.0243,
+        "cache-misses": 2.7719,
+        "page-faults": 0.0001,
+        "task-clock": 0.035198
+      }
+    },
+    {
+      "phase": "baseline",
+      "repeat": 2,
+      "per_iteration": {
+        "cycles": 157589.1913,
+        "instructions": 587709.621,
+        "branches": 127623.1885,
+        "branch-misses": 248.7929,
+        "cache-misses": 1.8456,
+        "page-faults": -0.0002,
+        "task-clock": 0.035097
+      }
+    },
+    {
+      "phase": "candidate",
+      "repeat": 2,
+      "per_iteration": {
+        "cycles": 157861.1921,
+        "instructions": 586785.9324,
+        "branches": 127434.1234,
+        "branch-misses": 245.4553,
+        "cache-misses": 3.3007,
+        "page-faults": 0.0,
+        "task-clock": 0.035142999999999994
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "repeat": 0,
+      "delta_pct": {
+        "cycles": 0.9029646671377956,
+        "instructions": -0.07690081179390074,
+        "branches": -0.06572105013891161,
+        "branch-misses": 6.673434145135415,
+        "cache-misses": -24.48930832636482,
+        "page-faults": null,
+        "task-clock": 0.9048603929679322
+      }
+    },
+    {
+      "repeat": 1,
+      "delta_pct": {
+        "cycles": 1.354636655232655,
+        "instructions": -0.06115803612736226,
+        "branches": -0.05433627135138508,
+        "branch-misses": 3.0025403640627113,
+        "cache-misses": 51.0901558922926,
+        "page-faults": -66.66666666666666,
+        "task-clock": 1.3387844413094152
+      }
+    },
+    {
+      "repeat": 2,
+      "delta_pct": {
+        "cycles": 0.17260117762909477,
+        "instructions": -0.15716751385289607,
+        "branches": -0.14814321928652285,
+        "branch-misses": -1.341517382529811,
+        "cache-misses": 78.8415691374079,
+        "page-faults": -100.0,
+        "task-clock": 0.1310653332193379
+      }
+    }
+  ]
+}

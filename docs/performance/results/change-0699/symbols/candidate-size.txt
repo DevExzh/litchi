@@ -1,0 +1,43 @@
+/home/zhuhe/code/litchi-0699-bin/candidate  :
+section                  size      addr
+.interp                    28       736
+.note.ABI-tag              32       764
+.note.gnu.build-id         36       796
+.dynsym                  1728       832
+.gnu.version              144      2560
+.gnu.version_r            320      2704
+.gnu.hash                  28      3024
+.dynstr                  1119      3052
+.rela.dyn               78264      4176
+.rela.plt                  48     82440
+.rodata                252748     82496
+.gcc_except_table      337500    335244
+.debug_gdb_scripts         34    672744
+.eh_frame_hdr           23508    672780
+.eh_frame              160780    696288
+.text                 1498225    861168
+.init                      27   2359396
+.fini                      13   2359424
+.plt                       48   2359440
+.tdata                     32   2363584
+.tbss                      72   2363616
+.fini_array                 8   2363616
+.init_array                16   2363624
+.data.rel.ro            50616   2363648
+.dynamic                  464   2414264
+.got                     6224   2414728
+.got.plt                   40   2420952
+.relro_padding           3840   2420992
+.tm_clone_table             0   2425088
+.data                    2552   2425088
+.bss                      256   2427640
+.comment                  177         0
+.debug_abbrev          146751         0
+.debug_info          25910500         0
+.debug_aranges         321520         0
+.debug_ranges         8190512         0
+.debug_str           18731457         0
+.debug_line           8296284         0
+Total                64015951
+
+

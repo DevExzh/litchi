@@ -1,0 +1,133 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "exit_code": 2,
+  "authored_check_exit_code": 0,
+  "disposition": "Only byte-preserved perf and size output has whitespace findings; authored sources and documentation pass.",
+  "exceptions": [
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-0-1000.stderr",
+      "sha256": "43aa90ba6d0d5d1d1e51995a2e6a8730f3c5821ed0a3ff9f109b28133863893e"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-0-11000.stderr",
+      "sha256": "2885a6d25da9c81a2bb86ffd8333fc14935a37fdee7108bfae036d41d863a3cd"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-1-1000.stderr",
+      "sha256": "c4c98c24321643c668776281f268ffa9fa846f07d269918170dc9c251195db8f"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-1-11000.stderr",
+      "sha256": "866ab5f3e8a9382937d9a9799a0bfe1a4945350e91b48e7b8d2e456e2f9eec81"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-2-1000.stderr",
+      "sha256": "32687214c231df0f8c265d5ee882bc68b1087142b3ea6fde61c63d2a250cd556"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-counter-2-11000.stderr",
+      "sha256": "ba10912b78f3833f07d42caf0a6fc4ce76008299375e7e3aa05580c917141b5f"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-early-name-error-inclusive.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-early-name-error-inclusive.stdout",
+      "sha256": "6442424e27a295da9d516847f0606c7347d37d4f4eedb3b0cd530e60c7cbf555"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-early-name-error-self.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-early-name-error-self.stdout",
+      "sha256": "09f98e03df02680c24ea8d47266114a2a256200ac1ba006f7909699cfbec0f7d"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-late-root-error-mce-inclusive.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-late-root-error-mce-inclusive.stdout",
+      "sha256": "f137641486cd459a0a8ec1037109d4e3ff0fc525ac0f8b0ba7ed421a9bc56dbe"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-late-root-error-mce-self.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/baseline-late-root-error-mce-self.stdout",
+      "sha256": "25a282acacd617c0e41a7ebabf1c3c7d7fd7a5181cd8d0c065f859ec0e62b153"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-0-1000.stderr",
+      "sha256": "3ce778bbd0e9d61f43fcb2b582efd5d597c2570eea3c102b79421e56e7ec8a96"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-0-11000.stderr",
+      "sha256": "7a534b8980bbe013b530ecdf37f3f6afe9a68f084227cb47972dba1be9771ca0"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-1-1000.stderr",
+      "sha256": "65fd4d675e76418925093e87ad9b6baa0fa8c0565ed08b4ac00c44c2b83914f0"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-1-11000.stderr",
+      "sha256": "e3238d0feb57c8315898861d71ecf6903f22d48187790098305bf290ea216f09"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-2-1000.stderr",
+      "sha256": "62d0b5a0ffa9e1948f7ed7aac72d907499d9431b90486ea1e3d8ebb5cb58144a"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-counter-2-11000.stderr",
+      "sha256": "34508297e46d63caa16f1ad5da89102d7725acc704df671cd8990a721e182473"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-early-name-error-inclusive.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-early-name-error-inclusive.stdout",
+      "sha256": "fbf315587d989ebe62bcc79d575d276c472dd9dd69da5a5002c06bca55192f8e"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-early-name-error-self.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-early-name-error-self.stdout",
+      "sha256": "4004b4737945ee44e6d66b09f5628c44d1a0b70c5bfa431c37e8b48ac6d6f1a2"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-late-root-error-mce-inclusive.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-late-root-error-mce-inclusive.stdout",
+      "sha256": "fea204ca124c7fabfe978c13af5915c14eca5ed434fdac4398367c2502f4c440"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-late-root-error-mce-self.stderr",
+      "sha256": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7"
+    },
+    {
+      "path": "docs/performance/results/change-0699/profiles/candidate-late-root-error-mce-self.stdout",
+      "sha256": "92b551aae794a489a6b7d2c65161dcf293434e2c24de35bc6cb0e3f7c1a0363d"
+    },
+    {
+      "path": "docs/performance/results/change-0699/symbols/baseline-size.txt",
+      "sha256": "ff07e35bd7541533f59b04c0556ba61c58b5e7173183ac676d5abd05f1597534"
+    },
+    {
+      "path": "docs/performance/results/change-0699/symbols/candidate-size.txt",
+      "sha256": "5d8d4a87173eb9955e81349d28f1247d18d8d9c8580d82ecd3f643ac7400daf9"
+    }
+  ]
+}

@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0699 — measure the marker-free namespace scan next
+
+[0699](0699-marker-free-refusal-attribution.md) distinguishes the early-name
+refusal from MCE start: its slide bytes take the unchanged marker-free return.
+The outlier still appears without earlier timed matrix cases, so matrix order
+is not a necessary cause. Baseline self samples show the processor at 7.25%
+and libc memcmp at 42.89%; 257/261 processor samples lie in its per-byte
+59-byte window comparison loop. Do not assign all libc cost to that loop or
+infer a speedup. Test the existing safe memchr substring search next, keeping
+limits, Cow/Report/error behavior and frame ownership unchanged. Production
+is unchanged; the borrowed-view candidate remains rejected.
+
 ## 0698 — refusal cost blocks borrowed inherited views
 
 [0698](0698-mce-borrowed-inherited-namespaces.md) confirms that borrowed

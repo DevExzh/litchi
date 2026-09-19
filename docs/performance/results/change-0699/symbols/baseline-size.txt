@@ -1,0 +1,43 @@
+/home/zhuhe/code/litchi-0699-bin/baseline  :
+section                  size      addr
+.interp                    28       736
+.note.ABI-tag              32       764
+.note.gnu.build-id         36       796
+.dynsym                  1728       832
+.gnu.version              144      2560
+.gnu.version_r            320      2704
+.gnu.hash                  28      3024
+.dynstr                  1119      3052
+.rela.dyn               78264      4176
+.rela.plt                  48     82440
+.rodata                252748     82496
+.gcc_except_table      337552    335244
+.debug_gdb_scripts         34    672796
+.eh_frame_hdr           23516    672832
+.eh_frame              160840    696352
+.text                 1498529    861296
+.init                      27   2359828
+.fini                      13   2359856
+.plt                       48   2359872
+.tdata                     32   2364016
+.tbss                      72   2364048
+.fini_array                 8   2364048
+.init_array                16   2364056
+.data.rel.ro            50616   2364096
+.dynamic                  464   2414712
+.got                     6224   2415176
+.got.plt                   40   2421400
+.relro_padding           3392   2421440
+.tm_clone_table             0   2425536
+.data                    2552   2425536
+.bss                      256   2428088
+.comment                  177         0
+.debug_abbrev          146755         0
+.debug_info          25910589         0
+.debug_aranges         321536         0
+.debug_ranges         8190672         0
+.debug_str           18728335         0
+.debug_line           8296111         0
+Total                64012901
+
+
