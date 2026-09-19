@@ -1,0 +1,5968 @@
+{
+  "one-real": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109501"
+      ],
+      "candidate_archive_sha256": [
+        "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    }
+  },
+  "one-control": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+      ],
+      "after_semantic_sha256": [
+        "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+      ],
+      "after_semantic_payload_bytes": [
+        "5647"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109515"
+      ],
+      "candidate_archive_sha256": [
+        "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    }
+  },
+  "one-generated": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+      ],
+      "after_semantic_sha256": [
+        "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+      ],
+      "after_semantic_payload_bytes": [
+        "12426"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40810"
+      ],
+      "candidate_archive_sha256": [
+        "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "one-notes-poi": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "after_revision_sha256": [
+        "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+      ],
+      "after_semantic_sha256": [
+        "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+      ],
+      "after_semantic_payload_bytes": [
+        "163"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "candidate_archive_bytes": [
+        "26401"
+      ],
+      "candidate_archive_sha256": [
+        "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "one-notes-lo": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "after_revision_sha256": [
+        "a9150c37a4cbc8792a32f83e55f68c32e0a8631a2f15f59c9e31a8af9aa8ba9b"
+      ],
+      "after_semantic_sha256": [
+        "8054dd66561f73ff327c1ead16c8a7cf81f705ce66f17b1af686727d0953a0a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "199"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "candidate_archive_bytes": [
+        "21412"
+      ],
+      "candidate_archive_sha256": [
+        "903d53fb56161276fe5e59f696e2a01a782fa65c3c96fca3de0a36a8af3b9b73"
+      ],
+      "reopened_target_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "workflow": [
+        "one"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    }
+  },
+  "noop-real": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109520"
+      ],
+      "before_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "after_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109520"
+      ],
+      "after_archive_sha256": [
+        "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    }
+  },
+  "noop-control": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "before_archive_bytes": [
+        "109535"
+      ],
+      "before_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "after_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "after_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "after_semantic_payload_bytes": [
+        "5591"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "after_archive_bytes": [
+        "109535"
+      ],
+      "after_archive_sha256": [
+        "f4cf8c8cf23a27d6e043a176507124730cc8cfb07060ccebaaa011a82aa14344"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        }
+      ]
+    }
+  },
+  "noop-generated": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "before_archive_bytes": [
+        "40797"
+      ],
+      "before_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "after_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "after_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "after_semantic_payload_bytes": [
+        "12480"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "after_archive_bytes": [
+        "40797"
+      ],
+      "after_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "0e0e1071685e472d06e1432582e745dd9b723638494aedac4347176d4c0ea4ec"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "noop-notes-poi": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+      ],
+      "source_archive_bytes": [
+        "30976"
+      ],
+      "source_archive_sha256": [
+        "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "before_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "before_semantic_payload_bytes": [
+        "117"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "3"
+      ],
+      "before_archive_bytes": [
+        "26393"
+      ],
+      "before_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "after_revision_sha256": [
+        "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+      ],
+      "after_semantic_sha256": [
+        "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+      ],
+      "after_semantic_payload_bytes": [
+        "117"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "3"
+      ],
+      "after_archive_bytes": [
+        "26393"
+      ],
+      "after_archive_sha256": [
+        "4f20994b97c8880529ad54701de7efb1f4a4b222df530b85735781155e7b9bed"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "87ec4027e1c873944291bdd61ee07ed30d74d45cbb418c85ae256e0a18e9e2cc"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "noop-notes-lo": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "noop"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx"
+      ],
+      "source_archive_bytes": [
+        "25881"
+      ],
+      "source_archive_sha256": [
+        "a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:4"
+      ],
+      "before_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "before_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "before_semantic_payload_bytes": [
+        "145"
+      ],
+      "before_slides": [
+        "1"
+      ],
+      "before_shapes": [
+        "6"
+      ],
+      "before_archive_bytes": [
+        "21400"
+      ],
+      "before_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "after_revision_sha256": [
+        "402b4c4da31c72a1416c9611d69ef7e4f0dcbd9654a8d0537fd9a591a5776f25"
+      ],
+      "after_semantic_sha256": [
+        "2b7b48679c0f0f94aba8cd87504f89251eaaedcebb879eaf9207d197cb442db8"
+      ],
+      "after_semantic_payload_bytes": [
+        "145"
+      ],
+      "after_slides": [
+        "1"
+      ],
+      "after_shapes": [
+        "6"
+      ],
+      "after_archive_bytes": [
+        "21400"
+      ],
+      "after_archive_sha256": [
+        "dd001908be9d8dda7a1dd0d94091c8891d1477c77e8e9837015f9676626f22bb"
+      ],
+      "commit_is_changed": [
+        "false"
+      ],
+      "revision_identical": [
+        "true"
+      ],
+      "output_identical": [
+        "true"
+      ],
+      "correctness_target_text_sha256": [
+        "938db8c9f82c8cb58d3f3ef4fd250036a48d26a712753d2fde5abd03a85cabf4"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 4
+        }
+      ]
+    }
+  },
+  "two-real": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+      ],
+      "source_archive_bytes": [
+        "108164"
+      ],
+      "source_archive_sha256": [
+        "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109491"
+      ],
+      "candidate_archive_sha256": [
+        "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "two-control": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx"
+      ],
+      "source_archive_bytes": [
+        "106536"
+      ],
+      "source_archive_sha256": [
+        "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+      ],
+      "target1": [
+        "slide:1",
+        "shape:1"
+      ],
+      "target2": [
+        "slide:2",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+      ],
+      "before_semantic_sha256": [
+        "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+      ],
+      "before_semantic_payload_bytes": [
+        "5591"
+      ],
+      "before_slides": [
+        "13"
+      ],
+      "before_shapes": [
+        "253"
+      ],
+      "after_revision_sha256": [
+        "74fc225432a6711242620f5f42d5833d4cbdfa422847c789b352acbe24ab629b"
+      ],
+      "after_semantic_sha256": [
+        "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+      ],
+      "after_semantic_payload_bytes": [
+        "5703"
+      ],
+      "after_slides": [
+        "13"
+      ],
+      "after_shapes": [
+        "253"
+      ],
+      "candidate_archive_bytes": [
+        "109504"
+      ],
+      "candidate_archive_sha256": [
+        "5e9e73014bc4c1f216279ce73a6b1f36c6ca96475de425759847afc28e8cedbd"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 1,
+          "shape": 1
+        },
+        {
+          "slide": 2,
+          "shape": 0
+        }
+      ]
+    }
+  },
+  "two-generated": {
+    "a0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    },
+    "a1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    },
+    "a2": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    },
+    "b0": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    },
+    "b1": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    },
+    "a3": {
+      "probe": [
+        "0693"
+      ],
+      "workflow": [
+        "two"
+      ],
+      "source": [
+        "generated:12x8"
+      ],
+      "source_archive_bytes": [
+        "40797"
+      ],
+      "source_archive_sha256": [
+        "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+      ],
+      "target1": [
+        "slide:0",
+        "shape:0"
+      ],
+      "target2": [
+        "slide:1",
+        "shape:0"
+      ],
+      "before_revision_sha256": [
+        "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+      ],
+      "before_semantic_sha256": [
+        "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+      ],
+      "before_semantic_payload_bytes": [
+        "12480"
+      ],
+      "before_slides": [
+        "12"
+      ],
+      "before_shapes": [
+        "96"
+      ],
+      "after_revision_sha256": [
+        "992f41232eee52fb09b8f2087255da493a6730a7fd87840144650cea76b65b48"
+      ],
+      "after_semantic_sha256": [
+        "43607d10fa8e64236b4bf8c28baf9d65ef58a5dfbf1caadd88e1832b8c5bdaea"
+      ],
+      "after_semantic_payload_bytes": [
+        "12372"
+      ],
+      "after_slides": [
+        "12"
+      ],
+      "after_shapes": [
+        "96"
+      ],
+      "candidate_archive_bytes": [
+        "40821"
+      ],
+      "candidate_archive_sha256": [
+        "d7ce14c00c1371164fe0e75bb773ffdacce0cfa3579d283f476857c060b4547c"
+      ],
+      "reopened_target1_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "reopened_target2_text_sha256": [
+        "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+      ],
+      "correctness_target_text": [
+        "litchi-perf-0691-opened-phase"
+      ],
+      "target_coordinates": [
+        {
+          "slide": 0,
+          "shape": 0
+        },
+        {
+          "slide": 1,
+          "shape": 0
+        }
+      ]
+    }
+  }
+}

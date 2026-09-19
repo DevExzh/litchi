@@ -10,6 +10,7 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use std::io::Write;
 
+use crate::notes::SlideRootProof;
 use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference};
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
@@ -26,6 +27,7 @@ pub(crate) struct CaptureSlide<'a> {
 pub(crate) struct CaptureSlides<'a> {
     pub(crate) slides: Vec<CaptureSlide<'a>>,
     pub(crate) first_name_error: Option<(usize, Error)>,
+    pub(crate) slide_root_proofs: Option<Vec<SlideRootProof<'a>>>,
 }
 
 pub(super) fn validate_slide_catalog(
@@ -54,6 +56,9 @@ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<Capt
             resource: "opened-presentation capture slides",
             source,
         })?;
+    let mut proofs = Vec::new();
+    let mut collect_notes_proofs = proofs.try_reserve_exact(references.len()).is_ok();
+    let mut slide_root_proofs = collect_notes_proofs.then_some(proofs);
     let mut first_name_error = None;
 
     for (index, reference) in references.iter().enumerate() {
@@ -68,7 +73,16 @@ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<Capt
             |part| part.content_type(),
         )?;
         let (slide_part, name) = if first_name_error.is_none() {
-            let (slide_part, name) = SlidePart::from_part_with_name(part)?;
+            let (slide_part, name, notes_proof) =
+                SlidePart::from_part_with_name(part, collect_notes_proofs)?;
+            if let Some(proof) = notes_proof {
+                if let Some(proofs) = slide_root_proofs.as_mut() {
+                    proofs.push(proof);
+                }
+                if !proof.is_valid() {
+                    collect_notes_proofs = false;
+                }
+            }
             let name = match name {
                 Ok(name) => Some(name),
                 Err(error) => {
@@ -89,6 +103,7 @@ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<Capt
     Ok(CaptureSlides {
         slides,
         first_name_error,
+        slide_root_proofs,
     })
 }
 

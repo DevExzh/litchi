@@ -642,6 +642,7 @@ fn capture_internal(
     let mut relationship_ids = std::collections::HashSet::new();
     let mut part_names = std::collections::HashSet::new();
     let mut first_name_error = captured.first_name_error;
+    let slide_root_proofs = captured.slide_root_proofs;
     for (index, (reference, captured)) in references.iter().zip(captured.slides).enumerate() {
         let slide = captured.slide;
         let relationship = presentation
@@ -693,7 +694,16 @@ fn capture_internal(
             part_name,
         });
     }
-    let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
+    let _notes = match slide_root_proofs.as_deref() {
+        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs(
+            package,
+            &presentation_name,
+            references.len(),
+            proofs,
+        )?,
+        None => crate::notes::load_snapshot(package, &presentation_name)?,
+    };
+    drop(slide_root_proofs);
     let slide_name_index = SlideNameIndex::build(&slides)?;
     // The snapshot owns its package from here on, and the memo it keeps must
     // name that package's own payload allocations, so the revision is taken

@@ -6,11 +6,12 @@ mod package;
 mod transaction;
 mod validation;
 
-pub(crate) use codec::rewrite_text;
 pub use codec::{master_xml, write_text, write_text_with};
+pub(crate) use codec::{rewrite_text, root_conformance_from_processed};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    apply_commit, apply_patch, clear_checked, load, load_snapshot, remove_checked,
+    SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
+    load_snapshot_with_slide_root_proofs, remove_checked,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove};

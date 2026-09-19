@@ -1,0 +1,14 @@
+{
+  "status": "superseded",
+  "reason": "Production caller already filtered exact source identity, but private resolver helper trusted Some and its direct fallback test failed. Move identity filter into resolver (same production behavior), strengthen integration sentinel-proof test, and repeat frozen candidate measurements and gates.",
+  "candidate_source_sha256": {
+    "crates/litchi-pptx/src/opened/tests.rs": "97445382b3759c0696fd4361d3239254566a70669fb3b00506658443f0cd451d",
+    "crates/litchi-pptx/src/opened/model.rs": "5cb5a59ba6bed9e9ca626e7e9fb60f2aad182db2f44523f642d50064cf5e971d",
+    "crates/litchi-pptx/src/parts/slide.rs": "41474b07156161019d8b6d72c9a43e233bdd3c0a544ab82972542d9fc60b735b",
+    "crates/litchi-pptx/src/parts/mod.rs": "2a3eaa07274e992a13b56fe2aa9dbc4ad24d679f6adc893029d59506f562d94c",
+    "crates/litchi-pptx/src/notes/codec.rs": "3b53dd5ed53baac9557c7df46dbfffc746f8bb54b49fe5a0bbac43e344984d3c",
+    "crates/litchi-pptx/src/notes/package.rs": "8af354ae72391c9f5cf7cfefb2ae5060baf2bcb30a67eb16d57fc1a242e55d97",
+    "crates/litchi-pptx/src/notes/mod.rs": "58f06bbdcf4c8fb2889a868e50ac38a635eca0869c44472c100e1a19e5a76e8b",
+    "crates/litchi-pptx/src/presentation/package.rs": "890d751a97ae3e305993ad24db2e8e55662ceeb1be14d409542215b38c499f26"
+  }
+}

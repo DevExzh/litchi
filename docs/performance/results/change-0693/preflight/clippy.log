@@ -1,0 +1,33 @@
+HEAD 5e89851b9e9d53daec5b291672d7ac15503243c7
+$ cargo clippy -p litchi-pptx --all-features --lib --no-deps --locked -- -D warnings
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: manual implementation of `Iterator::find`
+   --> crates/litchi-pptx/src/notes/codec.rs:331:5
+    |
+331 | /     for conformance in [Conformance::Transitional, Conformance::Strict] {
+332 | |         if scan_processed_xml(processed, raw_len, max, conformance, root).is_ok() {
+333 | |             return Some(conformance);
+...   |
+336 | |     None
+    | |________^ help: replace with an iterator: `[Conformance::Transitional, Conformance::Strict].into_iter().find(|&conformance| scan_processed_xml(processed, raw_len, max, conformance, root).is_ok())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_find
+    = note: `-D clippy::manual-find` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_find)]`
+
+error: could not compile `litchi-pptx` (lib) due to 1 previous error
+
+exit 101

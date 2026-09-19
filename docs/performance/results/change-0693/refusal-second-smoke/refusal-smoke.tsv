@@ -1,0 +1,43 @@
+probe	0693-refusal
+mode	matrix
+samples	1
+warmups	0
+cases	8
+case	small-valid
+authoring_base_archive_bytes	31554
+authoring_base_archive_sha256	7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3
+prepared_input_graph_sha256	cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4
+expected_error_debug	ok (slides=2, first_name="Slide 256")
+sample_ns
+0	328581
+case	generated-12x8-valid
+authoring_base_archive_bytes	40992
+authoring_base_archive_sha256	fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019
+prepared_input_graph_sha256	de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614
+expected_error_debug	ok (slides=12, first_name="Slide 256")
+sample_ns
+0	727094
+case	early-name-error
+authoring_base_archive_bytes	32713
+authoring_base_archive_sha256	ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97
+prepared_input_graph_sha256	a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce
+expected_error_debug	Decode(Malformed("position 24: duplicated attribute, previous declaration at position 7"))
+observed_error_debug	Decode(Malformed("position 24: duplicated attribute, previous declaration at position 7"))
+sample_ns
+0	39080
+case	late-root-error
+authoring_base_archive_bytes	32713
+authoring_base_archive_sha256	ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97
+prepared_input_graph_sha256	91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd
+expected_error_debug	Invalid("slide part does not have a p:sld root")
+observed_error_debug	Invalid("slide part does not have a p:sld root")
+sample_ns
+0	36290
+case	late-missing-relationship
+authoring_base_archive_bytes	32713
+authoring_base_archive_sha256	ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97
+prepared_input_graph_sha256	ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3
+expected_error_debug	Relationship("presentation slide reference is missing relationship 'rId6'")
+observed_error_debug	Relationship("presentation slide reference is missing relationship 'rId6'")
+sample_ns
+0	28550

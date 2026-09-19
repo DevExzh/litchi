@@ -1,0 +1,10 @@
+{
+  "source_sha256_equal": true,
+  "files": {
+    "docs/performance/results/change-0692/trace-summary.json": "c4f2597908559865c10da6d77b1701b42a64bf14cd641670ebb4e0601a8c870b",
+    "docs/performance/results/change-0692/builds-candidate.json": "b3cee6afe49d72e044b2ca50f1fea09018153c95ab10f6b64dfa357b15f639e5",
+    "docs/performance/results/change-0692/trace-runs/20260919T184347627478Z-2833482/manifest.json": "f21ffd0185308bcc8cc42307b9c2b04054b6d3156915e32809f513b0cb2d9d35",
+    "docs/performance/results/change-0692/trace-runs/20260919T184347627478Z-2833482/source-hashes.json": "b619cc7e3fefa3fcfd97f89489bafe808505426b6a7e548f1fbd0a6883017510"
+  },
+  "reason": "All 602 baseline PPTX/common/OPC Rust source hashes equal frozen candidate 0692. Prior restored trace is diagnostic call-count baseline only; no numeric cross-process pointer comparisons or latency reuse."
+}

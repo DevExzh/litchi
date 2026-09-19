@@ -317,6 +317,22 @@ pub(crate) fn root_conformance(xml: &[u8], max: usize, root: &str) -> Result<Con
     Err(invalid(format!("invalid {root} root or namespace")))
 }
 
+/// Classify one already-MCE-processed PresentationML root with the same
+/// Transitional-then-Strict retry and generic-error masking as
+/// [`root_conformance`].  `raw_len` is checked separately because the raw
+/// notes limit is part of `scan_xml`'s contract even when the processed bytes
+/// are borrowed from a capture-local reader.
+pub(crate) fn root_conformance_from_processed(
+    processed: &[u8],
+    raw_len: usize,
+    max: usize,
+    root: &str,
+) -> Option<Conformance> {
+    [Conformance::Transitional, Conformance::Strict]
+        .into_iter()
+        .find(|&conformance| scan_processed_xml(processed, raw_len, max, conformance, root).is_ok())
+}
+
 pub(crate) fn scan_xml(
     xml: &[u8],
     max: usize,
@@ -327,10 +343,29 @@ pub(crate) fn scan_xml(
         return Err(limit("notes XML bytes", max));
     }
     let processed = process_ooxml(xml)?;
+    scan_processed_xml(
+        processed.as_ref(),
+        xml.len(),
+        max,
+        conformance,
+        expected_root,
+    )
+}
+
+fn scan_processed_xml(
+    processed: &[u8],
+    raw_len: usize,
+    max: usize,
+    conformance: Conformance,
+    expected_root: &str,
+) -> Result<XmlScan> {
+    if raw_len > max {
+        return Err(limit("notes XML bytes", max));
+    }
     if processed.len() > max {
         return Err(limit("processed notes XML bytes", max));
     }
-    let mut reader = NsReader::from_reader(processed.as_ref());
+    let mut reader = NsReader::from_reader(processed);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -469,4 +504,84 @@ fn inspect_element(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TRANSITIONAL_ROOT: &[u8] =
+        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+    const STRICT_ROOT: &[u8] =
+        br#"<p:sld xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"/>"#;
+    const INVALID_ROOT: &[u8] = br#"<p:sld xmlns:p="urn:invalid"/>"#;
+
+    #[test]
+    fn processed_root_classification_matches_raw_transitional_and_strict_retry() {
+        for (raw, expected) in [
+            (TRANSITIONAL_ROOT, Conformance::Transitional),
+            (STRICT_ROOT, Conformance::Strict),
+        ] {
+            let processed = process_ooxml(raw).expect("test root must process");
+            assert_eq!(
+                root_conformance(raw, crate::notes::MAX_SLIDE_XML, "sld")
+                    .expect("raw root must classify"),
+                expected
+            );
+            assert_eq!(
+                root_conformance_from_processed(
+                    processed.as_ref(),
+                    raw.len(),
+                    crate::notes::MAX_SLIDE_XML,
+                    "sld",
+                ),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn processed_root_classification_keeps_generic_failure_masking_and_limits() {
+        let processed = process_ooxml(INVALID_ROOT).expect("test root must process");
+        let raw_error = root_conformance(INVALID_ROOT, crate::notes::MAX_SLIDE_XML, "sld")
+            .expect_err("invalid root must be refused");
+        assert_eq!(
+            raw_error.to_string(),
+            "invalid PresentationML: invalid sld root or namespace"
+        );
+        assert_eq!(
+            root_conformance_from_processed(
+                processed.as_ref(),
+                INVALID_ROOT.len(),
+                crate::notes::MAX_SLIDE_XML,
+                "sld",
+            ),
+            None
+        );
+
+        let raw_limited = root_conformance(INVALID_ROOT, INVALID_ROOT.len() - 1, "sld")
+            .expect_err("raw notes limit must be masked by root classification");
+        assert_eq!(raw_limited.to_string(), raw_error.to_string());
+        assert_eq!(
+            root_conformance_from_processed(
+                processed.as_ref(),
+                INVALID_ROOT.len(),
+                INVALID_ROOT.len() - 1,
+                "sld",
+            ),
+            None
+        );
+
+        let processed_limit =
+            scan_processed_xml(processed.as_ref(), 0, 1, Conformance::Transitional, "sld")
+                .err()
+                .expect("processed notes limit must remain visible to the scanner");
+        assert!(matches!(
+            processed_limit,
+            Error::Limit {
+                resource: "processed notes XML bytes",
+                limit: 1,
+            }
+        ));
+    }
 }

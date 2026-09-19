@@ -1,0 +1,39 @@
+LITCHI0693_PART profile=candidate stage=processed_xml uri=/ppt/presentation.xml raw_ptr=0x63c26739a1b0 raw_len=976
+LITCHI0693_CODEC call=0 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_MODEL profile=candidate stage=capture_begin parts=33
+LITCHI0693_PART profile=candidate stage=processed_xml uri=/ppt/presentation.xml raw_ptr=0x63c26739a1b0 raw_len=976
+LITCHI0693_CODEC call=1 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=processed_xml uri=/ppt/presentation.xml raw_ptr=0x63c26739a1b0 raw_len=976
+LITCHI0693_CODEC call=2 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=processed_xml uri=/ppt/presentation.xml raw_ptr=0x63c26739a1b0 raw_len=976
+LITCHI0693_CODEC call=3 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide1.xml raw_ptr=0x63c2673fcc00 raw_len=3523
+LITCHI0693_CODEC call=4 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673fcc00 input_len=3523 output_ptr=0x63c2673fcc00 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide2.xml raw_ptr=0x63c2673e3910 raw_len=3523
+LITCHI0693_CODEC call=5 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e3910 input_len=3523 output_ptr=0x63c2673e3910 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide3.xml raw_ptr=0x63c2673e46e0 raw_len=3523
+LITCHI0693_CODEC call=6 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e46e0 input_len=3523 output_ptr=0x63c2673e46e0 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide4.xml raw_ptr=0x63c2673e54b0 raw_len=3523
+LITCHI0693_CODEC call=7 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e54b0 input_len=3523 output_ptr=0x63c2673e54b0 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide5.xml raw_ptr=0x63c2673e6280 raw_len=3523
+LITCHI0693_CODEC call=8 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e6280 input_len=3523 output_ptr=0x63c2673e6280 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide6.xml raw_ptr=0x63c2673e7050 raw_len=3523
+LITCHI0693_CODEC call=9 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e7050 input_len=3523 output_ptr=0x63c2673e7050 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide7.xml raw_ptr=0x63c26739f2d0 raw_len=3523
+LITCHI0693_CODEC call=10 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739f2d0 input_len=3523 output_ptr=0x63c26739f2d0 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide8.xml raw_ptr=0x63c2673a00a0 raw_len=3523
+LITCHI0693_CODEC call=11 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673a00a0 input_len=3523 output_ptr=0x63c2673a00a0 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide9.xml raw_ptr=0x63c2673a0e70 raw_len=3523
+LITCHI0693_CODEC call=12 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673a0e70 input_len=3523 output_ptr=0x63c2673a0e70 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide10.xml raw_ptr=0x63c2673fd9d0 raw_len=3523
+LITCHI0693_CODEC call=13 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673fd9d0 input_len=3523 output_ptr=0x63c2673fd9d0 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide11.xml raw_ptr=0x63c2673e1d70 raw_len=3523
+LITCHI0693_CODEC call=14 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e1d70 input_len=3523 output_ptr=0x63c2673e1d70 output_len=3523 mode=borrow status=ok
+LITCHI0693_PART profile=candidate stage=source_bound uri=/ppt/slides/slide12.xml raw_ptr=0x63c2673e2b40 raw_len=3523
+LITCHI0693_CODEC call=15 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673e2b40 input_len=3523 output_ptr=0x63c2673e2b40 output_len=3523 mode=borrow status=ok
+LITCHI0693_MODEL profile=candidate stage=capture_layout proof_entry_bytes=24 slide_entry_bytes=48
+LITCHI0693_CODEC call=16 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_CODEC call=17 profile=candidate stage=prefix:generated:capture input_ptr=0x63c26739a1b0 input_len=976 output_ptr=0x63c26739a1b0 output_len=976 mode=borrow status=ok
+LITCHI0693_CODEC call=18 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673ab5b0 input_len=7626 output_ptr=0x63c2673ab5b0 output_len=7626 mode=borrow status=ok
+LITCHI0693_CODEC call=19 profile=candidate stage=prefix:generated:capture input_ptr=0x63c2673b01f0 input_len=7653 output_ptr=0x63c2673b01f0 output_len=7653 mode=borrow status=ok
+LITCHI0693_MODEL profile=candidate stage=capture_success parts=33 slides=12

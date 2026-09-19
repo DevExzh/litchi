@@ -1,0 +1,29 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: unnecessary qualification
+   --> /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:637:25
+    |
+637 |         .map_or(0usize, std::mem::size_of_val);
+    |                         ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+637 -         .map_or(0usize, std::mem::size_of_val);
+637 +         .map_or(0usize, size_of_val);
+    |
+
+error: unnecessary qualification
+   --> /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:641:9
+    |
+641 |         std::mem::size_of::<crate::notes::SlideRootProof<'_>>(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+641 -         std::mem::size_of::<crate::notes::SlideRootProof<'_>>(),
+641 +         size_of::<crate::notes::SlideRootProof<'_>>(),
+    |
+
+error: could not compile `litchi-pptx` (lib) due to 2 previous errors

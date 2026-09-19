@@ -1,0 +1,88 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "exit_code": 2,
+  "disposition": "Only byte-preserved raw logs, perf output and trace patches have whitespace findings; source and authored documentation pass.",
+  "exceptions": [
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/baseline/counters-10.txt",
+      "sha256": "50ad0ad5d60189bc41ea2faff98ffb866852c42a8e3138ede6b8cec5b0b4c777"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/baseline/counters-210.txt",
+      "sha256": "3211c1a25b51486b12d411ea93b8900c0b0bf0db2b625394de1fdecc70bb420b"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/baseline/inclusive-symbols.txt",
+      "sha256": "d11f5606aa5d10eaa81f87e1568738db586fba554a21f98d7b28c6ccc1004e19"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/baseline/self-symbols.txt",
+      "sha256": "51268133ea8e70b3f9ca6a59bb60834acf2480304b51dc765192fe6b7117d87f"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/candidate/counters-10.txt",
+      "sha256": "69b7336b9a08f7ef6948be2ddde0af459dd02a9ce1350a2bff9c8acc601595f1"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/candidate/counters-210.txt",
+      "sha256": "277b1a47dd9242c4ae7ffffd20710301140b2605ebb543af1756a5214c94e0c2"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/candidate/inclusive-symbols.txt",
+      "sha256": "cf6d9b811df5f98a57eaa10122f871a661d96e0c562fbda8aef11276c80ae18b"
+    },
+    {
+      "path": "docs/performance/results/change-0693/initial-identity-helper/profile/candidate/self-symbols.txt",
+      "sha256": "cee936886f8c7ce1ab5fd1a31a9234144b50a4c8fcdc8b8ecce4492637cbc9ed"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/baseline/counters-10.txt",
+      "sha256": "50ad0ad5d60189bc41ea2faff98ffb866852c42a8e3138ede6b8cec5b0b4c777"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/baseline/counters-210.txt",
+      "sha256": "3211c1a25b51486b12d411ea93b8900c0b0bf0db2b625394de1fdecc70bb420b"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/baseline/inclusive-symbols.txt",
+      "sha256": "d11f5606aa5d10eaa81f87e1568738db586fba554a21f98d7b28c6ccc1004e19"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/baseline/self-symbols.txt",
+      "sha256": "51268133ea8e70b3f9ca6a59bb60834acf2480304b51dc765192fe6b7117d87f"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/candidate/counters-10.txt",
+      "sha256": "ec2d11f04524162198b458a592dc7f7cdf23428c55b0db768ca9d2a170a6516f"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/candidate/counters-210.txt",
+      "sha256": "ddcc30c573e38a86472df2730d0a93ee6cdecaa4a403828a724eabe50cdd94c1"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/candidate/inclusive-symbols.txt",
+      "sha256": "ef299b66040dec6a8a23ec8cc18fc824d13dc9a5a1546a7d56c98476c6669e9c"
+    },
+    {
+      "path": "docs/performance/results/change-0693/profile/candidate/self-symbols.txt",
+      "sha256": "9f8f9897c517a58a98cee06e47e1ef3390eca1d12ea2c3bba460ff91b5607114"
+    },
+    {
+      "path": "docs/performance/results/change-0693/setup-lock-check.log",
+      "sha256": "65afbd93dcdbc0aec3ef8eedd33bca5f2a2e55fcda9306e2e6b1ee022a14dbc1"
+    },
+    {
+      "path": "docs/performance/results/change-0693/trace-initial/20260919T195635246321Z-3149068/trace.patch",
+      "sha256": "f6fe63aae228425c43f4c214019fd5cb54dc07f75ff8919f10263ce1b91c1be0"
+    },
+    {
+      "path": "docs/performance/results/change-0693/trace-runs/20260919T195826994463Z-3152718/trace.patch",
+      "sha256": "6b37b689204be23b121c753e8125ae1c725f600157f5c286a85185001864802a"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Initial probe scaffolding mistakenly replaced the batch-number substring inside a dependency checksum. Cargo rejected it before compilation. The lock was recopied from0692 and only the exact local package name changed. No dependency checksum, registry, or production source was changed. All subsequent builds use --locked.

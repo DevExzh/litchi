@@ -1,0 +1,8 @@
+probe	0693
+mode	prefix
+source	/home/zhuhe/code/litchi/docs/performance/results/change-0693/marker-control.pptx
+source_archive_bytes	106536
+source_archive_sha256	af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a
+stage	apply
+iterations	1
+completed	1

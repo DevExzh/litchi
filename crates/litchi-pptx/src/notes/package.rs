@@ -59,6 +59,25 @@ struct GraphIndex {
     master: MasterIndex,
     slides: Vec<SlideIndex>,
 }
+
+/// Capture-local classification of one slide root. The raw slice is kept as
+/// a witness for the exact source passed through MCE; processed XML is not
+/// retained after the capture projection returns.
+#[derive(Clone, Copy)]
+pub(crate) struct SlideRootProof<'a> {
+    raw: &'a [u8],
+    conformance: Option<Conformance>,
+}
+
+impl<'a> SlideRootProof<'a> {
+    pub(crate) fn new(raw: &'a [u8], conformance: Option<Conformance>) -> Self {
+        Self { raw, conformance }
+    }
+
+    pub(crate) fn is_valid(self) -> bool {
+        self.conformance.is_some()
+    }
+}
 /// Load and validate the complete bounded notes graph for a presentation part.
 ///
 /// The returned graph is lifetime-free and independently editable, so each
@@ -76,7 +95,36 @@ pub(crate) fn load_snapshot(
     package: &OpcPackage,
     presentation_name: &PackURI,
 ) -> Result<Option<Snapshot>> {
-    let Some(index) = load_index(package, presentation_name)? else {
+    snapshot_from_index(
+        package,
+        presentation_name,
+        load_index(package, presentation_name)?,
+    )
+}
+
+/// Capture a notes snapshot while reusing root classifications produced by
+/// the opened-presentation slide pass. The proof vector is an optional
+/// optimization; ordinary notes callers retain the legacy path.
+pub(crate) fn load_snapshot_with_slide_root_proofs<'a>(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    expected_catalog_len: usize,
+    proofs: &[SlideRootProof<'a>],
+) -> Result<Option<Snapshot>> {
+    let index = load_index_with_slide_root_proofs(
+        package,
+        presentation_name,
+        Some((expected_catalog_len, proofs)),
+    )?;
+    snapshot_from_index(package, presentation_name, index)
+}
+
+fn snapshot_from_index(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    index: Option<GraphIndex>,
+) -> Result<Option<Snapshot>> {
+    let Some(index) = index else {
         return Ok(None);
     };
     let graph = materialize(package, index)?;
@@ -159,6 +207,18 @@ pub(crate) fn apply_commit(
 
 /// Validate and index the complete notes graph without copying resource payloads.
 fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<GraphIndex>> {
+    load_index_with_slide_root_proofs(package, presentation_name, None)
+}
+
+/// Validate and index the notes graph, optionally consuming capture-local
+/// slide-root classifications. The expected catalog length prevents a notes
+/// scanner that observes a different `sldId` inventory from using positional
+/// proofs.
+fn load_index_with_slide_root_proofs<'a>(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    slide_root_proofs: Option<(usize, &[SlideRootProof<'a>])>,
+) -> Result<Option<GraphIndex>> {
     let presentation = package.get_part(presentation_name)?;
     if !is_presentation_main_content_type(presentation.content_type()) {
         return Err(invalid("notes graph requires a PresentationML main part"));
@@ -178,8 +238,10 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
     if presentation_scan.slide_ids.len() > MAX_NOTES_SLIDES {
         return Err(limit("presentation slide count", MAX_NOTES_SLIDES));
     }
+    let proof_inventory_matches = slide_root_proofs
+        .is_some_and(|(expected_len, _)| expected_len == presentation_scan.slide_ids.len());
     let mut slide_sources = Vec::with_capacity(presentation_scan.slide_ids.len());
-    for id in &presentation_scan.slide_ids {
+    for (slide_index, id) in presentation_scan.slide_ids.iter().enumerate() {
         validate_id(id)?;
         let relationship = presentation
             .rels()
@@ -195,13 +257,16 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
         if slide.content_type() != SLIDE_CT {
             return Err(invalid("slide has invalid content type"));
         }
-        root_conformance(slide.blob(), MAX_SLIDE_XML, "sld").and_then(|actual| {
-            if actual == conformance {
-                Ok(actual)
-            } else {
-                Err(invalid("slide conformance differs from presentation"))
-            }
-        })?;
+        let actual = if proof_inventory_matches {
+            let current = slide.blob();
+            let proof = slide_root_proofs.and_then(|(_, proofs)| proofs.get(slide_index));
+            resolve_slide_root(current, proof)
+        } else {
+            root_conformance(slide.blob(), MAX_SLIDE_XML, "sld")
+        }?;
+        if actual != conformance {
+            return Err(invalid("slide conformance differs from presentation"));
+        }
         slide_sources.push((id.clone(), slide.partname().clone()));
     }
     let master_relationships: Vec<_> = presentation
@@ -420,6 +485,22 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
         },
         slides,
     }))
+}
+
+fn same_raw_source(left: &[u8], right: &[u8]) -> bool {
+    left.as_ptr() == right.as_ptr() && left.len() == right.len()
+}
+
+fn resolve_slide_root<'a>(
+    current: &[u8],
+    proof: Option<&SlideRootProof<'a>>,
+) -> Result<Conformance> {
+    match proof.filter(|proof| same_raw_source(proof.raw, current)) {
+        Some(proof) => proof
+            .conformance
+            .ok_or_else(|| invalid("invalid sld root or namespace")),
+        None => root_conformance(current, MAX_SLIDE_XML, "sld"),
+    }
 }
 
 fn materialize(package: &OpcPackage, index: GraphIndex) -> Result<Graph> {
@@ -1336,5 +1417,49 @@ fn validate_id(value: &str) -> Result<()> {
         Err(invalid("invalid relationship ID"))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod slide_root_proof_tests {
+    use super::*;
+
+    const VALID_ROOT: &[u8] =
+        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+    const STRICT_ROOT: &[u8] =
+        br#"<p:sld xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"/>"#;
+    const VALID_ROOT_WITH_TRAILING_SPACE: &[u8] =
+        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/> "#;
+
+    #[test]
+    fn root_proof_requires_exact_source_identity_and_falls_back_safely() {
+        let invalid_proof = SlideRootProof::new(VALID_ROOT, None);
+        let cached_error = resolve_slide_root(VALID_ROOT, Some(&invalid_proof))
+            .expect_err("an exact invalid proof must retain its generic refusal");
+        assert_eq!(
+            cached_error.to_string(),
+            "invalid PresentationML: invalid sld root or namespace"
+        );
+
+        let equal_bytes = VALID_ROOT.to_vec();
+        assert_eq!(
+            resolve_slide_root(&equal_bytes, Some(&invalid_proof))
+                .expect("equal bytes in a different allocation must use the raw fallback"),
+            Conformance::Transitional
+        );
+
+        assert_eq!(
+            resolve_slide_root(STRICT_ROOT, Some(&invalid_proof))
+                .expect("changed valid source must use the raw fallback"),
+            Conformance::Strict
+        );
+
+        let shortened = &VALID_ROOT_WITH_TRAILING_SPACE[..VALID_ROOT.len()];
+        let length_mismatch_proof = SlideRootProof::new(VALID_ROOT_WITH_TRAILING_SPACE, None);
+        assert_eq!(
+            resolve_slide_root(shortened, Some(&length_mismatch_proof))
+                .expect("same pointer with a different length must use the raw fallback"),
+            Conformance::Transitional
+        );
     }
 }

@@ -236,6 +236,29 @@ fn rewrite_presentation_xml(
     Ok(())
 }
 
+fn pad_part_blob(package: &mut Package, name: &PackURI, size: usize) -> Result<()> {
+    let mut blob = package.opc.get_part(name)?.blob().to_vec();
+    if blob.len() < size {
+        blob.resize(size, b' ');
+    }
+    package.opc.get_part_mut(name)?.set_blob(blob);
+    Ok(())
+}
+
+fn add_foreign_notes_inventory_sld_id(package: &mut Package, relationship_id: &str) -> Result<()> {
+    rewrite_presentation_xml(package, |mut xml| {
+        let marker = "<p:sldIdLst";
+        let Some(position) = xml.find(marker) else {
+            return xml;
+        };
+        let injected = format!(
+            r#"<x:sldId xmlns:x="urn:notes-inventory-lookalike" r:id="{relationship_id}"/>"#
+        );
+        xml.insert_str(position, &injected);
+        xml
+    })
+}
+
 #[test]
 fn capture_projection_matches_legacy_across_conformance_names_and_mce() -> Result<()> {
     for (label, strict, mce, name_mode) in [
@@ -361,6 +384,211 @@ fn capture_projection_keeps_notes_validation_after_slide_identity_and_names() ->
         &invalid_slide_and_notes,
         "slide part does not have a p:sld root",
     )?;
+    Ok(())
+}
+
+#[test]
+fn notes_capture_matrix_accepts_strict_mce_and_rejects_mixed_slide_conformance() -> Result<()> {
+    let mut transitional = opened_two_slide_package()?;
+    add_slide_mce_marker(&mut transitional, 0)?;
+    assert_capture_matches_legacy(&transitional)?;
+
+    let mut strict = opened_two_slide_package()?;
+    make_package_strict_with_notes(&mut strict)?;
+    add_slide_mce_marker(&mut strict, 0)?;
+    assert_capture_matches_legacy(&strict)?;
+
+    // The capture-time slide root validator accepts either OOXML namespace,
+    // but the notes graph requires every presentation slide to match the
+    // presentation's conformance. This must remain a notes-stage refusal.
+    let mut mixed = opened_two_slide_package()?;
+    make_package_strict_with_notes(&mut mixed)?;
+    rewrite_slide_xml(&mut mixed, 0, |xml| {
+        xml.replace(
+            "http://purl.oclc.org/ooxml/presentationml/main",
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+        )
+        .replace(
+            "http://purl.oclc.org/ooxml/drawingml/main",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+        )
+    })?;
+    assert_capture_error_contains(&mixed, "slide conformance differs from presentation")?;
+    Ok(())
+}
+
+#[test]
+fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let first_slide = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
+    let second_slide = PackURI::new("/ppt/slides/slide2.xml").map_err(Error::Invalid)?;
+    let equal_length = package
+        .opc
+        .get_part(&first_slide)?
+        .blob()
+        .len()
+        .max(package.opc.get_part(&second_slide)?.blob().len());
+    pad_part_blob(&mut package, &first_slide, equal_length)?;
+    pad_part_blob(&mut package, &second_slide, equal_length)?;
+
+    let first_raw = package.opc.get_part(&first_slide)?.blob();
+    let second_raw = package.opc.get_part(&second_slide)?.blob();
+    assert_eq!(first_raw.len(), second_raw.len());
+
+    // Reordering equal-length invalid proofs must fall back to the current
+    // raw source rather than reusing the wrong cached refusal.
+    let swapped = [
+        crate::notes::SlideRootProof::new(second_raw, None),
+        crate::notes::SlideRootProof::new(first_raw, None),
+    ];
+    let snapshot = crate::notes::load_snapshot_with_slide_root_proofs(
+        &package.opc,
+        &presentation,
+        2,
+        &swapped,
+    )?;
+    assert!(
+        snapshot.is_some(),
+        "swapped proofs must use raw-root fallback"
+    );
+
+    // With exact source identity, the sentinel invalid proofs remain
+    // authoritative and retain the typed root refusal.
+    let exact = [
+        crate::notes::SlideRootProof::new(first_raw, None),
+        crate::notes::SlideRootProof::new(second_raw, None),
+    ];
+    let error =
+        crate::notes::load_snapshot_with_slide_root_proofs(&package.opc, &presentation, 2, &exact)
+            .err()
+            .expect("exact invalid proofs must refuse the notes graph");
+    assert!(matches!(
+        error,
+        Error::Invalid(message) if message == "invalid sld root or namespace"
+    ));
+    Ok(())
+}
+
+#[test]
+fn notes_capture_matrix_preserves_name_root_and_notes_error_order() -> Result<()> {
+    // All slide roots are checked before the deferred first-name result is
+    // replayed. A later slide-root error therefore wins over an earlier name
+    // error.
+    let mut later_root = opened_two_slide_package()?;
+    set_slide_name_attribute(&mut later_root, 0, r#" name="Slide 256" name="bad""#)?;
+    rewrite_slide_xml(&mut later_root, 1, |xml| {
+        xml.replacen("<p:sld ", "<p:wrong ", 1)
+    })?;
+    assert_capture_error_contains(&later_root, "slide part does not have a p:sld root")?;
+
+    // Notes graph validation remains after the name replay. A malformed notes
+    // root must not preempt an earlier name error.
+    let mut name_and_notes = opened_two_slide_package()?;
+    set_slide_name_attribute(&mut name_and_notes, 0, r#" name="Slide 256" name="bad""#)?;
+    replace_notes_slide_root(&mut name_and_notes)?;
+    assert_capture_error_contains(&name_and_notes, "duplicated attribute")?;
+
+    // A malformed later slide root remains earlier than the notes graph even
+    // when both failures are present.
+    let mut root_and_notes = opened_two_slide_package()?;
+    rewrite_slide_xml(&mut root_and_notes, 1, |xml| {
+        xml.replacen("<p:sld ", "<p:wrong ", 1)
+    })?;
+    replace_notes_slide_root(&mut root_and_notes)?;
+    assert_capture_error_contains(&root_and_notes, "slide part does not have a p:sld root")?;
+    Ok(())
+}
+
+#[test]
+fn notes_capture_matrix_falls_back_when_notes_inventory_has_a_foreign_sld_id() -> Result<()> {
+    // The ordinary catalog ignores the foreign namespace, while notes::scan_xml
+    // intentionally collects any local-name sldId carrying an r:id. A missing
+    // relationship must remain the legacy error; a positional processed-XML
+    // hint is only an optimization and must not become a new refusal.
+    let mut missing = opened_two_slide_package()?;
+    add_foreign_notes_inventory_sld_id(&mut missing, "rIdLookalike")?;
+    assert_capture_error_contains(
+        &missing,
+        "presentation slide reference is missing its relationship",
+    )?;
+
+    // The same inventory mismatch must still be deferred until the original
+    // name-error position.
+    let mut name_and_missing = opened_two_slide_package()?;
+    set_slide_name_attribute(&mut name_and_missing, 0, r#" name="Slide 256" name="bad""#)?;
+    add_foreign_notes_inventory_sld_id(&mut name_and_missing, "rIdLookalike")?;
+    assert_capture_error_contains(&name_and_missing, "duplicated attribute")?;
+    Ok(())
+}
+
+#[test]
+fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_part_limit()
+-> Result<()> {
+    let slide = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
+
+    // root_conformance retries both dialects and intentionally maps both
+    // scan_xml limit failures to the generic root refusal. The raw payload is
+    // still below the broader PresentationML-part ceiling, so capture reaches
+    // this notes-stage result.
+    let mut notes_limited = opened_two_slide_package()?;
+    pad_part_blob(&mut notes_limited, &slide, crate::notes::MAX_SLIDE_XML + 1)?;
+    let error = notes_limited
+        .opened_presentation()
+        .err()
+        .expect("the 16 MiB slide root limit must refuse capture");
+    assert!(matches!(
+        error,
+        Error::Invalid(message) if message == "invalid sld root or namespace"
+    ));
+    assert_capture_matches_legacy(&notes_limited)?;
+
+    // processed_xml's 64 MiB part check runs in slide capture before notes
+    // validation. This uses arbitrary bytes because the check is a length
+    // preflight and must happen before XML/MCE decoding.
+    let mut part_limited = opened_two_slide_package()?;
+    pad_part_blob(
+        &mut part_limited,
+        &slide,
+        crate::parts::MAX_PART_XML_BYTES + 1,
+    )?;
+    let error = part_limited
+        .opened_presentation()
+        .err()
+        .expect("the 64 MiB part limit must refuse capture");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            resource: "PresentationML part XML",
+            limit: crate::parts::MAX_PART_XML_BYTES,
+        }
+    ));
+    assert_capture_matches_legacy(&part_limited)?;
+    Ok(())
+}
+
+#[test]
+fn notes_capture_matrix_does_not_cross_contaminate_immutable_package_sources() -> Result<()> {
+    let mut first = opened_two_slide_package()?;
+    let bytes = first.to_bytes()?;
+    let mut second = Package::from_vec(bytes)?;
+
+    let first_snapshot = first.opened_presentation()?;
+    set_slide_name_attribute(&mut second, 0, r#" name="Second source""#)?;
+    let second_snapshot = second.opened_presentation()?;
+
+    assert_eq!(first_snapshot.slides()[0].name(), "Slide 256");
+    assert_eq!(second_snapshot.slides()[0].name(), "Second source");
+    assert_capture_matches_legacy(&first)?;
+    assert_capture_matches_legacy(&second)?;
+
+    // A second package with an equal URI and a separate allocation must not
+    // inherit a capture-local processed result from the first source.
+    let mut third = Package::from_vec(first.to_bytes()?)?;
+    set_slide_name_attribute(&mut third, 0, r#" name="Third source""#)?;
+    let third_snapshot = third.opened_presentation()?;
+    assert_eq!(third_snapshot.slides()[0].name(), "Third source");
+    assert_capture_matches_legacy(&third)?;
     Ok(())
 }
 
@@ -1235,6 +1463,88 @@ fn make_package_strict(package: &mut Package) -> Result<()> {
             )?;
         }
     }
+    let names: Vec<_> = package
+        .opc
+        .iter_parts()
+        .map(|part| part.partname().clone())
+        .collect();
+    for name in names {
+        let relationships: Vec<_> = package
+            .opc
+            .get_part(&name)?
+            .rels()
+            .iter()
+            .map(|relationship| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.target_mode(),
+                )
+            })
+            .collect();
+        let part = package.opc.get_part_mut(&name)?;
+        for (id, kind, target, mode) in relationships {
+            if let Some(local) = kind.strip_prefix(REL) {
+                part.rels_mut().remove(&id);
+                part.rels_mut().try_add_relationship(
+                    format!("{STRICT_REL}{local}"),
+                    target,
+                    id,
+                    mode,
+                )?;
+            }
+        }
+        if let Ok(xml) = std::str::from_utf8(part.blob()) {
+            part.set_blob(
+                xml.replace(PML, STRICT_PML)
+                    .replace(DML, STRICT_DML)
+                    .replace(REL_NS, STRICT_REL_NS)
+                    .into_bytes(),
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Convert all XML and relationship namespaces while retaining the complete
+/// generated notes graph. The older strict helper removes notes parts because
+/// its callers intentionally exercise a no-notes strict package.
+fn make_package_strict_with_notes(package: &mut Package) -> Result<()> {
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+    const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+    const REL_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_REL_NS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
+    const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const STRICT_DML: &str = "http://purl.oclc.org/ooxml/drawingml/main";
+
+    let root_relationships: Vec<_> = package
+        .opc
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect();
+    for (id, kind, target, mode) in root_relationships {
+        if let Some(local) = kind.strip_prefix(REL) {
+            package.opc.rels_mut().remove(&id);
+            package.opc.rels_mut().try_add_relationship(
+                format!("{STRICT_REL}{local}"),
+                target,
+                id,
+                mode,
+            )?;
+        }
+    }
+
     let names: Vec<_> = package
         .opc
         .iter_parts()

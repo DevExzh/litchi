@@ -1,0 +1,226 @@
+[
+  {
+    "case": "small-valid",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 260590.5,
+    "mean_ns": 261501.28,
+    "p95_ns": 272871,
+    "p99_ns": 281491,
+    "median_bootstrap_95_ns": [
+      259676.0,
+      261171.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 697792.0,
+    "mean_ns": 697361.55,
+    "p95_ns": 703862,
+    "p99_ns": 708242,
+    "median_bootstrap_95_ns": [
+      696507.5,
+      698302.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 35180.0,
+    "mean_ns": 35437.52,
+    "p95_ns": 35570,
+    "p99_ns": 41690,
+    "median_bootstrap_95_ns": [
+      35140.0,
+      35220.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 35030.0,
+    "mean_ns": 35300.02,
+    "p95_ns": 35340,
+    "p99_ns": 41450,
+    "median_bootstrap_95_ns": [
+      35005.0,
+      35051.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 27771.0,
+    "mean_ns": 27962.09,
+    "p95_ns": 28020,
+    "p99_ns": 33670,
+    "median_bootstrap_95_ns": [
+      27730.5,
+      27795.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 258636.0,
+    "mean_ns": 258736.08,
+    "p95_ns": 267581,
+    "p99_ns": 270091,
+    "median_bootstrap_95_ns": [
+      257610.0,
+      259131.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 111480.5,
+    "mean_ns": 112282.68,
+    "p95_ns": 118070,
+    "p99_ns": 120060,
+    "median_bootstrap_95_ns": [
+      111391.0,
+      111540.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 22548611.5,
+    "mean_ns": 22560333.3,
+    "p95_ns": 22595687,
+    "p99_ns": 22797567,
+    "median_bootstrap_95_ns": [
+      22542271.0,
+      22551757.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 260560.5,
+    "mean_ns": 261392.59,
+    "p95_ns": 270681,
+    "p99_ns": 273371,
+    "median_bootstrap_95_ns": [
+      259111.0,
+      261856.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 705402.0,
+    "mean_ns": 704096.49,
+    "p95_ns": 710803,
+    "p99_ns": 716472,
+    "median_bootstrap_95_ns": [
+      704122.0,
+      706327.5
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 34845.5,
+    "mean_ns": 35118.51,
+    "p95_ns": 35190,
+    "p99_ns": 41360,
+    "median_bootstrap_95_ns": [
+      34830.0,
+      34880.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 34725.0,
+    "mean_ns": 35042.72,
+    "p95_ns": 35000,
+    "p99_ns": 41330,
+    "median_bootstrap_95_ns": [
+      34700.0,
+      34770.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 27430.0,
+    "mean_ns": 27623.39,
+    "p95_ns": 27620,
+    "p99_ns": 33270,
+    "median_bootstrap_95_ns": [
+      27400.0,
+      27460.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 248896.0,
+    "mean_ns": 251159.25,
+    "p95_ns": 258011,
+    "p99_ns": 260921,
+    "median_bootstrap_95_ns": [
+      248651.0,
+      251480.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 110130.0,
+    "mean_ns": 111051.98,
+    "p95_ns": 116530,
+    "p99_ns": 118570,
+    "median_bootstrap_95_ns": [
+      110020.0,
+      110285.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 22538279.0,
+    "mean_ns": 22543388.84,
+    "p95_ns": 22572936,
+    "p99_ns": 22611787,
+    "median_bootstrap_95_ns": [
+      22535416.0,
+      22542299.0
+    ]
+  }
+]

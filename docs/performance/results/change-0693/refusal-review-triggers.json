@@ -1,0 +1,226 @@
+[
+  {
+    "case": "late-root-error",
+    "pair": "b0/a2",
+    "metric": "p50_ns",
+    "delta_pct": 127.06251784184985,
+    "delta_ns": 44510.0
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 127.4515934107748,
+    "delta_ns": 44883.71000000001
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_pct": 142.07375886524824,
+    "delta_ns": 50081
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 109.32960893854751,
+    "delta_ns": 45011
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_pct": 125.30652979754775,
+    "delta_ns": 43945.0
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 134.14422611140165,
+    "delta_ns": 47298.020000000004
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_pct": 227.35235942356599,
+    "delta_ns": 80460
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 187.05780632411066,
+    "delta_ns": 75721
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b0/a2",
+    "metric": "p50_ns",
+    "delta_pct": 44.20689655172414,
+    "delta_ns": 48716.0
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 44.2556958796041,
+    "delta_ns": 49058.73999999999
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_pct": 42.79762982896473,
+    "delta_ns": 49620
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 37.84541780087438,
+    "delta_ns": 45880
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_pct": 42.32740063817124,
+    "delta_ns": 47290.5
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 42.443233565597225,
+    "delta_ns": 47697.42999999999
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_pct": 41.3531465553947,
+    "delta_ns": 48561
+  },
+  {
+    "case": "late-root-error-mce",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 41.26097567111984,
+    "delta_ns": 49200
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b0/a2",
+    "metric": "p50_ns",
+    "delta_pct": 161.43341000887506,
+    "delta_ns": 44564.5
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 161.94498139015002,
+    "delta_ns": 44972.509999999995
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_pct": 182.1415738411786,
+    "delta_ns": 50690
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 146.8424298489053,
+    "delta_ns": 47621
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_pct": 161.09313196691838,
+    "delta_ns": 44800.0
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 161.0053771869709,
+    "delta_ns": 45084.12999999999
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_pct": 179.96428571428572,
+    "delta_ns": 50390
+  },
+  {
+    "case": "late-missing-relationship",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 134.954128440367,
+    "delta_ns": 45601
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b0/a2",
+    "metric": "p50_ns",
+    "delta_pct": 46.73144577088908,
+    "delta_ns": 48285.5
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 46.24816661890154,
+    "delta_ns": 48234.53000000001
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_pct": 43.36097521273998,
+    "delta_ns": 47949
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 39.44240837696336,
+    "delta_ns": 45201
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b1/a3",
+    "metric": "p50_ns",
+    "delta_pct": 45.30003203274033,
+    "delta_ns": 47375.0
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 45.64777376971285,
+    "delta_ns": 48052.640000000014
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b1/a3",
+    "metric": "p95_ns",
+    "delta_pct": 44.36716283265674,
+    "delta_ns": 49181
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 50.01742611772906,
+    "delta_ns": 55970
+  }
+]

@@ -8,7 +8,10 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
-use super::{invalid, processed_xml, related_part_by_type, validate_content_type};
+use super::{
+    invalid, processed_xml, processed_xml_with_source, related_part_by_type, validate_content_type,
+};
+use crate::notes::SlideRootProof;
 use crate::shape::Scene;
 use crate::{Error, Result};
 
@@ -897,18 +900,33 @@ impl<'a> SlidePart<'a> {
     }
 
     /// Validate a slide and project its producer name from one temporary MCE
-    /// result. The processed bytes are dropped before a part-name fallback is
-    /// allocated, and no processed XML is retained in the returned view.
-    pub(crate) fn from_part_with_name(part: &'a dyn Part) -> Result<(Self, Result<String>)> {
+    /// result. The optional notes proof is classified while that result is
+    /// alive, then the processed bytes are dropped before a part-name
+    /// fallback is allocated.
+    pub(crate) fn from_part_with_name(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
-        let xml = processed_xml(part)?;
-        if root_name_from_xml(xml.as_ref())? != "sld" {
+        let xml = processed_xml_with_source(part)?;
+        if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
         }
-        let name = c_sld_name_from_xml(xml.as_ref());
+        let name = c_sld_name_from_xml(xml.processed.as_ref());
+        let notes_proof = (collect_notes_proof && name.is_ok()).then(|| {
+            SlideRootProof::new(
+                xml.source,
+                crate::notes::root_conformance_from_processed(
+                    xml.processed.as_ref(),
+                    xml.source.len(),
+                    crate::notes::MAX_SLIDE_XML,
+                    "sld",
+                ),
+            )
+        });
         drop(xml);
         let name = name.map(|name| name.unwrap_or_else(|| part.partname().to_string()));
-        Ok((Self { part }, name))
+        Ok((Self { part }, name, notes_proof))
     }
 
     /// The underlying OPC part.

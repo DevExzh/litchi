@@ -23,6 +23,30 @@ use crate::{Error, Result};
 pub(crate) const MAX_PART_XML_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_SLIDES: usize = 100_000;
 
+/// The exact source slice and its temporary MCE projection used by one
+/// capture-local reader.  Keeping the source slice beside the projection
+/// prevents a later consumer from mistaking a projection of one foreign
+/// `Part::blob()` result for a projection of another result.
+pub(crate) struct ProcessedXml<'a> {
+    pub(crate) source: &'a [u8],
+    pub(crate) processed: Cow<'a, [u8]>,
+}
+
+/// Process one exact source observation while retaining that observation for
+/// a capture-local proof.  The first `blob()` call preserves the established
+/// raw-size preflight; the second call is the exact slice supplied to MCE.
+pub(crate) fn processed_xml_with_source(part: &dyn Part) -> Result<ProcessedXml<'_>> {
+    if part.blob().len() > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "PresentationML part XML",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+    let source = part.blob();
+    let processed = litchi_ooxml_common::mce::process_ooxml(source)?;
+    Ok(ProcessedXml { source, processed })
+}
+
 pub(crate) fn processed_xml(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
     if part.blob().len() > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
@@ -158,4 +182,81 @@ pub(crate) fn validate_slide_relationship<'a, T>(
         });
     }
     Ok((relationship, target, part))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::Relationships;
+    use litchi_opc::part::BlobPart;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Clone)]
+    struct AlternatingBlobPart {
+        inner: BlobPart,
+        first: &'static [u8],
+        second: &'static [u8],
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Part for AlternatingBlobPart {
+        fn blob(&self) -> &[u8] {
+            if self.calls.fetch_add(1, Ordering::SeqCst) % 2 == 0 {
+                self.first
+            } else {
+                self.second
+            }
+        }
+
+        fn blob_arc(&self) -> Arc<Vec<u8>> {
+            Arc::new(self.blob().to_vec())
+        }
+
+        fn content_type(&self) -> &str {
+            self.inner.content_type()
+        }
+
+        fn partname(&self) -> &PackURI {
+            self.inner.partname()
+        }
+
+        fn rels(&self) -> &Relationships {
+            self.inner.rels()
+        }
+
+        fn rels_mut(&mut self) -> &mut Relationships {
+            self.inner.rels_mut()
+        }
+
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.inner.set_blob(blob);
+        }
+
+        fn set_content_type(&mut self, content_type: String) -> litchi_opc::Result<()> {
+            self.inner.set_content_type(content_type)
+        }
+    }
+
+    #[test]
+    fn source_bound_processing_uses_the_second_blob_observation() {
+        const FIRST: &[u8] = b"size-only source";
+        const SECOND: &[u8] =
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        let part = AlternatingBlobPart {
+            inner: BlobPart::new(
+                PackURI::new("/ppt/slides/alternate.xml").expect("valid part name"),
+                crate::notes::SLIDE_CT.to_owned(),
+                FIRST.to_vec(),
+            ),
+            first: FIRST,
+            second: SECOND,
+            calls: Arc::new(AtomicUsize::new(0)),
+        };
+
+        let processed = processed_xml_with_source(&part).expect("second source must be XML");
+        assert_eq!(processed.source, SECOND);
+        assert_eq!(processed.processed.as_ref(), SECOND);
+        assert_eq!(part.calls.load(Ordering::SeqCst), 2);
+    }
 }
