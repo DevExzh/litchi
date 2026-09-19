@@ -132,6 +132,7 @@
 
 mod aggregate;
 pub mod complex;
+mod discrete;
 mod elementary;
 pub(super) mod numerics;
 mod radix;
@@ -868,6 +869,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if discrete::is_discrete_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if aggregate::is_aggregate_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -989,6 +994,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if elementary::is_elementary_function(name) {
             return elementary::apply(self, node, name);
+        }
+        if discrete::is_discrete_function(name) {
+            return discrete::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all

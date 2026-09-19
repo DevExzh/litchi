@@ -1,0 +1,1192 @@
+[
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COMBIN(3;2)",
+    "cached": "3",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=COMBIN(5;3)",
+    "cached": "10",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=COMBIN(0;0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=COMBIN(1;1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=COMBIN(8;2)",
+    "cached": "28",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=COMBIN(12.5;2)",
+    "cached": "66",
+    "cells": []
+  },
+  {
+    "function": "COMBIN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combin.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=COMBIN(12;0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COMBINA(3;2)",
+    "cached": "6",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=COMBINA(5;3)",
+    "cached": "35",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=COMBINA(1;1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=COMBINA(8;2)",
+    "cached": "36",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=COMBINA(12.5;2)",
+    "cached": "78",
+    "cells": []
+  },
+  {
+    "function": "COMBINA",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/combina.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=COMBINA(12;0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/fact.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=FACT(1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/fact.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=FACT([.F1])",
+    "cached": "1",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "FACT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/fact.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=FACT(0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/fact.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=FACT(4)",
+    "cached": "24",
+    "cells": []
+  },
+  {
+    "function": "FACT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/fact.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=FACT(1.9)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE(0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE(0.7)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE(12)",
+    "cached": "46080",
+    "cells": []
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE([.G1])",
+    "cached": "81749606400",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "22"
+      }
+    ]
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE([.H11])",
+    "cached": "15",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE([.G9])",
+    "cached": "1",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "FACTDOUBLE",
+    "source": "sc/qa/unit/data/functions/addin/fods/factdouble.fods",
+    "sheet": "Sheet2",
+    "row": 25,
+    "column": 1,
+    "formula": "of:=FACTDOUBLE([.G25])",
+    "cached": "2",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      }
+    ]
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=GCD(16;32;24)",
+    "cached": "8",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=GCD([.J1:.J3])",
+    "cached": "2",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=GCD(5; 2)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=GCD(5; 0)",
+    "cached": "5",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=GCD(1.2;2.4)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=GCD(1.2;3.6)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=GCD(3;0)",
+    "cached": "3",
+    "cells": []
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=GCD([.L1];[.M1])",
+    "cached": "1",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "1.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "2.4"
+      }
+    ]
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 21,
+    "column": 1,
+    "formula": "of:=GCD([.L11];[.M11])",
+    "cached": "6",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 12,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 13,
+        "type": "number",
+        "value": "24"
+      }
+    ]
+  },
+  {
+    "function": "GCD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/gcd.fods",
+    "sheet": "Sheet2",
+    "row": 39,
+    "column": 1,
+    "formula": "of:=GCD(0;0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LCM(16;32;24)",
+    "cached": "96",
+    "cells": []
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=LCM([.J1:.J3])",
+    "cached": "24",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LCM(5; 2)",
+    "cached": "10",
+    "cells": []
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=LCM(5; 0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=LCM(3;0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 21,
+    "column": 1,
+    "formula": "of:=LCM([.L11];[.M11])",
+    "cached": "72",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 12,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 13,
+        "type": "number",
+        "value": "24"
+      }
+    ]
+  },
+  {
+    "function": "LCM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/lcm.fods",
+    "sheet": "Sheet2",
+    "row": 39,
+    "column": 1,
+    "formula": "of:=LCM(0;0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G1:.G3])",
+    "cached": "1260",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL({2;3;4})",
+    "cached": "1260",
+    "cells": []
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL(1000;0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G5];[.H5])",
+    "cached": "10",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 8,
+        "type": "number",
+        "value": "2"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G6];[.H6];[.I6];[.J6];[.K6];[.L6])",
+    "cached": "3",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 8,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 11,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "0"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G8];[.H8];[.I8];[.J8];[.K8];[.L8])",
+    "cached": "2053230379200",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 8,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 11,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "6"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G13];[.H13])",
+    "cached": "2.47272060489868E+023",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 7,
+        "type": "number",
+        "value": "102"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 8,
+        "type": "number",
+        "value": "21"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G14];[.H14])",
+    "cached": "30663442810",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 7,
+        "type": "number",
+        "value": "164"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 8,
+        "type": "number",
+        "value": "6"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G15];[.H15];[.I15])",
+    "cached": "8.94321721058995E+033",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 8,
+        "type": "number",
+        "value": "67"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "32"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 17,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G17];[.H17])",
+    "cached": "1",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 7,
+        "type": "number",
+        "value": "1000"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 8,
+        "type": "number",
+        "value": "0"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 18,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G18];[.H18];[.I18])",
+    "cached": "1260",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 8,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 19,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G19];[.H19])",
+    "cached": "10",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 7,
+        "type": "number",
+        "value": "3.4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 8,
+        "type": "number",
+        "value": "2.3"
+      }
+    ]
+  },
+  {
+    "function": "MULTINOMIAL",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/multinomial.fods",
+    "sheet": "Sheet2",
+    "row": 20,
+    "column": 1,
+    "formula": "of:=MULTINOMIAL([.G20];[.H20];[.I20])",
+    "cached": "4.13450750638954E+080",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 7,
+        "type": "number",
+        "value": "40"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 8,
+        "type": "number",
+        "value": "60"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 9,
+        "type": "number",
+        "value": "80"
+      }
+    ]
+  },
+  {
+    "function": "EVEN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/even.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=EVEN(2.3)",
+    "cached": "4",
+    "cells": []
+  },
+  {
+    "function": "EVEN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/even.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=EVEN(2)",
+    "cached": "2",
+    "cells": []
+  },
+  {
+    "function": "EVEN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/even.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=EVEN(0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "EVEN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/even.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=EVEN(-0.5)",
+    "cached": "-2",
+    "cells": []
+  },
+  {
+    "function": "EVEN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/even.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=EVEN([.F1])",
+    "cached": "0",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "ODD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/odd.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=ODD(2.3)",
+    "cached": "3",
+    "cells": []
+  },
+  {
+    "function": "ODD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/odd.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=ODD(2)",
+    "cached": "3",
+    "cells": []
+  },
+  {
+    "function": "ODD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/odd.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=ODD(0)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "ODD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/odd.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=ODD(-0.5)",
+    "cached": "-1",
+    "cells": []
+  },
+  {
+    "function": "ODD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/odd.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=ODD([.F1])",
+    "cached": "1",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=DELTA(1;2)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=DELTA(1;1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=DELTA([.G11];[.H11])",
+    "cached": "0",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "0.6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 8,
+        "type": "number",
+        "value": "88"
+      }
+    ]
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=DELTA(1)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 12,
+    "column": 1,
+    "formula": "of:=DELTA(5; 4)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "DELTA",
+    "source": "sc/qa/unit/data/functions/addin/fods/delta.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=DELTA(0.5; 0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=GESTEP(1;2)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=GESTEP(1;1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=GESTEP([.G11];[.H11])",
+    "cached": "0",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "0.6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 8,
+        "type": "number",
+        "value": "88"
+      }
+    ]
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=GESTEP(1)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 12,
+    "column": 1,
+    "formula": "of:=GESTEP(5; 4)",
+    "cached": "1",
+    "cells": []
+  },
+  {
+    "function": "GESTEP",
+    "source": "sc/qa/unit/data/functions/addin/fods/gestep.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=GESTEP(0.5; 0)",
+    "cached": "1",
+    "cells": []
+  }
+]

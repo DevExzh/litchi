@@ -1,11 +1,12 @@
 //! Resolver-aware numeric sequence and matrix aggregates.
 //!
 //! The scalar evaluator owns the scalar kernels.  This module owns the value
-//! profile's two sequence shapes: `SUM`, `PRODUCT`, and `SUMSQ` consume
-//! ordered number sequences, while `SUMPRODUCT` and the three `SUMX*`
+//! profile's two sequence shapes: `SUM`, `PRODUCT`, `SUMSQ`, `GCD`, `LCM`, and
+//! `MULTINOMIAL` consume ordered number sequences, while `SUMPRODUCT` and the three `SUMX*`
 //! functions consume equal-sized forced arrays.  References are traversed in
 //! place, so a large range does not first become a second owned array.
 
+use super::super::discrete::{DiscreteFold, DiscreteFunction, sequence_function};
 use super::super::numerics::{
     NumericAggregate, NumericOperation, ProductSumError, ProductTerm, ScaledProductSum, WideSum,
 };
@@ -19,6 +20,7 @@ pub(super) fn is_aggregate_function(name: &str) -> bool {
     name.eq_ignore_ascii_case("SUM")
         || name.eq_ignore_ascii_case("PRODUCT")
         || name.eq_ignore_ascii_case("SUMSQ")
+        || sequence_function(name).is_some()
         || name.eq_ignore_ascii_case("SUMPRODUCT")
         || name.eq_ignore_ascii_case("SUMX2MY2")
         || name.eq_ignore_ascii_case("SUMX2PY2")
@@ -40,6 +42,9 @@ enum Function {
     Sum,
     Product,
     SumSquares,
+    Gcd,
+    Lcm,
+    Multinomial,
     SumProduct,
     SumX2My2,
     SumX2Py2,
@@ -54,6 +59,12 @@ impl Function {
             Self::Product
         } else if name.eq_ignore_ascii_case("SUMSQ") {
             Self::SumSquares
+        } else if name.eq_ignore_ascii_case("GCD") {
+            Self::Gcd
+        } else if name.eq_ignore_ascii_case("LCM") {
+            Self::Lcm
+        } else if name.eq_ignore_ascii_case("MULTINOMIAL") {
+            Self::Multinomial
         } else if name.eq_ignore_ascii_case("SUMPRODUCT") {
             Self::SumProduct
         } else if name.eq_ignore_ascii_case("SUMX2MY2") {
@@ -68,7 +79,15 @@ impl Function {
     }
 
     const fn is_sequence(self) -> bool {
-        matches!(self, Self::Sum | Self::Product | Self::SumSquares)
+        matches!(
+            self,
+            Self::Sum
+                | Self::Product
+                | Self::SumSquares
+                | Self::Gcd
+                | Self::Lcm
+                | Self::Multinomial
+        )
     }
 
     const fn is_pair(self) -> bool {
@@ -96,7 +115,11 @@ where
         }
         return Ok(formula_error(ScalarError::Value));
     }
-    if function == Function::Product && arguments.is_empty() {
+    if matches!(
+        function,
+        Function::Product | Function::Gcd | Function::Lcm | Function::Multinomial
+    ) && arguments.is_empty()
+    {
         return Ok(formula_error(ScalarError::Value));
     }
 
@@ -115,15 +138,23 @@ fn apply_sequence<'expr, 'scalar, 'exec, 'position, R>(
 where
     R: Resolver + ?Sized,
 {
-    // SUMSQ has NumberSequence rather than NumberSequenceList. A 3-D
-    // reference remains one Reference and is therefore legal even when its
-    // physical representation contains multiple sheet planes; only an
-    // explicit union/reference-list is refused.
-    if function == Function::SumSquares
+    // SUMSQ and MULTINOMIAL have NumberSequence rather than
+    // NumberSequenceList. A 3-D reference remains one Reference and is
+    // therefore legal even when its physical representation contains
+    // multiple sheet planes; only an explicit union/reference-list is
+    // refused.
+    if matches!(function, Function::SumSquares | Function::Multinomial)
         && arguments
             .iter()
             .any(|value| matches!(value, RuntimeValue::Areas(areas) if areas.is_list))
     {
+        // A rejected ReferenceList remains unread, but a direct formula
+        // error in a later argument still has source precedence.  Inspect
+        // only materialized scalar/array values before publishing the shape
+        // error; `direct_formula_error` deliberately never traverses Areas.
+        if let Some(error) = direct_formula_error(evaluator, &arguments)? {
+            return Ok(formula_error(error));
+        }
         return Ok(formula_error(ScalarError::Value));
     }
 
@@ -190,7 +221,7 @@ where
         RuntimeElement::Empty => {},
         RuntimeElement::Missing => fold.push_formula_error(ScalarError::Value),
         RuntimeElement::Present(WorkingValue::Number(value)) => {
-            fold.push_number(value)?;
+            fold.push_number(evaluator, value)?;
         },
         RuntimeElement::Present(WorkingValue::Error(error)) => {
             fold.push_formula_error(error);
@@ -258,11 +289,11 @@ where
     R: Resolver + ?Sized,
 {
     match value {
-        WorkingValue::Number(value) => fold.push_number(value),
+        WorkingValue::Number(value) => fold.push_number(evaluator, value),
         WorkingValue::Logical(value) => fold_scalar_number(evaluator, fold, f64::from(value)),
         WorkingValue::Text(value) => {
             match super::super::to_number(WorkingValue::Text(value), &mut evaluator.scalar)? {
-                Ok(value) => fold.push_number(value),
+                Ok(value) => fold.push_number(evaluator, value),
                 Err(error) => {
                     fold.push_generated_error(error);
                     Ok(())
@@ -281,31 +312,49 @@ where
 }
 
 fn fold_scalar_number<'expr, 'scalar, 'exec, 'position, R>(
-    _evaluator: &mut ValueEvaluator<'expr, 'scalar, 'exec, 'position, R>,
+    evaluator: &mut ValueEvaluator<'expr, 'scalar, 'exec, 'position, R>,
     fold: &mut SequenceFold,
     value: f64,
 ) -> EvaluationResult<()>
 where
     R: Resolver + ?Sized,
 {
-    fold.push_number(value)
+    fold.push_number(evaluator, value)
 }
 
 struct SequenceFold {
     function: Function,
-    numeric: Option<NumericAggregate>,
-    squares: Option<WideSum>,
+    accumulator: SequenceAccumulator,
     formula_error: Option<ScalarError>,
     generated_error: Option<ScalarError>,
     work_index: usize,
 }
 
+enum SequenceAccumulator {
+    Numeric(NumericAggregate),
+    Squares(WideSum),
+    Discrete(DiscreteFold),
+}
+
 impl SequenceFold {
     fn new(function: Function) -> EvaluationResult<Self> {
-        let (numeric, squares) = match function {
-            Function::Sum => (Some(NumericAggregate::new(NumericOperation::Sum)), None),
-            Function::Product => (Some(NumericAggregate::new(NumericOperation::Product)), None),
-            Function::SumSquares => (None, Some(WideSum::default())),
+        let accumulator = match function {
+            Function::Sum => {
+                SequenceAccumulator::Numeric(NumericAggregate::new(NumericOperation::Sum))
+            },
+            Function::Product => {
+                SequenceAccumulator::Numeric(NumericAggregate::new(NumericOperation::Product))
+            },
+            Function::SumSquares => SequenceAccumulator::Squares(WideSum::default()),
+            Function::Gcd => {
+                SequenceAccumulator::Discrete(DiscreteFold::new(DiscreteFunction::Gcd))
+            },
+            Function::Lcm => {
+                SequenceAccumulator::Discrete(DiscreteFold::new(DiscreteFunction::Lcm))
+            },
+            Function::Multinomial => {
+                SequenceAccumulator::Discrete(DiscreteFold::new(DiscreteFunction::Multinomial))
+            },
             _ => {
                 return Err(EvaluationFailure::InvalidExpression(
                     "matrix aggregate reached sequence reducer",
@@ -314,8 +363,7 @@ impl SequenceFold {
         };
         Ok(Self {
             function,
-            numeric,
-            squares,
+            accumulator,
             formula_error: None,
             generated_error: None,
             work_index: 0,
@@ -333,22 +381,40 @@ impl SequenceFold {
         Ok(index)
     }
 
-    fn push_number(&mut self, value: f64) -> EvaluationResult<()> {
+    fn push_number<'expr, 'scalar, 'exec, 'position, R>(
+        &mut self,
+        evaluator: &mut ValueEvaluator<'expr, 'scalar, 'exec, 'position, R>,
+        value: f64,
+    ) -> EvaluationResult<()>
+    where
+        R: Resolver + ?Sized,
+    {
         if self.formula_error.is_some() {
             return Ok(());
         }
-        if let Some(numeric) = self.numeric.as_mut() {
-            if let Err(error) = numeric.push_number(value) {
-                self.push_generated_error(error);
-            }
-        } else if let Some(squares) = self.squares.as_mut() {
-            if let Err(error) = squares.push_square(value) {
-                self.push_generated_error(error);
-            }
-        } else {
-            return Err(EvaluationFailure::InvalidExpression(
-                "sequence numeric accumulator is missing",
-            ));
+        match &mut self.accumulator {
+            SequenceAccumulator::Numeric(numeric) => {
+                if let Err(error) = numeric.push_number(value) {
+                    self.push_generated_error(error);
+                }
+            },
+            SequenceAccumulator::Squares(squares) => {
+                if let Err(error) = squares.push_square(value) {
+                    self.push_generated_error(error);
+                }
+            },
+            SequenceAccumulator::Discrete(discrete) => {
+                // Admit bounded reducer work before executing its
+                // fixed-width arithmetic, then mirror the first generated
+                // reducer error into the outer sequence state.
+                let work = discrete.work_for(value);
+                evaluator
+                    .scalar
+                    .charge_work(u64::try_from(work).unwrap_or(u64::MAX))?;
+                if let Err(error) = discrete.push_number(value) {
+                    self.push_generated_error(error);
+                }
+            },
         }
         Ok(())
     }
@@ -369,23 +435,32 @@ impl SequenceFold {
         if let Some(error) = self.formula_error.or(self.generated_error) {
             return Ok(formula_error(error));
         }
-        let value = if let Some(numeric) = self.numeric {
-            match numeric.result() {
+        let value = match self.accumulator {
+            SequenceAccumulator::Numeric(numeric) => match numeric.result() {
                 Ok(Some(value)) => value,
                 Ok(None) if self.function == Function::Product => 1.0,
                 Ok(None) => 0.0,
                 Err(error) => return Ok(formula_error(error)),
-            }
-        } else if let Some(squares) = self.squares {
-            match squares.result() {
+            },
+            SequenceAccumulator::Squares(squares) => match squares.result() {
                 Ok(Some(value)) => value,
                 Ok(None) => 0.0,
                 Err(error) => return Ok(formula_error(error)),
-            }
-        } else {
-            return Err(EvaluationFailure::InvalidExpression(
-                "sequence numeric accumulator is missing",
-            ));
+            },
+            SequenceAccumulator::Discrete(discrete) => match discrete.finish() {
+                Ok(value) => value,
+                // A NumberSequenceList reference can contain no admitted
+                // Number/Error cells after Empty/Text/Logical filtering. The
+                // value profile publishes the constrained empty GCD/LCM as
+                // #NUM!, while MULTINOMIAL keeps its empty product identity.
+                Err(ScalarError::Value)
+                    if matches!(self.function, Function::Gcd | Function::Lcm) =>
+                {
+                    return Ok(formula_error(ScalarError::Number));
+                },
+                Err(ScalarError::Value) if self.function == Function::Multinomial => 1.0,
+                Err(error) => return Ok(formula_error(error)),
+            },
         };
         Ok(number(value))
     }
@@ -512,7 +587,12 @@ where
                     },
                 }
             },
-            Function::Sum | Function::Product | Function::SumSquares => {
+            Function::Sum
+            | Function::Product
+            | Function::SumSquares
+            | Function::Gcd
+            | Function::Lcm
+            | Function::Multinomial => {
                 return Err(EvaluationFailure::InvalidExpression(
                     "sequence aggregate reached matrix reducer",
                 ));

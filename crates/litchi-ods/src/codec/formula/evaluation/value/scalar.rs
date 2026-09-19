@@ -104,7 +104,7 @@ pub(super) fn infix<'a>(
         .map(Slot::Value)
 }
 
-/// Parameter conversion for the existing eager scalar function catalog.
+/// Parameter conversion for the eager scalar function catalog.
 /// TextOrNumber radix arguments use the explicit empty-Text profile.
 pub(super) fn argument<'a>(name: &str, index: usize, slot: Slot<'a>) -> WorkingValue<'a> {
     let text_first = index == 0
@@ -175,6 +175,18 @@ pub(super) fn eager<'a>(
         && !super::super::rounding::is_rounding_function(name)
         && !super::super::trigonometry::is_trigonometric_function(name)
         && !super::super::elementary::is_elementary_function(name)
+        && ![
+            "COMBIN",
+            "COMBINA",
+            "FACT",
+            "FACTDOUBLE",
+            "EVEN",
+            "ODD",
+            "DELTA",
+            "GESTEP",
+        ]
+        .iter()
+        .any(|function| name.eq_ignore_ascii_case(function))
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }

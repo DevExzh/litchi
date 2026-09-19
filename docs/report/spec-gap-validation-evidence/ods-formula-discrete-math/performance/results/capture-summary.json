@@ -1,0 +1,138 @@
+{
+  "baseline_commit": "782339a2c",
+  "captures": [
+    {
+      "binary_sha256": "728c3975e074e9d16fa431e75eef9b3fb443c498caf8cab26a2adc976f34b224",
+      "case_scope": "matched-controls",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-sin",
+        "scalar-control-imsum",
+        "database-control-dsum",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-sin",
+        "reference-array-16x4-arithmetic",
+        "reference-array-16x4-sin",
+        "scalar-aggregate-sum",
+        "literal-aggregate-4x4-sum",
+        "reference-aggregate-16x4-sum"
+      ],
+      "label": "baseline-782339a2c",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 330,
+      "source_git_head": "782339a2c467ba77def74839066ba9f9ef7eb67d"
+    },
+    {
+      "binary_sha256": "cd0b760f257b27a8717a702d7e3b2f2ec0a05982d5904c281fb62f3c29786bad",
+      "case_scope": "all-named-cases",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-sin",
+        "scalar-control-imsum",
+        "database-control-dsum",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-sin",
+        "reference-array-16x4-arithmetic",
+        "reference-array-16x4-sin",
+        "scalar-aggregate-sum",
+        "literal-aggregate-4x4-sum",
+        "reference-aggregate-16x4-sum",
+        "scalar-discrete-combin",
+        "literal-discrete-4x4-combin",
+        "scalar-discrete-combina",
+        "literal-discrete-4x4-combina",
+        "scalar-discrete-fact",
+        "literal-discrete-4x4-fact",
+        "scalar-discrete-factdouble",
+        "literal-discrete-4x4-factdouble",
+        "scalar-discrete-gcd",
+        "literal-discrete-4x4-gcd",
+        "scalar-discrete-lcm",
+        "literal-discrete-4x4-lcm",
+        "scalar-discrete-multinomial",
+        "literal-discrete-4x4-multinomial",
+        "scalar-discrete-even",
+        "literal-discrete-4x4-even",
+        "scalar-discrete-odd",
+        "literal-discrete-4x4-odd",
+        "scalar-discrete-delta",
+        "literal-discrete-4x4-delta",
+        "scalar-discrete-gestep",
+        "literal-discrete-4x4-gestep",
+        "reference-discrete-64x4-gcd",
+        "reference-discrete-256x4-gcd",
+        "reference-discrete-1024x4-gcd",
+        "nested-discrete-64-gcd",
+        "nested-discrete-256-gcd",
+        "nested-discrete-1024-gcd",
+        "reference-discrete-64x4-lcm",
+        "reference-discrete-256x4-lcm",
+        "reference-discrete-1024x4-lcm",
+        "nested-discrete-64-lcm",
+        "nested-discrete-256-lcm",
+        "nested-discrete-1024-lcm",
+        "reference-discrete-64x4-multinomial",
+        "reference-discrete-256x4-multinomial",
+        "reference-discrete-1024x4-multinomial",
+        "nested-discrete-64-multinomial",
+        "nested-discrete-256-multinomial",
+        "nested-discrete-1024-multinomial"
+      ],
+      "freeze_base_commit": "782339a2c467ba77def74839066ba9f9ef7eb67d",
+      "freeze_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/gates/freeze.json",
+      "label": "candidate-final",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 1530,
+      "source_git_head": "782339a2c467ba77def74839066ba9f9ef7eb67d"
+    }
+  ],
+  "cleanup": {
+    "baseline_removed": true,
+    "baseline_worktree": "/tmp/litchi-ods-discrete-baseline-2c5q65o6"
+  },
+  "controls": [
+    "scalar-control-arithmetic",
+    "scalar-control-sin",
+    "scalar-control-imsum",
+    "database-control-dsum",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-sin",
+    "reference-array-16x4-arithmetic",
+    "reference-array-16x4-sin",
+    "scalar-aggregate-sum",
+    "literal-aggregate-4x4-sum",
+    "reference-aggregate-16x4-sum"
+  ],
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "profile_input_sha256_after": {
+    "PLAN.md": "d2128740e7f10e0cd8e48573093a7d3afcd7d14c48c8b6ca4eac87ac48d94e70",
+    "README.md": "21d635e0bd964c18ddddce85bb668aa50dbadff90a9a88c0301aac8721e6d24e",
+    "harness/Cargo.lock": "6bbdef5707aa8deb4ebdb9b9b907926cc7d3ad7f26565b28f466797b9775a4bb",
+    "harness/Cargo.toml": "ed5314a996d3fafd5edb7282a424e9ee00a5ce1f83683b1e05dd0b8df8daf072",
+    "harness/src/main.rs": "b1e5ad79e6c93639ca3fbfaaf427b70646f2681ca9191aed706d2f45b75dbfd4",
+    "run_profile.py": "c662a09de60b1a837ebf192077f1702559f8dc3df13fd33a9b6da076b954d888",
+    "summarize.py": "a76124db158e033e22894991c18bb07de051536ec83b891e0178eed638fa10af",
+    "verify.py": "bd69fffcdaacbb7c8d464e5fcc72c7617bd08070771678fd7ec350756e9f33fc"
+  },
+  "profile_input_sha256_before": {
+    "PLAN.md": "d2128740e7f10e0cd8e48573093a7d3afcd7d14c48c8b6ca4eac87ac48d94e70",
+    "README.md": "21d635e0bd964c18ddddce85bb668aa50dbadff90a9a88c0301aac8721e6d24e",
+    "harness/Cargo.lock": "6bbdef5707aa8deb4ebdb9b9b907926cc7d3ad7f26565b28f466797b9775a4bb",
+    "harness/Cargo.toml": "ed5314a996d3fafd5edb7282a424e9ee00a5ce1f83683b1e05dd0b8df8daf072",
+    "harness/src/main.rs": "b1e5ad79e6c93639ca3fbfaaf427b70646f2681ca9191aed706d2f45b75dbfd4",
+    "run_profile.py": "c662a09de60b1a837ebf192077f1702559f8dc3df13fd33a9b6da076b954d888",
+    "summarize.py": "a76124db158e033e22894991c18bb07de051536ec83b891e0178eed638fa10af",
+    "verify.py": "bd69fffcdaacbb7c8d464e5fcc72c7617bd08070771678fd7ec350756e9f33fc"
+  },
+  "samples_per_group": 15,
+  "warmups_per_child": 3
+}
