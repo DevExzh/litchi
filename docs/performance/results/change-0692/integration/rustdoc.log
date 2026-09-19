@@ -1,0 +1,7 @@
+HEAD e9bd3360c442feacbd46d7af116794087388fbb0
+$ cargo doc -p litchi-pptx --all-features --no-deps --locked
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.92s
+   Generated /home/zhuhe/code/litchi-target-0692/doc/litchi_pptx/index.html
+
+exit 0

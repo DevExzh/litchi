@@ -1,0 +1,28 @@
+{
+  "python_syntax_pass": [
+    "docs/performance/results/change-0692/audit.py",
+    "docs/performance/results/change-0692/build.py",
+    "docs/performance/results/change-0692/check-control.py",
+    "docs/performance/results/change-0692/measure-allocations.py",
+    "docs/performance/results/change-0692/measure.py",
+    "docs/performance/results/change-0692/prepare-control.py",
+    "docs/performance/results/change-0692/profile.py",
+    "docs/performance/results/change-0692/quality-summary.py",
+    "docs/performance/results/change-0692/report-metrics.py",
+    "docs/performance/results/change-0692/run-evidence.py",
+    "docs/performance/results/change-0692/run-integration.py",
+    "docs/performance/results/change-0692/summarize-allocations.py",
+    "docs/performance/results/change-0692/summarize.py",
+    "docs/performance/results/change-0692/trace-summary.py",
+    "docs/performance/results/change-0692/trace.py"
+  ],
+  "probe_format_command": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--check",
+    "docs/performance/results/change-0692/probe/src/main.rs"
+  ],
+  "probe_format_exit_code": 0,
+  "probe_format_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

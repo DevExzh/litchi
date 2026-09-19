@@ -1,0 +1,12 @@
+[
+  {
+    "path": "crates/litchi/tests/unexpected_format.rs",
+    "sha256": "334d8e6281f6f66f91d3e3aa955832a550fb0f8215fe409c89ec227646bf59f8",
+    "unchanged_from_baseline": true
+  },
+  {
+    "path": "crates/litchi/src/detection_smart/detected.rs",
+    "sha256": "e531ceaadaa041f284bb0674c6315036afa85992bc1583d586c8b8a8e7d886a8",
+    "unchanged_from_baseline": true
+  }
+]

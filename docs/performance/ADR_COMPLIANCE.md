@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## 0692 — capture-local slide root/name projection
+
+[0692](0692-pptx-capture-name-projection.md) keeps all 33 constraint hashes
+unchanged and confines production work to `litchi-pptx` private capture helpers.
+ADR 0003 publication/revision behavior and public part APIs are unchanged.
+ADR 0005 ownership is one temporary processed slide buffer, a fallibly reserved
+slide-count-bounded vector, moved name strings and at most one deferred error;
+there is no persistent cache or repurposed byte budget. ADR 0006 ordering is
+checked against a frozen legacy sequence with explicit typed error assertions,
+including later root/relationship errors and notes precedence. Ordinary
+validation behavior is preserved; transient allocation opportunities differ.
+ADR 0008 evidence separates native, allocator and trace instruments and retains
+restoration hashes, scoped gains and costs. No coverage promotion.
+
 ## 0691 — PPTX measurement and private reuse design
 
 [0691](0691-pptx-repeated-mce-baseline.md) verifies all 33 unchanged constraint

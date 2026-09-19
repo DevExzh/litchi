@@ -1,0 +1,27 @@
+{
+  "completed_utc": "2026-09-19T18:59:29.261700+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0692",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0692-bin",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0692-profile",
+      "kind": "owned temporary directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0692/marker-control.pptx",
+      "kind": "reproducible marker control",
+      "sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "removed": true
+    }
+  ],
+  "preserved": "Preexisting shared targets, workspace Cargo.lock, unrelated worktrees and all retained text/source evidence."
+}

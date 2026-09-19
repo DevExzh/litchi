@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0692 — one redundant PPTX slide pass removed
+
+[0692](0692-pptx-capture-name-projection.md) reuses each temporary MCE result
+for root and name projection, deferring only the earliest name error.
+Real one-edit phases improve about 25%, no-op about 26%, and two-slide edits
+about 25%; marker-free controls also improve. Two MCE passes per slide and
+five presentation passes remain in real capture. Candidate MCE `start` still
+accounts for 18.17% of native open-plus-capture self samples. Profile remaining
+notes and presentation validation before extending reuse. The current change
+adds no persistent cache; temporary entries grow by 24 bytes per slide.
+
 ## 0691 — repeated PPTX capture processing remains the next target
 
 [0691](0691-pptx-repeated-mce-baseline.md) confirms 44 owned MCE outputs from

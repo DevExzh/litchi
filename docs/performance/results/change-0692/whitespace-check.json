@@ -1,0 +1,34 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0692/focused-tests-final.log",
+    ":(exclude)docs/performance/results/change-0692/profile/baseline/counters-10.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/baseline/counters-210.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/baseline/inclusive-symbols.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/baseline/self-symbols.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/candidate/counters-10.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/candidate/counters-210.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/candidate/inclusive-symbols.txt",
+    ":(exclude)docs/performance/results/change-0692/profile/candidate/self-symbols.txt",
+    ":(exclude)docs/performance/results/change-0692/trace-runs/20260919T184347627478Z-2833482/trace.patch"
+  ],
+  "exit_code": 0,
+  "excluded_hash_bound_artifacts": {
+    "docs/performance/results/change-0692/focused-tests-final.log": "ed5a3568d19499c87618403041845f88cbab16e3e0f0f65f34c4ddc9cfda319d",
+    "docs/performance/results/change-0692/profile/baseline/counters-10.txt": "74d474df5feef52bd7a283f776aabbdbfede3fa207e3551828aee70d22c220b4",
+    "docs/performance/results/change-0692/profile/baseline/counters-210.txt": "f880618b13fe8efa7b8f573573b508552ae6f7b4de45edd58bb2b71671c31d14",
+    "docs/performance/results/change-0692/profile/baseline/inclusive-symbols.txt": "8eb76a2304e90c8617d612e38cd74e354c0b68d9b38e84f4cb32ee9b41a575ed",
+    "docs/performance/results/change-0692/profile/baseline/self-symbols.txt": "a6379e1395618e3cebec714ef01664ec74c2dc7afa18a4fdad3bf2d9a26633c8",
+    "docs/performance/results/change-0692/profile/candidate/counters-10.txt": "f538efcd86643d3f278a3ade65cc5bea7b3d038cdeee358d0b03319b0cf6dddd",
+    "docs/performance/results/change-0692/profile/candidate/counters-210.txt": "51141e6044ebf122c074b554d2c04b13a797798f67f6a68afdb84a7d9f975ad0",
+    "docs/performance/results/change-0692/profile/candidate/inclusive-symbols.txt": "4158cdbf3c948eb8cfc205b20581f389d518f0201f009843f2e193f56955f42d",
+    "docs/performance/results/change-0692/profile/candidate/self-symbols.txt": "86bff19140e9c5453ee8af3178b6f5dd2c76cac1a36fb8c8f7020beee0d5e82b",
+    "docs/performance/results/change-0692/trace-runs/20260919T184347627478Z-2833482/trace.patch": "969c62d59e906edad1a24776ee97065a64682e056ad8280a3df3a78cd38f0205"
+  },
+  "reason": "Preserve exact raw diagnostic output and archived patch bytes."
+}

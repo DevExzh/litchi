@@ -25,9 +25,8 @@ const MAX_SEMANTIC_TEXT_EVENT_BYTES: usize = 1024 * 1024;
 const MAX_SEMANTIC_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 16 * 1024 * 1024;
 
-fn root_name(part: &dyn Part) -> Result<String> {
-    let xml = processed_xml(part)?;
-    let mut reader = NsReader::from_reader(xml.as_ref());
+fn root_name_from_xml(xml: &[u8]) -> Result<String> {
+    let mut reader = NsReader::from_reader(xml);
     loop {
         let (namespace, event) = reader.read_resolved_event()?;
         match event {
@@ -49,9 +48,18 @@ fn root_name(part: &dyn Part) -> Result<String> {
     }
 }
 
+fn root_name(part: &dyn Part) -> Result<String> {
+    let xml = processed_xml(part)?;
+    root_name_from_xml(xml.as_ref())
+}
+
+fn c_sld_name_from_xml(xml: &[u8]) -> Result<Option<String>> {
+    crate::namespace::presentation_name(xml)
+}
+
 fn c_sld_name(part: &dyn Part) -> Result<Option<String>> {
     let xml = processed_xml(part)?;
-    crate::namespace::presentation_name(xml.as_ref())
+    c_sld_name_from_xml(xml.as_ref())
 }
 
 /// Read the ordered `p:sldLayoutIdLst` relationship references owned by a
@@ -886,6 +894,21 @@ impl<'a> SlidePart<'a> {
             return Err(invalid("slide part does not have a p:sld root"));
         }
         Ok(Self { part })
+    }
+
+    /// Validate a slide and project its producer name from one temporary MCE
+    /// result. The processed bytes are dropped before a part-name fallback is
+    /// allocated, and no processed XML is retained in the returned view.
+    pub(crate) fn from_part_with_name(part: &'a dyn Part) -> Result<(Self, Result<String>)> {
+        validate_content_type(part, ct::PML_SLIDE)?;
+        let xml = processed_xml(part)?;
+        if root_name_from_xml(xml.as_ref())? != "sld" {
+            return Err(invalid("slide part does not have a p:sld root"));
+        }
+        let name = c_sld_name_from_xml(xml.as_ref());
+        drop(xml);
+        let name = name.map(|name| name.unwrap_or_else(|| part.partname().to_string()));
+        Ok((Self { part }, name))
     }
 
     /// The underlying OPC part.

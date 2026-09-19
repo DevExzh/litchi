@@ -1,0 +1,21 @@
+HEAD e9bd3360c442feacbd46d7af116794087388fbb0
+$ cargo test -p litchi --locked --no-default-features --features pptx,xlsx --lib --tests -- --test-threads=1
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+error: variable does not need to be mutable
+    --> crates/litchi/src/detection_smart/detected.rs:3621:13
+     |
+3621 |         let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
+     |             ----^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `-D unused-mut` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+
+exit 101

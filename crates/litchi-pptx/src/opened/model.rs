@@ -625,8 +625,8 @@ fn capture_internal(
         });
     }
     let view = crate::presentation::Presentation::new(presentation, package);
-    let contextual = view.slides()?;
-    if references.len() != contextual.len() {
+    let captured = view.capture_slides()?;
+    if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",
         ));
@@ -641,7 +641,9 @@ fn capture_internal(
     let mut ids = std::collections::HashSet::new();
     let mut relationship_ids = std::collections::HashSet::new();
     let mut part_names = std::collections::HashSet::new();
-    for (reference, slide) in references.iter().zip(contextual) {
+    let mut first_name_error = captured.first_name_error;
+    for (index, (reference, captured)) in references.iter().zip(captured.slides).enumerate() {
+        let slide = captured.slide;
         let relationship = presentation
             .part()
             .rels()
@@ -669,10 +671,25 @@ fn capture_internal(
                 "opened-presentation slide identities are not one-to-one",
             ));
         }
+        let name = if let Some(name) = captured.name {
+            name
+        } else {
+            let Some((name_index, error)) = first_name_error.take() else {
+                return Err(invalid(
+                    "opened-presentation capture name projection is incomplete",
+                ));
+            };
+            if name_index != index {
+                return Err(invalid(
+                    "opened-presentation capture name projection order changed",
+                ));
+            }
+            return Err(error);
+        };
         slides.push(Slide {
             id: reference.id(),
             relationship_id: reference.relationship_id().to_owned(),
-            name: slide.name()?,
+            name,
             part_name,
         });
     }

@@ -259,12 +259,14 @@ values. Focused tests should cover transitional/strict namespace forms, MCE
 markers, missing/empty `cSld@name`, malformed tails, first/second-slide root and
 name failures, duplicate identities, relationship target failures, and absent
 or invalid notes graphs. Instrumentation should show one `process_ooxml` call
-per slide in capture on valid inputs, with no changed call count for the main
-part or notes graph.
+per slide for the combined root/name projections, plus the unchanged notes
+validation call: two per slide overall on the measured real capture, down
+from three. Main-part and notes-graph call counts should remain unchanged.
 
 This candidate is preferred over a persistent per-part processed-XML cache for
-this batch: it removes the two large per-slide rewrites seen in the real-deck
-profile while retaining only values capture already stores, and it leaves ADR
+this batch: it targets one redundant rewrite per slide per capture, or two
+across an edit's capture pair, while retaining only values capture already
+stores, and it leaves ADR
 0005's retention budget and `blob_arc` ABA proof out of the production seam.
 
 ## The other repeated calls

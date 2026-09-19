@@ -1,0 +1,106 @@
+HEAD e9bd3360c442feacbd46d7af116794087388fbb0
+$ cargo test -p litchi --locked --no-default-features --features pptx,xlsx,ods --lib --tests -- --test-threads=1
+   Compiling generic-array v0.14.9
+   Compiling const-oid v0.9.6
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling base64ct v1.6.0
+   Compiling digest v0.11.3
+   Compiling pem-rfc7468 v0.7.0
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling sha2 v0.10.9
+   Compiling der v0.7.10
+   Compiling chrono v0.4.45
+   Compiling spki v0.7.3
+   Compiling sha2 v0.11.0
+   Compiling pkcs8 v0.10.2
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling ff v0.13.1
+   Compiling siphasher v1.0.3
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling cipher v0.5.2
+   Compiling crypto-bigint v0.5.5
+   Compiling spin v0.9.9
+   Compiling lazy_static v1.5.0
+   Compiling elliptic-curve v0.13.8
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling phf_shared v0.14.0
+   Compiling rand_chacha v0.3.1
+   Compiling num-integer v0.1.47
+   Compiling signature v2.2.0
+   Compiling universal-hash v0.6.1
+   Compiling hmac v0.12.1
+   Compiling fastrand v2.5.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling phf_generator v0.14.0
+   Compiling rfc6979 v0.4.0
+   Compiling polyval v0.7.3
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling bergshamra-core v0.7.0
+   Compiling inout v0.1.4
+   Compiling uppsala v0.9.0
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling bergshamra-xml v0.7.0
+   Compiling cipher v0.4.4
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling ghash v0.6.0
+   Compiling ecdsa v0.16.9
+   Compiling phf_macros v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling aead v0.6.1
+   Compiling pkcs1 v0.7.5
+   Compiling sha1 v0.10.7
+   Compiling hmac v0.13.0
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling byteorder v1.5.0
+   Compiling argon2 v0.5.3
+   Compiling blowfish v0.9.1
+   Compiling pbkdf2 v0.13.0
+   Compiling rsa v0.9.10
+   Compiling aes-gcm v0.11.1
+   Compiling phf v0.14.0
+   Compiling p256 v0.13.2
+   Compiling bergshamra-c14n v0.7.0
+   Compiling cbc v0.2.1
+   Compiling x509-cert v0.2.5
+   Compiling sha1 v0.11.0
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling proptest v1.7.0
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+error: field `bytes` is never read
+   --> crates/litchi/src/detection_smart/detected.rs:193:16
+    |
+191 | pub(crate) struct PreparedOdfProbeError {
+    |                   --------------------- field in this struct
+192 |     pub(crate) error: crate::opc::OpcError,
+193 |     pub(crate) bytes: Vec<u8>,
+    |                ^^^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `litchi` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+
+exit 101
