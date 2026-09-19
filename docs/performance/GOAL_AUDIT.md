@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0686 — bounded growth and completed-scan retry admission
+
+[0686](0686-xls-oversized-index-admission.md) retains bounded candidate growth
+and an owner-local oversized sentinel after source and performance review.
+Temporary pressure, partial/error scans and cancellation remain retryable.
+Six quality gates pass: 1,881 CFB/XLS tests and 61 facade tests, with two
+existing ignored tests. The 126-real-fixture differential and two deterministic
+generated full-visitor differentials match for owned and file sources.
+
+Native A/A and A/B/B/A cover 26 case/source groups; separate allocation and
+I/O probes disclose greater build peaks/retention, build/refusal regressions
+and a process-RSS increase alongside repeated-query gains. Broader corpus,
+physical cold-cache, remote and concurrent scaling remain open. No registered
+claim or CRUD coverage is promoted. OLE2/OOXML continue; iWork is excluded.
+
 ## 0685 — measured worksheet-prefix reuse with explicit small-route costs
 
 [0685](0685-xls-worksheet-chain-checkpoints.md) completes the fixed worksheet-start

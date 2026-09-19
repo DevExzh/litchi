@@ -1,0 +1,677 @@
+[
+  {
+    "case": "54016-stored-1048576",
+    "baseline": {
+      "phase": "baseline",
+      "case": "54016-stored-1048576",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 2508538.3395,
+            "instructions": 11134793.9175,
+            "branches": 2223240.6565,
+            "branch-misses": 1711.951,
+            "cache-misses": 3432.649,
+            "page-faults": -0.1045
+          },
+          "rss_kib": {
+            "10": 5036,
+            "1010": 5256
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2516503.632,
+            "instructions": 11135393.005,
+            "branches": 2223347.3385,
+            "branch-misses": 1708.0905,
+            "cache-misses": 3706.7105,
+            "page-faults": -0.1025
+          },
+          "rss_kib": {
+            "10": 5132,
+            "1010": 5300
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2517625.579,
+            "instructions": 11135373.5905,
+            "branches": 2223344.175,
+            "branch-misses": 1738.441,
+            "cache-misses": 3866.8395,
+            "page-faults": -0.103
+          },
+          "rss_kib": {
+            "10": 5268,
+            "1010": 5304
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 2516503.632,
+        "instructions": 11135373.5905,
+        "branches": 2223344.175,
+        "branch-misses": 1711.951,
+        "cache-misses": 3706.7105,
+        "page-faults": -0.103
+      },
+      "median_rss_kib": {
+        "10": 5132,
+        "1010": 5300
+      }
+    },
+    "candidate": {
+      "phase": "candidate",
+      "case": "54016-stored-1048576",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 11424.9465,
+            "instructions": 45423.006,
+            "branches": 9307.5665,
+            "branch-misses": 18.2585,
+            "cache-misses": 13.229,
+            "page-faults": 0.01
+          },
+          "rss_kib": {
+            "10": 5224,
+            "1010": 5400
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 11944.8595,
+            "instructions": 45394.6615,
+            "branches": 9302.4015,
+            "branch-misses": 20.4525,
+            "cache-misses": 15.818,
+            "page-faults": 0.0115
+          },
+          "rss_kib": {
+            "10": 5304,
+            "1010": 5420
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 11880.8955,
+            "instructions": 45390.6525,
+            "branches": 9301.052,
+            "branch-misses": 20.3085,
+            "cache-misses": 17.332,
+            "page-faults": 0.012
+          },
+          "rss_kib": {
+            "10": 5220,
+            "1010": 5492
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 11880.8955,
+        "instructions": 45394.6615,
+        "branches": 9302.4015,
+        "branch-misses": 20.3085,
+        "cache-misses": 15.818,
+        "page-faults": 0.0115
+      },
+      "median_rss_kib": {
+        "10": 5224,
+        "1010": 5420
+      }
+    },
+    "percent": {
+      "cycles": -99.52788085226972,
+      "instructions": -99.59233822618464,
+      "branches": -99.58160317216745,
+      "branch-misses": -98.81372188806806,
+      "cache-misses": -99.57326044210897,
+      "page-faults": null
+    },
+    "rss_percent": {
+      "10": 1.7926734216679563,
+      "1010": 2.264150943396226
+    }
+  },
+  {
+    "case": "54016-stored-524288",
+    "baseline": {
+      "phase": "baseline",
+      "case": "54016-stored-524288",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 2410671.344,
+            "instructions": 11125917.5665,
+            "branches": 2231264.2245,
+            "branch-misses": 1902.1165,
+            "cache-misses": 4126.364,
+            "page-faults": 43.763
+          },
+          "rss_kib": {
+            "10": 4388,
+            "1010": 4740
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2411546.8375,
+            "instructions": 11128102.5065,
+            "branches": 2231639.302,
+            "branch-misses": 1902.688,
+            "cache-misses": 4187.8145,
+            "page-faults": 43.76
+          },
+          "rss_kib": {
+            "10": 4436,
+            "1010": 4844
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 2411284.3945,
+            "instructions": 11125895.79,
+            "branches": 2231191.9715,
+            "branch-misses": 1908.314,
+            "cache-misses": 4067.661,
+            "page-faults": 43.7635
+          },
+          "rss_kib": {
+            "10": 4440,
+            "1010": 4816
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 2411284.3945,
+        "instructions": 11125917.5665,
+        "branches": 2231264.2245,
+        "branch-misses": 1902.688,
+        "cache-misses": 4126.364,
+        "page-faults": 43.763
+      },
+      "median_rss_kib": {
+        "10": 4436,
+        "1010": 4816
+      }
+    },
+    "candidate": {
+      "phase": "candidate",
+      "case": "54016-stored-524288",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 1570726.7795,
+            "instructions": 9439071.5185,
+            "branches": 1984200.712,
+            "branch-misses": 1677.441,
+            "cache-misses": 925.663,
+            "page-faults": 0.011
+          },
+          "rss_kib": {
+            "10": 4716,
+            "1010": 5036
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 1565619.595,
+            "instructions": 9439179.2755,
+            "branches": 1984221.031,
+            "branch-misses": 1677.8005,
+            "cache-misses": 1166.5725,
+            "page-faults": 0.0135
+          },
+          "rss_kib": {
+            "10": 4772,
+            "1010": 4980
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 1572860.6425,
+            "instructions": 9439119.518,
+            "branches": 1984210.1145,
+            "branch-misses": 1675.295,
+            "cache-misses": 855.27,
+            "page-faults": 0.0135
+          },
+          "rss_kib": {
+            "10": 4756,
+            "1010": 5036
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 1570726.7795,
+        "instructions": 9439119.518,
+        "branches": 1984210.1145,
+        "branch-misses": 1677.441,
+        "cache-misses": 925.663,
+        "page-faults": 0.0135
+      },
+      "median_rss_kib": {
+        "10": 4756,
+        "1010": 5036
+      }
+    },
+    "percent": {
+      "cycles": -34.85933127246472,
+      "instructions": -15.160979203898917,
+      "branches": -11.072382521409452,
+      "branch-misses": -11.838357103213982,
+      "cache-misses": -77.56710265987198,
+      "page-faults": -99.96915202339876
+    },
+    "rss_percent": {
+      "10": 7.213706041478818,
+      "1010": 4.568106312292364
+    }
+  },
+  {
+    "case": "Simple-stored-2097152",
+    "baseline": {
+      "phase": "baseline",
+      "case": "Simple-stored-2097152",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 7882.4295,
+            "instructions": 26059.4705,
+            "branches": 5347.3295,
+            "branch-misses": 17.385,
+            "cache-misses": 15.507,
+            "page-faults": 0.0305
+          },
+          "rss_kib": {
+            "10": 2536,
+            "1010": 2796
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 7715.623,
+            "instructions": 26082.1475,
+            "branches": 5351.509,
+            "branch-misses": 16.505,
+            "cache-misses": 15.788,
+            "page-faults": 0.031
+          },
+          "rss_kib": {
+            "10": 2472,
+            "1010": 2836
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8069.133,
+            "instructions": 26061.831,
+            "branches": 5347.5865,
+            "branch-misses": 17.6505,
+            "cache-misses": 17.186,
+            "page-faults": 0.03
+          },
+          "rss_kib": {
+            "10": 2544,
+            "1010": 2760
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 7882.4295,
+        "instructions": 26061.831,
+        "branches": 5347.5865,
+        "branch-misses": 17.385,
+        "cache-misses": 15.788,
+        "page-faults": 0.0305
+      },
+      "median_rss_kib": {
+        "10": 2536,
+        "1010": 2796
+      }
+    },
+    "candidate": {
+      "phase": "candidate",
+      "case": "Simple-stored-2097152",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 7959.5335,
+            "instructions": 26046.2925,
+            "branches": 5346.1105,
+            "branch-misses": 17.416,
+            "cache-misses": 19.209,
+            "page-faults": 0.03
+          },
+          "rss_kib": {
+            "10": 2520,
+            "1010": 2756
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8014.721,
+            "instructions": 25968.982,
+            "branches": 5332.414,
+            "branch-misses": 17.1075,
+            "cache-misses": 17.961,
+            "page-faults": 0.03
+          },
+          "rss_kib": {
+            "10": 2532,
+            "1010": 3032
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8231.9205,
+            "instructions": 26057.4265,
+            "branches": 5348.532,
+            "branch-misses": 18.2745,
+            "cache-misses": 19.418,
+            "page-faults": 0.0315
+          },
+          "rss_kib": {
+            "10": 2520,
+            "1010": 2760
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 8014.721,
+        "instructions": 26046.2925,
+        "branches": 5346.1105,
+        "branch-misses": 17.416,
+        "cache-misses": 19.209,
+        "page-faults": 0.03
+      },
+      "median_rss_kib": {
+        "10": 2520,
+        "1010": 2760
+      }
+    },
+    "percent": {
+      "cycles": 1.6783086991136287,
+      "instructions": -0.05962167431750043,
+      "branches": -0.027601236557850406,
+      "branch-misses": 0.17831463905664258,
+      "cache-misses": 21.668355713199894,
+      "page-faults": -1.6393442622950838
+    },
+    "rss_percent": {
+      "10": -0.6309148264984188,
+      "1010": -1.2875536480686733
+    }
+  },
+  {
+    "case": "synthetic-70000-default",
+    "baseline": {
+      "phase": "baseline",
+      "case": "synthetic-70000-default",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 4813089.872,
+            "instructions": 19741098.6435,
+            "branches": 3812964.479,
+            "branch-misses": 259.338,
+            "cache-misses": 6456.046,
+            "page-faults": 0.0465
+          },
+          "rss_kib": {
+            "10": 5608,
+            "1010": 5964
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 4809623.9295,
+            "instructions": 19741023.7025,
+            "branches": 3812949.234,
+            "branch-misses": 259.2105,
+            "cache-misses": 5986.524,
+            "page-faults": 0.047
+          },
+          "rss_kib": {
+            "10": 5800,
+            "1010": 6028
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 4810733.7655,
+            "instructions": 19740381.057,
+            "branches": 3812817.818,
+            "branch-misses": 231.732,
+            "cache-misses": 6130.023,
+            "page-faults": 0.047
+          },
+          "rss_kib": {
+            "10": 5576,
+            "1010": 6000
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 4810733.7655,
+        "instructions": 19741023.7025,
+        "branches": 3812949.234,
+        "branch-misses": 259.2105,
+        "cache-misses": 6130.023,
+        "page-faults": 0.047
+      },
+      "median_rss_kib": {
+        "10": 5608,
+        "1010": 6000
+      }
+    },
+    "candidate": {
+      "phase": "candidate",
+      "case": "synthetic-70000-default",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 7947.021,
+            "instructions": 26290.0655,
+            "branches": 5379.0345,
+            "branch-misses": 16.81,
+            "cache-misses": 21.789,
+            "page-faults": 0.0345
+          },
+          "rss_kib": {
+            "10": 5748,
+            "1010": 5860
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8194.326,
+            "instructions": 26356.9445,
+            "branches": 5389.6275,
+            "branch-misses": 18.052,
+            "cache-misses": 22.2175,
+            "page-faults": 0.0335
+          },
+          "rss_kib": {
+            "10": 5608,
+            "1010": 5780
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 8137.6955,
+            "instructions": 26362.4005,
+            "branches": 5392.195,
+            "branch-misses": 17.155,
+            "cache-misses": 18.644,
+            "page-faults": 0.034
+          },
+          "rss_kib": {
+            "10": 5596,
+            "1010": 5852
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 8137.6955,
+        "instructions": 26356.9445,
+        "branches": 5389.6275,
+        "branch-misses": 17.155,
+        "cache-misses": 21.789,
+        "page-faults": 0.034
+      },
+      "median_rss_kib": {
+        "10": 5608,
+        "1010": 5852
+      }
+    },
+    "percent": {
+      "cycles": -99.83084294628068,
+      "instructions": -99.86648643506435,
+      "branches": -99.85864937691956,
+      "branch-misses": -93.38182673927176,
+      "cache-misses": -99.64455272027527,
+      "page-faults": -27.6595744680851
+    },
+    "rss_percent": {
+      "10": 0.0,
+      "1010": -2.4666666666666615
+    }
+  },
+  {
+    "case": "synthetic-100000-default",
+    "baseline": {
+      "phase": "baseline",
+      "case": "synthetic-100000-default",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 6495156.491,
+            "instructions": 27755807.132,
+            "branches": 5386389.1275,
+            "branch-misses": 299.953,
+            "cache-misses": 8112.019,
+            "page-faults": 0.049
+          },
+          "rss_kib": {
+            "10": 6296,
+            "1010": 6456
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 6500921.3615,
+            "instructions": 27755541.661,
+            "branches": 5386330.17,
+            "branch-misses": 319.4815,
+            "cache-misses": 8204.0345,
+            "page-faults": 0.0505
+          },
+          "rss_kib": {
+            "10": 6296,
+            "1010": 6600
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 6497673.646,
+            "instructions": 27755436.5815,
+            "branches": 5386313.5355,
+            "branch-misses": 307.983,
+            "cache-misses": 8155.916,
+            "page-faults": 0.049
+          },
+          "rss_kib": {
+            "10": 6260,
+            "1010": 6540
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 6497673.646,
+        "instructions": 27755541.661,
+        "branches": 5386330.17,
+        "branch-misses": 307.983,
+        "cache-misses": 8155.916,
+        "page-faults": 0.049
+      },
+      "median_rss_kib": {
+        "10": 6296,
+        "1010": 6540
+      }
+    },
+    "candidate": {
+      "phase": "candidate",
+      "case": "synthetic-100000-default",
+      "samples": [
+        {
+          "per_extra_query": {
+            "cycles": 3865339.595,
+            "instructions": 23948949.957,
+            "branches": 4851527.1385,
+            "branch-misses": 257.447,
+            "cache-misses": 7199.3995,
+            "page-faults": 0.048
+          },
+          "rss_kib": {
+            "10": 6596,
+            "1010": 6744
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 3864986.9955,
+            "instructions": 23948669.962,
+            "branches": 4851472.623,
+            "branch-misses": 262.03,
+            "cache-misses": 7189.1445,
+            "page-faults": 0.049
+          },
+          "rss_kib": {
+            "10": 6580,
+            "1010": 6764
+          }
+        },
+        {
+          "per_extra_query": {
+            "cycles": 3861932.2795,
+            "instructions": 23948852.419,
+            "branches": 4851505.066,
+            "branch-misses": 263.6235,
+            "cache-misses": 7269.154,
+            "page-faults": 0.0475
+          },
+          "rss_kib": {
+            "10": 6592,
+            "1010": 6736
+          }
+        }
+      ],
+      "median_per_extra_query": {
+        "cycles": 3864986.9955,
+        "instructions": 23948852.419,
+        "branches": 4851505.066,
+        "branch-misses": 262.03,
+        "cache-misses": 7199.3995,
+        "page-faults": 0.048
+      },
+      "median_rss_kib": {
+        "10": 6592,
+        "1010": 6744
+      }
+    },
+    "percent": {
+      "cycles": -40.517372738790826,
+      "instructions": -13.7150601796717,
+      "branches": -9.929304129531303,
+      "branch-misses": -14.920628736001673,
+      "cache-misses": -11.72788562314766,
+      "page-faults": -2.0408163265306145
+    },
+    "rss_percent": {
+      "10": 4.701397712833555,
+      "1010": 3.119266055045866
+    }
+  }
+]

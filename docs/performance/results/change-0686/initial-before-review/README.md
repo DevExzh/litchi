@@ -1,0 +1,1 @@
+Initial candidate passed normal allocator checks but review found a partial-acquisition accounting risk in retry-after-failed-reservation. No performance disposition or final measurement uses this candidate. Final code selects the bounded size before one reservation attempt.

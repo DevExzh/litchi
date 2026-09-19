@@ -1,0 +1,330 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 75  of event 'cpu/cycles/P'
+# Event count (approx.): 259958627
+#
+# Overhead  Command          Shared Object               Symbol                                                                             
+# ........  ...............  ..........................  ...................................................................................
+#
+    22.25%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_cfb::shared::next_chain_sector
+            |          
+            |--12.04%--next_chain_sector (inlined)
+            |          |          
+            |          |--6.82%--0x3bcd4
+            |          |          0x1dd
+            |          |          
+            |          |--3.40%--0x3
+            |          |          
+            |           --1.82%--0x4ca42
+            |                     0x256
+            |          
+             --10.21%--get<u32> (inlined)
+                       get<u32, usize> (inlined)
+                       next_chain_sector (inlined)
+                       0x3bcd4
+                       0x1dd
+
+     8.48%  xls-index-retry  xls-index-retry-probe-0686  [.] <std::io::stdio::StdoutLock as std::io::Write>::write_all
+            |          
+             --1.70%--write_all (inlined)
+                       0x737265765f616d64
+
+     7.82%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::source::query_cell
+            |          
+            |--3.96%--map_err<litchi_xls::records::MeasuredCell, litchi_xls::error::Error, litchi_xls::workbook::source::SourceBackedError, fn(litchi_xls::error::Error) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+            |          scan_worksheet<litchi_xls::workbook::source::TargetCell<true>> (inlined)
+            |          scan_target_cell<true> (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          now (inlined)
+            |          execute_sample (inlined)
+            |          run (inlined)
+            |          
+            |--2.16%--select_unpredictable<usize> (inlined)
+            |          binary_search_by<litchi_xls::workbook::query_cache::CellSlot, core::slice::{impl#0}::partition_point::{closure_env#0}<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}>> (inlined)
+            |          partition_point<litchi_xls::workbook::query_cache::CellSlot, litchi_xls::workbook::query_cache::{impl#0}::slots_for::{closure_env#0}> (inlined)
+            |          slots_for (inlined)
+            |          replay_indexed_cell (inlined)
+            |          query_cell (inlined)
+            |          cell (inlined)
+            |          cell_by_index (inlined)
+            |          now (inlined)
+            |          execute_sample (inlined)
+            |          run (inlined)
+            |          
+             --1.70%--replay_indexed_cell (inlined)
+                       query_cell (inlined)
+                       cell (inlined)
+                       cell_by_index (inlined)
+                       now (inlined)
+                       execute_sample (inlined)
+                       run (inlined)
+
+     6.99%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted
+            |          
+            |--3.55%--cursor_chain_sector (inlined)
+            |          stream_cursor_at_hinted (inlined)
+            |          0x1dd
+            |          
+            |--1.74%--lt (inlined)
+            |          spec_next<usize> (inlined)
+            |          next<usize> (inlined)
+            |          cursor_chain_sector (inlined)
+            |          stream_cursor_at_hinted (inlined)
+            |          0x3bcd4
+            |          
+             --1.70%--branch<u32, litchi_cfb::file::OleError> (inlined)
+                       cursor_chain_sector (inlined)
+                       stream_cursor_at_hinted (inlined)
+                       0x264
+
+     5.31%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_cfb::directory_name::directory_name_data
+            |          
+            |--1.92%--copy_nonoverlapping<u16> (inlined)
+            |          insert_from_slice<[u16; 32]> (inlined)
+            |          extend_from_slice<[u16; 32]> (inlined)
+            |          directory_name_data (inlined)
+            |          0xa
+            |          
+            |--1.70%--triple<[u16; 32]> (inlined)
+            |          len<[u16; 32]> (inlined)
+            |          extend_from_slice<[u16; 32]> (inlined)
+            |          directory_name_data (inlined)
+            |          0xa
+            |          
+             --1.70%--directory_name_data (inlined)
+                       0x60e96236006a
+
+     5.09%  xls-index-retry  [unknown]                   [k] 0xffffffff9ff29554
+            |
+            ---0xffffffff9ff29554
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     5.09%  xls-index-retry  [unknown]                   [k] 0xffffffff9ff277a4
+            |
+            ---0xffffffff9ff277a4
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     3.51%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::workbook::source::resolve_shared_string
+            |
+            ---map_err<litchi_cfb::shared::SharedOleStreamCursor, litchi_cfb::file::OleError, litchi_xls::workbook::source::SourceBackedError, fn(litchi_cfb::file::OleError) -> litchi_xls::workbook::source::SourceBackedError> (inlined)
+               resolve_shared_string_inner (inlined)
+               resolve_shared_string (inlined)
+
+     3.39%  xls-index-retry  [unknown]                   [k] 0xffffffff9f0f61b6
+            |
+            ---0xffffffff9f0f61b6
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     3.39%  xls-index-retry  [unknown]                   [k] 0xffffffff9ff311dc
+            |
+            ---0xffffffff9ff311dc
+               0xffffffff9ed05077
+               0xffffffff9ff3033e
+               0xffffffff9ecf5bc4
+               0xffffffff9f0f6458
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+               write (inlined)
+               write (inlined)
+               write (inlined)
+               flush_buf<std::io::stdio::StdoutRaw> (inlined)
+               write_all<std::io::stdio::StdoutRaw> (inlined)
+               write_all<std::io::stdio::StdoutRaw> (inlined)
+               write_all (inlined)
+               write_all<std::io::stdio::StdoutLock> (inlined)
+               begin_object_key<&mut std::io::stdio::StdoutLock> (inlined)
+               serialize_key<&mut std::io::stdio::StdoutLock, serde_json::ser::PrettyFormatter, str> (inlined)
+               |          
+               |--1.70%--serialize_entry<serde_json::ser::Compound<&mut std::io::stdio::StdoutLock, serde_json::ser::PrettyFormatter>, str, u64> (inlined)
+               |          
+                --1.70%--serialize_entry<serde_json::ser::Compound<&mut std::io::stdio::StdoutLock, serde_json::ser::PrettyFormatter>, str, &str> (inlined)
+                          copy_nonoverlapping<u8> (inlined)
+                          write_to_buffer_unchecked<std::io::stdio::StdoutRaw> (inlined)
+                          write_all<std::io::stdio::StdoutRaw> (inlined)
+                          write_all<std::io::stdio::StdoutRaw> (inlined)
+                          write_all<std::io::stdio::StdoutRaw> (inlined)
+                          write_all (inlined)
+                          0x60e931e0e31c
+
+     3.39%  xls-index-retry  libc.so.6                   [.] __syscall_cancel
+            |
+            ---__internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     3.39%  xls-index-retry  [unknown]                   [k] 0xffffffff9ff30da0
+            |
+            ---0xffffffff9ff30da0
+               0xffffffff9ff303e1
+               0xffffffff9ecf5beb
+               0xffffffff9f0f6458
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     2.04%  xls-index-retry  xls-index-retry-probe-0686  [.] xls_index_retry_probe_0686::run
+            |
+            ---write<xls_index_retry_probe_0686::QueryRecord> (inlined)
+               push_mut<xls_index_retry_probe_0686::QueryRecord, alloc::alloc::Global> (inlined)
+               push<xls_index_retry_probe_0686::QueryRecord, alloc::alloc::Global> (inlined)
+               execute_sample (inlined)
+               run (inlined)
+               main (inlined)
+               0x2c
+
+     1.84%  xls-index-retry  xls-index-retry-probe-0686  [.] sha2::sha256::x86_sha::compress
+            |
+            ---_mm_sha256msg1_epu32 (inlined)
+               schedule (inlined)
+               compress (inlined)
+
+     1.76%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_cfb::shared::SharedOleStreamCursor::read_exact
+            |
+            ---branch<(u64, usize), litchi_cfb::file::OleError> (inlined)
+               read_from_state (inlined)
+               {closure#0} (inlined)
+               read_exact (inlined)
+               0x6
+
+     1.70%  xls-index-retry  libc.so.6                   [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+               drop_in_place<[litchi_core::sheet::types::CellValue]> (inlined)
+               drop<litchi_core::sheet::types::CellValue, alloc::alloc::Global> (inlined)
+               drop_in_place<alloc::vec::Vec<litchi_core::sheet::types::CellValue, alloc::alloc::Global>> (inlined)
+               execute_sample (inlined)
+               run (inlined)
+               main (inlined)
+               0x2c
+
+     1.70%  xls-index-retry  libc.so.6                   [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               copy_nonoverlapping<u8> (inlined)
+               write_to_buffer_unchecked<std::io::stdio::StdoutRaw> (inlined)
+               write_all<std::io::stdio::StdoutRaw> (inlined)
+               write_all<std::io::stdio::StdoutRaw> (inlined)
+               write_all<std::io::stdio::StdoutRaw> (inlined)
+               write_all (inlined)
+               write_all<std::io::stdio::StdoutLock> (inlined)
+               begin_string<serde_json::ser::PrettyFormatter, &mut std::io::stdio::StdoutLock> (inlined)
+               format_escaped_str<&mut std::io::stdio::StdoutLock, serde_json::ser::PrettyFormatter> (inlined)
+               serialize_str<&mut std::io::stdio::StdoutLock, serde_json::ser::PrettyFormatter> (inlined)
+
+     1.70%  xls-index-retry  xls-index-retry-probe-0686  [.] litchi_xls::cell::Cell::from_record_with_formula_context
+            |
+            ---from_record_with_formula_context (inlined)
+               _int_realloc
+               0x200000000
+
+     1.70%  xls-index-retry  [unknown]                   [k] 0xffffffff9ed0504b
+            |
+            ---0xffffffff9ed0504b
+               0xffffffff9ff3033e
+               0xffffffff9ecf5bc4
+               0xffffffff9f0f6458
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     1.70%  xls-index-retry  [unknown]                   [k] 0xffffffff9effed03
+            |
+            ---0xffffffff9effed03
+               0xffffffff9f000000
+               0xffffffff9f0004d3
+               0xffffffff9f00085e
+               0xffffffff9ec1a3ee
+               0xffffffff9ff1e2e3
+               0xffffffff9e800bb7
+               write<xls_index_retry_probe_0686::QueryRecord> (inlined)
+               push_mut<xls_index_retry_probe_0686::QueryRecord, alloc::alloc::Global> (inlined)
+               push<xls_index_retry_probe_0686::QueryRecord, alloc::alloc::Global> (inlined)
+               execute_sample (inlined)
+               run (inlined)
+               main (inlined)
+               0x2c
+
+     1.70%  xls-index-retry  [unknown]                   [k] 0xffffffff9ff28a34
+            |
+            ---0xffffffff9ff28a34
+               0xffffffff9ff29523
+               0xffffffff9ff2956a
+               0xffffffff9f0f6204
+               0xffffffff9f0e7e62
+               0xffffffff9f0e8346
+               0xffffffff9f0e8399
+               0xffffffff9eb48e2f
+               0xffffffff9ff15b65
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+     1.70%  xls-index-retry  xls-index-retry-probe-0686  [.] <std::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
+     1.70%  xls-index-retry  [unknown]                   [k] 0xffffffff9e800080
+            |
+            ---0xffffffff9e800080
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+
+     1.69%  xls-index-retry  [unknown]                   [k] 0xffffffff9eb48b6f
+            |
+            ---0xffffffff9eb48b6f
+               0xffffffff9ff15ba0
+               0xffffffff9e80012b
+               __internal_syscall_cancel (inlined)
+               __syscall_cancel
+               __libc_write (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

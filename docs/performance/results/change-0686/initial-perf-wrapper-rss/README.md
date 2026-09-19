@@ -1,0 +1,1 @@
+These first whole-process diagnostics wrapped perf with /usr/bin/time. Their ~62 MiB peak RSS is dominated by the perf wrapper and is NOT native probe RSS. Final captures place time inside perf so it measures the probe child. Final counter/RSS comparisons use only the corrected captures.

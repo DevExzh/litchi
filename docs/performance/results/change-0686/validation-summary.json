@@ -1,0 +1,35 @@
+{
+  "quality_gates": 6,
+  "rust_tests_passed": 1942,
+  "rust_tests_ignored": 2,
+  "real_corpus_files": 126,
+  "generated_fixtures": 2,
+  "native_groups": 26,
+  "native_owner_records": 15600,
+  "native_query_records": 124800,
+  "allocation_groups": 104,
+  "allocation_captures": 624,
+  "counted_source_routes": 13,
+  "audits": [
+    {
+      "name": "audit-costs",
+      "exit_code": 0,
+      "seconds": 1.0276106259552762
+    },
+    {
+      "name": "audit-native",
+      "exit_code": 0,
+      "seconds": 6.914518378907815
+    },
+    {
+      "name": "audit-diagnostics",
+      "exit_code": 0,
+      "seconds": 0.6502600099192932
+    },
+    {
+      "name": "audit-final",
+      "exit_code": 0,
+      "seconds": 2.4874918799614534
+    }
+  ]
+}

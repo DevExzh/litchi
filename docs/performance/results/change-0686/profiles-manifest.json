@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "diagnostic_manifest_sha256": "e04a854541e197145b0889f957e7df2ec8012d4b8b5b9f470d39aed926b5da8d",
+    "files": {
+      "baseline-profile-command.json": "18c1743b2774b744fc05e206547a1526a929beb51f414f459278f67c962c751e",
+      "baseline-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+      "baseline-profile-symbols.txt": "b611962c55f751ec8bbe67f375425d283bcc308a2ff4c0ce1e44466b1367099f",
+      "baseline-profile.json": "f9fbbb5671f3d43e23185a8fc29dc7a8eda1c647598fd6757015a34d13215a23",
+      "baseline-profile.stderr": "e9215c161d9a95a1944a608b8ad4aed3aff3f12c97f3a70cdd797868a4f38477"
+    }
+  },
+  "candidate": {
+    "diagnostic_manifest_sha256": "4b43e62dd2d6b7d227b9ec4f7900da84086c3007698c7862d3b10b72f81a3c98",
+    "files": {
+      "candidate-profile-command.json": "daa4cdb79d1faa0ed0b95fe3f2c64ac8cebd319229b21524bfe21bfd84ebf5c6",
+      "candidate-profile-report.stderr": "f060916a0433ca57831f00d70f219d7f3e9e6b2db87b82cc23f05d47e10dfaa7",
+      "candidate-profile-symbols.txt": "6353efed7f21c63b32d14783985b442f2d1c0ca0007fa23aa01e7e58404f116e",
+      "candidate-profile.json": "60bf78ec32cdcb1fea31d91b473e2539bfeb352afad179fc4638e819a71cca13",
+      "candidate-profile.stderr": "4b3fabace9232cb34e917f1dd363fe5b300804a690e14495140aa556292c0252"
+    }
+  }
+}
