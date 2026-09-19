@@ -10,4 +10,4 @@ mod worksheet;
 pub use layout::{ColumnEdit, DefaultsEdit, RowEdit};
 pub use transaction::Edit;
 pub(super) use transaction::SvgLifecycleIntent;
-pub use worksheet::{NewSheet, TabEdit, WorksheetEdit};
+pub use worksheet::{FormControlEdit, NewSheet, TabEdit, WorksheetEdit};

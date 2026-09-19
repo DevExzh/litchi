@@ -924,6 +924,10 @@ impl Properties {
         self.source.as_ref().map(SourcePayload::as_bytes)
     }
 
+    pub(crate) fn source_payload(&self) -> Option<SourcePayload> {
+        self.source.clone()
+    }
+
     /// Return the optional object type, including an unknown source token.
     #[must_use]
     pub fn object_type(&self) -> Option<&KnownOrUnknown<ObjectType>> {
@@ -1786,7 +1790,9 @@ impl Properties {
         }
         add_retained(
             &mut retained,
-            self.source.as_ref().map_or(0, |source| source.len()),
+            self.source
+                .as_ref()
+                .map_or(0, SourcePayload::retained_storage_bytes),
             limits,
         )?;
         // The root namespace Arc header is covered by the fixed Properties
@@ -2978,6 +2984,11 @@ fn validate_applicability(value: &Properties, object_type: ObjectType) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
+        Resource,
+    };
+    use std::num::{NonZeroU64, NonZeroUsize};
 
     #[test]
     fn properties_clone_shares_backing_until_mutation() {
@@ -3013,6 +3024,45 @@ mod tests {
             changed.object_type(),
             Some(&KnownOrUnknown::Known(ObjectType::CheckBox))
         );
+    }
+
+    #[test]
+    fn opaque_xml_clone_keeps_generated_source_budget_alive() {
+        let budget = Budget::root(
+            "form-control-opaque-clone-test",
+            BudgetLimits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let context = ExecutionContext::new(
+            budget.clone(),
+            cancellation,
+            ExecutionLimits::new(
+                NonZeroUsize::new(1).expect("one worker"),
+                NonZeroUsize::new(1).expect("one in-flight task"),
+                NonZeroU64::new(u64::MAX).expect("in-flight bytes"),
+                0,
+            )
+            .expect("execution limits"),
+        );
+        let hold =
+            super::super::budget::reserve_generated(Some(&context), 3, 1, "opaque clone test")
+                .expect("generated lease")
+                .expect("context supplies generated lease");
+        let source = SourcePayload::owned_budgeted(Arc::new(vec![b'<', b'x', b'>']), Some(hold));
+        let opaque = OpaqueXml::from_range(
+            source,
+            0..3,
+            Arc::from(Vec::<NamespaceBinding>::new().into_boxed_slice()),
+        )
+        .expect("opaque source range");
+        let cloned = opaque.clone();
+        drop(opaque);
+        assert!(budget.used(Resource::Memory) > 0);
+        assert!(budget.used(Resource::Objects) > 0);
+        drop(cloned);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        drop(cancellation_source);
     }
 
     #[test]

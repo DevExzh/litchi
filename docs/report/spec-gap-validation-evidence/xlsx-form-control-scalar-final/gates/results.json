@@ -1,0 +1,134 @@
+[
+  {
+    "name": "xlsx-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-xlsx"
+    ],
+    "exit_code": 0,
+    "seconds": 22.651612997055054,
+    "log_sha256": "c8f77a06918aa933d5eaa5d39f81873791dfeebf9224a1246035aac23e8e27c8"
+  },
+  {
+    "name": "opc-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-opc"
+    ],
+    "exit_code": 0,
+    "seconds": 16.502014875411987,
+    "log_sha256": "5056b316a46710db711115ff78c360ab9b4de2257dff02f79032d341ef9ee7b8"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 11.220857381820679,
+    "log_sha256": "8ee9534f5137ebf4c221a6b16083ec02fd3465742e1063ce117fa6c285d34279"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 4.91202974319458,
+    "log_sha256": "0ed24dc2a55aab2b77ffb373dbf04f3dc4fe865bd6a29914eb0d285db7d2cd93"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-opc",
+      "--",
+      "--check"
+    ],
+    "exit_code": 1,
+    "seconds": 1.9598827362060547,
+    "log_sha256": "aa53f3b08ce6ec882fab96b86fc52e7002a2c102ead9328831dd8c7ee99025bf"
+  },
+  {
+    "name": "batch-format",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-xlsx/src/edit.rs",
+      "crates/litchi-xlsx/src/lib.rs",
+      "crates/litchi-xlsx/src/workbook/mod.rs",
+      "crates/litchi-xlsx/tests/form_control_scalar_lifecycle.rs",
+      "crates/litchi-xlsx/src/form_control/mod.rs",
+      "crates/litchi-xlsx/src/form_control/owner.rs",
+      "crates/litchi-xlsx/src/form_control/mirror.rs",
+      "crates/litchi-xlsx/src/form_control/scalar_edit.rs",
+      "crates/litchi-xlsx/src/workbook/edit/codec.rs",
+      "crates/litchi-xlsx/src/workbook/edit/mod.rs",
+      "crates/litchi-xlsx/src/workbook/edit/model.rs",
+      "crates/litchi-xlsx/src/workbook/edit/validation.rs",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs",
+      "crates/litchi-xlsx/src/workbook/edit/planning.rs",
+      "crates/litchi-xlsx/src/form_control/budget.rs",
+      "crates/litchi-xlsx/src/form_control/model.rs",
+      "crates/litchi-xlsx/src/source_payload.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.3217804431915283,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 226.85955953598022,
+    "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa"
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.026490211486816406,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

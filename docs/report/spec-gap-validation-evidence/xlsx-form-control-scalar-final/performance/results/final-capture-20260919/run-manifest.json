@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "source_root": "/tmp/litchi-form-control-final",
+  "fixture_root": "/tmp/litchi-form-control-final/crates/litchi-xlsx/tests/fixtures/form_control_properties",
+  "freeze_receipt": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-form-control-scalar-final/gates/freeze.json",
+  "freeze_receipt_sha256": "3ecf389c09e1b04f80b453368abdf988a4176abfdfdb14e1536da8e6e36ae6d6",
+  "source_manifest_sha256": "181a161e4bff3791ab947a793952e4ad9c9ecaf2b6c30d36aa03e3ad78557338",
+  "harness_manifest_sha256": "6c8ddb9b63a55631c1af783b36306be72cfd9429725d9aeb6580556b91eb2a9d",
+  "compiler": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "target_triple": "x86_64-unknown-linux-gnu",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "toolchain": "1.95.0-x86_64-unknown-linux-gnu (overridden by '/tmp/litchi-form-control-final/rust-toolchain.toml')",
+  "build": {
+    "command": "cargo build --release --locked --offline --manifest-path Cargo.toml",
+    "profile": "release",
+    "allocator": "std::alloc::System wrapped by TrackingAllocator"
+  },
+  "host": {
+    "uname": "Linux-7.0.0-1012-aws-x86_64-with-glibc2.43",
+    "kernel": "7.0.0-1012-aws",
+    "processor": "",
+    "machine": "x86_64",
+    "cpu_count": 32,
+    "memory_total_bytes": 132553797632,
+    "storage": "Filesystem     1024-blocks     Used Available Capacity Mounted on\ntmpfs             64723536 47093528  17630008      73% /tmp",
+    "python": "3.14.4"
+  },
+  "environment": {
+    "TMPDIR": null,
+    "CARGO_TARGET_DIR": "/tmp/litchi-form-scalar-target.VKpqSG",
+    "CARGO_HOME": null,
+    "RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "warmups": 3,
+  "iterations_per_lane": 15,
+  "fixtures": [
+    "singlecontrol",
+    "tdf120301_xmlSpaceParsing",
+    "tdf134769"
+  ],
+  "lanes": [
+    "eager_noop_save_reopen",
+    "eager_read",
+    "eager_scalar_save_reopen",
+    "source_forward_apply",
+    "source_inverse_apply",
+    "source_noop_save_reopen",
+    "source_read",
+    "source_scalar_save_reopen"
+  ],
+  "sample_count": 360,
+  "errors": [],
+  "stats_sha256": "07e1aa3032c563cf0e2753b1afcbf58a35f824c07dd93ae06d63d5be974298e8",
+  "report_sha256": "ede89728f498ef0c52cf8df895dcf9336efba32be99bf4ed65b16cf79ae17375",
+  "stats_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-form-control-scalar-final/performance/results/final-capture-20260919/stats.json",
+  "report_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-form-control-scalar-final/performance/results/final-capture-20260919/report.md"
+}

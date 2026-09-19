@@ -1,0 +1,26 @@
+{
+  "base_commit": "967c04c1fe94396dfe61eae0bf640805e4f0730a",
+  "source_root": "/tmp/litchi-form-control-final",
+  "selected_files": {
+    "crates/litchi-opc/src/source_backed.rs": "12b082aebfbf118bd80fd28d85d7ce12ffe6b7eab212309d3d0e2288d6e94650",
+    "crates/litchi-xlsx/src/edit.rs": "c732411a40ce21777043476969e15b7c436e9ebd0048b18ed3f222515a9b3f6e",
+    "crates/litchi-xlsx/src/lib.rs": "e0732e928a4415aa1ee29baf97f6ae9cd8128d25d5c110d10bdfb8f1d31c7592",
+    "crates/litchi-xlsx/src/workbook/mod.rs": "e728fc3fce758e5184ddea3bb58daf834d2e949735a78fb2bf110636f137dc64",
+    "crates/litchi-xlsx/tests/form_control_scalar_lifecycle.rs": "1368f1c196cc517754a6049379846d2650caa2ee0f3241bb163b3426e36cb189",
+    "crates/litchi-xlsx/src/form_control/mod.rs": "c3cb85f463c56ed44753fc5d3e968f58e9dbfb67059efb342d4748b9f8d8ae2b",
+    "crates/litchi-xlsx/src/form_control/owner.rs": "1fd6a4c00de0b2ada3dfa7869ae5b36428afe733967d1ff5d1327f34512ecfdb",
+    "crates/litchi-xlsx/src/form_control/mirror.rs": "9cede7de1ae0d0b008d5fb26cb9d9a7dafd4f6256f6b8a9b77d4c7bcaa513fbf",
+    "crates/litchi-xlsx/src/form_control/scalar_edit.rs": "5ffcd5ac9bd32ad1caacc689f0dd1f9f016b35cfdb95d79b46f88c1be1269071",
+    "crates/litchi-xlsx/src/workbook/edit/codec.rs": "1ed2cfe8067fb8d7f5d0f1ed611623b579448e0652a17eb245c44ef9a967df50",
+    "crates/litchi-xlsx/src/workbook/edit/mod.rs": "ad897b05f89e6b98d900167011bf67190af6956a4b8764c58b506c929035ff8c",
+    "crates/litchi-xlsx/src/workbook/edit/model.rs": "cadeaea01c20a337520d40372563096dcc47dd52de6792bcbbfbb060a696da08",
+    "crates/litchi-xlsx/src/workbook/edit/validation.rs": "c54af66a77f1809faaabd7cbc2d338c18428d548aa9b30dcfbe70cb65c7e33aa",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs": "72c69052aa784b05408b25ecc6223d2707d67a17fa14012fcece295cc11b73b7",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "5fdf8bfd840652d38538f90fe8a40a5282a27e5c3622f86c95884dbd4a6c5430",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs": "5adb6de9dcf9c7f71c70dddba63af3f0c45d8214d319a53aa78ea84171b252db",
+    "crates/litchi-xlsx/src/workbook/edit/planning.rs": "b30ec417552fd6959ff6cbc25ec6489b9cd7cf24964cb987e12bac20e9ec5c28",
+    "crates/litchi-xlsx/src/form_control/budget.rs": "b4cdcf43dc8df72b6e7b0cdf0644241dff7ac8ec9174bf59fc00eb01a2258ac7",
+    "crates/litchi-xlsx/src/form_control/model.rs": "25d74071de87cd5dc2dff5dff498ebcee1cdba9a42ad83bb71525365ac5bc6aa",
+    "crates/litchi-xlsx/src/source_payload.rs": "20d90a45659711e078c5b376823952d04b90a325e69ce6f3e3797b7ea17fff1f"
+  }
+}
