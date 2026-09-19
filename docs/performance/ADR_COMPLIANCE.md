@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0688 — checked chain validation stays on the success path
+
+[0688](0688-cfb-checked-chain-hot-path.md) keeps the shared CFB checked
+sector helper and outlines only error formatting. Current marker, checked
+conversion, bounds lookup, next marker, and cursor termination retain exact
+precedence and errors under ADR 0006. Existing hints, checkpoint ownership,
+source fences, and reader/writer semantics are unchanged (ADRs 0003/0006).
+No unsafe code, dependency, API, cache or retained state is added (ADRs
+0001/0002/0024). ADR 0005 resource policies remain unchanged; query allocator
+and process-RSS evidence are reported separately from generated code/stack.
+Accepted ADR hashes remain unchanged. No ADR amendment or memory bound is
+claimed.
+
 ## 0687 — bounded ASCII keys preserve CFB name semantics
 
 [0687](0687-cfb-ascii-directory-keys.md) stays in the shared CFB owner with no

@@ -1,0 +1,44 @@
+/home/zhuhe/code/litchi-target-0688-before/release/xls0684-repeat  :
+section                   size      addr
+.interp                     28       736
+.note.ABI-tag               32       764
+.note.gnu.build-id          36       796
+.dynsym                   1728       832
+.gnu.version               144      2560
+.gnu.version_r             320      2704
+.gnu.hash                   28      3024
+.dynstr                   1120      3052
+.rela.dyn                52104      4176
+.rela.plt                   48     56280
+.gcc_except_table       193324     56328
+.rodata                  92388    249664
+.debug_gdb_scripts          34    342052
+.eh_frame_hdr            10996    342088
+.eh_frame                65012    353088
+.text                   636083    422208
+.init                       27   1058292
+.fini                       13   1058320
+.plt                        48   1058336
+.tdata                      32   1062480
+.tbss                       72   1062512
+.fini_array                  8   1062512
+.init_array                 16   1062520
+.data.rel.ro             35008   1062536
+.dynamic                   464   1097544
+.got                      3824   1098008
+.got.plt                    40   1101832
+.relro_padding            4048   1101872
+.tm_clone_table              0   1105968
+.data                     2512   1105968
+.bss                       256   1108480
+.comment                   177         0
+.debug_loc            47178288         0
+.debug_abbrev           524936         0
+.debug_info           50126063         0
+.debug_aranges          319776         0
+.debug_ranges          9201040         0
+.debug_str            20262189         0
+.debug_line            7057786         0
+Total                135770048
+
+

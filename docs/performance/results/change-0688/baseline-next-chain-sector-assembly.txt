@@ -1,0 +1,71 @@
+
+/home/zhuhe/code/litchi-target-0688-before/release/xls0684-repeat:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000b3be0 <litchi_cfb::shared::next_chain_sector>:
+   b3be0:	53                   	push   %rbx
+   b3be1:	48 83 ec 60          	sub    $0x60,%rsp
+   b3be5:	48 89 fb             	mov    %rdi,%rbx
+   b3be8:	89 0c 24             	mov    %ecx,(%rsp)
+   b3beb:	4c 89 44 24 30       	mov    %r8,0x30(%rsp)
+   b3bf0:	4c 89 4c 24 38       	mov    %r9,0x38(%rsp)
+   b3bf5:	83 f9 f9             	cmp    $0xfffffff9,%ecx
+   b3bf8:	76 4d                	jbe    b3c47 <litchi_cfb::shared::next_chain_sector+0x67>
+   b3bfa:	48 89 e0             	mov    %rsp,%rax
+   b3bfd:	48 89 44 24 08       	mov    %rax,0x8(%rsp)
+   b3c02:	48 8b 05 d7 8a 05 00 	mov    0x58ad7(%rip),%rax        # 10c6e0 <_DYNAMIC+0x798>
+   b3c09:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+   b3c0e:	48 8d 44 24 30       	lea    0x30(%rsp),%rax
+   b3c13:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+   b3c18:	48 8d 05 01 38 00 00 	lea    0x3801(%rip),%rax        # b7420 <<&T as core::fmt::Display>::fmt>
+   b3c1f:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   b3c24:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+   b3c28:	48 8d 35 ed 3f f9 ff 	lea    -0x6c013(%rip),%rsi        # 47c1c <anon.320152b598d3bfa6a3fcbdc9661b1e8c.419.llvm.15014334783055174669+0x10ad>
+   b3c2f:	48 8d 54 24 08       	lea    0x8(%rsp),%rdx
+   b3c34:	ff 15 06 88 05 00    	call   *0x58806(%rip)        # 10c440 <_DYNAMIC+0x4f8>
+   b3c3a:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+   b3c41:	48 83 c4 60          	add    $0x60,%rsp
+   b3c45:	5b                   	pop    %rbx
+   b3c46:	c3                   	ret
+   b3c47:	89 c8                	mov    %ecx,%eax
+   b3c49:	48 39 c2             	cmp    %rax,%rdx
+   b3c4c:	76 1e                	jbe    b3c6c <litchi_cfb::shared::next_chain_sector+0x8c>
+   b3c4e:	8b 04 86             	mov    (%rsi,%rax,4),%eax
+   b3c51:	89 44 24 04          	mov    %eax,0x4(%rsp)
+   b3c55:	83 f8 fe             	cmp    $0xfffffffe,%eax
+   b3c58:	0f 95 c1             	setne  %cl
+   b3c5b:	83 f8 fa             	cmp    $0xfffffffa,%eax
+   b3c5e:	0f 93 c2             	setae  %dl
+   b3c61:	84 d1                	test   %dl,%cl
+   b3c63:	74 70                	je     b3cd5 <litchi_cfb::shared::next_chain_sector+0xf5>
+   b3c65:	48 8d 44 24 04       	lea    0x4(%rsp),%rax
+   b3c6a:	eb 91                	jmp    b3bfd <litchi_cfb::shared::next_chain_sector+0x1d>
+   b3c6c:	48 89 e0             	mov    %rsp,%rax
+   b3c6f:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+   b3c74:	48 8b 05 15 88 05 00 	mov    0x58815(%rip),%rax        # 10c490 <_DYNAMIC+0x548>
+   b3c7b:	48 89 44 24 48       	mov    %rax,0x48(%rsp)
+   b3c80:	48 8d 44 24 30       	lea    0x30(%rsp),%rax
+   b3c85:	48 89 44 24 50       	mov    %rax,0x50(%rsp)
+   b3c8a:	48 8d 05 8f 37 00 00 	lea    0x378f(%rip),%rax        # b7420 <<&T as core::fmt::Display>::fmt>
+   b3c91:	48 89 44 24 58       	mov    %rax,0x58(%rsp)
+   b3c96:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+   b3c9b:	48 8d 35 bc d4 f8 ff 	lea    -0x72b44(%rip),%rsi        # 4115e <anon.3f513d2c565fcfa970c8a64eaa344e5b.445.llvm.346546039675621711+0xd6>
+   b3ca2:	48 8d 54 24 40       	lea    0x40(%rsp),%rdx
+   b3ca7:	ff 15 93 87 05 00    	call   *0x58793(%rip)        # 10c440 <_DYNAMIC+0x4f8>
+   b3cad:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+   b3cb2:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+   b3cb7:	48 89 4b 20          	mov    %rcx,0x20(%rbx)
+   b3cbb:	0f 10 44 24 18       	movups 0x18(%rsp),%xmm0
+   b3cc0:	0f 11 43 10          	movups %xmm0,0x10(%rbx)
+   b3cc4:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+   b3ccb:	48 89 43 08          	mov    %rax,0x8(%rbx)
+   b3ccf:	48 83 c4 60          	add    $0x60,%rsp
+   b3cd3:	5b                   	pop    %rbx
+   b3cd4:	c3                   	ret
+   b3cd5:	89 43 08             	mov    %eax,0x8(%rbx)
+   b3cd8:	48 c7 03 0b 00 00 00 	movq   $0xb,(%rbx)
+   b3cdf:	48 83 c4 60          	add    $0x60,%rsp
+   b3ce3:	5b                   	pop    %rbx
+   b3ce4:	c3                   	ret

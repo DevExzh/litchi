@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0688 — remove per-link call/result overhead from checked CFB walks
+
+[0688](0688-cfb-checked-chain-hot-path.md) follows actual calls in baseline
+assembly and a 59.07% checked-link self profile. Cold error formatting lets
+the compiler inline link checks into a single whole-walk function. Stored
+54016 owned eighth queries improve 12–17%; independent loop controls and
+38–46% instruction reductions confirm useful repeated-work savings. Large
+indexed open-plus-eight windows remain approximately flat.
+
+Tiny stored queries and disabled-index scans regress; Simple missing owned q8
+moves 70 → 80 ns. Whole `.text` grows 1,440 bytes (0.23%). Allocations and
+counted I/O match exactly; native-child RSS increases peak at 4.52% among
+measured medians. These costs remain explicit. Candidate chain walks still
+account for 56.65% self samples. Dependent traversal, small-route costs and
+within-sheet/SST work remain open; no registered claim or coverage promotion.
+
 ## 0687 — inline ASCII directory keys reduce repeated CFB lookup work
 
 [0687](0687-cfb-ascii-directory-keys.md) follows a fresh profile attributing

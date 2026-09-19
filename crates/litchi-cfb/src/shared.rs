@@ -3473,24 +3473,34 @@ fn cursor_chain_sector(
     Ok(sector)
 }
 
+#[inline]
 fn next_chain_sector(table: &[u32], sector: u32, table_name: &str) -> Result<u32, OleError> {
     if sector >= MAXREGSECT {
-        return Err(OleError::CorruptedFile(format!(
-            "invalid sector marker 0x{sector:08X} in {table_name} chain"
-        )));
+        return Err(invalid_chain_marker(sector, table_name));
     }
-    let index = usize::try_from(sector).map_err(|_error| {
-        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
-    })?;
-    let next = *table.get(index).ok_or_else(|| {
-        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
-    })?;
+    let index =
+        usize::try_from(sector).map_err(|_error| invalid_chain_index(sector, table_name))?;
+    let next = *table
+        .get(index)
+        .ok_or_else(|| invalid_chain_index(sector, table_name))?;
     if next != ENDOFCHAIN && next >= MAXREGSECT {
-        return Err(OleError::CorruptedFile(format!(
-            "invalid sector marker 0x{next:08X} in {table_name} chain"
-        )));
+        return Err(invalid_chain_marker(next, table_name));
     }
     Ok(next)
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_chain_marker(sector: u32, table_name: &str) -> OleError {
+    OleError::CorruptedFile(format!(
+        "invalid sector marker 0x{sector:08X} in {table_name} chain"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_chain_index(sector: u32, table_name: &str) -> OleError {
+    OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
 }
 
 fn try_zeroed_vec(length: usize, resource: &'static str) -> Result<Vec<u8>, OleError> {
@@ -7354,6 +7364,258 @@ mod tests {
             Ok(cursor) => Ok((cursor.len(), cursor.position())),
             Err(error) => Err((format!("{error:?}"), error.to_string())),
         }
+    }
+
+    // Keep a test-only copy of the pre-change helper beside the focused
+    // boundary matrix below. The production helper is intentionally small and
+    // is a hot link-walk operation, so the matrix compares both its value and
+    // its typed error text rather than duplicating expected strings in every
+    // case. This catches an inlining or cold-error refactor that changes which
+    // check wins when a current sector, table entry, or next marker is bad.
+    fn legacy_next_chain_sector_for_test(
+        allocation_table: &[u32],
+        sector: u32,
+        table_name: &str,
+    ) -> Result<u32, OleError> {
+        if sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid sector marker 0x{sector:08X} in {table_name} chain"
+            )));
+        }
+        let index = usize::try_from(sector).map_err(|_error| {
+            OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+        })?;
+        let next = *allocation_table.get(index).ok_or_else(|| {
+            OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+        })?;
+        if next != ENDOFCHAIN && next >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid sector marker 0x{next:08X} in {table_name} chain"
+            )));
+        }
+        Ok(next)
+    }
+
+    fn legacy_cursor_chain_sector_for_test(
+        table: &[u32],
+        resume: (u32, usize),
+        ordinal: usize,
+        table_name: &str,
+    ) -> Result<u32, OleError> {
+        let (mut sector, walked) = resume;
+        for _ in walked..ordinal {
+            sector = legacy_next_chain_sector_for_test(table, sector, table_name)?;
+            if sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(format!(
+                    "{table_name} chain ends before cursor offset"
+                )));
+            }
+        }
+        if sector == ENDOFCHAIN {
+            return Err(OleError::CorruptedFile(format!(
+                "{table_name} chain ends before cursor offset"
+            )));
+        }
+        Ok(sector)
+    }
+
+    fn sector_outcome(result: Result<u32, OleError>) -> Result<u32, (String, String)> {
+        match result {
+            Ok(sector) => Ok(sector),
+            Err(error) => Err((format!("{error:?}"), error.to_string())),
+        }
+    }
+
+    #[test]
+    fn next_chain_sector_matches_legacy_boundary_matrix() {
+        // The values below exercise both sides of the only accepted marker
+        // boundary. A next value below MAXREGSECT is returned without checking
+        // whether a later table lookup can resolve it; that delayed failure is
+        // covered by the cursor matrix below.
+        let next_values = [
+            0,
+            1,
+            MAXREGSECT - 1,
+            MAXREGSECT,
+            MAXREGSECT + 1,
+            crate::consts::DIFSECT,
+            crate::consts::FATSECT,
+            ENDOFCHAIN,
+            crate::consts::FREESECT,
+            u32::MAX,
+        ];
+        let current_markers = [
+            MAXREGSECT - 1,
+            MAXREGSECT,
+            MAXREGSECT + 1,
+            crate::consts::DIFSECT,
+            crate::consts::FATSECT,
+            ENDOFCHAIN,
+            crate::consts::FREESECT,
+            u32::MAX,
+        ];
+
+        for table_length in 0..=4usize {
+            let mut current_values: Vec<u32> = (0..=table_length as u32).collect();
+            current_values.extend(current_markers);
+
+            for table_name in ["FAT", "MiniFAT"] {
+                for &sector in &current_values {
+                    let table = vec![0; table_length];
+                    let Ok(index) = usize::try_from(sector) else {
+                        let expected = sector_outcome(legacy_next_chain_sector_for_test(
+                            &table, sector, table_name,
+                        ));
+                        let actual = sector_outcome(next_chain_sector(&table, sector, table_name));
+                        assert_eq!(actual, expected);
+                        continue;
+                    };
+
+                    if index >= table_length {
+                        let expected = sector_outcome(legacy_next_chain_sector_for_test(
+                            &table, sector, table_name,
+                        ));
+                        let actual = sector_outcome(next_chain_sector(&table, sector, table_name));
+                        assert_eq!(actual, expected);
+                        continue;
+                    }
+
+                    for &next in &next_values {
+                        let mut table = vec![0; table_length];
+                        table[index] = next;
+                        let expected = sector_outcome(legacy_next_chain_sector_for_test(
+                            &table, sector, table_name,
+                        ));
+                        let actual = sector_outcome(next_chain_sector(&table, sector, table_name));
+                        assert_eq!(
+                            actual, expected,
+                            "table length {table_length}, sector {sector}, next {next}, table {table_name}"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Pin the precedence and exact messages independently of the copied
+        // oracle: a bad current marker wins before an absent table entry, while
+        // ENDOFCHAIN is the sole reserved marker accepted as a next value.
+        assert!(matches!(
+            next_chain_sector(&[], ENDOFCHAIN, "FAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector marker 0xFFFFFFFE in FAT chain"
+        ));
+        assert!(matches!(
+            next_chain_sector(&[], 0, "MiniFAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector index 0 in MiniFAT"
+        ));
+        assert_eq!(
+            sector_outcome(next_chain_sector(&[ENDOFCHAIN], 0, "FAT")),
+            Ok(ENDOFCHAIN)
+        );
+        assert!(matches!(
+            next_chain_sector(&[MAXREGSECT], 0, "FAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector marker 0xFFFFFFFA in FAT chain"
+        ));
+    }
+
+    #[test]
+    fn cursor_chain_sector_matches_legacy_boundary_matrix_and_error_order() {
+        let next_values = [
+            0,
+            1,
+            MAXREGSECT - 1,
+            MAXREGSECT,
+            MAXREGSECT + 1,
+            crate::consts::DIFSECT,
+            crate::consts::FATSECT,
+            ENDOFCHAIN,
+            crate::consts::FREESECT,
+            u32::MAX,
+        ];
+        let resume_sectors = [
+            0,
+            1,
+            MAXREGSECT - 1,
+            MAXREGSECT,
+            MAXREGSECT + 1,
+            crate::consts::DIFSECT,
+            crate::consts::FATSECT,
+            ENDOFCHAIN,
+            crate::consts::FREESECT,
+            u32::MAX,
+        ];
+
+        // Keep this exhaustive over a small table and short walk. It includes
+        // arbitrary resume states because the helper itself is private and
+        // receives a position previously validated by its caller; preserving
+        // its no-loop behavior for walked >= ordinal is still part of the
+        // implementation contract used by hints.
+        for table_length in 0..=4usize {
+            for table_name in ["FAT", "MiniFAT"] {
+                for &resume_sector in &resume_sectors {
+                    for &next in &next_values {
+                        let mut table = vec![0; table_length];
+                        if let Ok(index) = usize::try_from(resume_sector)
+                            && index < table_length
+                        {
+                            table[index] = next;
+                        }
+
+                        for walked in 0..=3usize {
+                            for ordinal in 0..=3usize {
+                                let resume = (resume_sector, walked);
+                                let expected = sector_outcome(legacy_cursor_chain_sector_for_test(
+                                    &table, resume, ordinal, table_name,
+                                ));
+                                let actual = sector_outcome(cursor_chain_sector(
+                                    &table, resume, ordinal, table_name,
+                                ));
+                                assert_eq!(
+                                    actual, expected,
+                                    "table length {table_length}, resume ({resume_sector}, {walked}), ordinal {ordinal}, next {next}, table {table_name}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // These direct cases make the error ordering legible: ENDOFCHAIN
+        // returned by next_chain_sector is translated by the cursor helper,
+        // whereas a marker or index error from that lookup is preserved.
+        assert!(matches!(
+            cursor_chain_sector(&[ENDOFCHAIN], (0, 0), 1, "FAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT chain ends before cursor offset"
+        ));
+        assert!(matches!(
+            cursor_chain_sector(&[MAXREGSECT], (0, 0), 1, "FAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector marker 0xFFFFFFFA in FAT chain"
+        ));
+        assert!(matches!(
+            cursor_chain_sector(&[], (0, 0), 1, "MiniFAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector index 0 in MiniFAT"
+        ));
+        assert!(matches!(
+            cursor_chain_sector(&[], (ENDOFCHAIN, 1), 1, "MiniFAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "MiniFAT chain ends before cursor offset"
+        ));
+        assert_eq!(
+            sector_outcome(cursor_chain_sector(&[7], (7, 2), 1, "FAT")),
+            Ok(7)
+        );
+        assert_eq!(sector_outcome(next_chain_sector(&[7], 0, "FAT")), Ok(7));
+        assert!(matches!(
+            cursor_chain_sector(&[7], (0, 0), 2, "FAT"),
+            Err(OleError::CorruptedFile(message))
+                if message == "invalid sector index 7 in FAT"
+        ));
     }
 
     #[test]

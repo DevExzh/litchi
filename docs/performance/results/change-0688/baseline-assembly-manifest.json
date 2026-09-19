@@ -1,0 +1,95 @@
+{
+  "binary_sha256": "deba23e606ab0bcf954adc5074d21a4ad96ec92175d9f137f10e7873caacaa70",
+  "symbols": [
+    {
+      "label": "next-chain-sector",
+      "symbol": "litchi_cfb::shared::next_chain_sector",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b3be0",
+        "--stop-address=0xb3ce5",
+        "/home/zhuhe/code/litchi-target-0688-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 261,
+      "assembly_file": "baseline-next-chain-sector-assembly.txt",
+      "assembly_sha256": "dc1c4a73c71438c3830848d1865738ff6335b01e134bc3f755465f84492e9a09"
+    },
+    {
+      "label": "cursor",
+      "symbol": "litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b22b0",
+        "--stop-address=0xb2761",
+        "/home/zhuhe/code/litchi-target-0688-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 1201,
+      "assembly_file": "baseline-cursor-assembly.txt",
+      "assembly_sha256": "66e2bc54ceb1c9a2d7fed233ba9167f493a14ab952f5841ee57f66c9c825e635"
+    },
+    {
+      "label": "chain-walk",
+      "symbol": "litchi_cfb::shared::cursor_chain_sector",
+      "standalone_symbol": false
+    },
+    {
+      "label": "marker-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_marker",
+      "standalone_symbol": false
+    },
+    {
+      "label": "index-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_index",
+      "standalone_symbol": false
+    }
+  ],
+  "section_bytes": {
+    ".interp": 28,
+    ".note.ABI-tag": 32,
+    ".note.gnu.build-id": 36,
+    ".dynsym": 1728,
+    ".gnu.version": 144,
+    ".gnu.version_r": 320,
+    ".gnu.hash": 28,
+    ".dynstr": 1120,
+    ".rela.dyn": 52104,
+    ".rela.plt": 48,
+    ".gcc_except_table": 193324,
+    ".rodata": 92388,
+    ".debug_gdb_scripts": 34,
+    ".eh_frame_hdr": 10996,
+    ".eh_frame": 65012,
+    ".text": 636083,
+    ".init": 27,
+    ".fini": 13,
+    ".plt": 48,
+    ".tdata": 32,
+    ".tbss": 72,
+    ".fini_array": 8,
+    ".init_array": 16,
+    ".data.rel.ro": 35008,
+    ".dynamic": 464,
+    ".got": 3824,
+    ".got.plt": 40,
+    ".relro_padding": 4048,
+    ".tm_clone_table": 0,
+    ".data": 2512,
+    ".bss": 256,
+    ".comment": 177,
+    ".debug_loc": 47178288,
+    ".debug_abbrev": 524936,
+    ".debug_info": 50126063,
+    ".debug_aranges": 319776,
+    ".debug_ranges": 9201040,
+    ".debug_str": 20262189,
+    ".debug_line": 7057786
+  },
+  "section_file": "baseline-binary-sections.txt",
+  "section_sha256": "68d8adbd2eb3ac808c1c7118cc2ca1f90957e44be048b0a06064380e119c6d78"
+}

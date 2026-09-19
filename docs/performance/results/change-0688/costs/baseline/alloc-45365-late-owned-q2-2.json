@@ -1,0 +1,1 @@
+{"allocated_bytes":1703666,"allocation_calls":23,"budget":2097152,"callbacks":0,"column":24,"deallocated_bytes":65554,"deallocation_calls":2,"mode":"owned","operation":"q2","outcome":"value:Float(0.0)","peak_live_delta":851986,"retained_live_delta":786544,"row":664,"worksheet":0}
