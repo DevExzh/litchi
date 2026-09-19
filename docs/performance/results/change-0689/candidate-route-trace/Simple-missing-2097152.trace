@@ -1,0 +1,4 @@
+TRACE chain table=FAT from=0 to=2 links=2
+TRACE chain table=FAT from=0 to=2 links=2
+TRACE replay row=0 column=1
+TRACE replay row=0 column=1

@@ -1,0 +1,26 @@
+{
+  "completed_utc": "2026-09-19T16:43:45.843410+00:00",
+  "removed_owned_paths": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0689",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0689-before",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0689-after",
+      "existed_before": true,
+      "exists_after": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0689-profile",
+      "existed_before": true,
+      "exists_after": false
+    }
+  ],
+  "preserved": "Evidence, pre-existing targets, lockfiles and unrelated worktrees."
+}

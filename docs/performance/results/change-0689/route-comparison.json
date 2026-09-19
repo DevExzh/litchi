@@ -1,0 +1,734 @@
+[
+  {
+    "case": "54016-stored-2097152",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 613,
+            "links": 14
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 478,
+            "links": 478
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=313923 sheet_start=306931",
+          "TRACE sst index=6764 first_offset=244949"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 613,
+            "links": 14
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 478,
+            "links": 478
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=313923 sheet_start=306931",
+          "TRACE sst index=6764 first_offset=244949"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 613,
+            "links": 14
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 478,
+            "end": 478,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=313923 sheet_start=306931",
+          "TRACE sst index=6764 first_offset=244949"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 613,
+            "links": 14
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 478,
+            "end": 478,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=313923 sheet_start=306931",
+          "TRACE sst index=6764 first_offset=244949"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "Plan1-stored-2097152",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 215,
+            "links": 6
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 97,
+            "links": 97
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=110520 sheet_start=107170",
+          "TRACE sst index=253 first_offset=49775"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 215,
+            "links": 6
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 97,
+            "links": 97
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=110520 sheet_start=107170",
+          "TRACE sst index=253 first_offset=49775"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 215,
+            "links": 6
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 97,
+            "end": 97,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=110520 sheet_start=107170",
+          "TRACE sst index=253 first_offset=49775"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 215,
+            "links": 6
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 97,
+            "end": 97,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=110520 sheet_start=107170",
+          "TRACE sst index=253 first_offset=49775"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "Simple-stored-2097152",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 2,
+            "links": 2
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 2,
+            "links": 2
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 2,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 2,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "Simple-missing-2097152",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=1",
+        "worksheet": [],
+        "sst": [],
+        "locations": []
+      },
+      {
+        "target": "TRACE replay row=0 column=1",
+        "worksheet": [],
+        "sst": [],
+        "locations": []
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=1",
+        "worksheet": [],
+        "sst": [],
+        "locations": []
+      },
+      {
+        "target": "TRACE replay row=0 column=1",
+        "worksheet": [],
+        "sst": [],
+        "locations": []
+      }
+    ]
+  },
+  {
+    "case": "synthetic-70000-default",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 2,
+            "links": 2
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 2,
+            "links": 2
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 2,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 3,
+            "links": 1
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 2,
+            "end": 2,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=1682 sheet_start=1450",
+          "TRACE sst index=0 first_offset=1420"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "54016-late",
+    "baseline": [
+      {
+        "target": "TRACE replay row=5095 column=106",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 1643,
+            "links": 1044
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=841403 sheet_start=306931"
+        ]
+      },
+      {
+        "target": "TRACE replay row=5095 column=106",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 1643,
+            "links": 1044
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=841403 sheet_start=306931"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=5095 column=106",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 1643,
+            "links": 1044
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=841403 sheet_start=306931"
+        ]
+      },
+      {
+        "target": "TRACE replay row=5095 column=106",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 599,
+            "end": 1643,
+            "links": 1044
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=841403 sheet_start=306931"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "Plan1-late",
+    "baseline": [
+      {
+        "target": "TRACE replay row=301 column=10",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 281,
+            "links": 72
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=144289 sheet_start=107170"
+        ]
+      },
+      {
+        "target": "TRACE replay row=301 column=10",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 281,
+            "links": 72
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=144289 sheet_start=107170"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=301 column=10",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 281,
+            "links": 72
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=144289 sheet_start=107170"
+        ]
+      },
+      {
+        "target": "TRACE replay row=301 column=10",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 209,
+            "end": 281,
+            "links": 72
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=144289 sheet_start=107170"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "45365-first",
+    "baseline": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 60,
+            "links": 2
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 24,
+            "links": 24
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=31009 sheet_start=29939",
+          "TRACE sst index=0 first_offset=12434"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 60,
+            "links": 2
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 0,
+            "end": 24,
+            "links": 24
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=31009 sheet_start=29939",
+          "TRACE sst index=0 first_offset=12434"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 60,
+            "links": 2
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 24,
+            "end": 24,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=31009 sheet_start=29939",
+          "TRACE sst index=0 first_offset=12434"
+        ]
+      },
+      {
+        "target": "TRACE replay row=0 column=0",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 60,
+            "links": 2
+          }
+        ],
+        "sst": [
+          {
+            "table": "FAT",
+            "start": 24,
+            "end": 24,
+            "links": 0
+          }
+        ],
+        "locations": [
+          "TRACE worksheet frame_offset=31009 sheet_start=29939",
+          "TRACE sst index=0 first_offset=12434"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "45365-late",
+    "baseline": [
+      {
+        "target": "TRACE replay row=664 column=24",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 316,
+            "links": 258
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=161909 sheet_start=29939"
+        ]
+      },
+      {
+        "target": "TRACE replay row=664 column=24",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 316,
+            "links": 258
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=161909 sheet_start=29939"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "target": "TRACE replay row=664 column=24",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 316,
+            "links": 258
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=161909 sheet_start=29939"
+        ]
+      },
+      {
+        "target": "TRACE replay row=664 column=24",
+        "worksheet": [
+          {
+            "table": "FAT",
+            "start": 58,
+            "end": 316,
+            "links": 258
+          }
+        ],
+        "sst": [],
+        "locations": [
+          "TRACE worksheet frame_offset=161909 sheet_start=29939"
+        ]
+      }
+    ]
+  },
+  {
+    "case": "formula-refusal-2097152",
+    "baseline": [],
+    "candidate": []
+  }
+]

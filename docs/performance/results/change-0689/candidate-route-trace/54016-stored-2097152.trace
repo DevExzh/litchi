@@ -1,0 +1,16 @@
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE sst index=6764 first_offset=244949
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE sst index=6764 first_offset=244949
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE replay row=0 column=0
+TRACE worksheet frame_offset=313923 sheet_start=306931
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE sst index=6764 first_offset=244949
+TRACE chain table=FAT from=478 to=478 links=0
+TRACE replay row=0 column=0
+TRACE worksheet frame_offset=313923 sheet_start=306931
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE sst index=6764 first_offset=244949
+TRACE chain table=FAT from=478 to=478 links=0

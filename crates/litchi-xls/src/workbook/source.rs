@@ -3018,6 +3018,14 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
             return Ok(());
         }
         if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
+            if COLLECT_INDEX
+                && matches!(record, CellRecord::LabelSst { .. })
+                && let Some(index) = self.index.as_mut()
+            {
+                // Capture only after target_cell_value has completed: this
+                // keeps SST errors and their existing precedence unchanged.
+                index.set_sst_chain_checkpoint(&strings.chain);
+            }
             self.found = Some(SourceBackedCell {
                 row: u32::from(self.row),
                 column: u32::from(self.column),
@@ -3530,6 +3538,11 @@ fn replay_indexed_cell(
         .map(String::as_str)
         .collect::<Vec<_>>();
     let mut strings = SharedStringResolver::new(owner, &refs);
+    if let Some(checkpoint) = index.sst_chain_checkpoint.as_ref() {
+        // CFB restores only a checkpoint from this reader; each resolve still
+        // falls back cold for a foreign or backward position.
+        strings.chain = owner.cfb.chain_hint_from_checkpoint(checkpoint);
+    }
     let mut chain = index.chain_checkpoint.as_ref().map_or_else(
         || owner.cfb.chain_hint(),
         |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),

@@ -229,6 +229,33 @@ fn first_frame_of_kind(stream: &[u8], wanted: u16) -> (usize, usize) {
     }
 }
 
+fn shared_string_index_at(stream: &[u8], row: u16, column: u16) -> u32 {
+    let mut offset = first_sheet_offset(stream);
+    loop {
+        assert!(offset + 4 <= stream.len());
+        let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        let end = offset + 4 + length;
+        if kind == 0x00FD && length >= 10 {
+            let found_row = u16::from_le_bytes([stream[offset + 4], stream[offset + 5]]);
+            let found_column = u16::from_le_bytes([stream[offset + 6], stream[offset + 7]]);
+            if found_row == row && found_column == column {
+                return u32::from_le_bytes([
+                    stream[offset + 10],
+                    stream[offset + 11],
+                    stream[offset + 12],
+                    stream[offset + 13],
+                ]);
+            }
+        }
+        assert_ne!(
+            kind, 0x000A,
+            "worksheet has no requested shared string cell"
+        );
+        offset = end;
+    }
+}
+
 /// Inserts after the worksheet BOF and before the first selected frame.  The
 /// sheet's BoundSheet8 position does not move because the insertion is inside
 /// the worksheet substream.
@@ -316,6 +343,17 @@ fn duplicate_shared_string_workbook() -> Vec<u8> {
     extra.extend_from_slice(&label_sst_frame(50_000, 4, 0));
     extra.extend_from_slice(&number_frame(50_001, 4, 17.0));
     cfb_with_workbook(&insert_before_worksheet_eof(&original, &extra))
+}
+
+/// Three `LabelSst` coordinates in `54016.xls` whose shared-string indexes
+/// are, respectively, 0, 3946, and 7892.  The coordinates are deliberately
+/// kept here rather than inferred from a visitor: the test needs to exercise
+/// both directions from the checkpoint captured while the first target is
+/// resolved.
+const SST_DIRECTION_COORDINATES: [(u32, u32); 3] = [(0, 19), (4_137, 1), (5_050, 10)];
+
+fn large_shared_string_workbook() -> Vec<u8> {
+    fixture("54016.xls")
 }
 
 fn formula_string_workbook() -> Vec<u8> {
@@ -963,6 +1001,175 @@ fn formula_string_continuations_have_the_same_value_on_warm_hits() {
     assert_eq!(second, third);
     assert_eq!(third, expected);
     assert!(third_bytes > 0 && third_reads > 0);
+}
+
+#[test]
+fn a_shared_string_checkpoint_preserves_alternating_forward_and_backward_replays() {
+    let bytes = large_shared_string_workbook();
+    let stream = workbook_stream(bytes.clone());
+    let fixture_indices = SST_DIRECTION_COORDINATES
+        .map(|(row, column)| shared_string_index_at(&stream, row as u16, column as u16));
+    assert_eq!(fixture_indices, [0, 3_946, 7_892]);
+    let oracle_source = Arc::new(CountingSource::new(bytes.clone()));
+    let oracle_owner = SourceBackedWorkbook::from_read_at_with_limits(
+        oracle_source,
+        SourceBackedLimits::default().with_max_query_index_bytes(0),
+    )
+    .unwrap();
+    let oracle_sheet = oracle_owner.worksheet_by_index(0).unwrap().unwrap();
+    let expected = SST_DIRECTION_COORDINATES
+        .map(|(row, column)| oracle_sheet.cell_value(row, column).unwrap());
+    assert!(
+        expected
+            .iter()
+            .all(|value| matches!(value, Some(CellValue::String(_)))),
+        "fixture coordinates must be shared strings: {expected:?}"
+    );
+
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    // The second query builds the occurrence index while resolving the middle
+    // SST entry.  Its resolver position is the checkpoint later replayed by
+    // high, low, middle, and high targets below; low must restart because it
+    // is before this checkpoint.
+    assert_eq!(
+        worksheet
+            .cell_value(
+                SST_DIRECTION_COORDINATES[1].0,
+                SST_DIRECTION_COORDINATES[1].1
+            )
+            .unwrap(),
+        expected[1]
+    );
+    assert_eq!(
+        worksheet
+            .cell_value(
+                SST_DIRECTION_COORDINATES[1].0,
+                SST_DIRECTION_COORDINATES[1].1
+            )
+            .unwrap(),
+        expected[1]
+    );
+
+    let sequence = [2_usize, 0, 1, 2, 0, 2];
+    for index in sequence {
+        let (row, column) = SST_DIRECTION_COORDINATES[index];
+        let (actual, bytes_read, reads) = measure_query(&source, &worksheet, row, column);
+        assert_eq!(
+            actual, expected[index],
+            "shared-string replay changed at {row}:{column}"
+        );
+        assert!(bytes_read > 0 && reads > 0);
+    }
+}
+
+#[test]
+fn cloned_and_reopened_owners_keep_shared_string_checkpoint_local() {
+    let bytes = large_shared_string_workbook();
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    let checkpoint_target = SST_DIRECTION_COORDINATES[1];
+    let first = worksheet
+        .cell_value(checkpoint_target.0, checkpoint_target.1)
+        .unwrap();
+    assert_eq!(
+        worksheet
+            .cell_value(checkpoint_target.0, checkpoint_target.1)
+            .unwrap(),
+        first
+    );
+
+    let cloned_sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+    let reopened = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let reopened_sheet = reopened.worksheet_by_index(0).unwrap().unwrap();
+    let target = SST_DIRECTION_COORDINATES[2];
+    let (cloned_value, cloned_bytes, cloned_reads) =
+        measure_query(&source, &cloned_sheet, target.0, target.1);
+    let (reopened_value, reopened_bytes, reopened_reads) =
+        measure_query(&source, &reopened_sheet, target.0, target.1);
+    assert_eq!(cloned_value, reopened_value);
+    assert!(cloned_bytes > 0 && cloned_reads > 0);
+    assert!(reopened_bytes > cloned_bytes * 2);
+    assert!(reopened_reads > cloned_reads);
+}
+
+#[test]
+fn cloned_handles_replay_shared_string_checkpoints_concurrently_with_local_hints() {
+    let source = Arc::new(CountingSource::new(large_shared_string_workbook()));
+    let owner = SourceBackedWorkbook::from_read_at(source).unwrap();
+    let warm_sheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    let checkpoint_target = SST_DIRECTION_COORDINATES[1];
+    let second = warm_sheet
+        .cell_value(checkpoint_target.0, checkpoint_target.1)
+        .unwrap();
+    assert_eq!(
+        warm_sheet
+            .cell_value(checkpoint_target.0, checkpoint_target.1)
+            .unwrap(),
+        second
+    );
+
+    let coordinates = [
+        SST_DIRECTION_COORDINATES[2],
+        SST_DIRECTION_COORDINATES[0],
+        SST_DIRECTION_COORDINATES[1],
+        SST_DIRECTION_COORDINATES[2],
+    ];
+    let expected = coordinates.map(|(row, column)| warm_sheet.cell_value(row, column).unwrap());
+    let handles = coordinates.map(|(row, column)| {
+        let sheet = owner.clone().worksheet_by_index(0).unwrap().unwrap();
+        std::thread::spawn(move || sheet.cell_value(row, column))
+    });
+    for (handle, expected) in handles.into_iter().zip(expected) {
+        assert_eq!(handle.join().unwrap().unwrap(), expected);
+    }
+}
+
+#[test]
+fn a_string_target_failure_drops_the_partial_index_and_checkpoint() {
+    let source = Arc::new(CountingSource::new(malformed_tail_workbook()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    let mut observations = Vec::new();
+    for _ in 0..3 {
+        source.clear_measurement();
+        let error = worksheet.cell_value(0, 0).unwrap_err();
+        observations.push((error.to_string(), source.bytes_read(), source.read_count()));
+    }
+    assert_eq!(observations[0].0, observations[1].0);
+    assert_eq!(observations[1].0, observations[2].0);
+    assert_eq!(observations[0].1, observations[1].1);
+    assert_eq!(observations[1].1, observations[2].1);
+    assert_eq!(observations[0].2, observations[1].2);
+    assert_eq!(observations[1].2, observations[2].2);
+}
+
+#[test]
+fn a_valid_shared_string_checkpoint_preserves_duplicate_read_error_precedence() {
+    let source = Arc::new(CountingSource::new(duplicate_shared_string_workbook()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    // Build and publish through the ordinary valid SST cell so the retained
+    // index definitely carries a real shared-string chain checkpoint.
+    let expected = worksheet.cell_value(0, 0).unwrap();
+    assert_eq!(worksheet.cell_value(0, 0).unwrap(), expected);
+
+    source.fail_next_read_containing(b"replaceMe");
+    let error = worksheet.cell_value(50_000, 4).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("synthetic shared-string read failure"),
+        "unexpected duplicate SST error: {error:?}"
+    );
+    assert_eq!(
+        worksheet.cell_value(50_000, 4).unwrap(),
+        Some(CellValue::String("replaceMe".to_owned()))
+    );
 }
 
 #[test]

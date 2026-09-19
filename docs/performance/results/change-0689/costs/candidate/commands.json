@@ -1,0 +1,5462 @@
+[
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "--budget",
+      "0",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-54016-stored-0.json",
+    "exit_code": 0,
+    "seconds": 0.005530267022550106
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0019775390392169356
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.001835558912716806
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0018193890573456883
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0021086810156702995
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.002089180052280426
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0020833599846810102
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.002441671909764409
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0024504020111635327
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0024476919788867235
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.004237289889715612
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.004192530992440879
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.004179070005193353
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0016001680633053184
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.001565907965414226
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.001582766999490559
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0019324199529364705
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0019565889379009604
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0020355600863695145
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0023474920308217406
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0023378609912469983
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0023634620010852814
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.004299880936741829
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.00447863107547164
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "output": "alloc-54016-stored-0-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.004305930924601853
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-54016-stored-2097152.json",
+    "exit_code": 0,
+    "seconds": 0.003031475003808737
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0017779390327632427
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0017346979584544897
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0017537889070808887
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0025472419802099466
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0025574329774826765
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025512520223855972
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0025421329773962498
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0025931919226422906
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025672430638223886
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0025691320188343525
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.002547473064623773
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025333119556307793
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0015907080378383398
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.001646248041652143
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0015633871080353856
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.002375971060246229
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0024041520664468408
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0024050610372796655
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0023873510072007775
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.002452892018482089
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0024032520595937967
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0024003710132092237
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.002416960895061493
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-54016-stored-2097152-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.002504922915250063
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "--budget",
+      "1048576",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "108",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-54016-missing-1048576.json",
+    "exit_code": 0,
+    "seconds": 0.0030793349724262953
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0017303680069744587
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0017331390408799052
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0018633189611136913
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0025438619777560234
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.002527552074752748
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.002532723010517657
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.002568501979112625
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.002559482934884727
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025780419819056988
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0025243230629712343
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0025320519926026464
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025157920317724347
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0015742980176582932
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.001556157018058002
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0015888370107859373
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.002402901998721063
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0023995019728317857
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.002379331039264798
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.002492801984772086
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.002390481997281313
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0023797020548954606
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.002386881038546562
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0023950020549818873
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "0",
+      "108",
+      "1048576"
+    ],
+    "output": "alloc-54016-missing-1048576-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.002389721921645105
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-Plan1-stored-2097152.json",
+    "exit_code": 0,
+    "seconds": 0.0011482349364086986
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009770350297912955
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009672550950199366
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009898749412968755
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0010458549950271845
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010301750153303146
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.001019525108858943
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.001108144992031157
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010246550664305687
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.001031035091727972
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.001018465030938387
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010635450016707182
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.001020645024254918
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.000931265065446496
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009483849862590432
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009672639425843954
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009885550243780017
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.000992315006442368
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009978249436244369
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0010546449339017272
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009910049848258495
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.000983034959062934
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0010036149760708213
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010256549576297402
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-stored-2097152-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0010130349546670914
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-Simple-stored-2097152.json",
+    "exit_code": 0,
+    "seconds": 0.0009206939721480012
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008746440289542079
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009211750002577901
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.000857453909702599
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008506739977747202
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008326140232384205
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008295640582218766
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008560350397601724
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008606339106336236
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008436839561909437
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.000859103980474174
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008677339646965265
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008843650575727224
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008881340036168694
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008544940501451492
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008500040275976062
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.000852575059980154
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008503940189257264
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008573640370741487
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008614140097051859
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008706540102139115
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008426349377259612
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008673339616507292
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009375540539622307
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-Simple-stored-2097152-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008612050442025065
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "1",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-Simple-missing-2097152.json",
+    "exit_code": 0,
+    "seconds": 0.0008871139725670218
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008484339341521263
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008904850110411644
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008334240410476923
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008554740343242884
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008567339973524213
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008407840505242348
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008636940037831664
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009298250079154968
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.000868374016135931
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008497840026393533
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008458440424874425
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008442050311714411
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.000853274017572403
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008570339996367693
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008288240060210228
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.000841683940961957
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008442139951512218
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008479940006509423
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008715750882402062
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008466939907521009
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0008524639997631311
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0008386139525100589
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0008417540229856968
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "0",
+      "0",
+      "1",
+      "2097152"
+    ],
+    "output": "alloc-Simple-missing-2097152-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.000821663998067379
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-synthetic-70000-default.json",
+    "exit_code": 0,
+    "seconds": 0.003906789002940059
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0017678289441391826
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0017362079815939069
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.001836539013311267
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.003156555932946503
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.003215945092961192
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.003217916004359722
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.003133264952339232
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.003169325995258987
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.003208584967069328
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0031402859603986144
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0031754550291225314
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0031861059833317995
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0015115269925445318
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0014924670103937387
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0015255080070346594
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0029654440004378557
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0029665750917047262
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0030028040055185556
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.002935394993983209
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.002961643971502781
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0030459449626505375
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0029697640566155314
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.002979635028168559
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-synthetic-70000-default-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0030044149607419968
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "5095",
+      "--column",
+      "106",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-54016-late.json",
+    "exit_code": 0,
+    "seconds": 0.003098074928857386
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0017527180025354028
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0017440390074625611
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0017436480848118663
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.002619803068228066
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.002518111956305802
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025430029490962625
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.002521282061934471
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.002535621984861791
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025128329871222377
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.002527312026359141
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.002555662067607045
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0025270930491387844
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0015953779220581055
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0015588069800287485
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0015804580179974437
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.002382391015999019
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0024075410328805447
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.002373821916989982
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0023451410233974457
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0024047920014709234
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.002358251018449664
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0024122820468619466
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.002404151950031519
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "0",
+      "5095",
+      "106",
+      "2097152"
+    ],
+    "output": "alloc-54016-late-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.002369632013142109
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "301",
+      "--column",
+      "10",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-Plan1-late.json",
+    "exit_code": 0,
+    "seconds": 0.0011436149943619967
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009591650450602174
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010562549578025937
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009460549335926771
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0010088349226862192
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010089540155604482
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0010043550282716751
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009993849089369178
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009977250592783093
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0010031050769612193
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.001009634928777814
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.001006075064651668
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0010563050163909793
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009180549532175064
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009127240628004074
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009486350463703275
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009869049536064267
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.000985163962468505
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009746049763634801
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009888949571177363
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010055949678644538
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.000994995003566146
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.000982155092060566
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009954450652003288
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/ole/xls/WithCustomViews.xls",
+      "0",
+      "301",
+      "10",
+      "2097152"
+    ],
+    "output": "alloc-Plan1-late-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009889539796859026
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-45365-first.json",
+    "exit_code": 0,
+    "seconds": 0.0013773469254374504
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.001027445076033473
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010328249773010612
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.00099178496748209
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012052659876644611
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.001231276080943644
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012178960023447871
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012333159102126956
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.001222145976498723
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012238459894433618
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012027759803459048
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0012411660281941295
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012149059912189841
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009705539559945464
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009972439147531986
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009801649721339345
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.001195385935716331
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011928259627893567
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012238359777256846
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0011975859524682164
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.001205245964229107
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012640960048884153
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012097160797566175
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.001208735047839582
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-45365-first-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012174759758636355
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "0",
+      "--row",
+      "664",
+      "--column",
+      "24",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-45365-late.json",
+    "exit_code": 0,
+    "seconds": 0.001325275981798768
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009826549794524908
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010350949596613646
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009941949974745512
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012103959452360868
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011993650114163756
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012771869078278542
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012171559501439333
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011952759232372046
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012311351019889116
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012897170381620526
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0012129259994253516
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012076860293745995
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0009545539505779743
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0009670550934970379
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0009574550203979015
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012099460000172257
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0012042849557474256
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012179260374978185
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012125360080972314
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0012093759141862392
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012597260065376759
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0012567569501698017
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011977050453424454
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "0",
+      "664",
+      "24",
+      "2097152"
+    ],
+    "output": "alloc-45365-late-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0012096549617126584
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls-index-budget-probe-0684",
+      "--input",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "--budget",
+      "2097152",
+      "--worksheet",
+      "6",
+      "--row",
+      "0",
+      "--column",
+      "0",
+      "--queries",
+      "8"
+    ],
+    "output": "counts-formula-refusal-2097152.json",
+    "exit_code": 0,
+    "seconds": 0.0021919510327279568
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0014735269360244274
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0014052069745957851
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0014194169780239463
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0013987571001052856
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0013748470228165388
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.001478576916269958
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0013532360317185521
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0013636370422318578
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.0014555869856849313
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.0013379369629547
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0013953569578006864
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "owned",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-owned-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0013662460260093212
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q1-0.json",
+    "exit_code": 0,
+    "seconds": 0.0011064260033890605
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q1-1.json",
+    "exit_code": 0,
+    "seconds": 0.0010787351056933403
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q1",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q1-2.json",
+    "exit_code": 0,
+    "seconds": 0.0010896649910137057
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q2-0.json",
+    "exit_code": 0,
+    "seconds": 0.0011318160686641932
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q2-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011116150999441743
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q2",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q2-2.json",
+    "exit_code": 0,
+    "seconds": 0.001086865901015699
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q3-0.json",
+    "exit_code": 0,
+    "seconds": 0.0011096050729975104
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q3-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011276250006631017
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q3",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q3-2.json",
+    "exit_code": 0,
+    "seconds": 0.001093075959943235
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q8-0.json",
+    "exit_code": 0,
+    "seconds": 0.001126835006289184
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q8-1.json",
+    "exit_code": 0,
+    "seconds": 0.0011221860768273473
+  },
+  {
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0689-after/release/xls0686-alloc",
+      "file",
+      "q8",
+      "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "6",
+      "0",
+      "0",
+      "2097152"
+    ],
+    "output": "alloc-formula-refusal-2097152-file-q8-2.json",
+    "exit_code": 0,
+    "seconds": 0.0011390949366614223
+  }
+]

@@ -1,0 +1,133 @@
+{
+  "binary_sha256": "07e51c27ce09fa80457070d6d8f06862f23aca62087352145ed0f03812061e54",
+  "symbols": [
+    {
+      "label": "next-chain-sector",
+      "symbol": "litchi_cfb::shared::next_chain_sector",
+      "standalone_symbol": false
+    },
+    {
+      "label": "cursor",
+      "symbol": "litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b2400",
+        "--stop-address=0xb27be",
+        "/home/zhuhe/code/litchi-target-0689-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 958,
+      "assembly_file": "baseline-cursor-assembly.txt",
+      "assembly_sha256": "026d029a6163422859408a338cf0ae29ab1ba447320fa2e00b069e3b8118d81c"
+    },
+    {
+      "label": "chain-walk",
+      "symbol": "litchi_cfb::shared::cursor_chain_sector",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b3fb0",
+        "--stop-address=0xb4135",
+        "/home/zhuhe/code/litchi-target-0689-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 389,
+      "assembly_file": "baseline-chain-walk-assembly.txt",
+      "assembly_sha256": "d609040be89f82a5eb84f416798540ebfdb5af4b93c7d7c3dc339c73f177ead7"
+    },
+    {
+      "label": "marker-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_marker",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b41b0",
+        "--stop-address=0xb4215",
+        "/home/zhuhe/code/litchi-target-0689-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 101,
+      "assembly_file": "baseline-marker-error-assembly.txt",
+      "assembly_sha256": "5b1ad19ee9b075304a518b113faaa4184ef664800eb3a381a71617629857cceb"
+    },
+    {
+      "label": "index-error",
+      "symbol": "litchi_cfb::shared::invalid_chain_index",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x00000000000b4140",
+        "--stop-address=0xb41a5",
+        "/home/zhuhe/code/litchi-target-0689-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 101,
+      "assembly_file": "baseline-index-error-assembly.txt",
+      "assembly_sha256": "c652e70556373bfacb1d546bb5e7b455f6536aa16658cdb986331cfea356fa1b"
+    },
+    {
+      "label": "query-cell",
+      "symbol": "litchi_xls::workbook::source::query_cell",
+      "standalone_symbol": true,
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--start-address=0x000000000007a820",
+        "--stop-address=0x82ee4",
+        "/home/zhuhe/code/litchi-target-0689-before/release/xls0684-repeat"
+      ],
+      "code_bytes": 34500,
+      "assembly_file": "baseline-query-cell-assembly.txt",
+      "assembly_sha256": "e7c363a211f243bedec22641ec7fdcd4fd5994fd8c6a97c52ac6ba699ebd8ea7"
+    }
+  ],
+  "section_bytes": {
+    ".interp": 28,
+    ".note.ABI-tag": 32,
+    ".note.gnu.build-id": 36,
+    ".dynsym": 1728,
+    ".gnu.version": 144,
+    ".gnu.version_r": 320,
+    ".gnu.hash": 28,
+    ".dynstr": 1120,
+    ".rela.dyn": 52104,
+    ".rela.plt": 48,
+    ".gcc_except_table": 193316,
+    ".rodata": 92388,
+    ".debug_gdb_scripts": 34,
+    ".eh_frame_hdr": 11012,
+    ".eh_frame": 65144,
+    ".text": 637523,
+    ".init": 27,
+    ".fini": 13,
+    ".plt": 48,
+    ".tdata": 32,
+    ".tbss": 72,
+    ".fini_array": 8,
+    ".init_array": 16,
+    ".data.rel.ro": 35008,
+    ".dynamic": 464,
+    ".got": 3824,
+    ".got.plt": 40,
+    ".relro_padding": 2480,
+    ".tm_clone_table": 0,
+    ".data": 2512,
+    ".bss": 256,
+    ".comment": 177,
+    ".debug_loc": 47185293,
+    ".debug_abbrev": 524936,
+    ".debug_info": 50126843,
+    ".debug_aranges": 319808,
+    ".debug_ranges": 9202736,
+    ".debug_str": 20262359,
+    ".debug_line": 7058557
+  },
+  "section_file": "baseline-binary-sections.txt",
+  "section_sha256": "b2471e912d9e5604ecfcb8586842f14269a0a929405a87dd6d91a2c58cd63f8f"
+}
