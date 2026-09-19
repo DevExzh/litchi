@@ -779,7 +779,7 @@ fn start(
         }
     }
     c.ns = c.ns.with_local(local_namespaces, lim)?;
-    let name = expand(q, &c.ns, true)?;
+    let (namespace, local) = expand_parts(q, &c.ns, true)?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {
         if parent_active {
@@ -957,10 +957,16 @@ fn start(
             preserve_attributes: local_preserve_attributes,
         }));
     }
-    c.opaque = caps.extensions.contains(&name);
+    let mut name = (!caps.extensions.is_empty()).then(|| Name {
+        namespace: namespace.to_owned(),
+        local_name: local.to_owned(),
+    });
+    c.opaque = name
+        .as_ref()
+        .is_some_and(|name| caps.extensions.contains(name));
 
-    if name.namespace == NAMESPACE {
-        match name.local_name.as_str() {
+    if namespace == NAMESPACE {
+        match local {
             "AlternateContent" => {
                 validate_alternate_attributes(&raw, &c, caps, AlternateKind::Container)?;
             },
@@ -977,8 +983,8 @@ fn start(
             fallback,
         } = &mut parent.mode
     {
-        if name.namespace != NAMESPACE {
-            if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
+        if namespace != NAMESPACE {
+            if c.is_ignorable(namespace) && !caps.understands(namespace) {
                 rep.ignored_elements += 1;
                 return close(
                     st,
@@ -994,7 +1000,7 @@ fn start(
             }
             return Err(bad("non-ignorable AlternateContent child"));
         }
-        let (active, mode) = match name.local_name.as_str() {
+        let (active, mode) = match local {
             "Choice" => {
                 if *fallback {
                     return Err(bad("Choice after Fallback"));
@@ -1053,8 +1059,8 @@ fn start(
         );
     }
     let mut active = parent_active;
-    let mode = if name.namespace == NAMESPACE {
-        match name.local_name.as_str() {
+    let mode = if namespace == NAMESPACE {
+        match local {
             "AlternateContent" => {
                 rep.alternate_content_count += 1;
                 Mode::Alt {
@@ -1065,11 +1071,15 @@ fn start(
             },
             _ => return Err(bad("Choice/Fallback outside AlternateContent")),
         }
-    } else if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
-        if c.preserves_element(&name) {
+    } else if c.is_ignorable(namespace) && !caps.understands(namespace) {
+        let element_name = name.get_or_insert_with(|| Name {
+            namespace: namespace.to_owned(),
+            local_name: local.to_owned(),
+        });
+        if c.preserves_element(element_name) {
             rep.preserved_elements += 1;
             Mode::Emit(q.to_owned())
-        } else if c.processes(&name) {
+        } else if c.processes(element_name) {
             for a in &raw {
                 let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
                 if namespace == XML_NS && matches!(local, "base" | "lang" | "space") {

@@ -1,0 +1,11 @@
+   Compiling block-buffer v0.12.1
+   Compiling bitflags v2.13.2
+   Compiling digest v0.11.3
+   Compiling rustix v1.1.5
+   Compiling sha2 v0.11.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling tempfile v3.27.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling mce-oracle-0694 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0694/oracle)
+    Finished `release` profile [optimized + debuginfo] target(s) in 19.79s

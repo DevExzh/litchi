@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0694 — shared MCE element-name ownership
+
+[0694](0694-mce-borrowed-element-names.md) retains 7,800 native PPTX samples,
+6,000 capture/refusal samples, separate allocation diagnostics, native profiles,
+and 1,920 exact-output MCE oracle invocations. Real one-edit phase totals move
+11.996–12.271 → 11.502–11.626 ms; allocation calls fall 190,338 → 143,848.
+No total latency metric exceeds the +5% trigger, but twenty phase metrics,
+one refusal-matrix tail and page-fault growth remain disclosed. Custom-profile
+synthetic controls cost 2–6%, with narrower real-part median costs and a retained
+PPTX outlier. No full-save,
+cold-input, remote or scaling claim follows.
+
+## 0693 — PPTX capture notes-root proof reuse
+
+[0693](0693-pptx-capture-notes-proof.md) retains 7,800 native edit samples and
+6,000 capture/refusal samples. Real one-edit phase totals improve 29.11–29.42%,
+with 79,904 fewer allocation calls; late failures can cost 44–49 µs more.
+Trace/source restoration, focused correctness tests, reviews and final evidence
+checks pass. No registered performance claim or scenario-coverage promotion.
+
 ## 0692 — PPTX capture-local projection result
 
 [0692](0692-pptx-capture-name-projection.md) retains 7,800 native samples across

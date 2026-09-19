@@ -4,7 +4,7 @@ use super::codec::{
     active_marker_with_hash, active_offsets, find_bytes, process_markup_compatibility,
     reserve_exact,
 };
-use super::model::{Capabilities, Error, Limits, OffsetLimits, Report};
+use super::model::{Capabilities, Error, Limits, Name, OffsetLimits, Report};
 use std::{borrow::Cow, str};
 
 #[cfg(test)]
@@ -90,6 +90,135 @@ mod preservation_tests {
         let (xml, _) = run(&spoofed).unwrap();
         assert!(!xml.contains("PreserveAttributes"));
         assert!(!xml.contains("x:value"));
+    }
+
+    #[test]
+    fn extension_profiles_match_expanded_default_and_prefixed_names() {
+        let prefixed = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:e="urn:ext" xmlns:x="urn:x" mc:Ignorable="x"><e:opaque><mc:AlternateContent><mc:Choice Requires="x"><x:choice/></mc:Choice><mc:Fallback><kept/></mc:Fallback></mc:AlternateContent></e:opaque></r>"#
+        );
+        let default_namespace = format!(
+            r#"<r xmlns:mc="{MC}" xmlns="urn:ext" xmlns:x="urn:x" mc:Ignorable="x"><opaque><mc:AlternateContent><mc:Choice Requires="x"><x:choice/></mc:Choice><mc:Fallback><kept/></mc:Fallback></mc:AlternateContent></opaque></r>"#
+        );
+
+        let cases = [
+            (
+                prefixed,
+                r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:e="urn:ext" xmlns:x="urn:x"><e:opaque><kept></kept></e:opaque></r>"#,
+                r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:e="urn:ext" xmlns:x="urn:x"><e:opaque><mc:AlternateContent><mc:Choice Requires="x"><x:choice></x:choice></mc:Choice><mc:Fallback><kept></kept></mc:Fallback></mc:AlternateContent></e:opaque></r>"#,
+                Name {
+                    namespace: "urn:ext".to_owned(),
+                    local_name: "opaque".to_owned(),
+                },
+            ),
+            (
+                default_namespace,
+                r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns="urn:ext" xmlns:x="urn:x"><opaque><kept></kept></opaque></r>"#,
+                r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns="urn:ext" xmlns:x="urn:x"><opaque><mc:AlternateContent><mc:Choice Requires="x"><x:choice></x:choice></mc:Choice><mc:Fallback><kept></kept></mc:Fallback></mc:AlternateContent></opaque></r>"#,
+                Name {
+                    namespace: "urn:ext".to_owned(),
+                    local_name: "opaque".to_owned(),
+                },
+            ),
+        ];
+
+        for (source, baseline, opaque, extension) in cases {
+            let (actual, report) = run(&source).expect("baseline MCE selection");
+            assert_eq!(actual, baseline);
+            assert_eq!(
+                report,
+                Report {
+                    alternate_content_count: 1,
+                    selected_choices: 0,
+                    selected_fallbacks: 1,
+                    ignored_elements: 1,
+                    ignored_attributes: 1,
+                    preserved_elements: 0,
+                    preserved_attributes: 0,
+                    unwrapped_elements: 0,
+                }
+            );
+
+            let mut capabilities = Capabilities::new();
+            capabilities.preserve_extension_element(extension.clone());
+            let (actual, report) = run_with(&source, &capabilities, &Limits::default())
+                .expect("explicit extension profile");
+            assert_eq!(actual, opaque);
+            assert_eq!(
+                report,
+                Report {
+                    ignored_attributes: 1,
+                    ..Report::default()
+                }
+            );
+
+            let mut mismatched = Capabilities::new();
+            mismatched.preserve_extension_element(Name {
+                namespace: extension.namespace,
+                local_name: "other".to_owned(),
+            });
+            let (actual, report) = run_with(&source, &mismatched, &Limits::default())
+                .expect("nonmatching extension profile keeps baseline semantics");
+            assert_eq!(actual, baseline);
+            assert_eq!(
+                report,
+                Report {
+                    alternate_content_count: 1,
+                    selected_choices: 0,
+                    selected_fallbacks: 1,
+                    ignored_elements: 1,
+                    ignored_attributes: 1,
+                    preserved_elements: 0,
+                    preserved_attributes: 0,
+                    unwrapped_elements: 0,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn inherited_opaque_profile_keeps_unrecognized_descendants_and_mce_markup() {
+        let source = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:e="urn:ext" xmlns:u="urn:unknown"><e:opaque u:root="yes"><u:child mc:Ignorable="u" u:child="yes"><mc:AlternateContent><mc:Fallback><u:kept/></mc:Fallback></mc:AlternateContent></u:child></e:opaque></r>"#
+        );
+        let mut capabilities = Capabilities::new();
+        capabilities.preserve_extension_element(Name {
+            namespace: "urn:ext".to_owned(),
+            local_name: "opaque".to_owned(),
+        });
+
+        let (actual, report) = run_with(&source, &capabilities, &Limits::default())
+            .expect("opaque descendants remain processable");
+        assert_eq!(
+            actual,
+            format!(
+                r#"<r xmlns:mc="{MC}" xmlns:e="urn:ext" xmlns:u="urn:unknown"><e:opaque u:root="yes"><u:child mc:Ignorable="u" u:child="yes"><mc:AlternateContent><mc:Fallback><u:kept></u:kept></mc:Fallback></mc:AlternateContent></u:child></e:opaque></r>"#
+            )
+        );
+        assert_eq!(report, Report::default());
+    }
+
+    #[test]
+    fn rebinding_a_prefix_shadows_inherited_ignorable_and_preservation_rules() {
+        let source = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:outer" mc:Ignorable="x" mc:PreserveAttributes="x:keep"><outer x:keep="outer" x:drop="drop"/><scope xmlns:x="urn:inner"><a x:keep="unignored" x:drop="unignored"/></scope><shadow xmlns:x="urn:inner" mc:Ignorable="x"><a x:keep="dropped" x:drop="dropped"/></shadow></r>"#
+        );
+        let (actual, report) = run(&source).expect("shadowed directives remain valid");
+        assert_eq!(
+            actual,
+            format!(
+                r#"<r xmlns:mc="{MC}" xmlns:x="urn:outer"><outer x:keep="outer"></outer><scope xmlns:x="urn:inner"><a x:keep="unignored" x:drop="unignored"></a></scope><shadow xmlns:x="urn:inner"><a></a></shadow></r>"#
+            )
+        );
+        assert_eq!(report.preserved_attributes, 1);
+        assert_eq!(
+            report,
+            Report {
+                ignored_attributes: 6,
+                preserved_attributes: 1,
+                ..Report::default()
+            }
+        );
     }
 
     #[test]
@@ -2403,6 +2532,30 @@ mod namespace_emission_contract_tests {
         assert!(matches!(
             run_with(&unbound_element, &Capabilities::new(), &Limits::default()),
             Err(Error::NonConformant(message)) if message == "unbound prefix missing"
+        ));
+    }
+
+    #[test]
+    fn element_qname_refusal_precedes_its_directive_refusal() {
+        let invalid_element = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><x:bad:element mc:NotARealDirective="1"/></r>"#
+        );
+        assert!(matches!(
+            run_with(
+                &invalid_element,
+                &Capabilities::new(),
+                &Limits::default()
+            ),
+            Err(Error::NonConformant(message))
+                if message == "invalid QName: invalid XML QName 'x:bad:element'"
+        ));
+
+        let valid_element = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><x:element mc:NotARealDirective="1"/></r>"#
+        );
+        assert!(matches!(
+            run_with(&valid_element, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message)) if message == "unknown MCE attribute"
         ));
     }
 

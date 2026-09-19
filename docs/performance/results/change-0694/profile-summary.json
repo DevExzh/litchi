@@ -1,0 +1,66 @@
+{
+  "baseline": {
+    "counters": {
+      "10": {
+        "cycles": 289754996.0,
+        "instructions": 1088792880.0,
+        "branches": 219728796.0,
+        "branch-misses": 1142084.0,
+        "cache-misses": 332071.0,
+        "page-faults": 2227.0,
+        "task-clock": 64.73
+      },
+      "210": {
+        "cycles": 6047578780.0,
+        "instructions": 22850063064.0,
+        "branches": 4613200582.0,
+        "branch-misses": 23395947.0,
+        "cache-misses": 5761909.0,
+        "page-faults": 38709.0,
+        "task-clock": 1347.61
+      }
+    },
+    "per_open_capture": {
+      "cycles": 28789118.92,
+      "instructions": 108806350.92,
+      "branches": 21967358.93,
+      "branch-misses": 111269.315,
+      "cache-misses": 27149.19,
+      "page-faults": 182.41,
+      "task-clock": 6.4144
+    },
+    "whole_child_peak_rss_kib": 5696
+  },
+  "candidate": {
+    "counters": {
+      "10": {
+        "cycles": 279159671.0,
+        "instructions": 1056115827.0,
+        "branches": 211598732.0,
+        "branch-misses": 1105840.0,
+        "cache-misses": 333964.0,
+        "page-faults": 1936.0,
+        "task-clock": 62.61
+      },
+      "210": {
+        "cycles": 5889284921.0,
+        "instructions": 22102564996.0,
+        "branches": 4429358623.0,
+        "branch-misses": 24238542.0,
+        "cache-misses": 5608829.0,
+        "page-faults": 42215.0,
+        "task-clock": 1313.1
+      }
+    },
+    "per_open_capture": {
+      "cycles": 28050626.25,
+      "instructions": 105232245.845,
+      "branches": 21088799.455,
+      "branch-misses": 115663.51,
+      "cache-misses": 26374.325,
+      "page-faults": 201.395,
+      "task-clock": 6.25245
+    },
+    "whole_child_peak_rss_kib": 5700
+  }
+}
