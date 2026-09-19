@@ -28,8 +28,7 @@ use super::{
 use litchi_core::{Reservation, Resource};
 use std::cmp::Ordering;
 
-mod numerics;
-use numerics::{NumericAggregate, NumericOperation};
+use super::super::numerics::{NumericAggregate, NumericOperation};
 
 /// Return whether `name` is one of the twelve functions in OpenFormula §6.9.
 pub(super) fn is_database_function(name: &str) -> bool {
