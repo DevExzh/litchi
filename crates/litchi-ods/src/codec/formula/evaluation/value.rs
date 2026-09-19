@@ -156,6 +156,7 @@ mod complex;
 mod conditional;
 mod criteria;
 mod database;
+mod descriptive;
 #[allow(dead_code)]
 mod geometry;
 mod matrix;
@@ -2569,6 +2570,7 @@ where
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
             || statistical::is_statistical_function(name)
+            || descriptive::is_descriptive_function(name)
             || order::is_order_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
@@ -2599,7 +2601,8 @@ where
                 }
             } else if order::is_order_function(name) && order::matrix_argument(name, index, child) {
                 ValueFrame::VisitMatrixArgument(child)
-            } else if statistical::is_statistical_function(name)
+            } else if (statistical::is_statistical_function(name)
+                || descriptive::is_descriptive_function(name))
                 && Self::statistical_matrix_argument(child)
             {
                 // A literal rectangular Array must retain all of its cells in
@@ -3101,7 +3104,10 @@ where
             super::Kind::Function { name } if aggregate::is_aggregate_function(name) => {
                 self.cacheable_matrix_branch(node)
             },
-            super::Kind::Function { name } if statistical::is_statistical_function(name) => {
+            super::Kind::Function { name }
+                if statistical::is_statistical_function(name)
+                    || descriptive::is_descriptive_function(name) =>
+            {
                 self.cacheable_matrix_branch(node)
             },
             super::Kind::Function { name } if order::is_order_function(name) => {
@@ -3405,6 +3411,7 @@ where
                     }
                     let full_arguments = aggregate::is_aggregate_function(name)
                         || statistical::is_statistical_function(name)
+                        || descriptive::is_descriptive_function(name)
                         || complex::is_complex_sequence_function(name)
                         || name.eq_ignore_ascii_case("AND")
                         || name.eq_ignore_ascii_case("OR")
@@ -4073,6 +4080,7 @@ where
                         if complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
                             || statistical::is_statistical_function(name)
+                            || descriptive::is_descriptive_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
@@ -4988,6 +4996,7 @@ where
                             || complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
                             || statistical::is_statistical_function(name)
+                            || descriptive::is_descriptive_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
@@ -5634,6 +5643,7 @@ where
                     || name.eq_ignore_ascii_case("OR")
                     || aggregate::is_aggregate_function(name)
                     || statistical::is_statistical_function(name)
+                    || descriptive::is_descriptive_function(name)
                     || name.eq_ignore_ascii_case("TRUE")
                     || name.eq_ignore_ascii_case("FALSE") =>
             {
@@ -6468,6 +6478,20 @@ where
                 }
             }
             let value = statistical::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if descriptive::is_descriptive_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = descriptive::apply(self, name, arguments)?;
             if cacheable {
                 self.demand_cache_put(node, &value)?;
             }

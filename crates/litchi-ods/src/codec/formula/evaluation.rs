@@ -26,6 +26,12 @@
 //! rank functions (`MEDIAN`, `MODE`, `LARGE`, `SMALL`, `PERCENTILE`,
 //! `PERCENTRANK`, `QUARTILE`, and `RANK`) share finite numeric kernels with
 //! that VM; this resolver-free profile accepts their scalar argument forms.
+//! Descriptive reducers (`AVEDEV`, `DEVSQ`, `GEOMEAN`, `HARMEAN`, `KURT`,
+//! `SKEW`, and `SKEWP`) also share scalar and streamed-reference kernels.
+//! Centered moments retain bounded exact dyadic sums; `AVEDEV` replays the
+//! admitted sequence, and uncertain harmonic cancellation uses a budgeted
+//! exact rational replay. Signed geometric and harmonic inputs follow their
+//! real-valued domains rather than a positive-only input restriction.
 //! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
@@ -148,6 +154,7 @@
 
 mod aggregate;
 pub mod complex;
+mod descriptive;
 mod discrete;
 mod elementary;
 pub(super) mod numerics;
@@ -917,6 +924,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if descriptive::is_descriptive_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if order::is_order_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1030,6 +1041,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if statistical::is_statistical_function(name) {
             return statistical::apply(self, node, name);
+        }
+        if descriptive::is_descriptive_function(name) {
+            return descriptive::apply(self, node, name);
         }
         if order::is_order_function(name) {
             return order::apply(self, node, name);
