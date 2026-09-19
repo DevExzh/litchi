@@ -174,6 +174,7 @@ pub(super) fn eager<'a>(
         && !super::super::complex::is_complex_function(name)
         && !super::super::rounding::is_rounding_function(name)
         && !super::super::trigonometry::is_trigonometric_function(name)
+        && !super::super::elementary::is_elementary_function(name)
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }

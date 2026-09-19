@@ -1,0 +1,193 @@
+{
+  "oracle": "mpmath 1.3.0 and fractions.Fraction",
+  "decimal_precision": 600,
+  "observations": [
+    {
+      "function": "SQRTPI",
+      "input_decimal": [
+        "1.7976931348623157e+308"
+      ],
+      "input_binary64_hex": [
+        "0x1.fffffffffffffp+1023"
+      ],
+      "reference_decimal": "2.37647207976282701604302910135654751536854144e+154",
+      "rounded_binary64_bits": "5ffc5bf891b4ef6a"
+    },
+    {
+      "function": "SQRTPI",
+      "input_decimal": [
+        "5e-324"
+      ],
+      "input_binary64_hex": [
+        "0x0.0000000000001p-1022"
+      ],
+      "reference_decimal": "3.93973730515875477555231868657317985762488718e-162",
+      "rounded_binary64_bits": "1e6c5bf891b4ef6b"
+    },
+    {
+      "function": "LN",
+      "input_decimal": [
+        "5e-324"
+      ],
+      "input_binary64_hex": [
+        "0x0.0000000000001p-1022"
+      ],
+      "reference_decimal": "-744.440071921381262314107298446081634113087144",
+      "rounded_binary64_bits": "c0874385446d71c3"
+    },
+    {
+      "function": "LN",
+      "input_decimal": [
+        "1.0000000000000002"
+      ],
+      "input_binary64_hex": [
+        "0x1.0000000000001p+0"
+      ],
+      "reference_decimal": "2.22044604925031283432823045461548792598233181e-16",
+      "rounded_binary64_bits": "3cafffffffffffff"
+    },
+    {
+      "function": "LOG10",
+      "input_decimal": [
+        "5e-324"
+      ],
+      "input_binary64_hex": [
+        "0x0.0000000000001p-1022"
+      ],
+      "reference_decimal": "-323.306215343115803659555572934105510749035933",
+      "rounded_binary64_bits": "c07434e6420f4374"
+    },
+    {
+      "function": "LOG",
+      "input_decimal": [
+        "5e-324",
+        "1.0000000000000002"
+      ],
+      "input_binary64_hex": [
+        "0x0.0000000000001p-1022",
+        "0x1.0000000000001p+0"
+      ],
+      "reference_decimal": "-3352660030504798267.38922281897269580679350674",
+      "rounded_binary64_bits": "c3c74385446d71c4"
+    },
+    {
+      "function": "LOG",
+      "input_decimal": [
+        "1.0000000000000002",
+        "0.9999999999999999"
+      ],
+      "input_binary64_hex": [
+        "0x1.0000000000001p+0",
+        "0x1.fffffffffffffp-1"
+      ],
+      "reference_decimal": "-1.99999999999999966693309261245308101374125385",
+      "rounded_binary64_bits": "bfffffffffffffff"
+    },
+    {
+      "function": "EXP",
+      "input_decimal": [
+        "-745.0"
+      ],
+      "input_binary64_hex": [
+        "-0x1.7480000000000p+9"
+      ],
+      "reference_decimal": "2.82235073047193707635344008205978262082436306e-324",
+      "rounded_binary64_bits": "0000000000000001"
+    },
+    {
+      "function": "EXP",
+      "input_decimal": [
+        "709.0"
+      ],
+      "input_binary64_hex": [
+        "0x1.6280000000000p+9"
+      ],
+      "reference_decimal": "8.21840746155497218924137238659781639324450597e+307",
+      "rounded_binary64_bits": "7fdd422d2be5dc9b"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "1e+308",
+        "3.0"
+      ],
+      "input_binary64_hex": [
+        "0x1.1ccf385ebc8a0p+1023",
+        "0x1.8000000000000p+1"
+      ],
+      "exact_rational_numerator": "2",
+      "exact_rational_denominator": "1",
+      "rounded_binary64_bits": "4000000000000000"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "-1e+308",
+        "3.0"
+      ],
+      "input_binary64_hex": [
+        "-0x1.1ccf385ebc8a0p+1023",
+        "0x1.8000000000000p+1"
+      ],
+      "exact_rational_numerator": "1",
+      "exact_rational_denominator": "1",
+      "rounded_binary64_bits": "3ff0000000000000"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "1e+308",
+        "-3.0"
+      ],
+      "input_binary64_hex": [
+        "0x1.1ccf385ebc8a0p+1023",
+        "-0x1.8000000000000p+1"
+      ],
+      "exact_rational_numerator": "-1",
+      "exact_rational_denominator": "1",
+      "rounded_binary64_bits": "bff0000000000000"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "1.7976931348623157e+308",
+        "1e-300"
+      ],
+      "input_binary64_hex": [
+        "0x1.fffffffffffffp+1023",
+        "0x1.56e1fc2f8f359p-997"
+      ],
+      "exact_rational_numerator": "78100781182115",
+      "exact_rational_denominator": "3016028602530220424421062271578867838525126125874252890898307532480811172246863646685486789069132871854112712507200418582406770249989531589552959798883475511096677545853948017425342019529539590198394174553047792145043723038206885734470238620775335376572758801465612196212014773714996912064944617579072807182486470656",
+      "rounded_binary64_bits": "0151c210546b28c0"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "1.677259342285726e+21",
+        "77.0"
+      ],
+      "input_binary64_hex": [
+        "0x1.6bb298d53b681p+70",
+        "0x1.3400000000000p+6"
+      ],
+      "exact_rational_numerator": "9",
+      "exact_rational_denominator": "1",
+      "rounded_binary64_bits": "4022000000000000"
+    },
+    {
+      "function": "MOD",
+      "input_decimal": [
+        "-5e-324",
+        "1.7976931348623157e+308"
+      ],
+      "input_binary64_hex": [
+        "-0x0.0000000000001p-1022",
+        "0x1.fffffffffffffp+1023"
+      ],
+      "exact_rational_numerator": "36385714125121573300846800698456749842842774431060269030973563199251835202763131874220510446199752578146168959525535975504123660741259730559491535919078220069839241298744801305292878640835527930863994674357611588999020693594474762898847930291552594690170203187215045688094955660773922576137969830342611860225019935582199601121469249223149872466121371567155862303084330314602566069416432551333006194774477514260351201969859368060220131234488198148976536169638305696900504838830719760875514246216508976803882728582677352177004129288847854463084006372981390756344519549931097743963603971632334891836831978686870043355177324550146752511",
+      "exact_rational_denominator": "202402253307310618352495346718917307049556649764142118356901358027430339567995346891960383701437124495187077864316811911389808737385793476867013399940738509921517424276566361364466907742093216341239767678472745068562007483424692698618103355649159556340810056512358769552333414615230502532186327508646006263307707741093494784",
+      "rounded_binary64_bits": "7fefffffffffffff"
+    }
+  ]
+}

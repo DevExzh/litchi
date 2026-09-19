@@ -1,0 +1,8 @@
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-ods-elementary/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/tmp/litchi-ods-elementary/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/tmp/litchi-ods-elementary/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/tmp/litchi-ods-elementary/crates/xml-minifier)
+    Checking litchi-odf-common v0.0.1 (/tmp/litchi-ods-elementary/crates/litchi-odf-common)
+ Documenting litchi-ods v0.0.1 (/tmp/litchi-ods-elementary/crates/litchi-ods)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.57s
+   Generated /tmp/litchi-ods-elementary-target/doc/litchi_ods/index.html

@@ -1,0 +1,29 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/mathematical/fods/abs.fods": "958de44e2c1c5c20ba079946a28088c8fec0ba11eae4fe0b30473a457f9c7f27",
+    "sc/qa/unit/data/functions/mathematical/fods/exp.fods": "b3b6355639858eb602d3ab30ee59d3a0b0d20fc2d58077e98d24ba251cd486a1",
+    "sc/qa/unit/data/functions/mathematical/fods/ln.fods": "5fd33b74e8c27033d2901261fca2fac45fa5a067c22a1664fcbb736688fb1421",
+    "sc/qa/unit/data/functions/mathematical/fods/log.fods": "36a0d35316b900de8b4be2fd46d101a812493ef4cafbfb08ada2d4c17ca01bfb",
+    "sc/qa/unit/data/functions/mathematical/fods/log10.fods": "9f27dbfa7481c9a8ff39afe60767bb8661f03be5c6c6e7af0f768d4743e82a79",
+    "sc/qa/unit/data/functions/mathematical/fods/power.fods": "46b34194399a7ab89a25a697ce790607e71316108acd15149b173990a0a82dff",
+    "sc/qa/unit/data/functions/mathematical/fods/sqrt.fods": "715152ea243678db1f191f12f4f7eb585967c30df82a42b1c4f1a20960bdbb16",
+    "sc/qa/unit/data/functions/mathematical/fods/sqrtpi.fods": "b2398158e0bb186181ba1b9e038397aced51e1e9d22474863c5a9a5a9681e7e7",
+    "sc/qa/unit/data/functions/mathematical/fods/sign.fods": "21f6522478b91e0681094e788d359c7abba9aba6304f744d750a72caa927d18a",
+    "sc/qa/unit/data/functions/mathematical/fods/mod.fods": "784593f536b40dd932dba0a1f66257044edfe4c7e8db7980f244ec872a0b0606",
+    "sc/qa/unit/data/functions/mathematical/fods/quotient.fods": "ca3c03738c00a35c01fe15b1e2d7a2cc2317756427a5bbd93a6f615fc9ca0b7d"
+  },
+  "excluded_profile_variances": [
+    {
+      "function": "MOD",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=MOD(26^15;77)",
+      "cached": "0",
+      "reason": "The cached zero differs from the remainder of the represented binary64 operands. This evaluator uses a stable remainder, without a quotient/product cancellation step."
+    }
+  ]
+}

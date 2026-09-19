@@ -15,7 +15,9 @@
 //! `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DEGREES`, `PI`, `RADIANS`, `SEC`,
 //! `SECH`, `SIN`, `SINH`, `TAN`, and `TANH`), and the complete section 6.17
 //! rounding family (`CEILING`, `INT`, `FLOOR`, `MROUND`, `ROUND`, `ROUNDDOWN`,
-//! `ROUNDUP`, and `TRUNC`). Trigonometric kernels use finite `f64` libm
+//! `ROUNDUP`, and `TRUNC`), together with the bounded real elementary
+//! functions (`ABS`, `EXP`, `LN`, `LOG`, `LOG10`, `MOD`, `POWER`, `QUOTIENT`,
+//! `SIGN`, `SQRT`, and `SQRTPI`). Trigonometric kernels use finite `f64` libm
 //! operations, with stable large-argument forms for reciprocal hyperbolic
 //! functions. Rounding uses the normative sign, mode, tie, and decimal-place
 //! rules, while retaining the
@@ -125,6 +127,7 @@
 //! ```
 
 pub mod complex;
+mod elementary;
 mod radix;
 mod roman;
 mod rounding;
@@ -875,6 +878,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if elementary::is_elementary_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -966,6 +973,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if trigonometry::is_trigonometric_function(name) {
             return trigonometry::apply(self, node, name);
+        }
+        if elementary::is_elementary_function(name) {
+            return elementary::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
@@ -1185,8 +1195,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             },
             InfixOperator::Power => match numeric_pair(self, left, right)? {
                 Err(error) => Ok(WorkingValue::Error(error)),
-                Ok((left, right)) if left == 0.0 && right == 0.0 => Ok(WorkingValue::Number(1.0)),
-                Ok((left, right)) => Ok(finite_number(left.powf(right))),
+                Ok((left, right)) => Ok(match elementary::power_result(left, right) {
+                    Ok(value) => WorkingValue::Number(value),
+                    Err(error) => WorkingValue::Error(error),
+                }),
             },
             InfixOperator::Concatenate => concatenate(self, left, right),
             InfixOperator::Equal => Ok(WorkingValue::Logical(compare_equal(
