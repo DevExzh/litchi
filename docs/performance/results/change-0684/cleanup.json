@@ -1,0 +1,17 @@
+{
+  "baseline_status_before_cleanup": "?? docs/performance/results/change-0684/\n",
+  "worktree_command": [
+    "git",
+    "worktree",
+    "remove",
+    "--force",
+    "/home/zhuhe/code/litchi-0684-before"
+  ],
+  "removed": [
+    "/home/zhuhe/code/litchi-0684-before",
+    "/home/zhuhe/code/litchi-target-0684-before",
+    "/home/zhuhe/code/litchi-target-0684-after",
+    "/home/zhuhe/code/litchi-0684-profile"
+  ],
+  "scope": "Only 0684-owned baseline, build outputs and raw profiles; bound evidence retained."
+}

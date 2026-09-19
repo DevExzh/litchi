@@ -1,0 +1,21 @@
+candidate corpus owned 126
+candidate corpus file 126
+candidate counts/alloc 54016-stored
+candidate counts/alloc 54016-missing
+candidate counts/alloc 45365-2-stored
+candidate counts/alloc WithCustomViews-stored
+candidate counts/alloc WithCustomViews-missing
+candidate counts/alloc 15228-stored
+candidate counts/alloc Simple-stored
+candidate counts/alloc Simple-missing
+candidate counts/alloc formula-refusal
+candidate timing 54016-stored
+candidate timing 54016-missing
+candidate timing 45365-2-stored
+candidate timing WithCustomViews-stored
+candidate timing WithCustomViews-missing
+candidate timing 15228-stored
+candidate timing Simple-stored
+candidate timing Simple-missing
+candidate timing formula-refusal
+candidate complete

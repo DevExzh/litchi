@@ -1,0 +1,38 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.72s
+     Running unittests src/lib.rs (target/debug/deps/litchi_xls-056d18b626b02b23)
+
+running 11 tests
+test workbook::query_cache::tests::all_pinned_entries_refuse_a_candidate ... ok
+test workbook::query_cache::tests::cell_slots_are_grouped_by_coordinate ... ok
+test workbook::query_cache::tests::concurrent_reservations_share_one_owner_ceiling ... ok
+test workbook::query_cache::tests::disabled_cache_never_admits_a_candidate ... ok
+test workbook::query_cache::tests::dropping_an_unpublished_candidate_releases_its_managed_reservation ... ok
+test workbook::query_cache::tests::index_overhead_covers_the_retained_arc_and_cache_metadata_layout ... ok
+test workbook::query_cache::tests::pinned_entry_blocks_admission_without_releasing_its_reservation ... FAILED
+test workbook::query_cache::tests::pinned_entry_survives_pressure_and_unpinned_entry_is_lru_evicted ... ok
+test workbook::query_cache::tests::second_miss_is_the_only_candidate_trigger ... FAILED
+test workbook::query_cache::tests::source_version_is_part_of_the_cache_boundary ... ok
+test workbook::query_cache::tests::successful_retention_charges_the_hierarchy_until_cache_drop ... ok
+
+failures:
+
+---- workbook::query_cache::tests::pinned_entry_blocks_admission_without_releasing_its_reservation stdout ----
+
+thread 'workbook::query_cache::tests::pinned_entry_blocks_admission_without_releasing_its_reservation' (1494344) panicked at crates/litchi-xls/src/workbook/query_cache.rs:751:9:
+assertion failed: blocked.publish(SourceVersion::new(1, 0)).is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- workbook::query_cache::tests::second_miss_is_the_only_candidate_trigger stdout ----
+
+thread 'workbook::query_cache::tests::second_miss_is_the_only_candidate_trigger' (1494346) panicked at crates/litchi-xls/src/workbook/query_cache.rs:637:9:
+assertion failed: !cache.observe_miss(0)
+
+
+failures:
+    workbook::query_cache::tests::pinned_entry_blocks_admission_without_releasing_its_reservation
+    workbook::query_cache::tests::second_miss_is_the_only_candidate_trigger
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 1068 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-xls --lib`

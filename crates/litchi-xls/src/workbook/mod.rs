@@ -8,6 +8,7 @@
 mod codec;
 mod model;
 pub mod package;
+mod query_cache;
 pub mod source;
 
 #[cfg(test)]

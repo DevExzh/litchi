@@ -1,0 +1,38 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.59s
+     Running tests/xls_query_index_cache.rs (target/debug/deps/xls_query_index_cache-a12d95c3651722e8)
+
+running 17 tests
+test a_failed_tail_never_publishes_a_partial_index ... ok
+test a_label_sst_without_a_global_sst_keeps_the_typed_error_on_warm_hits ... ok
+test a_managed_memory_refusal_falls_back_without_changing_the_query_result ... ok
+test a_source_change_during_index_build_is_refused_without_a_warm_hit ... ok
+test a_successful_warm_index_shortcuts_later_hits_and_missing_cells ... ok
+test a_tiny_cache_budget_falls_back_without_changing_query_values ... ok
+test an_earlier_malformed_formula_string_still_refuses_a_warm_duplicate_hit ... ok
+test an_earlier_shared_string_read_error_still_refuses_a_warm_duplicate_hit ... ok
+test an_indexed_missing_target_still_takes_the_trailing_freshness_fence ... ok
+test an_out_of_range_shared_string_duplicate_is_typed_then_overwritten_on_hits ... ok
+test an_unselected_formula_without_string_keeps_the_missing_result_error_warm ... ok
+test cancellation_during_index_build_drops_the_candidate ... ok
+test cloned_workbooks_share_the_snapshot_cache_but_reopened_ones_do_not ... ok
+test disabled_cache_preserves_values_and_repeats_the_complete_scan ... ok
+test formula_string_continuations_have_the_same_value_on_warm_hits ... FAILED
+test visit_cells_keeps_duplicate_order_after_queries_warm_the_owner ... ok
+test zero_one_mib_and_two_mib_budgets_keep_results_identical ... ok
+
+failures:
+
+---- formula_string_continuations_have_the_same_value_on_warm_hits stdout ----
+
+thread 'formula_string_continuations_have_the_same_value_on_warm_hits' (1526146) panicked at crates/litchi-xls/tests/xls_query_index_cache.rs:818:5:
+assertion failed: matches!(third, Some(CellValue::Formula { .. }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    formula_string_continuations_have_the_same_value_on_warm_hits
+
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `-p litchi-xls --test xls_query_index_cache`

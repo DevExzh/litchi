@@ -1,0 +1,3 @@
+$ cargo build --release --offline --locked --manifest-path docs/performance/results/change-0684/allocation-probe/Cargo.toml
+   Compiling xls0684-alloc v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0684/allocation-probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.67s

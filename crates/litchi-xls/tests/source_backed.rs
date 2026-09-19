@@ -3195,7 +3195,10 @@ fn the_whole_sheet_walk_reports_shared_strings() {
 #[test]
 fn the_whole_sheet_walk_costs_one_scan_not_one_per_cell() {
     let source = Arc::new(CountingSource::new(ole_fixture("WithCustomViews.xls")));
-    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    // Compare the visitor with the uncached query scan. Retained-index query
+    // savings are exercised separately in xls_query_index_cache.
+    let limits = SourceBackedLimits::default().with_max_query_index_bytes(0);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     // One selected-cell query: the whole-substream scan every query pays for,

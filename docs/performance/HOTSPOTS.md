@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0684 — bounded XLS occurrence indexes and remaining chain walks
+
+[0684](0684-xls-occurrence-query-index.md) implements the occurrence-preserving
+cache from 0678 with a 2 MiB default and explicit zero-budget opt-out. Final
+ordinary-query specialization removes the initial 6–22% first-query regression.
+Prepared owned 54016 queries fall from about 369 µs to 2.8 µs, but construction
+roughly doubles the second query and retains about 1.50 MiB (1.57 MB). Three-query
+45365 workflows, tiny file-backed hits and repeated formula refusals retain
+explicit regressions; process RSS increases are reviewed, not averaged away.
+No registered claim or coverage promotion follows these scoped observations.
+
+The final warmed 54016 profile places 71.31% self samples in CFB
+`next_chain_sector`; snapshot chain hints remain the next isolated opportunity.
+Local budgets too small for admission retry collection; tiny-sheet and retry
+policy improvements remain open. Source/semantic proof and resource lifetimes
+must precede any hint-retention change.
+
 ## 0683 — compact XLSX selections and measured plain-text escape skipping
 
 [0683](0683-xlsx-selected-record-compaction.md) shrinks retained selected records
@@ -8395,7 +8412,7 @@ the accepted decisions are no longer listed as awaiting an owner.
 
 | Priority | Remaining work | Required proof or design |
 | ---: | --- | --- |
-| 1 | XLS retained sheet indexes and snapshot chain hints | Implement and measure the occurrence-preserving weighted cache in [0678](0678-xls-query-cache-design.md), including candidate/retained admission and target-specific refusal order. Snapshot chain hints remain separate. |
+| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. Snapshot chain hints remain separate; the final warm profile attributes 71.31% self samples to chain-sector traversal. Tiny-sheet admission and below-capacity retry costs also remain open. |
 | 2 | XLSX selected scanner's retained record vector | [0683](0683-xlsx-selected-record-compaction.md) implements compact records and exact SST staging, with an additional profiled escape-search optimization. Direct owning-result construction and managed semantic-vector admission remain open; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the callback contract. |
 | 3 | DOCX cache breadth and remaining per-view work | [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo with scoped fresh-view gains, pressure reclamation and replacement/rollback tests; its measured hot-query regression was removed by direct index ownership. Extend producer/concurrent/cold measurements and attribute remaining MCE visibility work before broader claims. |
 | 4 | XLS framing fusion and full SST locator scan | Preserve the coverage proof, validation order and malformed-input boundaries; pointer scratch removal does not eliminate the full scan; [0668](0668-xls-query-residues.md). |
