@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0692/probe/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0692",
+    "--bin",
+    "probe0692",
+    "-j",
+    "2"
+  ],
+  "exit_code": 0
+}

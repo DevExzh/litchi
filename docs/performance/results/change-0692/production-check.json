@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--lib",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "source_sha256": {
+    "crates/litchi-pptx/src/parts/slide.rs": "4dd5cf594abe9854459f09f7fa5f4ac495afb720be5bcce070135d7f914436fe",
+    "crates/litchi-pptx/src/presentation/package.rs": "bc0cdb86a56d087830c8ee87de101c923acb5f9c4bc39060461765e582d2664f",
+    "crates/litchi-pptx/src/presentation/model.rs": "96f4ab3d1df5c39b27c8ead70624b7c180c45a270d2b6289d0cd3729026547ff",
+    "crates/litchi-pptx/src/opened/model.rs": "22e8d489990a83fba2bfefb53d1044f063104d20a64c3ba72b41364c0a59ee9b"
+  },
+  "log_sha256": "19743e1c87ff525099477707302a33e3c4d329e59666714d3ddeb129e328a4b8",
+  "env": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0692",
+    "CARGO_BUILD_JOBS": "2",
+    "RUSTFLAGS": "-D warnings"
+  }
+}

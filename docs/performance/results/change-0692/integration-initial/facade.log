@@ -1,0 +1,78 @@
+HEAD e9bd3360c442feacbd46d7af116794087388fbb0
+$ cargo test -p litchi --locked --no-default-features --features pptx --lib --tests -- --test-threads=1
+   Compiling getrandom v0.3.4
+   Compiling zerocopy v0.8.56
+   Compiling num-traits v0.2.19
+   Compiling tempfile v3.27.0
+   Compiling chrono v0.4.45
+   Compiling rand_core v0.9.5
+   Compiling lock_api v0.4.13
+   Compiling utf8parse v0.2.2
+   Compiling parking_lot_core v0.9.11
+   Compiling anstyle-parse v0.2.7
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle v1.0.14
+   Compiling colorchoice v1.0.5
+   Compiling scopeguard v1.2.0
+   Compiling anstream v0.6.21
+   Compiling ppv-lite86 v0.2.21
+   Compiling errno v0.3.14
+   Compiling wait-timeout v0.2.1
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling strsim v0.10.0
+   Compiling fnv v1.0.7
+   Compiling bit-vec v0.8.0
+   Compiling hashbrown v0.16.1
+   Compiling simd-adler32 v0.3.10
+   Compiling equivalent v1.0.2
+   Compiling clap_lex v0.6.0
+   Compiling bumpalo v3.20.3
+   Compiling quick-error v1.2.3
+   Compiling rusty-fork v0.3.1
+   Compiling zopfli v0.8.3
+   Compiling clap_builder v4.4.18
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling indexmap v2.11.4
+   Compiling bit-set v0.8.0
+   Compiling clap_derive v4.4.7
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling signal-hook-registry v1.4.8
+   Compiling parking_lot v0.12.4
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.5
+   Compiling rand_xorshift v0.4.0
+   Compiling socket2 v0.6.5
+   Compiling mio v1.0.4
+   Compiling tokio-macros v2.5.0
+   Compiling pin-project-lite v0.2.17
+   Compiling typed-path v0.12.3
+   Compiling bytes v1.12.1
+   Compiling unarray v0.1.4
+   Compiling regex-syntax v0.8.11
+   Compiling proptest v1.7.0
+   Compiling tokio v1.47.5
+   Compiling zip v8.6.0
+   Compiling clap v4.4.18
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+error: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+   |
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+   |    ^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+   |
+30 | fn assert_boxed_unexpected(
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `litchi` (test "unexpected_format") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+
+exit 101

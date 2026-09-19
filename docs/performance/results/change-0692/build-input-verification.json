@@ -1,0 +1,36 @@
+{
+  "verified_after_builds": true,
+  "inputs": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+      "matches_current": true,
+      "matches_baseline_git_object": true
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+      "matches_current": true,
+      "matches_baseline_git_object": null
+    },
+    {
+      "path": "crates/litchi-pptx/Cargo.toml",
+      "sha256": "5a4e4103de4c427ff4601ab2ebc1b758eb26d58e8ad661d1db3f838ff490ec65",
+      "matches_current": true,
+      "matches_baseline_git_object": true
+    },
+    {
+      "path": "crates/litchi-ooxml-common/Cargo.toml",
+      "sha256": "e226484cae42a827ff8d37603870ebd088cfaba953338825664433290d04489e",
+      "matches_current": true,
+      "matches_baseline_git_object": true
+    },
+    {
+      "path": "crates/litchi-opc/Cargo.toml",
+      "sha256": "0572d27f2134b4d060e79ac2bbd57ae3d839ad768e57a944d5674538388b80fb",
+      "matches_current": true,
+      "matches_baseline_git_object": true
+    }
+  ],
+  "note": "Workspace Cargo.lock is pre-existing/ignored; standalone probe builds use their separately hash-bound locked probe/Cargo.lock."
+}

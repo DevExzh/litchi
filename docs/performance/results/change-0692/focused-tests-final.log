@@ -1,0 +1,13 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.67s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0692/debug/deps/litchi_pptx-2f276d6ead2eba17)
+
+running 5 tests
+test opened::tests::capture_projection_keeps_first_name_error_bounded_and_ordered ... ok
+test opened::tests::capture_projection_keeps_notes_validation_after_slide_identity_and_names ... ok
+test opened::tests::capture_projection_matches_legacy_across_conformance_names_and_mce ... ok
+test opened::tests::capture_projection_preserves_relationship_and_part_identity_error_order ... ok
+test opened::tests::capture_projection_preserves_root_and_catalog_error_precedence ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 587 filtered out; finished in 0.45s
+

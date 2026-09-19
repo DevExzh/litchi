@@ -1,0 +1,8 @@
+{
+  "source_sha256_equal": true,
+  "files": {
+    "docs/performance/results/change-0691/trace-summary.json": "9aa35f3bfbeb3654573f94846755dfcfc420dfd6a7bd7fda8fbb79b524116a1b",
+    "docs/performance/results/change-0691/trace-audit.json": "9aa35f3bfbeb3654573f94846755dfcfc420dfd6a7bd7fda8fbb79b524116a1b"
+  },
+  "reason": "All frozen baseline PPTX/common/OPC Rust sources exactly match final0691 trace inputs. Capture prefix behavior unchanged; numeric process pointer addresses are not compared."
+}

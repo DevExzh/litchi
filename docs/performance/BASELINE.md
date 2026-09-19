@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0692 — PPTX capture-local projection result
+
+[0692](0692-pptx-capture-name-projection.md) retains 7,800 native samples across
+13 one-edit, no-op and two-slide workflows. The real one-edit phases improve
+24.83–25.24%, from 22.76–22.88 to 17.11 ms; real capture MCE calls fall 44→31.
+Native timing excludes initial open/save/reopen. Counting allocation calls
+fall 22.82%, with unchanged measured peak/net live bytes. Per-leg tails,
+21 phase-tail triggers, +24 bytes of temporary storage per slide, page-fault
+cost and separate profiles remain visible. No broad or registered claim.
+
 ## 0691 — native opened-PPTX MCE baseline
 
 [0691](0691-pptx-repeated-mce-baseline.md) separates native phase timing from

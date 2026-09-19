@@ -201,6 +201,10 @@ impl<'a> Presentation<'a> {
         package::slides(self)
     }
 
+    pub(crate) fn capture_slides(&self) -> Result<package::CaptureSlides<'a>> {
+        package::capture_slides(self)
+    }
+
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
     ///
     /// # Errors

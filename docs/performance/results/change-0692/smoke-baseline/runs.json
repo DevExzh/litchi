@@ -1,0 +1,158 @@
+[
+  {
+    "case": "one-real",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "2",
+      "1",
+      "one"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "one-control",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0692/marker-control.pptx",
+      "2",
+      "1",
+      "one"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "one-generated",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "generated:12x8",
+      "2",
+      "1",
+      "one"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "one-notes-poi",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "2",
+      "1",
+      "one"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "one-notes-lo",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "2",
+      "1",
+      "one"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "noop-real",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "2",
+      "1",
+      "noop"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "noop-control",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0692/marker-control.pptx",
+      "2",
+      "1",
+      "noop"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "noop-generated",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "generated:12x8",
+      "2",
+      "1",
+      "noop"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "noop-notes-poi",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+      "2",
+      "1",
+      "noop"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "noop-notes-lo",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+      "2",
+      "1",
+      "noop"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "two-real",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "2",
+      "1",
+      "two"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "two-control",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0692/marker-control.pptx",
+      "2",
+      "1",
+      "two"
+    ],
+    "exit_code": 0
+  },
+  {
+    "case": "two-generated",
+    "command": [
+      "/home/zhuhe/code/litchi-0692-bin/baseline-native",
+      "phases",
+      "generated:12x8",
+      "2",
+      "1",
+      "two"
+    ],
+    "exit_code": 0
+  }
+]

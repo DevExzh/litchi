@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use sha2::{Digest, Sha256};
 
@@ -10,6 +11,399 @@ use super::{
     SlideRemovalPatch,
 };
 use crate::{Error, Package, Result, SlideCopyRefusal, SlideRemovalRefusal};
+
+/// Reproduce the capture sequence that preceded the capture-local projection
+/// helper.  This deliberately uses the ordinary public presentation slide
+/// resolver and keeps the relationship, identity, notes, and name checks in
+/// their old order.  The candidate capture is compared with this oracle, but
+/// malformed cases also assert an independent expected error fragment below
+/// so a shared implementation mistake cannot make both sides pass.
+fn legacy_capture_catalog(package: &Package) -> Result<Vec<super::Slide>> {
+    let presentation = crate::parts::PresentationPart::from_package(&package.opc)?;
+    let presentation_name = presentation.part().partname().clone();
+    let references = presentation.slide_references()?;
+    let view = crate::presentation::Presentation::new(presentation, &package.opc);
+    let contextual = view.slides()?;
+    if references.len() != contextual.len() {
+        return Err(super::model::invalid(
+            "opened-presentation slide references do not resolve one-to-one",
+        ));
+    }
+
+    let mut slides = Vec::new();
+    slides
+        .try_reserve_exact(references.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide identities",
+            source,
+        })?;
+    let mut ids = std::collections::HashSet::new();
+    let mut relationship_ids = std::collections::HashSet::new();
+    let mut part_names = std::collections::HashSet::new();
+    for (reference, slide) in references.iter().zip(contextual) {
+        let relationship = presentation
+            .part()
+            .rels()
+            .get(reference.relationship_id())
+            .ok_or_else(|| {
+                super::model::invalid("opened-presentation slide relationship is missing")
+            })?;
+        if relationship.is_external()
+            || !crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide")
+        {
+            return Err(super::model::invalid(
+                "opened-presentation slide relationship is unsupported",
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let part_name = slide.part().part().partname().clone();
+        if target != part_name {
+            return Err(super::model::invalid(
+                "opened-presentation slide relationship target changed during capture",
+            ));
+        }
+        if !ids.insert(reference.id())
+            || !relationship_ids.insert(reference.relationship_id().to_owned())
+            || !part_names.insert(part_name.clone())
+        {
+            return Err(super::model::invalid(
+                "opened-presentation slide identities are not one-to-one",
+            ));
+        }
+        slides.push(super::Slide {
+            id: reference.id(),
+            relationship_id: reference.relationship_id().to_owned(),
+            name: slide.name()?,
+            part_name,
+        });
+    }
+    let _notes = crate::notes::load_snapshot(&package.opc, &presentation_name)?;
+    let _slide_name_index = super::model::SlideNameIndex::build(&slides)?;
+    Ok(slides)
+}
+
+/// Inspect the private capture-local projection directly.  This is kept
+/// separate from `opened_presentation` so the deferred first-name-error slot
+/// and the bounded post-error root-only path have an observable regression
+/// contract of their own.
+fn candidate_capture_projection(
+    package: &Package,
+) -> Result<(
+    Vec<(usize, String, Option<String>)>,
+    Option<(usize, String)>,
+)> {
+    let presentation = crate::parts::PresentationPart::from_package(&package.opc)?;
+    let view = crate::presentation::Presentation::new(presentation, &package.opc);
+    let captured = view.capture_slides()?;
+    let slides = captured
+        .slides
+        .iter()
+        .enumerate()
+        .map(|(index, captured)| {
+            (
+                index,
+                captured.slide.part().part().partname().as_str().to_owned(),
+                captured.name.clone(),
+            )
+        })
+        .collect();
+    let first_name_error = captured
+        .first_name_error
+        .map(|(index, error)| (index, error.to_string()));
+    Ok((slides, first_name_error))
+}
+
+fn assert_capture_matches_legacy(package: &Package) -> Result<()> {
+    let legacy = legacy_capture_catalog(package);
+    let candidate = package.opened_presentation();
+    match (legacy, candidate) {
+        (Ok(expected), Ok(actual)) => assert_eq!(actual.slides(), expected.as_slice()),
+        (Err(expected), Err(actual)) => {
+            assert_eq!(
+                std::mem::discriminant(&actual),
+                std::mem::discriminant(&expected)
+            );
+            assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+        },
+        (Ok(_), Err(actual)) => {
+            panic!("capture result changed from legacy success to candidate error: {actual}")
+        },
+        (Err(expected), Ok(_)) => {
+            panic!("capture result changed from legacy error to candidate success: {expected}")
+        },
+    }
+    Ok(())
+}
+
+fn assert_capture_error_contains(package: &Package, expected: &str) -> Result<()> {
+    let legacy = legacy_capture_catalog(package).expect_err("legacy capture should fail");
+    let candidate = package
+        .opened_presentation()
+        .expect_err("candidate capture should fail");
+    assert_eq!(
+        std::mem::discriminant(&candidate),
+        std::mem::discriminant(&legacy)
+    );
+    assert_eq!(format!("{candidate:?}"), format!("{legacy:?}"));
+    assert!(
+        candidate.to_string().contains(expected),
+        "candidate error {:?} did not contain {:?}",
+        candidate.to_string(),
+        expected
+    );
+    Ok(())
+}
+
+fn rewrite_slide_xml(
+    package: &mut Package,
+    index: usize,
+    rewrite: impl FnOnce(String) -> String,
+) -> Result<()> {
+    let part_name =
+        PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).map_err(Error::Invalid)?;
+    let xml = std::str::from_utf8(package.opc.get_part(&part_name)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .to_owned();
+    package
+        .opc
+        .get_part_mut(&part_name)?
+        .set_blob(rewrite(xml).into_bytes());
+    Ok(())
+}
+
+fn set_slide_name_attribute(package: &mut Package, index: usize, replacement: &str) -> Result<()> {
+    rewrite_slide_xml(package, index, |xml| {
+        let marker = format!(r#" name="Slide {}""#, 256 + index);
+        xml.replacen(&marker, replacement, 1)
+    })
+}
+
+fn remove_slide_c_sld(package: &mut Package, index: usize) -> Result<()> {
+    rewrite_slide_xml(package, index, |mut xml| {
+        let Some(start) = xml.find("<p:cSld") else {
+            return xml;
+        };
+        let Some(close) = xml[start..].find("</p:cSld>") else {
+            return xml;
+        };
+        let end = start + close + "</p:cSld>".len();
+        xml.replace_range(start..end, "<p:spTree/>");
+        xml
+    })
+}
+
+fn add_slide_mce_marker(package: &mut Package, index: usize) -> Result<()> {
+    rewrite_slide_xml(package, index, |xml| {
+        xml.replacen(
+            "<p:sld ",
+            "<p:sld xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:p14=\"urn:test\" mc:Ignorable=\"p14\" ",
+            1,
+        )
+    })
+}
+
+fn add_malformed_slide_tail(package: &mut Package, index: usize) -> Result<()> {
+    rewrite_slide_xml(package, index, |xml| {
+        xml.replacen(
+            "</p:sld>",
+            "<p:extLst xmlns:xml=\"urn:invalid\"/></p:sld>",
+            1,
+        )
+    })
+}
+
+fn replace_notes_slide_root(package: &mut Package) -> Result<()> {
+    let notes = PackURI::new("/ppt/notesSlides/notesSlide1.xml").map_err(Error::Invalid)?;
+    package.opc.get_part_mut(&notes)?.set_blob(
+        b"<p:wrong xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"/>"
+            .to_vec(),
+    );
+    Ok(())
+}
+
+fn rewrite_presentation_xml(
+    package: &mut Package,
+    rewrite: impl FnOnce(String) -> String,
+) -> Result<()> {
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let xml = std::str::from_utf8(package.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .to_owned();
+    package
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(rewrite(xml).into_bytes());
+    Ok(())
+}
+
+#[test]
+fn capture_projection_matches_legacy_across_conformance_names_and_mce() -> Result<()> {
+    for (label, strict, mce, name_mode) in [
+        ("transitional named", false, false, "named"),
+        ("transitional empty", false, false, "empty"),
+        ("transitional fallback", false, false, "fallback"),
+        ("strict named", true, false, "named"),
+        ("strict empty", true, false, "empty"),
+        ("strict fallback", true, false, "fallback"),
+        ("transitional MCE named", false, true, "named"),
+        ("transitional MCE empty", false, true, "empty"),
+    ] {
+        let mut package = opened_plain_slides_package(2)?;
+        if strict {
+            make_package_strict(&mut package)?;
+        }
+        match name_mode {
+            "named" => set_slide_name_attribute(&mut package, 0, r#" name="Matrix Name""#)?,
+            "empty" => set_slide_name_attribute(&mut package, 0, r#" name="""#)?,
+            "fallback" => remove_slide_c_sld(&mut package, 0)?,
+            _ => unreachable!("test name mode is exhaustive"),
+        }
+        if mce {
+            add_slide_mce_marker(&mut package, 0)?;
+        }
+
+        assert_capture_matches_legacy(&package)
+            .map_err(|error| Error::Invalid(format!("{label}: {error}")))?;
+        let snapshot = package.opened_presentation()?;
+        let expected_name = match name_mode {
+            "named" => "Matrix Name",
+            "empty" => "",
+            "fallback" => "/ppt/slides/slide1.xml",
+            _ => unreachable!("test name mode is exhaustive"),
+        };
+        assert_eq!(snapshot.slides()[0].name(), expected_name, "{label}");
+        let (projected, first_name_error) = candidate_capture_projection(&package)?;
+        assert!(first_name_error.is_none(), "{label}: unexpected name error");
+        assert_eq!(projected[0].0, 0, "{label}: slide index changed");
+        assert_eq!(projected[0].1, "/ppt/slides/slide1.xml", "{label}");
+        assert_eq!(projected[0].2.as_deref(), Some(expected_name), "{label}");
+    }
+    Ok(())
+}
+
+#[test]
+fn capture_projection_keeps_first_name_error_bounded_and_ordered() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    set_slide_name_attribute(&mut package, 0, r#" name="Slide 256" name="first""#)?;
+    set_slide_name_attribute(&mut package, 1, r#" name="Slide 257" name="later""#)?;
+
+    let (projected, first_name_error) = candidate_capture_projection(&package)?;
+    assert_eq!(projected.len(), 2);
+    assert_eq!(projected[0].2, None);
+    assert_eq!(projected[1].2, None);
+    let (index, error) = first_name_error.expect("the first name error must be retained");
+    assert_eq!(index, 0);
+    assert!(error.contains("duplicated attribute"));
+
+    // The later malformed name is never retained: the post-error path checks
+    // only the later slide root, and the capture loop replays the first error
+    // at its original slide position.
+    assert_capture_error_contains(&package, "duplicated attribute")?;
+    Ok(())
+}
+
+#[test]
+fn capture_projection_preserves_root_and_catalog_error_precedence() -> Result<()> {
+    let mut root_after_name = opened_two_slide_package()?;
+    set_slide_name_attribute(&mut root_after_name, 0, r#" name="Slide 256" name="first""#)?;
+    rewrite_slide_xml(&mut root_after_name, 1, |xml| {
+        xml.replacen("<p:sld ", "<p:wrong ", 1)
+    })?;
+    // All slide roots are validated before any deferred name is replayed.
+    assert_capture_error_contains(&root_after_name, "slide part does not have a p:sld root")?;
+
+    let mut duplicate_catalog = opened_two_slide_package()?;
+    set_slide_name_attribute(
+        &mut duplicate_catalog,
+        0,
+        r#" name="Slide 256" name="first""#,
+    )?;
+    rewrite_presentation_xml(&mut duplicate_catalog, |xml| {
+        xml.replacen(r#"<p:sldId id="257""#, r#"<p:sldId id="256""#, 1)
+    })?;
+    // The main-part catalog rejects duplicate identities before the slide
+    // projection is entered, even when slide zero carries a name error.
+    assert_capture_error_contains(
+        &duplicate_catalog,
+        "presentation slide reference ids must be unique",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn capture_projection_keeps_notes_validation_after_slide_identity_and_names() -> Result<()> {
+    let mut invalid_notes = opened_two_slide_package()?;
+    replace_notes_slide_root(&mut invalid_notes)?;
+    assert_capture_error_contains(&invalid_notes, "invalid notes root or namespace")?;
+
+    let mut invalid_name_and_notes = opened_two_slide_package()?;
+    set_slide_name_attribute(
+        &mut invalid_name_and_notes,
+        0,
+        r#" name="Slide 256" name="first""#,
+    )?;
+    replace_notes_slide_root(&mut invalid_name_and_notes)?;
+    assert_capture_error_contains(&invalid_name_and_notes, "duplicated attribute")?;
+
+    let mut malformed_tail = opened_two_slide_package()?;
+    add_malformed_slide_tail(&mut malformed_tail, 0)?;
+    let (projected, error) = candidate_capture_projection(&malformed_tail)?;
+    assert!(error.is_none());
+    assert_eq!(projected[0].2.as_deref(), Some("Slide 256"));
+    assert_capture_error_contains(&malformed_tail, "invalid sld root or namespace")?;
+
+    let mut invalid_slide_and_notes = opened_two_slide_package()?;
+    rewrite_slide_xml(&mut invalid_slide_and_notes, 0, |xml| {
+        xml.replacen("<p:sld ", "<p:wrong ", 1)
+    })?;
+    replace_notes_slide_root(&mut invalid_slide_and_notes)?;
+    assert_capture_error_contains(
+        &invalid_slide_and_notes,
+        "slide part does not have a p:sld root",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn capture_projection_preserves_relationship_and_part_identity_error_order() -> Result<()> {
+    // The catalog permits a missing edge until contextual resolution. That
+    // later failure must still beat a name error from the first slide.
+    let mut missing = opened_plain_slides_package(2)?;
+    let presentation_name = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let relationship_id = crate::parts::PresentationPart::from_package(&missing.opc)?
+        .slide_references()?[1]
+        .relationship_id()
+        .to_owned();
+    set_slide_name_attribute(&mut missing, 0, r#" name="Slide 256" name="first""#)?;
+    missing
+        .opc
+        .get_part_mut(&presentation_name)?
+        .rels_mut()
+        .remove(&relationship_id);
+    assert_capture_error_contains(&missing, "missing relationship")?;
+
+    for earlier_name_error in [false, true] {
+        let mut duplicate = opened_plain_slides_package(3)?;
+        let relationship_id = crate::parts::PresentationPart::from_package(&duplicate.opc)?
+            .slide_references()?[1]
+            .relationship_id()
+            .to_owned();
+        let rels = duplicate.opc.get_part_mut(&presentation_name)?.rels_mut();
+        rels.remove(&relationship_id);
+        rels.try_add_relationship(
+            rt::SLIDE.into(),
+            "slides/slide1.xml".into(),
+            relationship_id,
+            TargetMode::Internal,
+        )?;
+        let index = if earlier_name_error { 0 } else { 2 };
+        set_slide_name_attribute(&mut duplicate, index, r#" name="bad" name="duplicate""#)?;
+        // Stable graphs fail the earlier catalog's case-folded target check;
+        // the capture loop's duplicate-part guard remains defensive.
+        assert_capture_error_contains(&duplicate, "slide reference targets must be unique")?;
+    }
+    Ok(())
+}
 
 fn opened_two_slide_package() -> Result<Package> {
     let mut package = Package::new()?;

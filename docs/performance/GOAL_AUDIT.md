@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0692 — measured PPTX capture projection reuse
+
+[0692](0692-pptx-capture-name-projection.md) follows the fresh 0691 attribution
+with a small private implementation and frozen A/A plus A/B/B/A evidence.
+All 13 total medians improve; the primary real edit gains about 25%, supported
+by 44→31 MCE calls and fewer allocation requests. Temporary per-slide storage,
+21 phase-tail review triggers, page-fault cost and limited RSS evidence are
+explicit. Untouched payload/metadata, no-op and two-slide oracles pass, with
+focused validation-order tests and owner/facade gates retained. No universal
+tail, cold-I/O, native Office or general PPTX claim; GOAL remains active and
+iWork excluded.
+
 ## 0691 — refresh evidence before changing PPTX capture
 
 [0691](0691-pptx-repeated-mce-baseline.md) adds 2,000 native phase samples across

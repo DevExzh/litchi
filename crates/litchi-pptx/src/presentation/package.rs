@@ -18,6 +18,16 @@ use super::Presentation;
 use super::codec;
 use super::embedded;
 
+pub(crate) struct CaptureSlide<'a> {
+    pub(crate) slide: Slide<'a>,
+    pub(crate) name: Option<String>,
+}
+
+pub(crate) struct CaptureSlides<'a> {
+    pub(crate) slides: Vec<CaptureSlide<'a>>,
+    pub(crate) first_name_error: Option<(usize, Error)>,
+}
+
 pub(super) fn validate_slide_catalog(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,
@@ -32,6 +42,54 @@ pub(super) fn validate_slide_catalog(
         )?;
     }
     Ok(())
+}
+
+pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
+    let package = presentation.package();
+    let references = presentation.catalog()?;
+    let mut slides = Vec::new();
+    slides
+        .try_reserve_exact(references.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation capture slides",
+            source,
+        })?;
+    let mut first_name_error = None;
+
+    for (index, reference) in references.iter().enumerate() {
+        let (_, _, part) = crate::parts::validate_slide_relationship(
+            presentation
+                .part()
+                .part()
+                .rels()
+                .get(reference.relationship_id()),
+            reference.relationship_id(),
+            |target| Ok(package.get_part(target)?),
+            |part| part.content_type(),
+        )?;
+        let (slide_part, name) = if first_name_error.is_none() {
+            let (slide_part, name) = SlidePart::from_part_with_name(part)?;
+            let name = match name {
+                Ok(name) => Some(name),
+                Err(error) => {
+                    first_name_error = Some((index, error));
+                    None
+                },
+            };
+            (slide_part, name)
+        } else {
+            (SlidePart::from_part(part)?, None)
+        };
+        slides.push(CaptureSlide {
+            slide: Slide::new(package, slide_part),
+            name,
+        });
+    }
+
+    Ok(CaptureSlides {
+        slides,
+        first_name_error,
+    })
 }
 
 pub(super) fn write_text_to<W: Write + ?Sized>(
