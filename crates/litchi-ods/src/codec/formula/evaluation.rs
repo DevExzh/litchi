@@ -17,7 +17,11 @@
 //! `COUNTIFS`, `AVERAGEIF`, and `AVERAGEIFS`): constant range arguments
 //! produce a formula `#VALUE!`, while reference arguments retain a typed
 //! scalar-profile capability refusal and are evaluated by the value VM. It
-//! also carries the complete section 6.8 complex-number family as a
+//! also evaluates the nine core statistical reducers (`COUNT`, `COUNTA`,
+//! `COUNTBLANK`, `AVERAGE`, `AVERAGEA`, `MIN`, `MAX`, `MINA`, and `MAXA`) for
+//! scalar sequence arguments; their reference and reference-list forms stay
+//! in the value VM, where cells can be streamed without materializing a
+//! range. It also carries the complete section 6.8 complex-number family as a
 //! distinguished scalar value, the complete
 //! OpenFormula 1.4 section 6.16 trigonometric/hyperbolic family (`ACOS`,
 //! `ACOSH`, `ACOT`, `ACOTH`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `COS`,
@@ -143,6 +147,7 @@ pub(super) mod numerics;
 mod radix;
 mod roman;
 mod rounding;
+mod statistical;
 mod trigonometry;
 pub mod value;
 
@@ -900,6 +905,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if statistical::is_statistical_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if is_conditional_aggregate_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1006,6 +1015,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if aggregate::is_aggregate_function(name) {
             return aggregate::apply(self, node, name);
+        }
+        if statistical::is_statistical_function(name) {
+            return statistical::apply(self, node, name);
         }
         if radix::is_radix_function(name) {
             return radix::apply(self, node, name);

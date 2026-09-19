@@ -153,6 +153,7 @@ mod matrix;
 mod owned;
 mod references;
 mod scalar;
+mod statistical;
 #[cfg(test)]
 mod tests;
 use geometry::Cuboid;
@@ -2550,6 +2551,7 @@ where
             || name.eq_ignore_ascii_case("OR")
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
+            || statistical::is_statistical_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
@@ -2577,6 +2579,15 @@ where
                 } else {
                     ValueFrame::VisitMatrixArgument(child)
                 }
+            } else if statistical::is_statistical_function(name)
+                && Self::statistical_matrix_argument(child)
+            {
+                // A literal rectangular Array must retain all of its cells in
+                // a projected branch. References and reference operators
+                // already retain their area geometry through VisitArgument;
+                // computed arguments stay in the enclosing projection so a
+                // reducer cannot cache a position-dependent scalar.
+                ValueFrame::VisitMatrixArgument(child)
             } else if conditional::is_range_argument(name, index, node.child_count()) {
                 // Conditional aggregates consume ranges as references. Keep
                 // their first-class area geometry intact even when the outer
@@ -2617,6 +2628,16 @@ where
         } else {
             None
         }
+    }
+
+    fn statistical_matrix_argument(mut node: super::Node<'expr>) -> bool {
+        while matches!(node.kind(), super::Kind::Parenthesized) {
+            let Some(child) = node.child(0) else {
+                return false;
+            };
+            node = child;
+        }
+        matches!(node.kind(), super::Kind::Array(_))
     }
 
     fn visit_matrix_function(
@@ -3060,6 +3081,9 @@ where
             super::Kind::Function { name } if aggregate::is_aggregate_function(name) => {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if statistical::is_statistical_function(name) => {
+                self.cacheable_matrix_branch(node)
+            },
             super::Kind::Function { name } if conditional::is_conditional_function(name) => {
                 self.cacheable_conditional_branch(node)
             },
@@ -3333,6 +3357,7 @@ where
                         return Ok(false);
                     }
                     let full_arguments = aggregate::is_aggregate_function(name)
+                        || statistical::is_statistical_function(name)
                         || complex::is_complex_sequence_function(name)
                         || name.eq_ignore_ascii_case("AND")
                         || name.eq_ignore_ascii_case("OR")
@@ -3962,6 +3987,7 @@ where
                     if let super::Kind::Function { name } = node.kind() {
                         if complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
+                            || statistical::is_statistical_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
@@ -4872,6 +4898,7 @@ where
                             || name.eq_ignore_ascii_case("OR")
                             || complex::is_complex_sequence_function(name)
                             || aggregate::is_aggregate_function(name)
+                            || statistical::is_statistical_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
                         {
@@ -5517,6 +5544,7 @@ where
                 if name.eq_ignore_ascii_case("AND")
                     || name.eq_ignore_ascii_case("OR")
                     || aggregate::is_aggregate_function(name)
+                    || statistical::is_statistical_function(name)
                     || name.eq_ignore_ascii_case("TRUE")
                     || name.eq_ignore_ascii_case("FALSE") =>
             {
@@ -6337,6 +6365,20 @@ where
                 }
             }
             let value = aggregate::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if statistical::is_statistical_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = statistical::apply(self, name, arguments)?;
             if cacheable {
                 self.demand_cache_put(node, &value)?;
             }
