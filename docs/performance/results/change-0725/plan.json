@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "change": "0725-xls-worksheet-replay-checkpoint",
+  "baseline_revision": "ee5e0b0650",
+  "cpu": 12,
+  "binary_root": "/home/zhuhe/code/litchi-0725-bin",
+  "capture_root": "captures",
+  "case_manifest": "docs/performance/results/change-0725/cases.json",
+  "probe_roots": [
+    "docs/performance/results/change-0684/repeat-probe",
+    "docs/performance/results/change-0684/budget-probe",
+    "docs/performance/results/change-0684/probe",
+    "docs/performance/results/change-0686/probe",
+    "docs/performance/results/change-0686/allocation-probe"
+  ],
+  "source_roots": [
+    "crates/litchi-cfb",
+    "crates/litchi-xls"
+  ],
+  "binaries": {
+    "native": "xls-index-retry-probe-0686",
+    "repeat": "xls0684-repeat",
+    "allocator": "xls0686-alloc",
+    "budget": "xls-index-budget-probe-0684",
+    "route": "xls-index-probe-0684"
+  },
+  "native": {
+    "queries": 8,
+    "warmups": 3,
+    "samples": 100,
+    "legs": [
+      "aa1",
+      "aa2",
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "abba": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "groups": 24,
+    "timing_metrics": [
+      "open",
+      "q1",
+      "q2",
+      "q3",
+      "q8",
+      "q3-to-q8-mean",
+      "open-plus-eight"
+    ]
+  },
+  "repeat": {
+    "repetitions": 50000,
+    "samples_per_leg": 9,
+    "preparatory_queries": 2,
+    "groups": 16
+  },
+  "allocator": {
+    "repeats": 3,
+    "operations": [
+      "q1",
+      "q2",
+      "q3",
+      "q8"
+    ],
+    "groups_per_phase": 96,
+    "strict_operations": [
+      "q1",
+      "q3",
+      "q8"
+    ],
+    "q2_allowance": {
+      "allocated_bytes": 40,
+      "allocation_calls": 0,
+      "deallocated_bytes": 0,
+      "deallocation_calls": 0,
+      "peak_live_delta": 40,
+      "retained_live_delta": 40
+    },
+    "allowance_reason": "Successful positive-budget q2 admits only the 40-byte fixed checkpoint layout; reuse the scan path so no new allocation call or temporary path bytes are permitted. Missing indexed q3/q8 must remove exactly one 16-byte path allocation/deallocation and its region peak. All other q1/q3/q8, zero-budget and refusal fields stay exact.",
+    "missing_warm_expected_deltas": {
+      "allocated_bytes": -16,
+      "allocation_calls": -1,
+      "deallocated_bytes": -16,
+      "deallocation_calls": -1,
+      "peak_live_delta": -16,
+      "retained_live_delta": 0
+    }
+  },
+  "budget_fence": {
+    "queries": 8,
+    "cases": [
+      {
+        "case": "Simple-fence",
+        "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "sheet": 0,
+        "row": 0,
+        "column": 0,
+        "expected_status": "value",
+        "budgets": [
+          0,
+          223,
+          224,
+          263,
+          264,
+          450,
+          489,
+          490,
+          491,
+          2097152
+        ]
+      },
+      {
+        "case": "Simple-missing-fence",
+        "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "sheet": 0,
+        "row": 0,
+        "column": 1,
+        "expected_status": "missing",
+        "budgets": [
+          0,
+          223,
+          224,
+          263,
+          264,
+          450,
+          489,
+          490,
+          491,
+          2097152
+        ]
+      },
+      {
+        "case": "54016-fence",
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "sheet": 0,
+        "row": 0,
+        "column": 0,
+        "expected_status": "value",
+        "budgets": [
+          0,
+          223,
+          224,
+          263,
+          264,
+          1048576,
+          2097152
+        ]
+      },
+      {
+        "case": "54016-missing-fence",
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "sheet": 0,
+        "row": 0,
+        "column": 108,
+        "expected_status": "missing",
+        "budgets": [
+          0,
+          223,
+          224,
+          263,
+          264,
+          1048576,
+          2097152
+        ]
+      }
+    ],
+    "purpose": "Record outcome and counted-source changes at the old 224-byte and new 264-byte fixed-charge fences. These are diagnostic capacity observations, not native latency samples."
+  },
+  "budget_primary": {
+    "queries": 8,
+    "groups_per_phase": 12,
+    "purpose": "Capture counted opening and selected-query routes for every primary case. Semantic outcomes and metric-vector shape are exact gates; route-count changes are retained as mechanism evidence."
+  },
+  "cases": [
+    {
+      "case": "54016-stored-0",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 0,
+      "expected_status": "value"
+    },
+    {
+      "case": "54016-stored-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "54016-missing-1048576",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 108,
+      "budget": 1048576,
+      "expected_status": "missing"
+    },
+    {
+      "case": "Plan1-stored-2097152",
+      "path": "test-data/ole/xls/WithCustomViews.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "Simple-stored-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "Simple-missing-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 1,
+      "budget": 2097152,
+      "expected_status": "missing"
+    },
+    {
+      "case": "synthetic-70000-default",
+      "path": "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "54016-late",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 5095,
+      "column": 106,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "Plan1-late",
+      "path": "test-data/ole/xls/WithCustomViews.xls",
+      "sheet": 0,
+      "row": 301,
+      "column": 10,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "45365-first",
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "45365-late",
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sheet": 0,
+      "row": 664,
+      "column": 24,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "formula-refusal-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "sheet": 6,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "error"
+    }
+  ],
+  "repeat_cases": [
+    "54016-stored-2097152",
+    "54016-late",
+    "54016-missing-1048576",
+    "Plan1-stored-2097152",
+    "Plan1-late",
+    "Simple-stored-2097152",
+    "45365-first",
+    "45365-late"
+  ],
+  "zero_budget_cases": [
+    "54016-stored-0"
+  ],
+  "refusal_cases": [
+    "formula-refusal-2097152"
+  ],
+  "hard_gates": {
+    "timing_percent": 5.0,
+    "timing_absolute_ns": 10.0,
+    "absolute_exception_metrics": [
+      "q3",
+      "q8",
+      "q3-to-q8-mean"
+    ],
+    "outcomes_exact": true,
+    "allocator_fixed_field": true,
+    "zero_budget_and_refusal_parity": true
+  },
+  "benefit_gates": {
+    "native": {
+      "case": "54016-late",
+      "mode": "owned",
+      "metric": "q8",
+      "minimum_improvement_percent": 10.0,
+      "statistics": [
+        "p50",
+        "mean"
+      ],
+      "both_pairs": true
+    },
+    "repeat": {
+      "case": "54016-late",
+      "mode": "owned",
+      "minimum_improvement_percent": 10.0,
+      "statistics": [
+        "p50",
+        "mean"
+      ],
+      "both_pairs": true
+    }
+  }
+}

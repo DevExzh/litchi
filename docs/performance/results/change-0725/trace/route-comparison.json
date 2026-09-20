@@ -1,0 +1,4291 @@
+{
+  "cases": [
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-scan": 8
+        }
+      },
+      "budget": 0,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-scan": 8
+        }
+      },
+      "case": "54016-stored-0",
+      "owner_query_ranges": [
+        [
+          0,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [],
+      "worksheet_checkpoint_build_query_count": 0,
+      "worksheet_replay_links": {
+        "baseline": [],
+        "candidate": []
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              },
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 613
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 613,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 613,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 0,
+                "links": 478,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              },
+              {
+                "from": 599,
+                "links": 14,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 613
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 613,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 613,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 613
+              },
+              {
+                "from": 478,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 478
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "54016-stored-2097152",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        14,
+        14
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          14,
+          14,
+          14,
+          14
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 1048576,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=108"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 4
+        }
+      },
+      "case": "54016-missing-1048576",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [],
+      "worksheet_checkpoint_build_query_count": 0,
+      "worksheet_replay_links": {
+        "baseline": [],
+        "candidate": []
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              },
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 215
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 215,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 215,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 0,
+                "links": 97,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              },
+              {
+                "from": 209,
+                "links": 6,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 215
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 215,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 215,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 215
+              },
+              {
+                "from": 97,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 97
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "Plan1-stored-2097152",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        6,
+        6
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 3
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 3
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "Simple-stored-2097152",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        1,
+        1
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          },
+          {
+            "calls": [],
+            "chains": [],
+            "header": "TRACE query sheet=0 row=0 column=1"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 4
+        }
+      },
+      "case": "Simple-missing-2097152",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [],
+      "worksheet_checkpoint_build_query_count": 0,
+      "worksheet_replay_links": {
+        "baseline": [],
+        "candidate": []
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 3
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 2,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 0,
+                "links": 2,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              },
+              {
+                "from": 2,
+                "links": 1,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 3
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 3,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 3
+              },
+              {
+                "from": 2,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 2
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "synthetic-70000-default",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        1,
+        1
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 1643,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 1643,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 599,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 599
+              },
+              {
+                "from": 599,
+                "links": 1044,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 1643,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 1643,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 1643
+              }
+            ],
+            "header": "TRACE query sheet=0 row=5095 column=106"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "54016-late",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        1044,
+        1044
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          1044,
+          1044,
+          1044,
+          1044
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 281,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 281,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 209,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 209
+              },
+              {
+                "from": 209,
+                "links": 72,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 281,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 281,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 281
+              }
+            ],
+            "header": "TRACE query sheet=0 row=301 column=10"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "Plan1-late",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        72,
+        72
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          72,
+          72,
+          72,
+          72
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              },
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 60
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 60,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 60,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "sst-entry",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 0,
+                "links": 24,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              },
+              {
+                "from": 58,
+                "links": 2,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 60
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 60,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-replay",
+              "sst-entry"
+            ],
+            "chains": [
+              {
+                "from": 60,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 60
+              },
+              {
+                "from": 24,
+                "links": 0,
+                "route": "sst-entry",
+                "table": "FAT",
+                "to": 24
+              }
+            ],
+            "header": "TRACE query sheet=0 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "sst-entry": 8,
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "45365-first",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        2,
+        2
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 316,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 316,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-scan",
+              "worksheet-checkpoint-build"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 58,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 58
+              },
+              {
+                "from": 58,
+                "links": 258,
+                "route": "worksheet-checkpoint-build",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 316,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          },
+          {
+            "calls": [
+              "worksheet-replay"
+            ],
+            "chains": [
+              {
+                "from": 316,
+                "links": 0,
+                "route": "worksheet-replay",
+                "table": "FAT",
+                "to": 316
+              }
+            ],
+            "header": "TRACE query sheet=0 row=664 column=24"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-checkpoint-build": 2,
+          "worksheet-replay": 4,
+          "worksheet-scan": 4
+        }
+      },
+      "case": "45365-late",
+      "owner_query_ranges": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [
+        258,
+        258
+      ],
+      "worksheet_checkpoint_build_query_count": 2,
+      "worksheet_replay_links": {
+        "baseline": [
+          258,
+          258,
+          258,
+          258
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 4,
+        "candidate": 4
+      }
+    },
+    {
+      "baseline": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 8
+        }
+      },
+      "budget": 2097152,
+      "candidate": {
+        "prequery_chains": [],
+        "queries": [
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          },
+          {
+            "calls": [
+              "worksheet-scan"
+            ],
+            "chains": [
+              {
+                "from": 0,
+                "links": 1591,
+                "route": "worksheet-scan",
+                "table": "FAT",
+                "to": 1591
+              }
+            ],
+            "header": "TRACE query sheet=6 row=0 column=0"
+          }
+        ],
+        "query_count": 8,
+        "route_counts": {
+          "worksheet-scan": 8
+        }
+      },
+      "case": "formula-refusal-2097152",
+      "owner_query_ranges": [
+        [
+          0,
+          8
+        ]
+      ],
+      "sst_links_equal": true,
+      "worksheet_checkpoint_build_links": [],
+      "worksheet_checkpoint_build_query_count": 0,
+      "worksheet_replay_links": {
+        "baseline": [],
+        "candidate": []
+      },
+      "worksheet_replay_query_count": {
+        "baseline": 0,
+        "candidate": 0
+      }
+    }
+  ],
+  "sequence": {
+    "candidate_checkpoint_build_links": [
+      1044
+    ],
+    "earlier_replay_links": {
+      "baseline": [
+        14
+      ],
+      "candidate": [
+        14
+      ]
+    },
+    "io_ranges_equal": true,
+    "origin_late_replay_links": {
+      "baseline": [
+        1044
+      ],
+      "candidate": [
+        0
+      ]
+    },
+    "semantic_equal": true
+  }
+}

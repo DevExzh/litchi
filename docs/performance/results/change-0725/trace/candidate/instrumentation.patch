@@ -1,0 +1,99 @@
+--- a/crates/litchi-cfb/src/shared.rs
++++ b/crates/litchi-cfb/src/shared.rs
+@@ -3467,6 +3467,12 @@
+     ordinal: usize,
+     table_name: &str,
+ ) -> Result<u32, OleError> {
++    eprintln!(
++        "TRACE chain table={table_name} from={} to={} links={}",
++        resume.1,
++        ordinal,
++        ordinal.saturating_sub(resume.1),
++    );
+     let (mut sector, walked) = resume;
+     for _ in walked..ordinal {
+         sector = next_chain_sector(table, sector, table_name)?;
+--- a/crates/litchi-xls/src/workbook/query_cache.rs
++++ b/crates/litchi-xls/src/workbook/query_cache.rs
+@@ -783,7 +783,7 @@
+     fn add_target_checkpoint(candidate: &mut IndexCandidate<'_>, file: &litchi_cfb::SharedOleFile) {
+         let mut worksheet_hint = file.chain_hint();
+         let _cursor = file
+-            .stream_cursor_at_hinted(&["Workbook"], 0, &mut worksheet_hint)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-checkpoint-build line=786"); &["Workbook"] }, 0, &mut worksheet_hint)
+             .unwrap();
+         candidate.set_chain_checkpoint(worksheet_hint.checkpoint());
+         candidate.push(slot());
+@@ -792,7 +792,7 @@
+         let mut target_hint = file.chain_hint_from_checkpoint(worksheet_checkpoint);
+         let target_offset = slot().stream_offset;
+         let _cursor = file
+-            .stream_cursor_at_hinted(&["Workbook"], target_offset, &mut target_hint)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-checkpoint-build line=795"); &["Workbook"] }, target_offset, &mut target_hint)
+             .unwrap();
+         candidate.set_target_chain_checkpoint(target_offset, &target_hint);
+     }
+@@ -1275,7 +1275,7 @@
+         let file = litchi_cfb::SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+         let mut hint = file.chain_hint();
+         let _cursor = file
+-            .stream_cursor_at_hinted(&["Workbook"], 0, &mut hint)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-checkpoint-build line=1278"); &["Workbook"] }, 0, &mut hint)
+             .unwrap();
+ 
+         let mut abandoned = cache.begin_candidate(0, Some(&execution)).unwrap();
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -2262,7 +2262,7 @@
+         chain: &mut StreamChainHint<'_>,
+     ) -> Result<Self> {
+         let cursor = cfb
+-            .stream_cursor_at_hinted(path, start, chain)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-scan line=2265"); path }, start, chain)
+             .map_err(SourceBackedError::from)?;
+         Ok(Self {
+             cursor,
+@@ -3017,7 +3017,7 @@
+         };
+         if owner
+             .cfb
+-            .stream_cursor_at_hinted(refs, frame_offset, &mut chain)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-checkpoint-build line=3020"); refs }, frame_offset, &mut chain)
+             .is_err()
+         {
+             return;
+@@ -3484,6 +3484,7 @@
+     column: u32,
+     execution: Option<&ExecutionContext>,
+ ) -> Result<Option<SourceBackedCell>> {
++    eprintln!("TRACE query sheet={} row={} column={}", sheet_index, row, column);
+     if let Some(context) = execution {
+         context.check().map_err(SourceBackedError::from)?;
+     }
+@@ -3618,7 +3619,7 @@
+         }
+         let mut cursor = owner
+             .cfb
+-            .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
++            .stream_cursor_at_hinted({ eprintln!("TRACE call route=worksheet-replay line=3621"); &refs }, slot.stream_offset, &mut chain)
+             .map_err(SourceBackedError::from)?;
+         if let Some(value) =
+             replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
+@@ -4046,7 +4047,7 @@
+             let mut cursor =
+                 owner
+                     .cfb
+-                    .stream_cursor_at_hinted(self.path, start, &mut self.chain)?;
++                    .stream_cursor_at_hinted({ eprintln!("TRACE call route=sst-fill line=4049"); self.path }, start, &mut self.chain)?;
+             cursor.read_exact(&mut self.window)
+         })();
+         if let Err(error) = filled {
+@@ -4333,7 +4334,7 @@
+ 
+     let mut cursor = owner
+         .cfb
+-        .stream_cursor_at_hinted(strings.path, first_offset, &mut strings.chain)
++        .stream_cursor_at_hinted({ eprintln!("TRACE call route=sst-entry line=4336"); strings.path }, first_offset, &mut strings.chain)
+         .map_err(SourceBackedError::from)?;
+     let span = last_segment - first_segment + 1;
+     let mut chunks = Vec::<Vec<u8>>::new();

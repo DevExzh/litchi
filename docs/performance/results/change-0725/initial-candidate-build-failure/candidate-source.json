@@ -1,0 +1,5 @@
+{
+  "crates/litchi-xls/src/workbook/query_cache.rs": "f5bf4863c8d85d5c9b4a3d354b398cb739edd43de72cd8ae7186fdfe46d01adf",
+  "crates/litchi-xls/src/workbook/source.rs": "936aa2930319595b35722d363809484f43f8e5396d23af793d173e21798d01ab",
+  "crates/litchi-xls/tests/xls_query_chain_checkpoint.rs": "c14fcea4ad9e9e6edb04e5f015f1bc18b56a123aca4950eff9645453a2b1c5a4"
+}

@@ -1,0 +1,4 @@
+{
+  "reason": "Remove duplicate missing trailing-version test and its duplicate FaultSource state; existing xls_query_index_cache.rs test already exercises identical scenario. Production bytes unchanged, no main timing captured. Final source census rebuilt and qualified after consolidation.",
+  "production_changed": false
+}

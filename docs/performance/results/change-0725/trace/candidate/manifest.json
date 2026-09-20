@@ -1,0 +1,567 @@
+{
+  "baseline_checkout_paths": [],
+  "baseline_excluded_test_paths": [
+    "crates/litchi-xls/tests/xls_query_chain_checkpoint.rs"
+  ],
+  "baseline_excluded_test_sha256": {
+    "crates/litchi-xls/tests/xls_query_chain_checkpoint.rs": "0ecc16ef5c304f269b0c80cc77391b79993d115ae7c6cd21ccae389d9b50ff6d"
+  },
+  "baseline_head": "ee5e0b0650eb5b68bf0ec7cc351290d5eb69e809",
+  "binary": "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+  "binary_sha256": "895b9ffa74887e7d257f4261d839544bbed3c821183b903ded048896e354b40f",
+  "cases": "docs/performance/results/change-0725/cases.json",
+  "cases_sha256": "f66f5a2b7be4624b781f870c3c4d9468fe36f361680336f484c5679fba3a6a79",
+  "commands": [
+    {
+      "binary": "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+      "binary_sha256": "895b9ffa74887e7d257f4261d839544bbed3c821183b903ded048896e354b40f",
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "docs/performance/results/change-0686/probe/Cargo.toml",
+        "--release",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 110.828,
+      "target": "/home/zhuhe/code/litchi-target-0725-trace"
+    },
+    {
+      "binary": "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-query-chain-sequence-0725",
+      "binary_sha256": "d1747891ade1c0a6400705565ca780c3fe04c082ffb77edfb5f66ea8cd70c802",
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "docs/performance/results/change-0725/sequence-probe/Cargo.toml",
+        "--release",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.954,
+      "target": "/home/zhuhe/code/litchi-target-0725-trace"
+    },
+    {
+      "case": "54016-stored-0",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        "--budget",
+        "0",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.005,
+      "semantic": "54016-stored-0.semantic.json",
+      "trace": "54016-stored-0.trace"
+    },
+    {
+      "case": "54016-stored-2097152",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.005,
+      "semantic": "54016-stored-2097152.semantic.json",
+      "trace": "54016-stored-2097152.trace"
+    },
+    {
+      "case": "54016-missing-1048576",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        "--budget",
+        "1048576",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "108",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.004,
+      "semantic": "54016-missing-1048576.semantic.json",
+      "trace": "54016-missing-1048576.trace"
+    },
+    {
+      "case": "Plan1-stored-2097152",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/ole/xls/WithCustomViews.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.001,
+      "semantic": "Plan1-stored-2097152.semantic.json",
+      "trace": "Plan1-stored-2097152.trace"
+    },
+    {
+      "case": "Simple-stored-2097152",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.001,
+      "semantic": "Simple-stored-2097152.semantic.json",
+      "trace": "Simple-stored-2097152.trace"
+    },
+    {
+      "case": "Simple-missing-2097152",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "1",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.001,
+      "semantic": "Simple-missing-2097152.semantic.json",
+      "trace": "Simple-missing-2097152.trace"
+    },
+    {
+      "case": "synthetic-70000-default",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.006,
+      "semantic": "synthetic-70000-default.semantic.json",
+      "trace": "synthetic-70000-default.trace"
+    },
+    {
+      "case": "54016-late",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "5095",
+        "--column",
+        "106",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.005,
+      "semantic": "54016-late.semantic.json",
+      "trace": "54016-late.trace"
+    },
+    {
+      "case": "Plan1-late",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/ole/xls/WithCustomViews.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "301",
+        "--column",
+        "10",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.001,
+      "semantic": "Plan1-late.semantic.json",
+      "trace": "Plan1-late.trace"
+    },
+    {
+      "case": "45365-first",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/45365-2.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.002,
+      "semantic": "45365-first.semantic.json",
+      "trace": "45365-first.trace"
+    },
+    {
+      "case": "45365-late",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/45365-2.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "0",
+        "--row",
+        "664",
+        "--column",
+        "24",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.002,
+      "semantic": "45365-late.semantic.json",
+      "trace": "45365-late.trace"
+    },
+    {
+      "case": "formula-refusal-2097152",
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-index-retry-probe-0686",
+        "--input",
+        "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+        "--budget",
+        "2097152",
+        "--mode",
+        "owned",
+        "--worksheet",
+        "6",
+        "--row",
+        "0",
+        "--column",
+        "0",
+        "--queries",
+        "4",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.002,
+      "semantic": "formula-refusal-2097152.semantic.json",
+      "trace": "formula-refusal-2097152.trace"
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-query-chain-sequence-0725",
+        "--input",
+        "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+        "--budget",
+        "2097152",
+        "--worksheet",
+        "0",
+        "--late-row",
+        "5095",
+        "--late-column",
+        "106",
+        "--first-row",
+        "0",
+        "--first-column",
+        "0",
+        "--missing-row",
+        "0",
+        "--missing-column",
+        "108"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.004,
+      "semantic": "sequence.semantic.json",
+      "trace": "sequence.trace"
+    }
+  ],
+  "effective_source_sha256": {
+    "crates/litchi-cfb/src/shared.rs": "e08a7de161a5be50602204f27201bfa459ec0e3f83c274df627260fd20929853",
+    "crates/litchi-xls/src/workbook/query_cache.rs": "f5bf4863c8d85d5c9b4a3d354b398cb739edd43de72cd8ae7186fdfe46d01adf",
+    "crates/litchi-xls/src/workbook/source.rs": "bac6d61c3665faa4e684328a996d737f42efc0579a313726680b5796c9021893"
+  },
+  "instrumented_source_sha256": {
+    "crates/litchi-cfb/src/shared.rs": "db78053d3ce6de3df49b5b2266276e69b5f836ad174bb8affd3ce34bbe5d9bd4",
+    "crates/litchi-xls/src/workbook/query_cache.rs": "b5c4468f0d307cd55828ff5b8af9e02ad6e8331671228db7ff6463200678fa0e",
+    "crates/litchi-xls/src/workbook/source.rs": "62128a176816872c859592c29604327305471e64747e29fe8dee639dd3a05ef1"
+  },
+  "original_source_sha256": {
+    "crates/litchi-cfb/src/shared.rs": "e08a7de161a5be50602204f27201bfa459ec0e3f83c274df627260fd20929853",
+    "crates/litchi-xls/src/workbook/query_cache.rs": "f5bf4863c8d85d5c9b4a3d354b398cb739edd43de72cd8ae7186fdfe46d01adf",
+    "crates/litchi-xls/src/workbook/source.rs": "bac6d61c3665faa4e684328a996d737f42efc0579a313726680b5796c9021893"
+  },
+  "outputs": [
+    {
+      "case": "54016-stored-0",
+      "semantic": "54016-stored-0.semantic.json",
+      "semantic_sha256": "eb35925e076283182cfc2d877f572103fb65d7d35ebef849d15f1f71393beb2e",
+      "trace": "54016-stored-0.trace",
+      "trace_sha256": "c4c1bbf4af1892f3256a47c303a408b49fd86eb474721ab023a547300759356f"
+    },
+    {
+      "case": "54016-stored-2097152",
+      "semantic": "54016-stored-2097152.semantic.json",
+      "semantic_sha256": "08fda751b0aa1e7651c18a739e3529ba3699ecb59be38ca5852a1ff63b1d8a86",
+      "trace": "54016-stored-2097152.trace",
+      "trace_sha256": "da21d6dd0cccb2fb53a6a40c81a0ad47019725e3464a8abe6649b520a4bb41f5"
+    },
+    {
+      "case": "54016-missing-1048576",
+      "semantic": "54016-missing-1048576.semantic.json",
+      "semantic_sha256": "175c09bc960f40b2c03f0823a3984a2f52011bf336e6bdb40efdbab192816a0b",
+      "trace": "54016-missing-1048576.trace",
+      "trace_sha256": "1220451a427385cd10a5b95f4726f82bc55388a58c45617660399828b9e349a1"
+    },
+    {
+      "case": "Plan1-stored-2097152",
+      "semantic": "Plan1-stored-2097152.semantic.json",
+      "semantic_sha256": "05c42a7b6a3e6f6741c4b4ae16b6c4eb1b0866bc7458418d54195c9da91f740b",
+      "trace": "Plan1-stored-2097152.trace",
+      "trace_sha256": "c0d36668ae77dc2027548b4590d1741a90aa29e17ae524a5dc27ed7b827f966a"
+    },
+    {
+      "case": "Simple-stored-2097152",
+      "semantic": "Simple-stored-2097152.semantic.json",
+      "semantic_sha256": "1aff22727131e14f2251138528075eb3df4fbfa45b621785140f3f88c6c59bb1",
+      "trace": "Simple-stored-2097152.trace",
+      "trace_sha256": "23bc1d955b97b2d40b833aa2925a24207ab83cb8ef3cef9f90af7d7b0a02a19e"
+    },
+    {
+      "case": "Simple-missing-2097152",
+      "semantic": "Simple-missing-2097152.semantic.json",
+      "semantic_sha256": "f4c45eb3d2d2c4f65cdeb8b6e0efe4fe373301cd4aaa05a96022c08a13fd3912",
+      "trace": "Simple-missing-2097152.trace",
+      "trace_sha256": "d40f1ee0e095ad2633c91eb81a63866bb104a472562aeb76efee4ba025a781e4"
+    },
+    {
+      "case": "synthetic-70000-default",
+      "semantic": "synthetic-70000-default.semantic.json",
+      "semantic_sha256": "d633c4b3d6292e1fbbe1d15ec2951957f62906c6c8ea87793eb919d9beefd7cb",
+      "trace": "synthetic-70000-default.trace",
+      "trace_sha256": "23bc1d955b97b2d40b833aa2925a24207ab83cb8ef3cef9f90af7d7b0a02a19e"
+    },
+    {
+      "case": "54016-late",
+      "semantic": "54016-late.semantic.json",
+      "semantic_sha256": "f000c13b245567efa887771987e447278065eeb20b466549d6bbefe83158b20e",
+      "trace": "54016-late.trace",
+      "trace_sha256": "574351ef25e06a05e3360f1bca02a0891279dc0943a11c39b37de058c00d644c"
+    },
+    {
+      "case": "Plan1-late",
+      "semantic": "Plan1-late.semantic.json",
+      "semantic_sha256": "2856e58c474cd3494321c8d760bb5b7a972c1dd7042ca335098c640d371e6618",
+      "trace": "Plan1-late.trace",
+      "trace_sha256": "da5dcb08d97ad9f4a810ec4726ce7e0a31093e1c0af398390a6b8aec86686f31"
+    },
+    {
+      "case": "45365-first",
+      "semantic": "45365-first.semantic.json",
+      "semantic_sha256": "1e986aab006c3bfc4fe33cb397d566a450b2bb844b6aea7b099a1850602d94be",
+      "trace": "45365-first.trace",
+      "trace_sha256": "47ec1ef213f2fb0ce66d70073865d5972a92d755c1d491e1703b33e93f80e8c1"
+    },
+    {
+      "case": "45365-late",
+      "semantic": "45365-late.semantic.json",
+      "semantic_sha256": "8cd122ab93a8e29654aa03e0d3ae837834bb490af37b0a6635f614c32a8b0686",
+      "trace": "45365-late.trace",
+      "trace_sha256": "064e6d6dae68e60fa273b0f97bf019e248b6df960b994f898bb9aed307049465"
+    },
+    {
+      "case": "formula-refusal-2097152",
+      "semantic": "formula-refusal-2097152.semantic.json",
+      "semantic_sha256": "78d8752154b645c4bfed333c5ccda1becded30dff3a208a112ff54709ccb1dba",
+      "trace": "formula-refusal-2097152.trace",
+      "trace_sha256": "68e5a2b026ea1c90375510925fa9ddebcad8845659e4c32e720f9cad41b5d0aa"
+    }
+  ],
+  "phase": "candidate",
+  "probe_sha256": {
+    "docs/performance/results/change-0686/probe/Cargo.lock": "5028b3e2bf58052f6721df70b1f91adc7d8c9b2bb57a89caec17ab021d1390ac",
+    "docs/performance/results/change-0686/probe/Cargo.toml": "0834dbf57b5710b2cbe840afd1fd43740b3cc61cd13b2409b70eb5e6b3174cae",
+    "docs/performance/results/change-0686/probe/README.md": "24e3b2043832cc66f89dbd576cffbd395512a7b0a07a587b029274b3687c9cef",
+    "docs/performance/results/change-0686/probe/src/lib.rs": "65124da348b74aeb0863774d6613e69c6971eccfb8b5164cc23f573e4a5b6021",
+    "docs/performance/results/change-0686/probe/src/main.rs": "85c5bc1ca23e642a05712008386fc1981e9b3ce9f1ba63ee04c72db512162937"
+  },
+  "restored": true,
+  "restored_source_sha256": {
+    "crates/litchi-cfb/src/shared.rs": "e08a7de161a5be50602204f27201bfa459ec0e3f83c274df627260fd20929853",
+    "crates/litchi-xls/src/workbook/query_cache.rs": "f5bf4863c8d85d5c9b4a3d354b398cb739edd43de72cd8ae7186fdfe46d01adf",
+    "crates/litchi-xls/src/workbook/source.rs": "bac6d61c3665faa4e684328a996d737f42efc0579a313726680b5796c9021893"
+  },
+  "schema_version": 1,
+  "scope": "Diagnostic stderr routes only; instrumented timings are excluded from evidence.",
+  "sequence_binary": "/home/zhuhe/code/litchi-0725-trace-bin/candidate/xls-query-chain-sequence-0725",
+  "sequence_binary_sha256": "d1747891ade1c0a6400705565ca780c3fe04c082ffb77edfb5f66ea8cd70c802",
+  "sequence_output": {
+    "semantic": "sequence.semantic.json",
+    "semantic_sha256": "524667d5d08de960bf4f5dbd86b6d09d55446e8ce4f14bff64bcff723d5c8c7a",
+    "trace": "sequence.trace",
+    "trace_sha256": "180bd0489463318c1d1ea02a5b7484187a5da2cfb595ef7c65cd49062511ce3a"
+  },
+  "sequence_probe_sha256": {
+    "docs/performance/results/change-0725/sequence-probe/Cargo.lock": "7cf8fff1b8e4bc10833eada6d3dd99e8ce6028d57fba648962663559726a569d",
+    "docs/performance/results/change-0725/sequence-probe/Cargo.toml": "22efbb98d763b2079c1e45f2669c1ae64fc95293ce0b43e68c7ca9fb85ce5034",
+    "docs/performance/results/change-0725/sequence-probe/src/main.rs": "9970b86502190caeb6c865662c4d7588eecef2aa05e6de29949b14ae1ceefe02"
+  },
+  "source_paths": [
+    "crates/litchi-cfb/src/shared.rs",
+    "crates/litchi-xls/src/workbook/query_cache.rs",
+    "crates/litchi-xls/src/workbook/source.rs"
+  ],
+  "source_sha256_before_instrumentation": {
+    "crates/litchi-cfb/src/shared.rs": "db78053d3ce6de3df49b5b2266276e69b5f836ad174bb8affd3ce34bbe5d9bd4",
+    "crates/litchi-xls/src/workbook/query_cache.rs": "b5c4468f0d307cd55828ff5b8af9e02ad6e8331671228db7ff6463200678fa0e",
+    "crates/litchi-xls/src/workbook/source.rs": "62128a176816872c859592c29604327305471e64747e29fe8dee639dd3a05ef1"
+  },
+  "target": "/home/zhuhe/code/litchi-target-0725-trace"
+}

@@ -1,0 +1,81 @@
+{
+  "allocator_scope": "native binary uses the system allocator without allocation counters; allocation metrics come from the separate change-0686 allocation probe",
+  "column": 24,
+  "fresh_owner_per_sample": true,
+  "input_bytes": 167424,
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/45365-2.xls",
+  "input_sha256": "8f34695f74d3cec8ef3826c71161b36bcdc2bc939763f346cf8347ac616a5ce0",
+  "max_query_index_bytes": 2097152,
+  "mode": "owned",
+  "probe": "change-0686-xls-index-budget-retry",
+  "queries": 4,
+  "records": [
+    {
+      "all_queries_agree": true,
+      "open": {
+        "outcome": {
+          "error": null,
+          "status": "ok",
+          "value": null
+        }
+      },
+      "queries": [
+        {
+          "agrees_with_first": true,
+          "ordinal": 0,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "bits": 0,
+              "kind": "Float"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 1,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "bits": 0,
+              "kind": "Float"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 2,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "bits": 0,
+              "kind": "Float"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 3,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "bits": 0,
+              "kind": "Float"
+            }
+          }
+        }
+      ],
+      "sample": 1
+    }
+  ],
+  "row": 664,
+  "samples": 1,
+  "schema_version": 1,
+  "source_construction_scope": "source adapter is constructed before each open timer; owned bytes are read once before all samples",
+  "warmups": 1,
+  "worksheet": 0
+}

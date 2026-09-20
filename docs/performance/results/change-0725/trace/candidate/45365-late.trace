@@ -1,0 +1,28 @@
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=58 links=58
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=58 links=58
+TRACE call route=worksheet-checkpoint-build line=3020
+TRACE chain table=FAT from=58 to=316 links=258
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-replay line=3621
+TRACE chain table=FAT from=316 to=316 links=0
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-replay line=3621
+TRACE chain table=FAT from=316 to=316 links=0
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=58 links=58
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=58 links=58
+TRACE call route=worksheet-checkpoint-build line=3020
+TRACE chain table=FAT from=58 to=316 links=258
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-replay line=3621
+TRACE chain table=FAT from=316 to=316 links=0
+TRACE query sheet=0 row=664 column=24
+TRACE call route=worksheet-replay line=3621
+TRACE chain table=FAT from=316 to=316 links=0

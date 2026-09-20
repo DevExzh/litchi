@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0725 — revised XLS checkpoint rejected
+
+[0725](0725-xls-revised-checkpoint-pilot.md) removes the duplicate construction
+path allocation and skips unused missing-query setup. All 16 repeated groups
+pass; owned late/missing loops improve about 83%/32%. Yet 17/24 native groups
+fail, including repeatable zero-budget workflow regressions of about 8% and
+Simple publication regressions. Exact allocation and semantic gates pass.
+The combined candidate is archived and baseline restored. Next isolate empty-slot
+setup on the unchanged index; its standalone benefit remains unproven. The
+non-iWork goal stays active. [Evidence](results/change-0725/README.md).
+
 ## 0724 — XLS checkpoint component attribution
 
 [0724](0724-xls-checkpoint-cost-attribution.md) compares baseline, larger layout,

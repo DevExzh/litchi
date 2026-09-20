@@ -1,0 +1,13 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+error: variable does not need to be mutable
+    --> /home/zhuhe/code/litchi/crates/litchi-xls/src/workbook/source.rs:3552:17
+     |
+3552 |     if let Some(mut candidate) = sink.index.take() {
+     |                 ----^^^^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+     |
+     = note: `-D unused-mut` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi-xls` (lib) due to 1 previous error
