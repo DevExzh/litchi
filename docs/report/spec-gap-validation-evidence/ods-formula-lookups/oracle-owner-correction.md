@@ -30,8 +30,8 @@ Current identities are:
 
 | Input | SHA-256 |
 | --- | --- |
-| `lookup_oracle.py` | `2d9541fb319944e1d5bb24f3a79197fec2d9580bf8ba51d16ff9be9e624cbc24` |
-| `lookup-goldens.json` | `42083ceca906fe5842b2f1b30695310b3d23de3a9034e55fd17ff49d71bf4faa` |
+| `lookup_oracle.py` | `a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b` |
+| `lookup-goldens.json` | `ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758` |
 | `contract.md` | `b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf` |
 
 The native receipt was captured from the same contract hash and independently
@@ -41,3 +41,8 @@ parities and 13 explicitly documented LibreOffice divergences. The native
 reproduction and root `verify.py --allow-pending` both validate the retained
 native fixture; the overall bundle remains pending the unrelated source/gate/
 performance receipts.
+
+The sheet-bound `lookup.reference_extension_sheet_bound_is_na` case now uses
+the implementation-independent read envelope 2–4: binary search may reject
+the out-of-extent result vector after two key probes and perform no result-cell
+read.

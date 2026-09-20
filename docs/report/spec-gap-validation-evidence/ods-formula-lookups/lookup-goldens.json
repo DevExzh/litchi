@@ -2449,8 +2449,8 @@
         "value": "#N/A"
       },
       "expected_reads": null,
-      "expected_reads_min": 3,
-      "expected_reads_max": 5
+      "expected_reads_min": 2,
+      "expected_reads_max": 4
     },
     {
       "case": "lookup.empty_key_and_empty_result",
