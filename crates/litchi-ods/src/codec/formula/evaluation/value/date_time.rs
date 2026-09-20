@@ -975,3 +975,179 @@ where
         _ => Ok(None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::{
+        CalculationTimestamp, EvaluationFailure, EvaluationOptions, UnsupportedKind,
+    };
+    use super::super::{
+        CellRead, Context, EvaluationContext, Evaluator, Limits, Position, Resolver, Shape,
+        SheetExtent, ValueEvaluator, WorkingValue,
+    };
+    use crate::codec::formula::expression::Expression;
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits as CoreExecutionLimits,
+        Limits as CoreLimits, Profile,
+    };
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    struct NoReadResolver;
+
+    impl Resolver for NoReadResolver {
+        fn sheet_extent(
+            &self,
+            _sheet: &str,
+            _execution: &ExecutionContext,
+        ) -> Result<Option<SheetExtent>, EvaluationFailure> {
+            Ok(None)
+        }
+
+        fn read_cell<'a>(
+            &'a self,
+            _sheet: &str,
+            _row: usize,
+            _column: usize,
+            _execution: &ExecutionContext,
+        ) -> Result<CellRead<'a>, EvaluationFailure> {
+            Ok(CellRead::Empty)
+        }
+
+        fn sheet_index(
+            &self,
+            _sheet: &str,
+            _execution: &ExecutionContext,
+        ) -> Result<Option<usize>, EvaluationFailure> {
+            Ok(None)
+        }
+
+        fn sheet_name_at(
+            &self,
+            _index: usize,
+            _execution: &ExecutionContext,
+        ) -> Result<Option<&str>, EvaluationFailure> {
+            Ok(None)
+        }
+
+        fn sheet_count(&self, _execution: &ExecutionContext) -> Result<usize, EvaluationFailure> {
+            Ok(0)
+        }
+    }
+
+    fn execution() -> ExecutionContext {
+        let (_cancellation, token) = CancellationSource::pair();
+        let limits = CoreExecutionLimits::new(
+            NonZeroUsize::new(1).expect("one worker"),
+            NonZeroUsize::new(1).expect("one task"),
+            NonZeroU64::new(1 << 20).expect("one MiB"),
+            0,
+        )
+        .expect("valid execution limits");
+        ExecutionContext::new(
+            Budget::root(
+                "value-date-time-cache-test",
+                CoreLimits::for_profile(Profile::Desktop),
+            ),
+            token,
+            limits,
+        )
+    }
+
+    fn number(value: super::super::RuntimeValue<'_>) -> f64 {
+        match value {
+            super::super::RuntimeValue::Scalar(WorkingValue::Number(value)) => value,
+            other => panic!("expected cached scalar number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn projected_timestamp_functions_cache_payloads_only_with_a_snapshot() {
+        let resolver = NoReadResolver;
+        let execution = execution();
+        let timestamp = CalculationTimestamp::from_serial(46_000.5)
+            .expect("test timestamp is in the date profile");
+        let options = EvaluationOptions::default().with_calculation_timestamp(timestamp);
+        let demand = Shape::new(2, 1).expect("two projected rows");
+
+        for name in ["NOW", "TODAY", "EASTERSUNDAY"] {
+            let source = format!("={name}()");
+            let expression = Expression::parse(&source).expect("timestamp function parses");
+            let context =
+                Context::new(&execution, Position::new("Sheet", 0, 0)).with_options(options);
+            let limits = Limits::default();
+            let scalar_context =
+                EvaluationContext::with_options(context.execution(), context.options());
+            let scalar = Evaluator::new(
+                &expression,
+                &scalar_context,
+                limits.scalar_limits(),
+                context.execution().budget().clone(),
+            );
+            let mut evaluator = ValueEvaluator::new(
+                &expression,
+                &resolver,
+                &context,
+                limits,
+                scalar,
+                context.execution().budget().clone(),
+            );
+            evaluator.projection = Some((demand, 0));
+            let first = number(
+                evaluator
+                    .run_from(expression.root())
+                    .expect("first projected demand succeeds"),
+            );
+            assert_eq!(evaluator.demand_cache.len(), 1);
+            assert_eq!(
+                number(
+                    evaluator
+                        .demand_cache_get(expression.root())
+                        .expect("cache lookup succeeds")
+                        .expect("timestamp payload cached")
+                ),
+                first
+            );
+
+            evaluator.projection = Some((demand, 1));
+            let second = number(
+                evaluator
+                    .run_from(expression.root())
+                    .expect("second projected demand succeeds from cache"),
+            );
+            assert_eq!(second, first);
+            assert_eq!(evaluator.demand_cache.len(), 1);
+        }
+
+        for name in ["NOW", "TODAY", "EASTERSUNDAY"] {
+            let source = format!("={name}()");
+            let expression = Expression::parse(&source).expect("timestamp function parses");
+            let context = Context::new(&execution, Position::new("Sheet", 0, 0));
+            let limits = Limits::default();
+            let scalar_context =
+                EvaluationContext::with_options(context.execution(), context.options());
+            let scalar = Evaluator::new(
+                &expression,
+                &scalar_context,
+                limits.scalar_limits(),
+                context.execution().budget().clone(),
+            );
+            let mut evaluator = ValueEvaluator::new(
+                &expression,
+                &resolver,
+                &context,
+                limits,
+                scalar,
+                context.execution().budget().clone(),
+            );
+            evaluator.projection = Some((demand, 0));
+            let error = evaluator
+                .run_from(expression.root())
+                .expect_err("timestamp function refuses without snapshot");
+            assert!(matches!(
+                error,
+                EvaluationFailure::Unsupported(UnsupportedKind::CalculationClock)
+            ));
+            assert!(evaluator.demand_cache.is_empty());
+        }
+    }
+}
