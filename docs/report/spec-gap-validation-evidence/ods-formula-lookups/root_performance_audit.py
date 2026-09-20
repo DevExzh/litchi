@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections import defaultdict
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import random
 from statistics import median
 import subprocess
@@ -244,9 +244,9 @@ def baseline_profile_paths(profile: Any, commit: str) -> set[str]:
     listing = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", commit], cwd=REPO, text=True).splitlines()
     paths = set(profile.SOURCE_FILES)
     for pattern in profile.SOURCE_FILE_GLOBS:
-        # fnmatch keeps this audit independent of a live checkout.
-        import fnmatch
-        paths.update(path for path in listing if fnmatch.fnmatch(path, pattern))
+        # Match pathlib's recursive glob semantics without a live checkout;
+        # **/ includes zero directories (for example reference/iri.rs).
+        paths.update(path for path in listing if PurePosixPath(path).full_match(pattern))
     return paths
 
 
@@ -347,10 +347,18 @@ def verify_records(directory: Path, records: list[dict[str, Any]], expected: lis
             raise AuditError(f"{directory} {key}: released bytes exceed requested")
         total_reads = int(record.get("reference_reads_p50", -1))
         normalized = int(record.get("reference_reads_per_repeat", -1))
-        expected = expected_reads(matrix, str(key[0]))
-        equal(f"{directory} {key} total reference reads", total_reads, expected * repeat)
-        equal(f"{directory} {key} normalized reference reads", normalized, expected)
-        equal(f"{directory} {key} raw reference reads", int(sample["reference_reads"]), expected * repeat)
+        expected_read_count = expected_reads(matrix, str(key[0]))
+        if key[0] in {"lookup-cancel-vlookup", "lookup-cancel-indirect"}:
+            # The frozen harness shares one sticky cancellation token across
+            # four repeats: only the first repeat can reach the resolver.
+            equal(f"{directory} {key} cancellation repeats", repeat, 4)
+            equal(f"{directory} {key} cancellation preflight reads", expected_read_count, 1)
+            expected_total_reads = 1
+        else:
+            expected_total_reads = expected_read_count * repeat
+        equal(f"{directory} {key} total reference reads", total_reads, expected_total_reads)
+        equal(f"{directory} {key} normalized reference reads", normalized, expected_total_reads // repeat)
+        equal(f"{directory} {key} raw reference reads", int(sample["reference_reads"]), expected_total_reads)
         input_bytes = int(record.get("input_bytes", -1))
         output_bytes = int(record.get("output_bytes_p50", -1))
         bytes_per_repeat = int(record.get("bytes_per_repeat_p50", -1))
@@ -512,35 +520,17 @@ def compare_groups(baseline: dict[tuple[str, str], list[dict[str, Any]]], candid
 
 
 def verify_retained_rows_with_matrix(directory: Path, records: list[dict[str, Any]], expected: list[str], phases: list[str], warmups: int, samples: int, matrix: dict[str, Any], receipts: Any) -> dict[str, Any]:
-    original_direct = getattr(receipts, "direct_read_bound", None)
-    original_preflight = getattr(receipts, "preflight_read_bound", None)
-    if original_direct is None or original_preflight is None or not hasattr(receipts, "verify_rows") or not hasattr(receipts, "verify_preflight"):
-        raise AuditError("retained performance verifier lacks read-bound hooks")
-    stale_failure: str | None = None
-    try:
-        receipts.verify_rows(directory, records, expected, warmups, samples)
-    except RuntimeError as error:
-        stale_failure = str(error)
-    def direct(case: str, elements: int):
-        if case in set(matrix["controls"]) | set(matrix["candidates"]):
-            value = expected_reads(matrix, case)
-            return value, value
-        return original_direct(case, elements)
-    def preflight(case: str):
-        if case in set(matrix["controls"]) | set(matrix["candidates"]):
-            return expected_reads(matrix, case)
-        return original_preflight(case)
-    receipts.direct_read_bound = direct
-    receipts.preflight_read_bound = preflight
+    if not hasattr(receipts, "verify_rows") or not hasattr(receipts, "verify_preflight"):
+        raise AuditError("retained performance verifier lacks row/preflight validation")
+    equal("retained verifier phases", list(receipts.PHASES), phases)
+    # Use the captured verifier unchanged. Independent exact read-count checks
+    # above already cover every case, including sticky cancellation repeats.
     try:
         receipts.verify_rows(directory, records, expected, warmups, samples)
         receipts.verify_preflight(directory, expected)
     except RuntimeError as error:
-        raise AuditError(f"reviewed retained verifier failed: {error}") from error
-    finally:
-        receipts.direct_read_bound = original_direct
-        receipts.preflight_read_bound = original_preflight
-    return {"captured_verifier_failure": stale_failure, "corrected": True, "matrix_sha256": matrix["sha256"]}
+        raise AuditError(f"captured retained verifier failed: {error}") from error
+    return {"captured_verifier_failure": None, "corrected": False, "matrix_sha256": matrix["sha256"]}
 
 
 def main() -> int:
@@ -591,9 +581,10 @@ def main() -> int:
         equal("matched harness identity", baseline_manifest["before"].get("harness_sha256"), candidate_manifest["before"].get("harness_sha256"))
         equal("matched profile identity", baseline_manifest["before"].get("profile_input_sha256"), candidate_manifest["before"].get("profile_input_sha256"))
         retained_validation = verify_retained_rows_with_matrix(RESULTS / "candidate-final", candidate_records, expected_cases_for_capture(by_label["candidate-final"], matrix), matrix["phases"], warmups, samples, matrix, receipts)
-        bootstrap = summary.get("bootstrap")
-        if not isinstance(bootstrap, dict):
-            raise AuditError("capture summary bootstrap settings are absent")
+        # These are descriptive audit settings, not capture inputs or a
+        # pre-registered performance acceptance test. Keep every comparison
+        # and flag; never use a later interval to erase an observed regression.
+        bootstrap = {"seed": 20260920, "resamples": 10000, "review_threshold_percent": 5.0}
         seed = bootstrap.get("seed")
         resamples = bootstrap.get("resamples")
         threshold = bootstrap.get("review_threshold_percent")
@@ -601,6 +592,7 @@ def main() -> int:
             raise AuditError("capture summary bootstrap settings are malformed")
         comparisons, accounting = compare_groups(grouped(baseline_records), grouped(candidate_records), seed=seed, resamples=resamples, threshold=float(threshold))
         result = {"status": "verified; individual performance flags retained", "verified_complete_samples": len(baseline_records) + len(candidate_records), "baseline_commit": BASELINE_COMMIT, "candidate_label": "candidate-final", "matched_control_groups": len(set(grouped(baseline_records)) & set(grouped(candidate_records))), "candidate_only_groups": len(set(grouped(candidate_records)) - set(grouped(baseline_records))), "case_matrix_sha256": matrix["sha256"], "retained_verifier_read_bound_correction": retained_validation, "gate_workspace_payloads_excluded_from_profiler_closure": excluded, "accounting_fields": list(accounting), "accounting_sets_unchanged": True, "comparisons": comparisons, "review_triggers": [row for row in comparisons if row["review_trigger"]], "source_pair_verified": True, "harness_pair_verified": True}
+        result["descriptive_bootstrap_settings"] = bootstrap
         (HERE / "root-performance-audit.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps({"status": "ok", "samples": result["verified_complete_samples"], "review_triggers": len(result["review_triggers"])}, sort_keys=True))
         return 0
