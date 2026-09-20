@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0702 — temporary inherited owners removed; early refusal tails remain
+
+[0702](0702-mce-borrowed-inherited-after-marker-search.md) retains borrowed
+Inherited namespace views while preserving parent Ctx and child-frame owners.
+Longer real one-edit/no-op gains are about 4%; the earlier sustained early-name
+median cost is absent on the unchanged 0701 marker helper. One candidate leg
+still flags early-name mean +5.14%, p95 +55.05% and p99 +15.40%, with slow
+samples concentrated at its timed beginning. Preserve that unresolved tail
+for follow-up rather than assuming a code-layout or host-noise cause. Marked
+XML parsing remains material; this change removes temporary Arc traffic but
+reduces no allocation metric and adds 128 bytes of local stack reservation.
+
 ## 0701 — first-byte search removes marker-free scan work
 
 [0701](0701-mce-first-byte-marker-search.md) retains the lower-setup helper:

@@ -1,0 +1,1 @@
+OK	probe=0702-mce-oracle	profile=baseline	input_len=4	output_len=4	output_sha256=5382511e672645156e2889ebc21c72a0e59377fcbe774abaa703e0a42b3d2006	borrowed=true	report=Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }

@@ -1,0 +1,54 @@
+{
+  "phase": "candidate",
+  "binary_sha256": "20e323ff86bdb84a134ae50405244603a4e92c7698f7994028eca69050ff22c1",
+  "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+  "address": 1508944,
+  "size": 7183,
+  "commands": [
+    {
+      "name": "symbols",
+      "command": [
+        "nm",
+        "-S",
+        "-C",
+        "/home/zhuhe/code/litchi-0702-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "1f3f29a117118c8a4ba2d54cd6a03b58dda729461bab840c7e83fadf242e7a89",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "processor",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1508944",
+        "--stop-address=1516127",
+        "/home/zhuhe/code/litchi-0702-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "5f9f0579aa6be377132d35b1001bce449a09535f1fc5006c28d3b9b4c90656d8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "marker-search",
+      "command": [
+        "objdump",
+        "-d",
+        "-C",
+        "--no-show-raw-insn",
+        "--start-address=1508768",
+        "--stop-address=1508938",
+        "/home/zhuhe/code/litchi-0702-bin/candidate-native"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "b09c8339c18c7cc7da5a106e6e2baca46bc13d3e3b5f72337a911bac9874f096",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "helper_symbol": "litchi_ooxml_common::mce::codec::contains_mce_namespace",
+  "helper_address": 1508768,
+  "helper_size": 170
+}

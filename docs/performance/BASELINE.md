@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0702 — retained borrowed inherited namespaces after marker-search isolation
+
+[0702](0702-mce-borrowed-inherited-after-marker-search.md) retries the
+0698 ownership change on the retained 0701 marker-search baseline. Longer
+real one-edit medians improve 3.72–4.77%, no-op 4.29–4.43%, and two-edit
+1.15–3.74%. All 1,920 oracle comparisons match; both 104-test focused suites
+and integration gates pass. Allocation metrics are unchanged. Retain with
+explicit costs: +128 bytes of start-handler stack reservation, tiny marked
+median +20 ns, and one follow-up early-name mean/p95/p99 regression despite
+near-neutral medians. Initial over-limit and generated total/capture tail
+triggers do not repeat. This is a new scoped result, not a reversal of the
+historical evidence that rejected 0698.
+
 ## 0701 — retained first-byte MCE marker search
 
 [0701](0701-mce-first-byte-marker-search.md) retains a private outlined

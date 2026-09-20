@@ -1,0 +1,401 @@
+HEAD 72d6f4500d906b9a5d6d4a0e571b0bb840ab1e68
+$ cargo test -p litchi --locked --no-default-features --features pptx --lib --tests -- --test-threads=1
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.4
+   Compiling syn v2.0.114
+   Compiling typenum v1.20.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_core v1.0.229
+   Compiling autocfg v1.5.1
+   Compiling synstructure v0.13.2
+   Compiling getrandom v0.3.4
+   Compiling version_check v0.9.5
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerovec-derive v0.10.4
+   Compiling zerofrom v0.1.4
+   Compiling yoke v0.7.4
+   Compiling displaydoc v0.2.6
+   Compiling zerovec v0.10.4
+   Compiling smallvec v1.16.0
+   Compiling generic-array v0.14.9
+   Compiling writeable v0.5.5
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling tinystr v0.7.6
+   Compiling litemap v0.7.3
+   Compiling crossbeam-utils v0.8.22
+   Compiling icu_locid v1.5.0
+   Compiling icu_provider_macros v1.5.0
+   Compiling icu_properties_data v1.5.1
+   Compiling memchr v2.8.3
+   Compiling zerocopy v0.8.56
+   Compiling crossbeam-epoch v0.9.20
+   Compiling icu_provider v1.5.0
+   Compiling num-traits v0.2.19
+   Compiling hybrid-array v0.4.14
+   Compiling crossbeam-deque v0.8.7
+   Compiling icu_normalizer_data v1.5.1
+   Compiling rustix v1.1.4
+   Compiling crc32fast v1.5.1
+   Compiling icu_locid_transform v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling bitflags v2.13.1
+   Compiling syn v3.0.4
+   Compiling rayon-core v1.13.0
+   Compiling zeroize v1.9.0
+   Compiling once_cell v1.21.4
+   Compiling getrandom v0.4.3
+   Compiling linux-raw-sys v0.12.1
+   Compiling zmij v1.0.19
+   Compiling rand_core v0.10.1
+   Compiling serde v1.0.229
+   Compiling cpufeatures v0.3.1
+   Compiling serde_derive v1.0.229
+   Compiling block-buffer v0.12.1
+   Compiling icu_properties v1.5.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling rustversion v1.0.23
+   Compiling utf16_iter v1.0.5
+   Compiling utf8_iter v1.0.4
+   Compiling thiserror v2.0.18
+   Compiling const-oid v0.10.2
+   Compiling fastrand v2.5.0
+   Compiling write16 v1.0.0
+   Compiling serde_json v1.0.149
+   Compiling zlib-rs v0.6.7
+   Compiling tempfile v3.27.0
+   Compiling icu_normalizer v1.5.0
+   Compiling digest v0.11.3
+   Compiling digest v0.10.7
+   Compiling chacha20 v0.10.2
+   Compiling quick-xml v0.41.0
+   Compiling thiserror-impl v2.0.18
+   Compiling flate2 v1.1.10
+   Compiling cpufeatures v0.2.17
+   Compiling itoa v1.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling tinyvec_macros v0.1.1
+   Compiling either v1.18.0
+   Compiling tinyvec v1.12.0
+   Compiling rayon v1.12.0
+   Compiling chrono v0.4.45
+   Compiling sha2 v0.10.9
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling idna_adapter v1.2.0
+   Compiling percent-encoding v2.3.2
+   Compiling fast-float2 v0.2.4
+   Compiling debug_unsafe v0.1.4
+   Compiling base64 v0.22.1
+   Compiling atoi_simd v0.18.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling form_urlencoded v1.2.2
+   Compiling idna v1.1.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling unicode-normalization v0.1.25
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling rand_core v0.9.5
+   Compiling lock_api v0.4.13
+   Compiling utf8parse v0.2.2
+   Compiling parking_lot_core v0.9.11
+   Compiling ryu v1.0.22
+   Compiling anstyle-parse v0.2.7
+   Compiling anstyle v1.0.14
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling scopeguard v1.2.0
+   Compiling anstyle-query v1.1.5
+   Compiling colorchoice v1.0.5
+   Compiling anstream v0.6.21
+   Compiling ppv-lite86 v0.2.21
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling wait-timeout v0.2.1
+   Compiling errno v0.3.14
+   Compiling simd-adler32 v0.3.10
+   Compiling hashbrown v0.16.1
+   Compiling heck v0.4.1
+   Compiling quick-error v1.2.3
+   Compiling equivalent v1.0.2
+   Compiling log v0.4.29
+   Compiling bit-vec v0.8.0
+   Compiling clap_lex v0.6.0
+   Compiling bumpalo v3.20.3
+   Compiling strsim v0.10.0
+   Compiling fnv v1.0.7
+   Compiling rusty-fork v0.3.1
+   Compiling clap_builder v4.4.18
+   Compiling zopfli v0.8.3
+   Compiling bit-set v0.8.0
+   Compiling indexmap v2.11.4
+   Compiling clap_derive v4.4.7
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling signal-hook-registry v1.4.8
+   Compiling rand_chacha v0.9.0
+   Compiling parking_lot v0.12.4
+   Compiling rand v0.9.5
+   Compiling rand_xorshift v0.4.0
+   Compiling tokio-macros v2.5.0
+   Compiling socket2 v0.6.5
+   Compiling mio v1.0.4
+   Compiling unarray v0.1.4
+   Compiling bytes v1.12.1
+   Compiling lazy_static v1.5.0
+   Compiling pin-project-lite v0.2.17
+   Compiling typed-path v0.12.3
+   Compiling regex-syntax v0.8.11
+   Compiling proptest v1.7.0
+   Compiling zip v8.6.0
+   Compiling tokio v1.47.5
+   Compiling clap v4.4.18
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+warning: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+   |
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+   |    ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+   |
+30 | fn assert_boxed_unexpected(
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi` (test "unexpected_format") generated 2 warnings
+warning: variable does not need to be mutable
+    --> crates/litchi/src/detection_smart/detected.rs:3621:13
+     |
+3621 |         let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
+     |             ----^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib test) generated 1 warning (run `cargo fix --lib -p litchi --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 40.92s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/litchi-5823cb4ee344fc7a)
+
+running 40 tests
+test detection_smart::detected::prepared_index_tests::a_non_office_file_is_rejected_by_both_detectors ... ok
+test detection_smart::detected::prepared_index_tests::non_ooxml_inputs_are_still_classified_without_a_prepared_handle ... ok
+test detection_smart::detected::prepared_index_tests::pptx_detect_then_open_indexes_twice_and_prepared_open_indexes_once ... ok
+test detection_smart::detected::presentation_path_policy_tests::ooxml_candidate_uses_the_lower_of_caller_and_neutral_limits ... ok
+test detection_smart::detected::presentation_path_policy_tests::ordinary_odp_ignores_ooxml_suffix_limit ... ok
+test detection_smart::detected::short_signature_tests::short_zip_candidate_is_rejected_without_short_read_failure ... ok
+test detection_smart::detected::short_signature_tests::source_pptx_probe_preserves_non_pptx_zip_allocation_for_fallback ... ok
+test detection_smart::detected::short_signature_tests::source_pptx_probe_propagates_input_limit ... ok
+test detection_smart::detected::short_signature_tests::source_pptx_probe_propagates_malformed_zip_candidate ... ok
+test detection_smart::detected::short_signature_tests::source_pptx_probe_propagates_part_limit ... ok
+test detection_smart::detected::short_signature_tests::source_pptx_probe_terminals_valid_non_pptx_opc_classification ... ok
+test detection_smart::functions::tests::detects_short_rtf_reader_and_restores_cursor ... ok
+test detection_smart::functions::tests::detects_xml_binary_and_macro_enabled_ooxml_families ... ok
+test detection_smart::functions::tests::test_detect_docx_from_bytes ... ok
+test detection_smart::functions::tests::test_detect_ole2_from_bytes ... ok
+test presentation::prs::source_pptx_path_tests::bytes_limits_keep_source_probe_bounded ... ok
+test presentation::prs::source_pptx_path_tests::bytes_source_routes_to_private_owner_and_caches_selected_payloads ... ok
+test presentation::prs::source_pptx_path_tests::cached_source_metadata_rechecks_cancellation ... ok
+test presentation::prs::source_pptx_path_tests::cached_source_metadata_rechecks_source_revision ... ok
+test presentation::prs::source_pptx_path_tests::eager_slide_catalog_rejects_wrong_slide_target_like_source_catalog ... ok
+test presentation::prs::source_pptx_path_tests::extensionless_path_source_routes_to_private_owner ... ok
+test presentation::prs::source_pptx_path_tests::generic_non_zip_over_neutral_ceiling_reports_exact_limit ... ok
+test presentation::prs::source_pptx_path_tests::generic_non_zip_uses_neutral_fallback_and_public_not_office ... ok
+test presentation::prs::source_pptx_path_tests::malformed_pptx_path_returns_typed_opc_error_without_fallback ... ok
+test presentation::prs::source_pptx_path_tests::oversized_ooxml_suffix_non_zip_keeps_eager_limit_precedence ... ok
+test presentation::prs::source_pptx_path_tests::path_part_limit_returns_typed_opc_error_with_exact_bounds ... ok
+test presentation::prs::source_pptx_path_tests::path_source_routes_to_private_owner_and_defers_corrupt_slide ... ok
+test presentation::prs::source_pptx_path_tests::source_slide_catalog_is_ordered_metadata_only_and_defers_bad_slide ... ok
+test presentation::prs::source_pptx_path_tests::source_slide_catalog_reports_typed_stale_source ... ok
+test presentation::prs::source_pptx_path_tests::source_text_rejects_reserved_namespace_prefix_consistently ... ok
+test presentation::types::tests::test_map_file_format_invalid ... ok
+test presentation::types::tests::test_map_file_format_keynote ... ok
+test presentation::types::tests::test_map_file_format_odp ... ok
+test presentation::types::tests::test_map_file_format_ppt ... ok
+test presentation::types::tests::test_map_file_format_pptx ... ok
+test presentation::types::tests::test_presentation_format_clone ... ok
+test presentation::types::tests::test_presentation_format_copy ... ok
+test presentation::types::tests::test_presentation_format_debug ... ok
+test presentation::types::tests::test_presentation_format_inequality ... ok
+test presentation::types::tests::test_presentation_format_variants ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/catalog_detection_arbitration.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/catalog_detection_arbitration-d302e976e983a25f)
+
+running 1 test
+test content_type_matching::accepts_canonical_content_type_casing_but_rejects_prefix_and_suffix_near_matches ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/catalog_first_detection.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/catalog_first_detection-7d614cdfd19a865b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/encryption_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/encryption_facade-13e2c80346fe87c9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_xlsx_integration/main.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/eval_xlsx_integration-6e23070d7c6156d2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_error_model.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_error_model-563bfab4321d4699)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_facade-4cb02be558454e75)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_merge_readers.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_merge_readers-e5b459db9f9b48d1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_merge_transactions.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_merge_transactions-902a3e36b51f559d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_numbers_compatibility.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_numbers_compatibility-d4c056b3fe99c4f4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_pages_table_deletion.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_pages_table_deletion-da45c1a8e04e0402)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_path.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_path-c19c14616073894a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_source_errors.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/iwork_source_errors-d8fe46ed39fd9df1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/keynote_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/keynote_facade-6ca36ffea91b3b17)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_docx_lists.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/markdown_docx_lists-a1caea2fa62482db)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_docx_semantics.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/markdown_docx_semantics-556e76348d3340b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_real_fixtures.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/markdown_real_fixtures-6ad15a3858cd6de6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/numbers_facade-cd868c46308a10e9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_semantic_values.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/numbers_semantic_values-097dc41753ec3c57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_semantic_view.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/numbers_semantic_view-82c52dd3e652abb2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pages_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/pages_facade-83f6d554065b2837)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/read_limits_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/read_limits_facade-b89a3f9756367d63)
+
+running 3 tests
+test pptx_limits_are_nameable ... ok
+test presentation_limits_bound_path_and_byte_ingress ... ok
+test presentation_limits_reject_invalid_suffix_and_unknown_extension_ooxml ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/semantic_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/semantic_facade-c28ec2203ace3533)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantic_reader_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/semantic_reader_facade-42ecdb30d881448f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/unexpected_format.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/unexpected_format-0381289ce0d2cbf5)
+
+running 1 test
+test a_non_office_file_given_to_the_presentation_opener_still_reports_not_an_office_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/unified_sheet_selectors.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/unified_sheet_selectors-33c8ced5bfa677a8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vba_inspection_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/vba_inspection_facade-847a4a8aa7f14bc9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsb_facade.rs (/home/zhuhe/code/litchi-target-0702/debug/deps/xlsb_facade-157ebff6600c7e3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit 0

@@ -1,0 +1,330 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 3e90ca04d9..6e7dbad095 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -438,14 +438,14 @@ fn shadowed_before(
+ 
+ /// The namespace scope an element inherited, and the scope its output already
+ /// carries, so that the writer can re-declare exactly the difference.
+-struct Inherited {
+-    ns: Option<Arc<NamespaceLayer>>,
+-    emitted: Option<Arc<NamespaceLayer>>,
++struct Inherited<'a> {
++    ns: Option<&'a Arc<NamespaceLayer>>,
++    emitted: Option<&'a Arc<NamespaceLayer>>,
+ }
+ 
+-impl Inherited {
++impl Inherited<'_> {
+     fn hoists(&self) -> bool {
+-        hoists(self.ns.as_ref(), self.emitted.as_ref())
++        hoists(self.ns, self.emitted)
+     }
+ 
+     /// The scope children inherit as already emitted: this element's own scope
+@@ -454,7 +454,7 @@ impl Inherited {
+         if emitted {
+             ctx.ns.head.clone()
+         } else {
+-            self.emitted.clone()
++            self.emitted.cloned()
+         }
+     }
+ }
+@@ -776,10 +776,6 @@ fn start(
+         });
+     }
+     let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
+-    let inherited = Inherited {
+-        ns: c.ns.head.clone(),
+-        emitted: st.last().and_then(|f| f.emitted_ns.clone()),
+-    };
+     let mut local_namespaces = Vec::new();
+     for a in &raw {
+         if a.key == "xmlns" {
+@@ -799,26 +795,33 @@ fn start(
+     let (namespace, local) = expand_parts(q, &c.ns, true)?;
+     let parent_active = st.last().is_none_or(|f| f.active);
+     if c.opaque {
+-        if parent_active {
+-            write_start(
+-                out,
+-                q,
+-                &c,
+-                &mut raw,
+-                caps,
+-                false,
+-                rep,
+-                e.as_ref(),
+-                &inherited,
+-            )?;
+-        }
+-        let f = Frame {
+-            emitted_ns: inherited.after(&c, parent_active),
+-            ctx: c,
+-            mode: Mode::Emit(q.to_owned()),
+-            active: parent_active,
++        let frame = {
++            let parent = st.last();
++            let inherited = Inherited {
++                ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
++                emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
++            };
++            if parent_active {
++                write_start(
++                    out,
++                    q,
++                    &c,
++                    &mut raw,
++                    caps,
++                    false,
++                    rep,
++                    e.as_ref(),
++                    &inherited,
++                )?;
++            }
++            Frame {
++                emitted_ns: inherited.after(&c, parent_active),
++                ctx: c,
++                mode: Mode::Emit(q.to_owned()),
++                active: parent_active,
++            }
+         };
+-        return close(st, f, empty, out);
++        return close(st, frame, empty, out);
+     }
+ 
+     let mut directives = Vec::new();
+@@ -993,7 +996,7 @@ fn start(
+         }
+     }
+ 
+-    if let Some(parent) = st.last_mut()
++    let alt = if let Some(parent) = st.last_mut()
+         && let Mode::Alt {
+             choices,
+             selected,
+@@ -1003,77 +1006,77 @@ fn start(
+         if namespace != NAMESPACE {
+             if c.is_ignorable(namespace) && !caps.understands(namespace) {
+                 rep.ignored_elements += 1;
+-                return close(
+-                    st,
+-                    Frame {
+-                        emitted_ns: inherited.after(&c, false),
+-                        ctx: c,
+-                        mode: Mode::Skip,
+-                        active: false,
+-                    },
+-                    empty,
+-                    out,
+-                );
++                Some((false, Mode::Skip))
++            } else {
++                return Err(bad("non-ignorable AlternateContent child"));
+             }
+-            return Err(bad("non-ignorable AlternateContent child"));
+-        }
+-        let (active, mode) = match local {
+-            "Choice" => {
+-                if *fallback {
+-                    return Err(bad("Choice after Fallback"));
+-                }
+-                *choices += 1;
+-                if *choices > lim.max_choices_per_alternate {
+-                    return Err(limit("choices"));
+-                }
+-                let req = attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
+-                let mut ok = true;
+-                let mut count = 0;
+-                for p in req.split_whitespace() {
+-                    if !xml_name::is_ncname(p) {
+-                        return Err(bad("invalid Requires prefix"));
++        } else {
++            Some(match local {
++                "Choice" => {
++                    if *fallback {
++                        return Err(bad("Choice after Fallback"));
+                     }
+-                    count += 1;
+-                    ok &= caps.understands(
+-                        c.ns.get(p)
+-                            .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
+-                    );
+-                }
+-                if count == 0 {
+-                    return Err(bad("empty Requires"));
+-                }
+-                let a = parent.active && !*selected && ok;
+-                if a {
+-                    *selected = true;
+-                    rep.selected_choices += 1;
+-                }
+-                (a, Mode::Branch)
+-            },
+-            "Fallback" => {
+-                if *fallback {
+-                    return Err(bad("duplicate Fallback"));
+-                }
+-                *fallback = true;
+-                let a = parent.active && !*selected;
+-                if a {
+-                    *selected = true;
+-                    rep.selected_fallbacks += 1;
+-                }
+-                (a, Mode::Branch)
+-            },
+-            _ => return Err(bad("invalid AlternateContent child")),
+-        };
+-        return close(
+-            st,
++                    *choices += 1;
++                    if *choices > lim.max_choices_per_alternate {
++                        return Err(limit("choices"));
++                    }
++                    let req =
++                        attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
++                    let mut ok = true;
++                    let mut count = 0;
++                    for p in req.split_whitespace() {
++                        if !xml_name::is_ncname(p) {
++                            return Err(bad("invalid Requires prefix"));
++                        }
++                        count += 1;
++                        ok &= caps.understands(
++                            c.ns.get(p)
++                                .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
++                        );
++                    }
++                    if count == 0 {
++                        return Err(bad("empty Requires"));
++                    }
++                    let a = parent.active && !*selected && ok;
++                    if a {
++                        *selected = true;
++                        rep.selected_choices += 1;
++                    }
++                    (a, Mode::Branch)
++                },
++                "Fallback" => {
++                    if *fallback {
++                        return Err(bad("duplicate Fallback"));
++                    }
++                    *fallback = true;
++                    let a = parent.active && !*selected;
++                    if a {
++                        *selected = true;
++                        rep.selected_fallbacks += 1;
++                    }
++                    (a, Mode::Branch)
++                },
++                _ => return Err(bad("invalid AlternateContent child")),
++            })
++        }
++    } else {
++        None
++    };
++    if let Some((active, mode)) = alt {
++        let frame = {
++            let parent = st.last();
++            let inherited = Inherited {
++                ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
++                emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
++            };
+             Frame {
+                 emitted_ns: inherited.after(&c, false),
+                 ctx: c,
+                 mode,
+                 active,
+-            },
+-            empty,
+-            out,
+-        );
++            }
++        };
++        return close(st, frame, empty, out);
+     }
+     let mut active = parent_active;
+     let mode = if namespace == NAMESPACE {
+@@ -1114,36 +1117,39 @@ fn start(
+         Mode::Emit(q.to_owned())
+     };
+     let emitted = matches!(mode, Mode::Emit(_)) && active;
+-    if emitted {
+-        write_start(
+-            out,
+-            q,
+-            &c,
+-            &mut raw,
+-            caps,
+-            true,
+-            rep,
+-            e.as_ref(),
+-            &inherited,
+-        )?;
+-    }
+-    if st.is_empty() {
+-        if *root {
+-            return Err(bad("multiple roots"));
++    let frame = {
++        let parent = st.last();
++        let inherited = Inherited {
++            ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
++            emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
++        };
++        if emitted {
++            write_start(
++                out,
++                q,
++                &c,
++                &mut raw,
++                caps,
++                true,
++                rep,
++                e.as_ref(),
++                &inherited,
++            )?;
++        }
++        if st.is_empty() {
++            if *root {
++                return Err(bad("multiple roots"));
++            }
++            *root = true;
+         }
+-        *root = true;
+-    }
+-    close(
+-        st,
+         Frame {
+             emitted_ns: inherited.after(&c, emitted),
+             ctx: c,
+             mode,
+             active,
+-        },
+-        empty,
+-        out,
+-    )
++        }
++    };
++    close(st, frame, empty, out)
+ }
+ 
+ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) -> R<()> {
+@@ -1313,7 +1319,7 @@ fn write_start(
+     filter: bool,
+     rep: &mut Report,
+     tag: &[u8],
+-    inherited: &Inherited,
++    inherited: &Inherited<'_>,
+ ) -> R<()> {
+     // Decide the compatibility filter first, so the counters are identical
+     // whether the tag is copied or rebuilt, and so the copy is taken only when
+@@ -1382,7 +1388,7 @@ fn write_start(
+         // element's own declarations are written by the attribute loop below,
+         // in source order, exactly once.
+         let declared: &[Attr<'_>] = raw;
+-        Namespaces::for_each_hoisted(inherited.ns.as_ref(), inherited.emitted.as_ref(), |p, u| {
++        Namespaces::for_each_hoisted(inherited.ns, inherited.emitted, |p, u| {
+             if declares(declared, p) {
+                 return Ok(());
+             }

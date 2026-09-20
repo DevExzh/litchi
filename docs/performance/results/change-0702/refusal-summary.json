@@ -1,0 +1,842 @@
+[
+  {
+    "case": "small-valid",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 222881.5,
+    "mean_ns": 223477.13,
+    "p95_ns": 231911,
+    "p99_ns": 235332,
+    "median_bootstrap_95_ns": [
+      221791.0,
+      224421.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 540047.5,
+    "mean_ns": 542681.43,
+    "p95_ns": 547113,
+    "p99_ns": 563593,
+    "median_bootstrap_95_ns": [
+      538322.0,
+      541103.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 18840.0,
+    "mean_ns": 18958.6,
+    "p95_ns": 19080,
+    "p99_ns": 24250,
+    "median_bootstrap_95_ns": [
+      18810.0,
+      18865.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 62805.0,
+    "mean_ns": 63272.91,
+    "p95_ns": 68200,
+    "p99_ns": 69220,
+    "median_bootstrap_95_ns": [
+      62751.0,
+      62845.5
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 142380.0,
+    "mean_ns": 143260.62,
+    "p95_ns": 148481,
+    "p99_ns": 151561,
+    "median_bootstrap_95_ns": [
+      142201.0,
+      142536.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 60305.0,
+    "mean_ns": 60614.8,
+    "p95_ns": 65130,
+    "p99_ns": 65750,
+    "median_bootstrap_95_ns": [
+      60230.0,
+      60321.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 139891.0,
+    "mean_ns": 140745.1,
+    "p95_ns": 145881,
+    "p99_ns": 147580,
+    "median_bootstrap_95_ns": [
+      139821.0,
+      139991.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 190851.0,
+    "mean_ns": 192014.76,
+    "p95_ns": 197601,
+    "p99_ns": 199661,
+    "median_bootstrap_95_ns": [
+      190751.0,
+      190951.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 96540.5,
+    "mean_ns": 97102.49,
+    "p95_ns": 102331,
+    "p99_ns": 104470,
+    "median_bootstrap_95_ns": [
+      96451.0,
+      96635.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a0",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 156030.5,
+    "mean_ns": 159197.48,
+    "p95_ns": 183341,
+    "p99_ns": 188831,
+    "median_bootstrap_95_ns": [
+      154041.0,
+      159201.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 219656.0,
+    "mean_ns": 221342.43,
+    "p95_ns": 227671,
+    "p99_ns": 231541,
+    "median_bootstrap_95_ns": [
+      219322.0,
+      220176.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 549853.0,
+    "mean_ns": 549549.64,
+    "p95_ns": 555633,
+    "p99_ns": 556522,
+    "median_bootstrap_95_ns": [
+      548023.0,
+      550843.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 18530.0,
+    "mean_ns": 18825.8,
+    "p95_ns": 18710,
+    "p99_ns": 24170,
+    "median_bootstrap_95_ns": [
+      18505.0,
+      18551.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 63520.5,
+    "mean_ns": 63999.83,
+    "p95_ns": 69211,
+    "p99_ns": 70171,
+    "median_bootstrap_95_ns": [
+      63445.0,
+      63575.0
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 144760.0,
+    "mean_ns": 145681.62,
+    "p95_ns": 150831,
+    "p99_ns": 153590,
+    "median_bootstrap_95_ns": [
+      144601.0,
+      144880.5
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 60955.5,
+    "mean_ns": 61334.21,
+    "p95_ns": 66221,
+    "p99_ns": 66560,
+    "median_bootstrap_95_ns": [
+      60871.0,
+      61025.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 142390.5,
+    "mean_ns": 143147.4,
+    "p95_ns": 147750,
+    "p99_ns": 148560,
+    "median_bootstrap_95_ns": [
+      142246.0,
+      142546.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 198396.0,
+    "mean_ns": 199531.48,
+    "p95_ns": 204571,
+    "p99_ns": 207792,
+    "median_bootstrap_95_ns": [
+      198181.0,
+      198616.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 98065.5,
+    "mean_ns": 98605.89,
+    "p95_ns": 103580,
+    "p99_ns": 104271,
+    "median_bootstrap_95_ns": [
+      97870.5,
+      98281.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a1",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 153776.0,
+    "mean_ns": 155995.48,
+    "p95_ns": 164971,
+    "p99_ns": 167531,
+    "median_bootstrap_95_ns": [
+      153501.0,
+      153970.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 218861.0,
+    "mean_ns": 220497.4,
+    "p95_ns": 227041,
+    "p99_ns": 228331,
+    "median_bootstrap_95_ns": [
+      218626.0,
+      219451.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 548717.5,
+    "mean_ns": 547826.95,
+    "p95_ns": 553213,
+    "p99_ns": 555413,
+    "median_bootstrap_95_ns": [
+      545133.0,
+      549493.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 18810.0,
+    "mean_ns": 18971.09,
+    "p95_ns": 18981,
+    "p99_ns": 24660,
+    "median_bootstrap_95_ns": [
+      18790.0,
+      18835.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 64140.0,
+    "mean_ns": 64627.62,
+    "p95_ns": 69850,
+    "p99_ns": 72260,
+    "median_bootstrap_95_ns": [
+      64090.5,
+      64190.5
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 143371.0,
+    "mean_ns": 144200.83,
+    "p95_ns": 149541,
+    "p99_ns": 152391,
+    "median_bootstrap_95_ns": [
+      143221.0,
+      143490.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 61475.0,
+    "mean_ns": 61866.01,
+    "p95_ns": 67011,
+    "p99_ns": 67890,
+    "median_bootstrap_95_ns": [
+      61431.0,
+      61551.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 141745.5,
+    "mean_ns": 142646.01,
+    "p95_ns": 147891,
+    "p99_ns": 151700,
+    "median_bootstrap_95_ns": [
+      141611.0,
+      141920.5
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 204306.0,
+    "mean_ns": 205523.93,
+    "p95_ns": 211311,
+    "p99_ns": 213451,
+    "median_bootstrap_95_ns": [
+      203786.0,
+      204921.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 98255.5,
+    "mean_ns": 98925.7,
+    "p95_ns": 104261,
+    "p99_ns": 105821,
+    "median_bootstrap_95_ns": [
+      98165.5,
+      98360.5
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a2",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 156870.0,
+    "mean_ns": 158724.7,
+    "p95_ns": 167261,
+    "p99_ns": 169060,
+    "median_bootstrap_95_ns": [
+      155241.0,
+      158841.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 219951.0,
+    "mean_ns": 221393.47,
+    "p95_ns": 227761,
+    "p99_ns": 233061,
+    "median_bootstrap_95_ns": [
+      219581.0,
+      220341.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 557833.0,
+    "mean_ns": 558176.47,
+    "p95_ns": 564953,
+    "p99_ns": 585553,
+    "median_bootstrap_95_ns": [
+      555477.5,
+      559703.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 18435.5,
+    "mean_ns": 18621.99,
+    "p95_ns": 18660,
+    "p99_ns": 24171,
+    "median_bootstrap_95_ns": [
+      18420.0,
+      18475.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 63295.5,
+    "mean_ns": 63773.32,
+    "p95_ns": 68811,
+    "p99_ns": 69971,
+    "median_bootstrap_95_ns": [
+      63256.0,
+      63405.0
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 138945.5,
+    "mean_ns": 140008.2,
+    "p95_ns": 147221,
+    "p99_ns": 147971,
+    "median_bootstrap_95_ns": [
+      138770.0,
+      139116.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 61185.0,
+    "mean_ns": 61694.91,
+    "p95_ns": 68511,
+    "p99_ns": 69791,
+    "median_bootstrap_95_ns": [
+      61090.0,
+      61270.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 136986.0,
+    "mean_ns": 138180.39,
+    "p95_ns": 145571,
+    "p99_ns": 149691,
+    "median_bootstrap_95_ns": [
+      136851.0,
+      137141.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 193451.0,
+    "mean_ns": 198600.1,
+    "p95_ns": 205171,
+    "p99_ns": 308432,
+    "median_bootstrap_95_ns": [
+      193301.0,
+      193631.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 98345.0,
+    "mean_ns": 99064.79,
+    "p95_ns": 105110,
+    "p99_ns": 105940,
+    "median_bootstrap_95_ns": [
+      98250.0,
+      98446.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "b0",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 167311.0,
+    "mean_ns": 168356.04,
+    "p95_ns": 184041,
+    "p99_ns": 188691,
+    "median_bootstrap_95_ns": [
+      165356.0,
+      169431.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 220526.0,
+    "mean_ns": 220939.42,
+    "p95_ns": 228841,
+    "p99_ns": 232511,
+    "median_bootstrap_95_ns": [
+      218611.0,
+      221061.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 547882.0,
+    "mean_ns": 548066.34,
+    "p95_ns": 556223,
+    "p99_ns": 560363,
+    "median_bootstrap_95_ns": [
+      546023.0,
+      549613.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 18530.0,
+    "mean_ns": 18633.69,
+    "p95_ns": 18840,
+    "p99_ns": 18890,
+    "median_bootstrap_95_ns": [
+      18500.0,
+      18560.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 63880.5,
+    "mean_ns": 64360.92,
+    "p95_ns": 69761,
+    "p99_ns": 76230,
+    "median_bootstrap_95_ns": [
+      63820.0,
+      63930.0
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 137825.5,
+    "mean_ns": 138901.79,
+    "p95_ns": 145951,
+    "p99_ns": 148531,
+    "median_bootstrap_95_ns": [
+      137655.0,
+      138021.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 61285.0,
+    "mean_ns": 61664.41,
+    "p95_ns": 65880,
+    "p99_ns": 67090,
+    "median_bootstrap_95_ns": [
+      61200.0,
+      61420.5
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 135271.0,
+    "mean_ns": 136325.29,
+    "p95_ns": 142651,
+    "p99_ns": 144831,
+    "median_bootstrap_95_ns": [
+      135111.0,
+      135375.5
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 191836.0,
+    "mean_ns": 193321.06,
+    "p95_ns": 199891,
+    "p99_ns": 203721,
+    "median_bootstrap_95_ns": [
+      191556.0,
+      192101.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 96441.0,
+    "mean_ns": 97112.79,
+    "p95_ns": 103150,
+    "p99_ns": 105430,
+    "median_bootstrap_95_ns": [
+      96351.0,
+      96551.0
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "b1",
+    "phase": "candidate",
+    "samples": 100,
+    "p50_ns": 168561.0,
+    "mean_ns": 168862.44,
+    "p95_ns": 182741,
+    "p99_ns": 191661,
+    "median_bootstrap_95_ns": [
+      165085.5,
+      169971.0
+    ]
+  },
+  {
+    "case": "small-valid",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 223256.5,
+    "mean_ns": 223878.72,
+    "p95_ns": 232261,
+    "p99_ns": 234162,
+    "median_bootstrap_95_ns": [
+      221751.0,
+      224146.0
+    ]
+  },
+  {
+    "case": "generated-12x8-valid",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 543283.0,
+    "mean_ns": 542661.82,
+    "p95_ns": 549533,
+    "p99_ns": 561693,
+    "median_bootstrap_95_ns": [
+      539627.5,
+      544312.0
+    ]
+  },
+  {
+    "case": "early-name-error",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 18590.0,
+    "mean_ns": 18738.4,
+    "p95_ns": 18840,
+    "p99_ns": 24200,
+    "median_bootstrap_95_ns": [
+      18570.5,
+      18600.0
+    ]
+  },
+  {
+    "case": "late-root-error",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 63105.0,
+    "mean_ns": 63502.51,
+    "p95_ns": 68590,
+    "p99_ns": 69330,
+    "median_bootstrap_95_ns": [
+      63035.5,
+      63165.5
+    ]
+  },
+  {
+    "case": "late-root-error-mce",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 142206.0,
+    "mean_ns": 143323.01,
+    "p95_ns": 149321,
+    "p99_ns": 150891,
+    "median_bootstrap_95_ns": [
+      142070.5,
+      142370.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 60805.5,
+    "mean_ns": 61188.11,
+    "p95_ns": 66461,
+    "p99_ns": 66940,
+    "median_bootstrap_95_ns": [
+      60735.5,
+      60860.0
+    ]
+  },
+  {
+    "case": "late-missing-relationship-mce",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 140081.0,
+    "mean_ns": 140963.1,
+    "p95_ns": 146480,
+    "p99_ns": 148840,
+    "median_bootstrap_95_ns": [
+      140000.5,
+      140141.0
+    ]
+  },
+  {
+    "case": "notes-invalid-tail",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 195526.0,
+    "mean_ns": 195824.88,
+    "p95_ns": 202761,
+    "p99_ns": 204531,
+    "median_bootstrap_95_ns": [
+      193161.0,
+      197051.0
+    ]
+  },
+  {
+    "case": "mixed-conformance",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 97485.5,
+    "mean_ns": 98064.59,
+    "p95_ns": 103181,
+    "p99_ns": 103721,
+    "median_bootstrap_95_ns": [
+      97395.5,
+      97575.5
+    ]
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "leg": "a3",
+    "phase": "baseline",
+    "samples": 100,
+    "p50_ns": 161301.0,
+    "mean_ns": 162061.91,
+    "p95_ns": 174931,
+    "p99_ns": 177401,
+    "median_bootstrap_95_ns": [
+      158031.0,
+      162640.0
+    ]
+  }
+]
