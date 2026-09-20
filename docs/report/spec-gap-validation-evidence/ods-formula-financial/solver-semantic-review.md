@@ -178,3 +178,20 @@ production call sites use the rich `push_rich`/`finish_rich` API. The reducer
 state, signed-power MIRR path, formula-error behavior, and typed accumulator
 boundary are unchanged. This follow-up remains **PASS** for the reviewed
 semantic findings; no new source blocker was found.
+
+## RATE zero-guard follow-up
+
+The solver handoff adds one scoped correction for the guarded `RATE` boundary.
+The current solver hash is
+`387f9791103bc97fb85fa99e46502e0b5e74f8da59586ba755a8785fd18761c8`; the
+reducers remain `ecda9ba493af93ac7fb8f7da24048b3dd6888a52e18ae8b2d45ee3bc8a6c9e27`.
+
+After the existing boundary work charge and cancellation check, the code now
+recognizes `boundary == 0.0` before calling `residual_from_sums`. This covers
+the valid annuity-due case where both guarded terms are zero and the temporary
+log accumulator has no scale. The new
+`rate_due_boundary_accepts_empty_guarded_residual` regression asserts an exact
+`-1.0` result; the public roots replay also covers this path. The change is
+localized to guarded-boundary publication and preserves the work/cancellation
+fences. No new semantic blocker was found, so the implementation disposition
+remains **PASS**, pending ordinary integration/gate evidence.

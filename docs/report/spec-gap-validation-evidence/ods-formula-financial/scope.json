@@ -8,61 +8,61 @@
     "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
     "common_conventions_section": "6.12.1"
   },
-  "scope_note": "All 54 financial functions remain in scope. contract.md drafts 20 cash-flow and annuity functions; depreciation-contract.md drafts seven depreciation and fractional monetary functions. The 27 security/coupon functions still require their contract. Grouping is for implementation planning, not a normative classification.",
+  "scope_note": "All 54 financial functions remain in scope. contract.md drafts 20 cash-flow and annuity functions; depreciation-contract.md drafts seven depreciation and fractional monetary functions; security-coupon-contract.md drafts the remaining 27, pending independent source review and resolution of open profiles. Grouping is for implementation planning, not a normative classification.",
   "functions": [
     {
       "section": "6.12.2",
       "name": "ACCRINT",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.3",
       "name": "ACCRINTM",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.4",
       "name": "AMORLINC",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.5",
       "name": "COUPDAYBS",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.6",
       "name": "COUPDAYS",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.7",
       "name": "COUPDAYSNC",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.8",
       "name": "COUPNCD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.9",
       "name": "COUPNUM",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.10",
       "name": "COUPPCD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.11",
@@ -92,7 +92,7 @@
       "section": "6.12.15",
       "name": "DISC",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.16",
@@ -110,7 +110,7 @@
       "section": "6.12.18",
       "name": "DURATION",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.19",
@@ -134,7 +134,7 @@
       "section": "6.12.22",
       "name": "INTRATE",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.23",
@@ -158,7 +158,7 @@
       "section": "6.12.26",
       "name": "MDURATION",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.27",
@@ -188,25 +188,25 @@
       "section": "6.12.31",
       "name": "ODDFPRICE",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.32",
       "name": "ODDFYIELD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.33",
       "name": "ODDLPRICE",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.34",
       "name": "ODDLYIELD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.35",
@@ -230,19 +230,19 @@
       "section": "6.12.38",
       "name": "PRICE",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.39",
       "name": "PRICEDISC",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.40",
       "name": "PRICEMAT",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.41",
@@ -260,7 +260,7 @@
       "section": "6.12.43",
       "name": "RECEIVED",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.44",
@@ -284,19 +284,19 @@
       "section": "6.12.47",
       "name": "TBILLEQ",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.48",
       "name": "TBILLPRICE",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.49",
       "name": "TBILLYIELD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.50",
@@ -320,19 +320,19 @@
       "section": "6.12.53",
       "name": "YIELD",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.54",
       "name": "YIELDDISC",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     },
     {
       "section": "6.12.55",
       "name": "YIELDMAT",
       "planning_group": "security-and-coupon",
-      "contract_status": "not drafted"
+      "contract_status": "draft; independent review pending"
     }
   ]
 }
