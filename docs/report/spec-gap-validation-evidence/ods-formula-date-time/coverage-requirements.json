@@ -1,6 +1,6 @@
 {
   "schema": "ods-formula-date-time-coverage-v1",
-  "status": "pending; branch and fractional-floor source evidence pending",
+  "status": "PASS",
   "normative": "OpenDocument 1.4 Part 4 section 6.10",
   "functions": {
     "DATE": {
@@ -1215,7 +1215,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-date-time-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
         "bindings": [
           {
@@ -1372,6 +1372,23 @@
               "root": "evidence",
               "path": "oracle-execution.json",
               "sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda"
+            }
+          },
+          {
+            "kind": "source_review",
+            "root": "repo",
+            "path": "crates/litchi-ods/src/codec/formula/evaluation/date_time.rs",
+            "sha256": "29f1495a55aac7effee9f6509deef38e5d5f747ba2b87c65a188d8759c1265e3",
+            "identifiers": [
+              "calendar_branch.eastersunday_timestamp"
+            ],
+            "requirements": [
+              "current/following-year selection and timestamp range limits"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/source-review-calendar-eastersunday.json",
+              "sha256": "0f321e5a685a117e5faf2eb417ae5787f96c81d04964af2bcb8763b23d63449d"
             }
           }
         ]
@@ -3575,7 +3592,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-date-time-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
         "bindings": [
           {
@@ -3698,6 +3715,23 @@
               "root": "evidence",
               "path": "oracle-execution.json",
               "sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda"
+            }
+          },
+          {
+            "kind": "source_review",
+            "root": "repo",
+            "path": "crates/litchi-ods/src/codec/formula/evaluation/date_time.rs",
+            "sha256": "29f1495a55aac7effee9f6509deef38e5d5f747ba2b87c65a188d8759c1265e3",
+            "identifiers": [
+              "calendar_branch.weeknum_floor"
+            ],
+            "requirements": [
+              "DateParam flooring and week-start calculation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/source-review-calendar-weeknum.json",
+              "sha256": "7259327bd46ace4efd695ab0464d4ff6ceecd3e2fe23a4b475b21d4b81e174a4"
             }
           }
         ]

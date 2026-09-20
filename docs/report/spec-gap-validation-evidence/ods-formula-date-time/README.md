@@ -22,6 +22,8 @@ retain their full-reference demand.
 
 ## Evidence
 
+- [Batch completion and limitations](completion.md) and
+  [strict root verification](root-verification.json).
 - [Final freeze](gates/freeze.json) at source candidate `d16039ce48` and
   [seven verified gates](gates/verification.json): 1,745 passing tests, no failures
   or ignored tests.
