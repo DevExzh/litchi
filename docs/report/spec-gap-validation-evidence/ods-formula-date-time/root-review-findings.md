@@ -119,3 +119,32 @@ Independent source reviews found no remaining semantic or resource blocker.
 The final freeze, reproducible gate receipts, complete coverage mapping, and
 performance capture are still required; these development runs do not replace
 those deliverables.
+
+## Pre-freeze harness and coverage checks
+
+The package formatting check and workspace boundary checker passed after a
+parser formatting cleanup. The boundary checker reports 65 packages, 241
+internal dependency declarations, and 11 already declared migration debts.
+The native reproducer again validated 126 deterministic observations and six
+host-clock observations using a temporary profile that it removed.
+
+The performance harness now compiles against both the candidate and the
+actual production baseline, with the new timestamp API enabled only for the
+candidate. Its standalone lock was generated offline from the retained gate
+lock; comparing package identities and registry checksums found only the new
+harness package, with no new external versions. The harness lock hashes to
+`5261723f62e5ebbea6875cb51b29dbfbfdfd6dca1a651febf7779a2d65a70319`.
+
+The first candidate preflight passed 89 of 120 workload cases. The 31 failures
+mostly identify malformed range spellings in fixtures, plus drift between
+two time formulas and their expectations and a scalar-versus-1-by-1-array
+expectation. They are preparation failures, not performance measurements.
+Correcting them and replaying all cases on both relevant builds is required
+before timing capture.
+
+The separate coverage audit also identified missing assertions beyond the
+passing tests: full numeric fallback grammar, broader formula-error
+precedence, WORKDAY reference sequence failures, and matrix failure cleanup.
+These were assigned for focused test additions before freezing source.
+Architectural properties such as absence of ambient I/O require source-review
+evidence alongside tests; they must not be claimed from a fabricated mock.
