@@ -1,0 +1,9 @@
+{
+  "baseline_source_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+  "candidate_source_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338",
+  "patch_sha256": "4d003dbc5832f2cb18887fedc001b6b2a72f779ed5b49445c06f2cc2727faedb",
+  "baseline_a1_before_candidate": true,
+  "production_delta": "Fuse section part and explicit relationship collection in one validated body traversal; paragraph_section_range unchanged",
+  "test_delta": "Eight focused differential and refusal tests retain the original two-pass behavior as an oracle",
+  "failed_quality_attempt": "quality-attempts/01: denied unused qualification after importing SectionHeaderFooterPart; corrected before all final checks and candidate captures"
+}

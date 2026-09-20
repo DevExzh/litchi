@@ -1,0 +1,4 @@
+PASS: four source-bound serialization profiles and exact semantic parity
+verified 32 children; exact replay PASS
+PASS retained sample-order shift diagnostic
+PASS restored baseline, rejected-candidate evidence, negative checks, exact replay and cleanup

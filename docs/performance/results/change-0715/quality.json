@@ -1,0 +1,105 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 18.320759495953098,
+    "log": "quality-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  },
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0715",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 56.64794403407723,
+    "log": "quality-tests.log",
+    "log_sha256": "db2e284953f184f29218572da84b16a999c8767aca803f670244127dae177c64",
+    "source_manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0715",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 31.624909837031737,
+    "log": "quality-clippy.log",
+    "log_sha256": "103c921011ddad2b2f9ff4b05ff3737c89dd8b31622be8b1864f9b4f1b23adfa",
+    "source_manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  },
+  {
+    "name": "doctests",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0715",
+      "-j",
+      "2",
+      "--all-features",
+      "--doc"
+    ],
+    "exit_code": 0,
+    "seconds": 2.0807650269707665,
+    "log": "quality-doctests.log",
+    "log_sha256": "d4c2fa94deeaacf8016ac09b0eb732bcc1f2cc105cd72a7776698b08ad63fe68",
+    "source_manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "env",
+      "RUSTDOCFLAGS=-D warnings",
+      "cargo",
+      "doc",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0715",
+      "-j",
+      "2",
+      "--all-features",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 9.341865740949288,
+    "log": "quality-rustdoc.log",
+    "log_sha256": "36f415c4b8afbf71f6a12c8ef9d649ea4358a4cb49dab061c68e82e36be6e2b7",
+    "source_manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  }
+]

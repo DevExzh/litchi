@@ -1,0 +1,617 @@
+diff --git a/crates/litchi-docx/src/package/codec.rs b/crates/litchi-docx/src/package/codec.rs
+index e558efa348..a896ef9914 100644
+--- a/crates/litchi-docx/src/package/codec.rs
++++ b/crates/litchi-docx/src/package/codec.rs
+@@ -723,10 +723,10 @@ impl Package {
+                 let smart_arts = mutable_doc.collect_smart_arts();
+                 let has_header = mutable_doc.has_header();
+                 let has_footer = mutable_doc.has_footer();
+-                let section_header_footer_parts =
+-                    mutable_doc.collect_section_header_footer_parts()?;
+-                let explicit_section_relationships =
+-                    mutable_doc.collect_explicit_section_header_footer_relationships()?;
++                let section_publication_references =
++                    mutable_doc.collect_section_publication_references()?;
++                let section_header_footer_parts = section_publication_references.parts;
++                let explicit_section_relationships = section_publication_references.relationships;
+                 let mut planned_section_parts = Vec::new();
+                 for (index, (header, part)) in section_header_footer_parts.into_iter().enumerate() {
+                     let stem = if header {
+diff --git a/crates/litchi-docx/src/writer/doc/model.rs b/crates/litchi-docx/src/writer/doc/model.rs
+index 102fea029b..1972ca9a1c 100644
+--- a/crates/litchi-docx/src/writer/doc/model.rs
++++ b/crates/litchi-docx/src/writer/doc/model.rs
+@@ -45,8 +45,8 @@ use super::codec::{
+     compact_changed_document_xml, patch_document_protection, write_document_protection,
+ };
+ use super::package::{
+-    BodyElement, DocumentBody, collect_explicit_section_relationships, collect_section_parts,
+-    shift_toc_index_on_insert, shift_toc_index_on_remove,
++    BodyElement, DocumentBody, SectionPublicationReferences,
++    collect_section_publication_references, shift_toc_index_on_insert, shift_toc_index_on_remove,
+ };
+ 
+ /// A mutable Word document for writing and modification.
+@@ -404,12 +404,17 @@ impl MutableDocument {
+         self.insert_section_break(after_paragraph, properties)
+     }
+ 
+-    pub(crate) fn collect_section_header_footer_parts(
++    pub(crate) fn collect_section_publication_references(
+         &self,
+-    ) -> Result<Vec<(bool, super::super::section::SectionHeaderFooterPart)>> {
+-        let mut parts = Vec::new();
+-        collect_section_parts(&self.section, &mut parts)?;
+-        self.body.collect_section_parts(&mut parts)?;
++    ) -> Result<SectionPublicationReferences> {
++        let mut references = SectionPublicationReferences::default();
++        collect_section_publication_references(&self.section, &mut references)?;
++        self.body
++            .collect_section_publication_references(&mut references)?;
++        let SectionPublicationReferences {
++            parts,
++            mut relationships,
++        } = references;
+         let mut unique: Vec<(bool, super::super::section::SectionHeaderFooterPart)> = Vec::new();
+         for (header, part) in parts {
+             if let Some((existing_header, existing)) =
+@@ -425,19 +430,12 @@ impl MutableDocument {
+                 unique.push((header, part));
+             }
+         }
+-        Ok(unique)
+-    }
+-
+-    pub(crate) fn collect_explicit_section_header_footer_relationships(
+-        &self,
+-    ) -> Result<Vec<(String, bool)>> {
+-        let mut relationships = Vec::new();
+-        collect_explicit_section_relationships(&self.section, &mut relationships);
+-        self.body
+-            .collect_explicit_section_relationships(&mut relationships)?;
+         relationships.sort();
+         relationships.dedup();
+-        Ok(relationships)
++        Ok(SectionPublicationReferences {
++            parts: unique,
++            relationships,
++        })
+     }
+ 
+     /// Add a new paragraph to the end of the document.
+diff --git a/crates/litchi-docx/src/writer/doc/package.rs b/crates/litchi-docx/src/writer/doc/package.rs
+index 1c5504a428..3ddec8c653 100644
+--- a/crates/litchi-docx/src/writer/doc/package.rs
++++ b/crates/litchi-docx/src/writer/doc/package.rs
+@@ -19,7 +19,7 @@ use crate::error::{Error, Result};
+ use crate::parts::document_part::active_block_ranges;
+ 
+ use super::super::paragraph::MutableParagraph;
+-use super::super::section::SectionProperties;
++use super::super::section::{SectionHeaderFooterPart, SectionProperties};
+ use super::super::table::MutableTable;
+ use super::super::toc::TableOfContents;
+ 
+@@ -60,6 +60,12 @@ pub(super) struct ParsedDocumentBody {
+     pub(super) suffix: String,
+ }
+ 
++#[derive(Debug, Default, PartialEq, Eq)]
++pub(crate) struct SectionPublicationReferences {
++    pub(crate) parts: Vec<(bool, SectionHeaderFooterPart)>,
++    pub(crate) relationships: Vec<(String, bool)>,
++}
++
+ #[derive(Clone, Copy)]
+ enum PreservedBodyKind {
+     Paragraph,
+@@ -934,22 +940,22 @@ impl DocumentBody {
+         None
+     }
+ 
+-    pub(super) fn collect_section_parts(
++    pub(super) fn collect_section_publication_references(
+         &self,
+-        parts: &mut Vec<(bool, super::super::section::SectionHeaderFooterPart)>,
++        references: &mut SectionPublicationReferences,
+     ) -> Result<()> {
+         for element in &self.elements {
+             match element {
+                 BodyElement::Paragraph(paragraph) => {
+                     if let Some(section) = &paragraph.properties.section {
+-                        collect_section_parts(section, parts)?;
++                        collect_section_publication_references(section, references)?;
+                     }
+                 },
+                 BodyElement::PreservedParagraph(raw) => {
+                     if let Some((start, end)) = paragraph_section_range(raw)? {
+-                        collect_section_parts(
++                        collect_section_publication_references(
+                             &SectionProperties::from_xml(&raw[start..end])?,
+-                            parts,
++                            references,
+                         )?;
+                     }
+                 },
+@@ -963,35 +969,6 @@ impl DocumentBody {
+         Ok(())
+     }
+ 
+-    pub(super) fn collect_explicit_section_relationships(
+-        &self,
+-        relationships: &mut Vec<(String, bool)>,
+-    ) -> Result<()> {
+-        for element in &self.elements {
+-            match element {
+-                BodyElement::Paragraph(paragraph) => {
+-                    if let Some(section) = &paragraph.properties.section {
+-                        collect_explicit_section_relationships(section, relationships);
+-                    }
+-                },
+-                BodyElement::PreservedParagraph(raw) => {
+-                    if let Some((start, end)) = paragraph_section_range(raw)? {
+-                        collect_explicit_section_relationships(
+-                            &SectionProperties::from_xml(&raw[start..end])?,
+-                            relationships,
+-                        );
+-                    }
+-                },
+-                BodyElement::Table(_)
+-                | BodyElement::PreservedTable(_)
+-                | BodyElement::PreservedSectionProperties(_)
+-                | BodyElement::PreservedAlt(..)
+-                | BodyElement::PreservedOther(_) => {},
+-            }
+-        }
+-        Ok(())
+-    }
+-
+     /// Generate XML with actual relationship IDs from the mapper.
+     pub(super) fn write_contents_with_rels(
+         &self,
+@@ -1028,9 +1005,18 @@ impl DocumentBody {
+     }
+ }
+ 
++pub(super) fn collect_section_publication_references(
++    section: &SectionProperties,
++    references: &mut SectionPublicationReferences,
++) -> Result<()> {
++    collect_section_parts(section, &mut references.parts)?;
++    collect_explicit_section_relationships(section, &mut references.relationships);
++    Ok(())
++}
++
+ pub(super) fn collect_section_parts(
+     section: &SectionProperties,
+-    parts: &mut Vec<(bool, super::super::section::SectionHeaderFooterPart)>,
++    parts: &mut Vec<(bool, SectionHeaderFooterPart)>,
+ ) -> Result<()> {
+     section.validate()?;
+     for reference in &section.headers {
+@@ -1330,3 +1316,425 @@ pub(crate) enum BodyElement {
+     PreservedAlt(String, Chunk),
+     PreservedOther(String),
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::{
++        BodyElement, DocumentBody, SectionPublicationReferences,
++        collect_explicit_section_relationships, collect_section_parts, paragraph_section_range,
++    };
++    use crate::alt::{Chunk, Rel};
++    use crate::error::{Error, Result};
++    use crate::header_footer::Kind;
++    use crate::writer::{
++        MutableDocument, SectionHeaderFooterPart, SectionHeaderFooterReference, SectionProperties,
++    };
++
++    const WORD_NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
++    const RELATIONSHIP_NAMESPACE: &str =
++        "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
++    const HEADER_XML: &str = concat!(
++        "<w:hdr xmlns:w=\"",
++        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
++        "\"><w:p/></w:hdr>"
++    );
++    const HEADER_XML_WITH_WHITESPACE: &str = concat!(
++        "<w:hdr xmlns:w=\"",
++        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
++        "\"> <w:p/> </w:hdr>"
++    );
++    const FOOTER_XML: &str = concat!(
++        "<w:ftr xmlns:w=\"",
++        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
++        "\"><w:p/></w:ftr>"
++    );
++
++    fn old_two_pass(document: &MutableDocument) -> Result<SectionPublicationReferences> {
++        let mut parts: Vec<(bool, SectionHeaderFooterPart)> = Vec::new();
++        collect_section_parts(document.section(), &mut parts)?;
++        old_collect_body_parts(&document.body, &mut parts)?;
++
++        let mut unique: Vec<(bool, SectionHeaderFooterPart)> = Vec::new();
++        for (header, part) in parts {
++            if let Some((existing_header, existing)) =
++                unique.iter().find(|(_, existing)| existing.key == part.key)
++            {
++                if *existing_header != header || existing.xml != part.xml {
++                    return Err(Error::InvalidFormat(format!(
++                        "section header/footer key {:?} has conflicting definitions",
++                        part.key
++                    )));
++                }
++            } else {
++                unique.push((header, part));
++            }
++        }
++
++        let mut relationships = Vec::new();
++        collect_explicit_section_relationships(document.section(), &mut relationships);
++        old_collect_body_relationships(&document.body, &mut relationships)?;
++        relationships.sort();
++        relationships.dedup();
++        Ok(SectionPublicationReferences {
++            parts: unique,
++            relationships,
++        })
++    }
++
++    fn old_collect_body_parts(
++        body: &DocumentBody,
++        parts: &mut Vec<(bool, SectionHeaderFooterPart)>,
++    ) -> Result<()> {
++        for element in &body.elements {
++            match element {
++                BodyElement::Paragraph(paragraph) => {
++                    if let Some(section) = paragraph.section_break() {
++                        collect_section_parts(section, parts)?;
++                    }
++                },
++                BodyElement::PreservedParagraph(raw) => {
++                    if let Some((start, end)) = paragraph_section_range(raw)? {
++                        collect_section_parts(
++                            &SectionProperties::from_xml(&raw[start..end])?,
++                            parts,
++                        )?;
++                    }
++                },
++                BodyElement::Table(_)
++                | BodyElement::PreservedTable(_)
++                | BodyElement::PreservedSectionProperties(_)
++                | BodyElement::PreservedAlt(..)
++                | BodyElement::PreservedOther(_) => {},
++            }
++        }
++        Ok(())
++    }
++
++    fn old_collect_body_relationships(
++        body: &DocumentBody,
++        relationships: &mut Vec<(String, bool)>,
++    ) -> Result<()> {
++        for element in &body.elements {
++            match element {
++                BodyElement::Paragraph(paragraph) => {
++                    if let Some(section) = paragraph.section_break() {
++                        collect_explicit_section_relationships(section, relationships);
++                    }
++                },
++                BodyElement::PreservedParagraph(raw) => {
++                    if let Some((start, end)) = paragraph_section_range(raw)? {
++                        collect_explicit_section_relationships(
++                            &SectionProperties::from_xml(&raw[start..end])?,
++                            relationships,
++                        );
++                    }
++                },
++                BodyElement::Table(_)
++                | BodyElement::PreservedTable(_)
++                | BodyElement::PreservedSectionProperties(_)
++                | BodyElement::PreservedAlt(..)
++                | BodyElement::PreservedOther(_) => {},
++            }
++        }
++        Ok(())
++    }
++
++    fn compare_with_old_two_pass(document: &MutableDocument) {
++        let expected = old_two_pass(document).map_err(|error| error.to_string());
++        let actual = document
++            .collect_section_publication_references()
++            .map_err(|error| error.to_string());
++        assert_eq!(actual, expected);
++    }
++
++    fn assert_invalid_format(result: Result<SectionPublicationReferences>, expected: &str) {
++        match result {
++            Err(Error::InvalidFormat(message)) => assert_eq!(message, expected),
++            Err(error) => panic!("expected InvalidFormat, got {error}"),
++            Ok(_) => panic!("expected InvalidFormat({expected:?})"),
++        }
++    }
++
++    fn preserved_paragraph_document(raw: &str) -> MutableDocument {
++        let mut document = MutableDocument::new();
++        document
++            .body
++            .elements
++            .push(BodyElement::PreservedParagraph(raw.to_owned()));
++        document
++    }
++
++    fn duplicate_part_document() -> MutableDocument {
++        let mut document = MutableDocument::new();
++        document.add_paragraph();
++        let mut duplicate_section = SectionProperties::default();
++        duplicate_section
++            .set_header_part(Kind::Primary, "shared", HEADER_XML)
++            .unwrap();
++        document.insert_section_break(0, duplicate_section).unwrap();
++        document
++            .section_mut()
++            .set_header_part(Kind::Primary, "shared", HEADER_XML_WITH_WHITESPACE)
++            .unwrap();
++        document
++    }
++
++    #[test]
++    fn fused_collection_matches_two_pass_for_mixed_owned_and_preserved_sections() {
++        let source = format!(
++            r#"<w:document xmlns:w="{WORD_NAMESPACE}" xmlns:r="{RELATIONSHIP_NAMESPACE}"><w:body><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rPreserved"/></w:sectPr></w:pPr></w:p><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rPreserved"/></w:sectPr></w:pPr></w:p><w:sectPr><w:footerReference w:type="default" r:id="rFinal"/></w:sectPr></w:body></w:document>"#
++        );
++        let mut document = MutableDocument::from_xml(&source).unwrap();
++        document.add_paragraph();
++        let mut body_section = SectionProperties::default();
++        body_section
++            .set_header_part(Kind::Primary, "body-owned", HEADER_XML)
++            .unwrap();
++        document.insert_section_break(2, body_section).unwrap();
++        document
++            .section_mut()
++            .set_header_part(Kind::FirstPage, "final-owned", HEADER_XML)
++            .unwrap();
++
++        compare_with_old_two_pass(&document);
++        let references = document.collect_section_publication_references().unwrap();
++        assert_eq!(
++            references
++                .parts
++                .iter()
++                .map(|(_, part)| part.key.as_str())
++                .collect::<Vec<_>>(),
++            ["final-owned", "body-owned"]
++        );
++        assert_eq!(
++            references.relationships,
++            [
++                ("rFinal".to_owned(), false),
++                ("rPreserved".to_owned(), true)
++            ]
++        );
++    }
++
++    #[test]
++    fn fused_collection_dedups_same_id_per_role_without_merging_opposite_roles() {
++        let source = format!(
++            r#"<w:document xmlns:w="{WORD_NAMESPACE}" xmlns:r="{RELATIONSHIP_NAMESPACE}"><w:body><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rShared"/></w:sectPr></w:pPr></w:p><w:p><w:pPr><w:sectPr><w:footerReference w:type="default" r:id="rShared"/></w:sectPr></w:pPr></w:p><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rShared"/></w:sectPr></w:pPr></w:p><w:sectPr/></w:body></w:document>"#
++        );
++        let document = MutableDocument::from_xml(&source).unwrap();
++        compare_with_old_two_pass(&document);
++        let references = document.collect_section_publication_references().unwrap();
++        assert_eq!(
++            references.relationships,
++            [("rShared".to_owned(), false), ("rShared".to_owned(), true)]
++        );
++    }
++
++    #[test]
++    fn fused_collection_skips_nonparagraph_body_variants() {
++        let mut document = MutableDocument::new();
++        document.add_table(1, 1);
++        document.body.elements.extend([
++            BodyElement::PreservedTable(
++                format!(
++                    r#"<w:tbl xmlns:w="{WORD_NAMESPACE}"><w:tr><w:tc><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rTable"/></w:sectPr></w:pPr></w:p></w:tc></w:tr></w:tbl>"#
++                ),
++            ),
++            BodyElement::PreservedSectionProperties(format!(
++                r#"<w:sectPr xmlns:w="{WORD_NAMESPACE}"><w:footerReference w:type="default" r:id="rFinal"/></w:sectPr>"#
++            )),
++            BodyElement::PreservedAlt(
++                format!(r#"<w:altChunk xmlns:w="{WORD_NAMESPACE}"/>"#),
++                Chunk::new(Rel::new("rAlt").unwrap(), None),
++            ),
++            BodyElement::PreservedOther(format!(
++                r#"<w:p xmlns:w="{WORD_NAMESPACE}"><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rOther"/></w:sectPr></w:pPr></w:p>"#
++            )),
++        ]);
++
++        compare_with_old_two_pass(&document);
++        let references = document.collect_section_publication_references().unwrap();
++        assert!(references.parts.is_empty());
++        assert!(references.relationships.is_empty());
++    }
++
++    #[test]
++    fn fused_collection_keeps_first_identical_owned_part() {
++        let mut document = MutableDocument::new();
++        document.add_paragraph();
++        let mut body_section = SectionProperties::default();
++        body_section
++            .set_header_part(Kind::Primary, "shared", HEADER_XML)
++            .unwrap();
++        document.insert_section_break(0, body_section).unwrap();
++        document
++            .section_mut()
++            .set_header_part(Kind::Primary, "shared", HEADER_XML)
++            .unwrap();
++
++        compare_with_old_two_pass(&document);
++        let references = document.collect_section_publication_references().unwrap();
++        assert_eq!(references.parts.len(), 1);
++        assert_eq!(references.parts[0].1.key, "shared");
++    }
++
++    #[test]
++    fn fused_collection_keeps_conflicting_part_errors_unchanged() {
++        let mut role_conflict = MutableDocument::new();
++        role_conflict.add_paragraph();
++        let mut body_section = SectionProperties::default();
++        body_section
++            .set_header_part(Kind::Primary, "shared", HEADER_XML)
++            .unwrap();
++        role_conflict.insert_section_break(0, body_section).unwrap();
++        role_conflict
++            .section_mut()
++            .set_footer_part(Kind::Primary, "shared", FOOTER_XML)
++            .unwrap();
++        compare_with_old_two_pass(&role_conflict);
++        assert_invalid_format(
++            role_conflict.collect_section_publication_references(),
++            "section header/footer key \"shared\" has conflicting definitions",
++        );
++
++        let mut xml_conflict = MutableDocument::new();
++        xml_conflict.add_paragraph();
++        let mut body_section = SectionProperties::default();
++        body_section
++            .set_header_part(Kind::Primary, "shared", HEADER_XML)
++            .unwrap();
++        xml_conflict.insert_section_break(0, body_section).unwrap();
++        xml_conflict
++            .section_mut()
++            .set_header_part(Kind::Primary, "shared", HEADER_XML_WITH_WHITESPACE)
++            .unwrap();
++        compare_with_old_two_pass(&xml_conflict);
++        assert_invalid_format(
++            xml_conflict.collect_section_publication_references(),
++            "section header/footer key \"shared\" has conflicting definitions",
++        );
++    }
++
++    #[test]
++    fn fused_collection_defers_part_conflicts_until_later_validation_finishes() {
++        let conflict_only = duplicate_part_document();
++        compare_with_old_two_pass(&conflict_only);
++        assert_invalid_format(
++            conflict_only.collect_section_publication_references(),
++            "section header/footer key \"shared\" has conflicting definitions",
++        );
++
++        let mut document = duplicate_part_document();
++        document.add_paragraph();
++        document
++            .insert_section_break(1, SectionProperties::default())
++            .unwrap();
++        document
++            .paragraph(1)
++            .expect("second paragraph exists")
++            .section_break_mut()
++            .expect("second section exists")
++            .page_width = 0;
++
++        compare_with_old_two_pass(&document);
++        assert_invalid_format(
++            document.collect_section_publication_references(),
++            "section page dimensions must be nonzero",
++        );
++    }
++
++    #[test]
++    fn fused_collection_preserves_free_section_validation_errors() {
++        let mut invalid_id = MutableDocument::new();
++        invalid_id
++            .section_mut()
++            .headers
++            .push(SectionHeaderFooterReference {
++                kind: Kind::Primary,
++                relationship_id: Some("not an NCName".to_owned()),
++                part: None,
++            });
++        compare_with_old_two_pass(&invalid_id);
++        assert_invalid_format(
++            invalid_id.collect_section_publication_references(),
++            "section header/footer relationship ID is not an XML NCName",
++        );
++
++        let mut owned_and_existing = MutableDocument::new();
++        owned_and_existing
++            .section_mut()
++            .headers
++            .push(SectionHeaderFooterReference {
++                kind: Kind::Primary,
++                relationship_id: Some("rHeader".to_owned()),
++                part: Some(SectionHeaderFooterPart {
++                    key: "owned".to_owned(),
++                    xml: HEADER_XML.to_owned(),
++                }),
++            });
++        compare_with_old_two_pass(&owned_and_existing);
++        assert_invalid_format(
++            owned_and_existing.collect_section_publication_references(),
++            "section header/footer cannot be both existing and owned",
++        );
++    }
++
++    fn assert_preserved_error(raw: &str, expected: &str) {
++        let document = preserved_paragraph_document(raw);
++        compare_with_old_two_pass(&document);
++        assert_invalid_format(document.collect_section_publication_references(), expected);
++    }
++
++    #[test]
++    fn fused_collection_preserves_preserved_paragraph_refusals_and_namespaces() {
++        let multiple = format!(
++            r#"<w:p xmlns:w="{WORD_NAMESPACE}"><w:pPr><w:sectPr/><w:sectPr/></w:pPr></w:p>"#
++        );
++        assert_preserved_error(&multiple, "paragraph contains multiple section properties");
++
++        let outside = format!(r#"<w:p xmlns:w="{WORD_NAMESPACE}"><w:sectPr/></w:p>"#);
++        assert_preserved_error(
++            &outside,
++            "paragraph section properties must be inside one pPr",
++        );
++
++        let nonfinal = format!(
++            r#"<w:p xmlns:w="{WORD_NAMESPACE}"><w:pPr><w:sectPr/><w:rStyle w:val="x"/></w:pPr></w:p>"#
++        );
++        assert_preserved_error(
++            &nonfinal,
++            "paragraph section properties must be the final pPr child",
++        );
++
++        let foreign_ppr = format!(
++            r#"<w:p xmlns:w="{WORD_NAMESPACE}" xmlns:x="urn:foreign"><x:pPr><w:sectPr/></x:pPr></w:p>"#
++        );
++        assert_preserved_error(
++            &foreign_ppr,
++            "paragraph section properties must be inside one pPr",
++        );
++
++        let foreign_section = format!(
++            r#"<w:p xmlns:w="{WORD_NAMESPACE}" xmlns:x="urn:foreign"><w:pPr><x:sectPr/></w:pPr></w:p>"#
++        );
++        let foreign_document = preserved_paragraph_document(&foreign_section);
++        compare_with_old_two_pass(&foreign_document);
++        assert!(
++            foreign_document
++                .collect_section_publication_references()
++                .unwrap()
++                .parts
++                .is_empty()
++        );
++
++        let strict = r#"<s:p xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:pPr><s:sectPr/></s:pPr></s:p>"#;
++        let strict_document = preserved_paragraph_document(strict);
++        compare_with_old_two_pass(&strict_document);
++        assert!(
++            strict_document
++                .collect_section_publication_references()
++                .unwrap()
++                .relationships
++                .is_empty()
++        );
++    }
++}

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "packet": "change-0715-docx-publication-collection-pilot",
+  "freeze_status": "frozen",
+  "revision": "653a87ffefdb223fadbf2a25427e92159d15cf75",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0715-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "phase_order": [
+    "counting_publish",
+    "lifecycle"
+  ],
+  "native": {
+    "repeats": 2,
+    "samples": 100,
+    "warmup": 10
+  },
+  "allocator": {
+    "repeats": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "stages": [
+    {
+      "label": "baseline-A1",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-1",
+      "order": "forward",
+      "repeat": 1
+    },
+    {
+      "label": "candidate-B1",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-1",
+      "order": "forward",
+      "repeat": 1
+    },
+    {
+      "label": "candidate-B2",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-2",
+      "order": "reverse",
+      "repeat": 2
+    },
+    {
+      "label": "baseline-A2",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-2",
+      "order": "reverse",
+      "repeat": 2
+    }
+  ],
+  "thresholds": {
+    "generated_counting_improvement_percent": 10,
+    "nonregression_percent": 3,
+    "allocation_nonregression_percent": 3,
+    "repeat_flag_percent": 5,
+    "tail_metrics": [
+      "p95",
+      "p99"
+    ]
+  },
+  "source_delta_allowlist": [
+    "crates/litchi-docx/src/package/codec.rs",
+    "crates/litchi-docx/src/writer/doc/model.rs",
+    "crates/litchi-docx/src/writer/doc/package.rs"
+  ],
+  "files": {
+    "builds": "pilot-builds.json",
+    "source_baseline": "source-baseline.json",
+    "source_candidate": "source-candidate.json",
+    "constraints": "constraints.json"
+  },
+  "claims": {
+    "hypothesis": "Fuse duplicate section publication collection validation into one traversal.",
+    "primary": "Generated counting_publish native p50 and mean improve by at least 10 percent in both ABBA pairs.",
+    "nonregression": "NumberedList counting_publish and both corpus lifecycle native p50 and mean regress by no more than 3 percent in either pair.",
+    "allocation": "Allocator allocation request counts and requested bytes regress by no more than 3 percent in every corpus, phase, and ABBA pair.",
+    "limitations": [
+      "The allocator lane is instrumentation-bearing and is not latency-comparable to native.",
+      "Repeat and tail spreads above 5 percent are retained as flags and do not become hidden exclusions.",
+      "Phase measurements are independent; lifecycle, counting_publish, and publication values are never added or subtracted.",
+      "This pilot makes no hardware, RSS, cold-cache, throughput, or scaling claim."
+    ]
+  }
+}

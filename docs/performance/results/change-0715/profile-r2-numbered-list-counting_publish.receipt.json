@@ -1,0 +1,90 @@
+{
+  "job": {
+    "lane": "profile",
+    "repeat": 2,
+    "phase": "counting_publish",
+    "corpus": {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    },
+    "name": "profile-r2-numbered-list-counting_publish",
+    "case": "docx_real_file_ordinary_save_counting_publish",
+    "samples": 1,
+    "warmup": 0,
+    "order_index": 2
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--zero-before=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--dump-after=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0715/profile-r2-numbered-list-counting_publish.callgrind",
+    "/home/zhuhe/code/litchi-0715-bin/current-native",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "docx_real_file_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0715/profile-r2-numbered-list-counting_publish.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0715-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T10:30:15.153403+00:00",
+  "seconds": 2.5748896879376844,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0715-bin/current-native",
+    "sha256": "447b42d2d128a200643de137f5064f574f3e70a85e41f4f5ce40d0e19e17c3d8",
+    "bytes": 62887448
+  },
+  "source_before": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "source_after": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "source_manifest_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+  "build_sha256": "624881bdc59a278833f88fb88aec22ec6e21c2fa73d87a22ea8dd2fdc6f46af8",
+  "plan_sha256": "ca8bac2115fec1a2785632620e169dc32a8dcc2c5dcca0f786357bb63f0554bf",
+  "script_sha256": "f9f7bb370b67ff0181382ed1260a0676939eb7d1b687c855a2e1e2c1e4d9af46",
+  "fixture_before": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "fixture_after": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "profile-r2-numbered-list-counting_publish.callgrind": "65f8bceb770862a9fb3dc0d78b09610a8f09f5dc44a41943f8b30b956046437c",
+    "profile-r2-numbered-list-counting_publish.callgrind.1": "12cd70f19e71efbd35d2363c353ba441fb2ce93e67faa4009c9bb309b77b8ecd",
+    "profile-r2-numbered-list-counting_publish.callgrind.2": "811d74eaccb22ba048bbb5656e414ec76960e9d5245957be7b9d3267f4d95ec3",
+    "profile-r2-numbered-list-counting_publish.callgrind.3": "3a2ecbaa1e473ba413e61d8b2a063dd2b310df097fa4c300859d1a8a871314f2",
+    "profile-r2-numbered-list-counting_publish.callgrind.4": "66037c48b53555250e67a4a12877f7f31f123d8bfe3e5b41c064b01ed55ed3fd",
+    "profile-r2-numbered-list-counting_publish.callgrind.5": "d2d0a86dbcb82e0c18a5b517128a9c904b769ae009f0680f8f0b3bcccd21c594",
+    "profile-r2-numbered-list-counting_publish.json": "8229dd60a645ec55e2fb695f5ab1a059b1b75e51d7980a53a38395e31a29328d",
+    "profile-r2-numbered-list-counting_publish.stderr": "8afa8a4ddb39ab774cda5142e3bf8ee8e5552080c2c1ae96a345fd80926aba28",
+    "profile-r2-numbered-list-counting_publish.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
