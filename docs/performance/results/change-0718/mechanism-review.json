@@ -1,0 +1,25 @@
+{
+  "status": "hypothesis pending stack attribution",
+  "owner_chain": [
+    "DOCX write_plain",
+    "OpcPackage::to_stream",
+    "PackageWriter::write_counted",
+    "preservation prepare_with/generated_entry",
+    "ReusableDeflateState::new",
+    "flate2::Compress::new",
+    "zlib_rs::deflate::init"
+  ],
+  "mechanism": "One regenerated generated-document member allocates Deflate arrays on the same order as the observed page count; page count is not an allocation attribution proof.",
+  "prior_rejections": [
+    "0715 section collector fusion remains rejected.",
+    "0618 Deflate pooling across regenerated members remains rejected; do not revive it based on fault association.",
+    "0618 mini-archive parse cost was tiny and the validation step remains required."
+  ],
+  "source_files": {
+    "crates/litchi-docx/src/package/codec.rs": "6931ca94dfbe5a0f3daf11d759f716e7d783cbab7099d9f5ce775aeb113bf3b0",
+    "crates/litchi-opc/src/pkgwriter.rs": "7b2d5213106633ddfc54cf1d246c38577c8a4d62aa1e52411388f21a19131208",
+    "crates/soapberry-zip/src/preserve.rs": "7f1758b6ac9db7ae5df6b1e301879ef8b983ca3c98f4cae9e10e42b4a1eb5564",
+    "crates/soapberry-zip/src/writer.rs": "8cc059b05bdbcf1ba79f7b1f6b9e063035ce69a1bff54961aa67d48318409701",
+    "docs/performance/0618-zip-writer-deflate-state-reuse.md": "d4dfd7e74c09a0f84926483e2dece36e64818bc1758b292312ddbcc72496ce58"
+  }
+}

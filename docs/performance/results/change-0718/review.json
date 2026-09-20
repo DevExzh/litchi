@@ -1,0 +1,17 @@
+{
+  "decision": "retain unchanged-source attribution evidence; no production optimization or native speedup claim",
+  "independent_findings": [
+    "All four traces have664snapshots and1992markeropens plusone extra status read; measured alignment is correct.",
+    "All188localoffsets map through the unique executableELFsegment and match containing symbols.",
+    "Every attributed phase brk transition increases the break; NumberedList phasecalls occur only inwarmup.",
+    "The single zero-fault generated sample has no phase brk but cannot prove absence of allocation or generalize allocator behavior.",
+    "DHAT sums only cumulative tb/tbk; whole-child and owner-context totals remain separate."
+  ],
+  "resolution": "The final marker-window selector includes all six MAPPING_SYSCALLS; earlier four-call review caveat is resolved, with no result change. All current attributed phase stacks have zero unknown or truncated frames.",
+  "secondary_analysis": "Retained raw brk requests/returns independently validate success and program-break transitions; no new capture.",
+  "limits": [
+    "No causal fault cost or faulting instruction.",
+    "No native latency or RSS claim.",
+    "No restoration of0715 or0618 rejected mechanisms."
+  ]
+}

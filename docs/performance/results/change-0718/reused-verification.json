@@ -1,0 +1,24 @@
+{
+  "packet": "docs/performance/results/change-0717",
+  "reason": "All source and support files are unchanged from0717; reuse fresh0717 harness checks and explicit0713 production results. New diagnostic executable build, capture validation, and report gate are fresh.",
+  "files": {
+    "quality.json": "75988dd8d01f191ad40785c99f17cc67cb28f2b0d7481a8af37368a927e4c503",
+    "support-files.json": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "source.json": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "source-final.json": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "reused-production-verification.json": "5f31d7901b624d08980fcac9483b757be2cc593f9f979d0b7237e4a73aefeb45",
+    "evidence/results.json": "3dc7c1cbdb6ecbedf55ff84e378f73ac6e0866c25056c4b8d4c08d5d8e491f20",
+    "quality-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-tests-native.log": "7f933a3def14a742e7dce895b6d92d396b54b8f10ea9ba782df68b65b8eb4d8f",
+    "quality-tests-procfs.log": "67bb59cb26e69ee6b29a16a29ad78dde800a47e1d7bc2db2256b3a02fc4af40a",
+    "quality-clippy.log": "385a6d0d3491e0b0a4d027aaca7a55b75753961b3ae8f3dcb14e2897d6579bc0",
+    "quality-rustdoc.log": "a2bc0f21570f4d1b3899246d7b12da96895949913a2da81e701edd013b9ea407",
+    "quality-latency-guard.log": "9f57be8303f60a77981506848b825e9706b46948f159e7045f928579d6e32900",
+    "evidence/crate-boundaries.log": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+    "evidence/claims.log": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8",
+    "evidence/claims-structural.log": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850",
+    "evidence/report.log": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+    "evidence/coverage.log": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+    "evidence/non-iwork.log": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2"
+  }
+}

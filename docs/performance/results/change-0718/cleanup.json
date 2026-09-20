@@ -1,0 +1,15 @@
+{
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-target-0718",
+    "/home/zhuhe/code/litchi-0718-bin",
+    "/home/zhuhe/code/litchi-0718-fs"
+  ],
+  "owned_paths_absent": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0718-bin/procfs",
+      "sha256": "b012f6409ed86d42847e4f86b7d30406ce0b4f355240f42c32a1c94c413d6d3f",
+      "bytes": 63167992
+    }
+  ]
+}

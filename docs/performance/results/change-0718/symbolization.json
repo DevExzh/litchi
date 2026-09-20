@@ -1,0 +1,2593 @@
+{
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "sha256": "b012f6409ed86d42847e4f86b7d30406ce0b4f355240f42c32a1c94c413d6d3f",
+    "bytes": 63167992
+  },
+  "method": "Strace libunwind true_offset is a mapped-file offset; translate through the unique executable PT_LOAD segment. Resolve ELF virtual addresses with addr2line and require exact name agreement with a covering nm symbol range.",
+  "segments": [
+    {
+      "file_offset": 12132416,
+      "virtual_address": 12136512,
+      "file_size": 41139488,
+      "memory_size": 41139488,
+      "flags": 5,
+      "alignment": 4096
+    }
+  ],
+  "frames": {
+    "0xb92065": {
+      "file_offset": 12132453,
+      "virtual_address": 12136549,
+      "function": "_start",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 12136512,
+          "bytes": 38,
+          "name": "_start"
+        }
+      ]
+    },
+    "0xbeccd7": {
+      "file_offset": 12504279,
+      "virtual_address": 12508375,
+      "function": "litchi_perf_baseline::main",
+      "location": "litchi_perf_baseline.ce726cc8dd8debdc-cgu.12:?",
+      "covering_symbols": [
+        {
+          "address": 12507552,
+          "bytes": 1757,
+          "name": "litchi_perf_baseline::main"
+        }
+      ]
+    },
+    "0xbed9f5": {
+      "file_offset": 12507637,
+      "virtual_address": 12511733,
+      "function": "main",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 12511696,
+          "bytes": 39,
+          "name": "main"
+        }
+      ]
+    },
+    "0xbef971": {
+      "file_offset": 12515697,
+      "virtual_address": 12519793,
+      "function": "std::rt::lang_start::{{closure}}",
+      "location": "litchi_perf_baseline.ce726cc8dd8debdc-cgu.15:?",
+      "covering_symbols": [
+        {
+          "address": 12519776,
+          "bytes": 196,
+          "name": "std::rt::lang_start::{{closure}}"
+        }
+      ]
+    },
+    "0xbefa33": {
+      "file_offset": 12515891,
+      "virtual_address": 12519987,
+      "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+      "location": "litchi_perf_baseline.ce726cc8dd8debdc-cgu.15:?",
+      "covering_symbols": [
+        {
+          "address": 12519984,
+          "bytes": 5,
+          "name": "std::sys::backtrace::__rust_begin_short_backtrace"
+        }
+      ]
+    },
+    "0xbf439f": {
+      "file_offset": 12534687,
+      "virtual_address": 12538783,
+      "function": "litchi_perf_baseline::git_output",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12538528,
+          "bytes": 890,
+          "name": "litchi_perf_baseline::git_output"
+        }
+      ]
+    },
+    "0xbfb637": {
+      "file_offset": 12564023,
+      "virtual_address": 12568119,
+      "function": "litchi_perf_baseline::environment",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12568000,
+          "bytes": 1669,
+          "name": "litchi_perf_baseline::environment"
+        }
+      ]
+    },
+    "0xbfb664": {
+      "file_offset": 12564068,
+      "virtual_address": 12568164,
+      "function": "litchi_perf_baseline::environment",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12568000,
+          "bytes": 1669,
+          "name": "litchi_perf_baseline::environment"
+        }
+      ]
+    },
+    "0xbfb675": {
+      "file_offset": 12564085,
+      "virtual_address": 12568181,
+      "function": "litchi_perf_baseline::environment",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12568000,
+          "bytes": 1669,
+          "name": "litchi_perf_baseline::environment"
+        }
+      ]
+    },
+    "0xbfb6ac": {
+      "file_offset": 12564140,
+      "virtual_address": 12568236,
+      "function": "litchi_perf_baseline::environment",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12568000,
+          "bytes": 1669,
+          "name": "litchi_perf_baseline::environment"
+        }
+      ]
+    },
+    "0xbfb7f6": {
+      "file_offset": 12564470,
+      "virtual_address": 12568566,
+      "function": "litchi_perf_baseline::environment",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12568000,
+          "bytes": 1669,
+          "name": "litchi_perf_baseline::environment"
+        }
+      ]
+    },
+    "0xbfd39f": {
+      "file_offset": 12571551,
+      "virtual_address": 12575647,
+      "function": "litchi_perf_baseline::write_report",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12575440,
+          "bytes": 2168,
+          "name": "litchi_perf_baseline::write_report"
+        }
+      ]
+    },
+    "0xc0135f": {
+      "file_offset": 12587871,
+      "virtual_address": 12591967,
+      "function": "litchi_perf_baseline::parse_options",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12591424,
+          "bytes": 20871,
+          "name": "litchi_perf_baseline::parse_options"
+        }
+      ]
+    },
+    "0xc06cdc": {
+      "file_offset": 12610780,
+      "virtual_address": 12614876,
+      "function": "litchi_perf_baseline::command_output",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12614800,
+          "bytes": 592,
+          "name": "litchi_perf_baseline::command_output"
+        }
+      ]
+    },
+    "0xc644dd": {
+      "file_offset": 12993757,
+      "virtual_address": 12997853,
+      "function": "litchi_perf_baseline::semantic_docx_bytes",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12997792,
+          "bytes": 1367,
+          "name": "litchi_perf_baseline::semantic_docx_bytes"
+        }
+      ]
+    },
+    "0xc64706": {
+      "file_offset": 12994310,
+      "virtual_address": 12998406,
+      "function": "litchi_perf_baseline::semantic_docx_bytes",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12997792,
+          "bytes": 1367,
+          "name": "litchi_perf_baseline::semantic_docx_bytes"
+        }
+      ]
+    },
+    "0xc6480a": {
+      "file_offset": 12994570,
+      "virtual_address": 12998666,
+      "function": "litchi_perf_baseline::semantic_docx_bytes",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12997792,
+          "bytes": 1367,
+          "name": "litchi_perf_baseline::semantic_docx_bytes"
+        }
+      ]
+    },
+    "0xc64909": {
+      "file_offset": 12994825,
+      "virtual_address": 12998921,
+      "function": "litchi_perf_baseline::semantic_docx_bytes",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 12997792,
+          "bytes": 1367,
+          "name": "litchi_perf_baseline::semantic_docx_bytes"
+        }
+      ]
+    },
+    "0xd3a99d": {
+      "file_offset": 13871517,
+      "virtual_address": 13875613,
+      "function": "litchi_perf_baseline::build_semantic_docx_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 13875552,
+          "bytes": 3701,
+          "name": "litchi_perf_baseline::build_semantic_docx_corpus"
+        }
+      ]
+    },
+    "0xd58a9f": {
+      "file_offset": 13994655,
+      "virtual_address": 13998751,
+      "function": "litchi_perf_baseline::current_executable_identity",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 13998448,
+          "bytes": 2994,
+          "name": "litchi_perf_baseline::current_executable_identity"
+        }
+      ]
+    },
+    "0xebfab5": {
+      "file_offset": 15465141,
+      "virtual_address": 15469237,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecb358": {
+      "file_offset": 15512408,
+      "virtual_address": 15516504,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecb62b": {
+      "file_offset": 15513131,
+      "virtual_address": 15517227,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecb72c": {
+      "file_offset": 15513388,
+      "virtual_address": 15517484,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecc960": {
+      "file_offset": 15518048,
+      "virtual_address": 15522144,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecc975": {
+      "file_offset": 15518069,
+      "virtual_address": 15522165,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecc983": {
+      "file_offset": 15518083,
+      "virtual_address": 15522179,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xecd0ac": {
+      "file_offset": 15519916,
+      "virtual_address": 15524012,
+      "function": "litchi_perf_baseline::run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 15469088,
+          "bytes": 59539,
+          "name": "litchi_perf_baseline::run"
+        }
+      ]
+    },
+    "0xf24ba2": {
+      "file_offset": 15879074,
+      "virtual_address": 15883170,
+      "function": "core::ptr::drop_in_place<litchi_docx::package::model::Package>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 15883120,
+          "bytes": 214,
+          "name": "core::ptr::drop_in_place<litchi_docx::package::model::Package>"
+        }
+      ]
+    },
+    "0xf52ce4": {
+      "file_offset": 16067812,
+      "virtual_address": 16071908,
+      "function": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 16071792,
+          "bytes": 1702,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>"
+        }
+      ]
+    },
+    "0x11f0204": {
+      "file_offset": 18809348,
+      "virtual_address": 18813444,
+      "function": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.03:?",
+      "covering_symbols": [
+        {
+          "address": 18812464,
+          "bytes": 3692,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with"
+        }
+      ]
+    },
+    "0x1224330": {
+      "file_offset": 19022640,
+      "virtual_address": 19026736,
+      "function": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.03:?",
+      "covering_symbols": [
+        {
+          "address": 19026576,
+          "bytes": 2739,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to"
+        }
+      ]
+    },
+    "0x1229570": {
+      "file_offset": 19043696,
+      "virtual_address": 19047792,
+      "function": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.03:?",
+      "covering_symbols": [
+        {
+          "address": 19047632,
+          "bytes": 2723,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to"
+        }
+      ]
+    },
+    "0x12caec5": {
+      "file_offset": 19705541,
+      "virtual_address": 19709637,
+      "function": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19709392,
+          "bytes": 858,
+          "name": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold"
+        }
+      ]
+    },
+    "0x12cafa7": {
+      "file_offset": 19705767,
+      "virtual_address": 19709863,
+      "function": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19709392,
+          "bytes": 858,
+          "name": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold"
+        }
+      ]
+    },
+    "0x1302f3f": {
+      "file_offset": 19935039,
+      "virtual_address": 19939135,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1303214": {
+      "file_offset": 19935764,
+      "virtual_address": 19939860,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1303897": {
+      "file_offset": 19937431,
+      "virtual_address": 19941527,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1304242": {
+      "file_offset": 19939906,
+      "virtual_address": 19944002,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1304775": {
+      "file_offset": 19941237,
+      "virtual_address": 19945333,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x13059ea": {
+      "file_offset": 19945962,
+      "virtual_address": 19950058,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1305a40": {
+      "file_offset": 19946048,
+      "virtual_address": 19950144,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1305b6d": {
+      "file_offset": 19946349,
+      "virtual_address": 19950445,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1305bdc": {
+      "file_offset": 19946460,
+      "virtual_address": 19950556,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1305c4e": {
+      "file_offset": 19946574,
+      "virtual_address": 19950670,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x1305cc4": {
+      "file_offset": 19946692,
+      "virtual_address": 19950788,
+      "function": "litchi_perf_baseline::ordinary_save::build_corpus",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19938848,
+          "bytes": 16577,
+          "name": "litchi_perf_baseline::ordinary_save::build_corpus"
+        }
+      ]
+    },
+    "0x130796f": {
+      "file_offset": 19954031,
+      "virtual_address": 19958127,
+      "function": "litchi_perf_baseline::ordinary_save::read_bounded",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19957664,
+          "bytes": 667,
+          "name": "litchi_perf_baseline::ordinary_save::read_bounded"
+        }
+      ]
+    },
+    "0x1307ab4": {
+      "file_offset": 19954356,
+      "virtual_address": 19958452,
+      "function": "litchi_perf_baseline::ordinary_save::classify_inputs",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19958336,
+          "bytes": 1480,
+          "name": "litchi_perf_baseline::ordinary_save::classify_inputs"
+        }
+      ]
+    },
+    "0x13080ab": {
+      "file_offset": 19955883,
+      "virtual_address": 19959979,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x13080f3": {
+      "file_offset": 19955955,
+      "virtual_address": 19960051,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x1308147": {
+      "file_offset": 19956039,
+      "virtual_address": 19960135,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x1308281": {
+      "file_offset": 19956353,
+      "virtual_address": 19960449,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x130829b": {
+      "file_offset": 19956379,
+      "virtual_address": 19960475,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x1308303": {
+      "file_offset": 19956483,
+      "virtual_address": 19960579,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x13083a8": {
+      "file_offset": 19956648,
+      "virtual_address": 19960744,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x1308436": {
+      "file_offset": 19956790,
+      "virtual_address": 19960886,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x13084de": {
+      "file_offset": 19956958,
+      "virtual_address": 19961054,
+      "function": "litchi_perf_baseline::ordinary_save::publish_reference",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19959920,
+          "bytes": 1949,
+          "name": "litchi_perf_baseline::ordinary_save::publish_reference"
+        }
+      ]
+    },
+    "0x130a08d": {
+      "file_offset": 19964045,
+      "virtual_address": 19968141,
+      "function": "litchi_perf_baseline::ordinary_save::Owner::edit",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19967840,
+          "bytes": 4816,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::edit"
+        }
+      ]
+    },
+    "0x130b688": {
+      "file_offset": 19969672,
+      "virtual_address": 19973768,
+      "function": "litchi_perf_baseline::ordinary_save::Owner::open",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19972656,
+          "bytes": 4198,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::open"
+        }
+      ]
+    },
+    "0x130b6e9": {
+      "file_offset": 19969769,
+      "virtual_address": 19973865,
+      "function": "litchi_perf_baseline::ordinary_save::Owner::open",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19972656,
+          "bytes": 4198,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::open"
+        }
+      ]
+    },
+    "0x130c3d2": {
+      "file_offset": 19973074,
+      "virtual_address": 19977170,
+      "function": "litchi_perf_baseline::ordinary_save::Owner::save",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19976864,
+          "bytes": 931,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::save"
+        }
+      ]
+    },
+    "0x130c963": {
+      "file_offset": 19974499,
+      "virtual_address": 19978595,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130d4ab": {
+      "file_offset": 19977387,
+      "virtual_address": 19981483,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130f118": {
+      "file_offset": 19984664,
+      "virtual_address": 19988760,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130f156": {
+      "file_offset": 19984726,
+      "virtual_address": 19988822,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130f1fa": {
+      "file_offset": 19984890,
+      "virtual_address": 19988986,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130f231": {
+      "file_offset": 19984945,
+      "virtual_address": 19989041,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x130fb8f": {
+      "file_offset": 19987343,
+      "virtual_address": 19991439,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x131021b": {
+      "file_offset": 19989019,
+      "virtual_address": 19993115,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x1310431": {
+      "file_offset": 19989553,
+      "virtual_address": 19993649,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x13105d0": {
+      "file_offset": 19989968,
+      "virtual_address": 19994064,
+      "function": "litchi_perf_baseline::ordinary_save::run_case",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 19977808,
+          "bytes": 18380,
+          "name": "litchi_perf_baseline::ordinary_save::run_case"
+        }
+      ]
+    },
+    "0x1362122": {
+      "file_offset": 20324642,
+      "virtual_address": 20328738,
+      "function": "core::ptr::drop_in_place<litchi_docx::package::model::Package>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 20328688,
+          "bytes": 214,
+          "name": "core::ptr::drop_in_place<litchi_docx::package::model::Package>"
+        }
+      ]
+    },
+    "0x13652fa": {
+      "file_offset": 20337402,
+      "virtual_address": 20341498,
+      "function": "core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::Owner>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 20341440,
+          "bytes": 148,
+          "name": "core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::Owner>"
+        }
+      ]
+    },
+    "0x1371624": {
+      "file_offset": 20387364,
+      "virtual_address": 20391460,
+      "function": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 20391344,
+          "bytes": 1702,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>"
+        }
+      ]
+    },
+    "0x13a19f4": {
+      "file_offset": 20584948,
+      "virtual_address": 20589044,
+      "function": "litchi_perf_baseline::filesystem::host_evidence",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20588848,
+          "bytes": 4789,
+          "name": "litchi_perf_baseline::filesystem::host_evidence"
+        }
+      ]
+    },
+    "0x13a1a0b": {
+      "file_offset": 20584971,
+      "virtual_address": 20589067,
+      "function": "litchi_perf_baseline::filesystem::host_evidence",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20588848,
+          "bytes": 4789,
+          "name": "litchi_perf_baseline::filesystem::host_evidence"
+        }
+      ]
+    },
+    "0x13a1cfd": {
+      "file_offset": 20585725,
+      "virtual_address": 20589821,
+      "function": "litchi_perf_baseline::filesystem::host_evidence",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20588848,
+          "bytes": 4789,
+          "name": "litchi_perf_baseline::filesystem::host_evidence"
+        }
+      ]
+    },
+    "0x13a2089": {
+      "file_offset": 20586633,
+      "virtual_address": 20590729,
+      "function": "litchi_perf_baseline::filesystem::host_evidence",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20588848,
+          "bytes": 4789,
+          "name": "litchi_perf_baseline::filesystem::host_evidence"
+        }
+      ]
+    },
+    "0x13a249f": {
+      "file_offset": 20587679,
+      "virtual_address": 20591775,
+      "function": "litchi_perf_baseline::filesystem::host_evidence",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20588848,
+          "bytes": 4789,
+          "name": "litchi_perf_baseline::filesystem::host_evidence"
+        }
+      ]
+    },
+    "0x13a4696": {
+      "file_offset": 20596374,
+      "virtual_address": 20600470,
+      "function": "litchi_perf_baseline::filesystem::command_output",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20600368,
+          "bytes": 596,
+          "name": "litchi_perf_baseline::filesystem::command_output"
+        }
+      ]
+    },
+    "0x13e3f7b": {
+      "file_offset": 20856699,
+      "virtual_address": 20860795,
+      "function": "litchi_perf_baseline::process_metrics::Snapshot::read",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20860752,
+          "bytes": 1288,
+          "name": "litchi_perf_baseline::process_metrics::Snapshot::read"
+        }
+      ]
+    },
+    "0x13e3fb9": {
+      "file_offset": 20856761,
+      "virtual_address": 20860857,
+      "function": "litchi_perf_baseline::process_metrics::Snapshot::read",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20860752,
+          "bytes": 1288,
+          "name": "litchi_perf_baseline::process_metrics::Snapshot::read"
+        }
+      ]
+    },
+    "0x13e4008": {
+      "file_offset": 20856840,
+      "virtual_address": 20860936,
+      "function": "litchi_perf_baseline::process_metrics::Snapshot::read",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 20860752,
+          "bytes": 1288,
+          "name": "litchi_perf_baseline::process_metrics::Snapshot::read"
+        }
+      ]
+    },
+    "0x1447682": {
+      "file_offset": 21264002,
+      "virtual_address": 21268098,
+      "function": "litchi_opc::phys_pkg::PhysPkgWriter<W>::finish_into_inner",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21268048,
+          "bytes": 327,
+          "name": "litchi_opc::phys_pkg::PhysPkgWriter<W>::finish_into_inner"
+        }
+      ]
+    },
+    "0x144a335": {
+      "file_offset": 21275445,
+      "virtual_address": 21279541,
+      "function": "litchi_opc::phys_pkg::PhysPkgWriter<W>::write",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21279024,
+          "bytes": 1514,
+          "name": "litchi_opc::phys_pkg::PhysPkgWriter<W>::write"
+        }
+      ]
+    },
+    "0x144a912": {
+      "file_offset": 21276946,
+      "virtual_address": 21281042,
+      "function": "litchi_opc::phys_pkg::read_owned_path_with_limits",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21280544,
+          "bytes": 1533,
+          "name": "litchi_opc::phys_pkg::read_owned_path_with_limits"
+        }
+      ]
+    },
+    "0x1481624": {
+      "file_offset": 21501476,
+      "virtual_address": 21505572,
+      "function": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        },
+        {
+          "address": 21505536,
+          "bytes": 168,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::take_reusable_deflate"
+        }
+      ]
+    },
+    "0x148afb0": {
+      "file_offset": 21540784,
+      "virtual_address": 21544880,
+      "function": "soapberry_zip::writer::ZipArchiveWriter<W>::finish",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21542128,
+          "bytes": 2875,
+          "name": "soapberry_zip::writer::ZipArchiveWriter<W>::finish"
+        }
+      ]
+    },
+    "0x14ae5f6": {
+      "file_offset": 21685750,
+      "virtual_address": 21689846,
+      "function": "core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<soapberry_zip::writer::ReusableDeflateState>>>",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.07:?",
+      "covering_symbols": [
+        {
+          "address": 21689824,
+          "bytes": 132,
+          "name": "core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<soapberry_zip::writer::ReusableDeflateState>>>"
+        }
+      ]
+    },
+    "0x1530f64": {
+      "file_offset": 22220644,
+      "virtual_address": 22224740,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22224672,
+          "bytes": 456,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+        }
+      ]
+    },
+    "0x1531134": {
+      "file_offset": 22221108,
+      "virtual_address": 22225204,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22225136,
+          "bytes": 456,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+        }
+      ]
+    },
+    "0x1531304": {
+      "file_offset": 22221572,
+      "virtual_address": 22225668,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22225600,
+          "bytes": 456,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+        }
+      ]
+    },
+    "0x1537cc2": {
+      "file_offset": 22248642,
+      "virtual_address": 22252738,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22252416,
+          "bytes": 25887,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+        }
+      ]
+    },
+    "0x153cfc3": {
+      "file_offset": 22269891,
+      "virtual_address": 22273987,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22252416,
+          "bytes": 25887,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+        }
+      ]
+    },
+    "0x15434e3": {
+      "file_offset": 22295779,
+      "virtual_address": 22299875,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22278304,
+          "bytes": 25887,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+        }
+      ]
+    },
+    "0x1549a03": {
+      "file_offset": 22321667,
+      "virtual_address": 22325763,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 22304192,
+          "bytes": 25887,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+        }
+      ]
+    },
+    "0x159d0e0": {
+      "file_offset": 22663392,
+      "virtual_address": 22667488,
+      "function": "soapberry_zip::office::StreamingArchiveWriter<W>::finish_with_progress",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.09:?",
+      "covering_symbols": [
+        {
+          "address": 22667072,
+          "bytes": 929,
+          "name": "soapberry_zip::office::StreamingArchiveWriter<W>::finish_with_progress"
+        }
+      ]
+    },
+    "0x15ae439": {
+      "file_offset": 22733881,
+      "virtual_address": 22737977,
+      "function": "soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated_with_accounting",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.09:?",
+      "covering_symbols": [
+        {
+          "address": 22736816,
+          "bytes": 2748,
+          "name": "soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated_with_accounting"
+        }
+      ]
+    },
+    "0x15c50fb": {
+      "file_offset": 22827259,
+      "virtual_address": 22831355,
+      "function": "litchi_perf_baseline::operation_metrics::aggregate_in_process_observations",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.09:?",
+      "covering_symbols": [
+        {
+          "address": 22831280,
+          "bytes": 1638,
+          "name": "litchi_perf_baseline::operation_metrics::aggregate_in_process_observations"
+        }
+      ]
+    },
+    "0x15c5649": {
+      "file_offset": 22828617,
+      "virtual_address": 22832713,
+      "function": "litchi_perf_baseline::operation_metrics::aggregate_in_process_observations",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.09:?",
+      "covering_symbols": [
+        {
+          "address": 22831280,
+          "bytes": 1638,
+          "name": "litchi_perf_baseline::operation_metrics::aggregate_in_process_observations"
+        }
+      ]
+    },
+    "0x15c575a": {
+      "file_offset": 22828890,
+      "virtual_address": 22832986,
+      "function": "litchi_perf_baseline::operation_metrics::from_in_process_observations_without_sink",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.09:?",
+      "covering_symbols": [
+        {
+          "address": 22832928,
+          "bytes": 612,
+          "name": "litchi_perf_baseline::operation_metrics::from_in_process_observations_without_sink"
+        }
+      ]
+    },
+    "0x16b285d": {
+      "file_offset": 23799901,
+      "virtual_address": 23803997,
+      "function": "litchi_opc::atomic::replace_with_impl",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 23803728,
+          "bytes": 1064,
+          "name": "litchi_opc::atomic::replace_with_impl"
+        }
+      ]
+    },
+    "0x16b2933": {
+      "file_offset": 23800115,
+      "virtual_address": 23804211,
+      "function": "litchi_opc::atomic::replace_with_impl",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 23803728,
+          "bytes": 1064,
+          "name": "litchi_opc::atomic::replace_with_impl"
+        }
+      ]
+    },
+    "0x16b2a7f": {
+      "file_offset": 23800447,
+      "virtual_address": 23804543,
+      "function": "litchi_opc::atomic::replace_with_impl",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 23803728,
+          "bytes": 1064,
+          "name": "litchi_opc::atomic::replace_with_impl"
+        }
+      ]
+    },
+    "0x173ec66": {
+      "file_offset": 24374374,
+      "virtual_address": 24378470,
+      "function": "tempfile::util::create_helper",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 24377760,
+          "bytes": 1249,
+          "name": "tempfile::util::create_helper"
+        }
+      ]
+    },
+    "0x17bfc8d": {
+      "file_offset": 24902797,
+      "virtual_address": 24906893,
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.12:?",
+      "covering_symbols": [
+        {
+          "address": 24906768,
+          "bytes": 175,
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        }
+      ]
+    },
+    "0x17fdfe6": {
+      "file_offset": 25157606,
+      "virtual_address": 25161702,
+      "function": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.13:?",
+      "covering_symbols": [
+        {
+          "address": 25160544,
+          "bytes": 15926,
+          "name": "litchi_opc::pkgwriter::PackageWriter::write_to_stream"
+        }
+      ]
+    },
+    "0x17fe2e9": {
+      "file_offset": 25158377,
+      "virtual_address": 25162473,
+      "function": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.13:?",
+      "covering_symbols": [
+        {
+          "address": 25160544,
+          "bytes": 15926,
+          "name": "litchi_opc::pkgwriter::PackageWriter::write_to_stream"
+        }
+      ]
+    },
+    "0x180c141": {
+      "file_offset": 25215297,
+      "virtual_address": 25219393,
+      "function": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.13:?",
+      "covering_symbols": [
+        {
+          "address": 25207600,
+          "bytes": 15817,
+          "name": "litchi_opc::pkgwriter::PackageWriter::write_to_stream"
+        }
+      ]
+    },
+    "0x1813c63": {
+      "file_offset": 25246819,
+      "virtual_address": 25250915,
+      "function": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.13:?",
+      "covering_symbols": [
+        {
+          "address": 25239184,
+          "bytes": 15748,
+          "name": "litchi_opc::pkgwriter::PackageWriter::write_to_stream"
+        }
+      ]
+    },
+    "0x187fa19": {
+      "file_offset": 25688601,
+      "virtual_address": 25692697,
+      "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter",
+      "location": "litchi_perf_baseline.17fa8aaa5ca6007b-cgu.14:?",
+      "covering_symbols": [
+        {
+          "address": 25692592,
+          "bytes": 247,
+          "name": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter"
+        }
+      ]
+    },
+    "0x2dd8cd7": {
+      "file_offset": 48073943,
+      "virtual_address": 48078039,
+      "function": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48078016,
+          "bytes": 50,
+          "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+        }
+      ]
+    },
+    "0x2dd8ce9": {
+      "file_offset": 48073961,
+      "virtual_address": 48078057,
+      "function": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48078016,
+          "bytes": 50,
+          "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+        }
+      ]
+    },
+    "0x2dd99ec": {
+      "file_offset": 48077292,
+      "virtual_address": 48081388,
+      "function": "litchi_docx::writer::doc::model::MutableDocument::collect_explicit_section_header_footer_relationships",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48081312,
+          "bytes": 368,
+          "name": "litchi_docx::writer::doc::model::MutableDocument::collect_explicit_section_header_footer_relationships"
+        }
+      ]
+    },
+    "0x2dd9b31": {
+      "file_offset": 48077617,
+      "virtual_address": 48081713,
+      "function": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48081680,
+          "bytes": 3914,
+          "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml"
+        }
+      ]
+    },
+    "0x2df904b": {
+      "file_offset": 48205899,
+      "virtual_address": 48209995,
+      "function": "litchi_docx::writer::doc::package::DocumentBody::add_paragraph",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 48209680,
+          "bytes": 465,
+          "name": "litchi_docx::writer::doc::package::DocumentBody::add_paragraph"
+        }
+      ]
+    },
+    "0x2df9b70": {
+      "file_offset": 48208752,
+      "virtual_address": 48212848,
+      "function": "litchi_docx::writer::doc::package::DocumentBody::collect_explicit_section_relationships",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 48212672,
+          "bytes": 676,
+          "name": "litchi_docx::writer::doc::package::DocumentBody::collect_explicit_section_relationships"
+        }
+      ]
+    },
+    "0x2dfaa50": {
+      "file_offset": 48212560,
+      "virtual_address": 48216656,
+      "function": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 48213360,
+          "bytes": 7269,
+          "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml"
+        }
+      ]
+    },
+    "0x2dfc289": {
+      "file_offset": 48218761,
+      "virtual_address": 48222857,
+      "function": "litchi_docx::writer::doc::package::push_raw_body_xml",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 48221312,
+          "bytes": 2505,
+          "name": "litchi_docx::writer::doc::package::push_raw_body_xml"
+        }
+      ]
+    },
+    "0x2dfcb14": {
+      "file_offset": 48220948,
+      "virtual_address": 48225044,
+      "function": "litchi_docx::writer::doc::package::paragraph_section_range",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48224944,
+          "bytes": 1711,
+          "name": "litchi_docx::writer::doc::package::paragraph_section_range"
+        }
+      ]
+    },
+    "0x2e36705": {
+      "file_offset": 48457477,
+      "virtual_address": 48461573,
+      "function": "litchi_docx::writer::paragraph::MutableParagraph::add_run_with_text",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48461552,
+          "bytes": 264,
+          "name": "litchi_docx::writer::paragraph::MutableParagraph::add_run_with_text"
+        }
+      ]
+    },
+    "0x2e37eac": {
+      "file_offset": 48463532,
+      "virtual_address": 48467628,
+      "function": "litchi_docx::writer::paragraph::MutableParagraph::add_run",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48467456,
+          "bytes": 324,
+          "name": "litchi_docx::writer::paragraph::MutableParagraph::add_run"
+        }
+      ]
+    },
+    "0x2e54ca9": {
+      "file_offset": 48581801,
+      "virtual_address": 48585897,
+      "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48585840,
+          "bytes": 99,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "address": 48585840,
+          "bytes": 99,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        }
+      ]
+    },
+    "0x2e5510a": {
+      "file_offset": 48582922,
+      "virtual_address": 48587018,
+      "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48586960,
+          "bytes": 100,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "address": 48586960,
+          "bytes": 100,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "address": 48586960,
+          "bytes": 100,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        }
+      ]
+    },
+    "0x2e5519f": {
+      "file_offset": 48583071,
+      "virtual_address": 48587167,
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 48587072,
+          "bytes": 175,
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        }
+      ]
+    },
+    "0x2e551bd": {
+      "file_offset": 48583101,
+      "virtual_address": 48587197,
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.05:?",
+      "covering_symbols": [
+        {
+          "address": 48587072,
+          "bytes": 175,
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        }
+      ]
+    },
+    "0x2e86350": {
+      "file_offset": 48784208,
+      "virtual_address": 48788304,
+      "function": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48788240,
+          "bytes": 10979,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::new"
+        }
+      ]
+    },
+    "0x2e8b655": {
+      "file_offset": 48805461,
+      "virtual_address": 48809557,
+      "function": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 48808784,
+          "bytes": 1524,
+          "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+        }
+      ]
+    },
+    "0x2ea7d34": {
+      "file_offset": 48921908,
+      "virtual_address": 48926004,
+      "function": "litchi_docx::namespace::scan_word_element_ranges",
+      "location": "litchi_docx.78b8175a0a6c2893-cgu.10:?",
+      "covering_symbols": [
+        {
+          "address": 48925824,
+          "bytes": 5075,
+          "name": "litchi_docx::namespace::scan_word_element_ranges"
+        },
+        {
+          "address": 48925824,
+          "bytes": 5075,
+          "name": "litchi_docx::namespace::scan_word_element_ranges"
+        },
+        {
+          "address": 48925824,
+          "bytes": 5075,
+          "name": "litchi_docx::namespace::scan_word_element_ranges"
+        },
+        {
+          "address": 48925824,
+          "bytes": 5075,
+          "name": "litchi_docx::namespace::scan_word_element_ranges"
+        }
+      ]
+    },
+    "0x30aab3f": {
+      "file_offset": 51030847,
+      "virtual_address": 51034943,
+      "function": "litchi_opc::atomic::sync_parent",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 51034880,
+          "bytes": 171,
+          "name": "litchi_opc::atomic::sync_parent"
+        }
+      ]
+    },
+    "0x30ac89c": {
+      "file_offset": 51038364,
+      "virtual_address": 51042460,
+      "function": "std::sys::thread_local::native::lazy::Storage<T,D>::get_or_init_slow",
+      "location": "litchi_opc.5a8ed9835f9b645d-cgu.04:?",
+      "covering_symbols": [
+        {
+          "address": 51042416,
+          "bytes": 63,
+          "name": "std::sys::thread_local::native::lazy::Storage<T,D>::get_or_init_slow"
+        }
+      ]
+    },
+    "0x30ce620": {
+      "file_offset": 51176992,
+      "virtual_address": 51181088,
+      "function": "litchi_opc::pkgreader::PackageReader::from_phys_reader_deferred",
+      "location": "litchi_opc.5a8ed9835f9b645d-cgu.06:?",
+      "covering_symbols": [
+        {
+          "address": 51180352,
+          "bytes": 2295,
+          "name": "litchi_opc::pkgreader::PackageReader::from_phys_reader_deferred"
+        }
+      ]
+    },
+    "0x30ec2de": {
+      "file_offset": 51299038,
+      "virtual_address": 51303134,
+      "function": "litchi_opc::package::OpcPackage::from_owned_bytes_with_limits",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 51302768,
+          "bytes": 1011,
+          "name": "litchi_opc::package::OpcPackage::from_owned_bytes_with_limits"
+        }
+      ]
+    },
+    "0x30efbe6": {
+      "file_offset": 51313638,
+      "virtual_address": 51317734,
+      "function": "litchi_opc::package::OpcPackage::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 51317680,
+          "bytes": 488,
+          "name": "litchi_opc::package::OpcPackage::new"
+        }
+      ]
+    },
+    "0x30fccea": {
+      "file_offset": 51367146,
+      "virtual_address": 51371242,
+      "function": "core::ops::function::FnOnce::call_once",
+      "location": "litchi_opc.5a8ed9835f9b645d-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 51371200,
+          "bytes": 47,
+          "name": "core::ops::function::FnOnce::call_once"
+        }
+      ]
+    },
+    "0x31299bc": {
+      "file_offset": 51550652,
+      "virtual_address": 51554748,
+      "function": "tempfile::file::create_named",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 51554672,
+          "bytes": 276,
+          "name": "tempfile::file::create_named"
+        }
+      ]
+    },
+    "0x31cf2e7": {
+      "file_offset": 52228839,
+      "virtual_address": 52232935,
+      "function": "soapberry_zip::office::ArchiveReader::new_with_limits",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52224256,
+          "bytes": 9938,
+          "name": "soapberry_zip::office::ArchiveReader::new_with_limits"
+        }
+      ]
+    },
+    "0x31d1a4b": {
+      "file_offset": 52238923,
+      "virtual_address": 52243019,
+      "function": "soapberry_zip::office::ArchiveReader::read_with_accounting",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52241632,
+          "bytes": 2618,
+          "name": "soapberry_zip::office::ArchiveReader::read_with_accounting"
+        }
+      ]
+    },
+    "0x31d1b03": {
+      "file_offset": 52239107,
+      "virtual_address": 52243203,
+      "function": "soapberry_zip::office::ArchiveReader::read_with_accounting",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52241632,
+          "bytes": 2618,
+          "name": "soapberry_zip::office::ArchiveReader::read_with_accounting"
+        }
+      ]
+    },
+    "0x31d2a10": {
+      "file_offset": 52242960,
+      "virtual_address": 52247056,
+      "function": "soapberry_zip::office::ArchiveReader::read",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52247008,
+          "bytes": 57,
+          "name": "soapberry_zip::office::ArchiveReader::read"
+        }
+      ]
+    },
+    "0x31d3a5f": {
+      "file_offset": 52247135,
+      "virtual_address": 52251231,
+      "function": "soapberry_zip::office::LazyArchiveReader::read_shared",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52251168,
+          "bytes": 68,
+          "name": "soapberry_zip::office::LazyArchiveReader::read_shared"
+        }
+      ]
+    },
+    "0x31d47f5": {
+      "file_offset": 52250613,
+      "virtual_address": 52254709,
+      "function": "soapberry_zip::office::LazyArchiveReader::read_shared_with_reader",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 52251472,
+          "bytes": 4624,
+          "name": "soapberry_zip::office::LazyArchiveReader::read_shared_with_reader"
+        }
+      ]
+    },
+    "0x31dea6f": {
+      "file_offset": 52292207,
+      "virtual_address": 52296303,
+      "function": "soapberry_zip::writer::ReusableDeflateState::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52296272,
+          "bytes": 169,
+          "name": "soapberry_zip::writer::ReusableDeflateState::new"
+        }
+      ]
+    },
+    "0x31dea85": {
+      "file_offset": 52292229,
+      "virtual_address": 52296325,
+      "function": "soapberry_zip::writer::ReusableDeflateState::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52296272,
+          "bytes": 169,
+          "name": "soapberry_zip::writer::ReusableDeflateState::new"
+        }
+      ]
+    },
+    "0x31e5b5f": {
+      "file_offset": 52321119,
+      "virtual_address": 52325215,
+      "function": "soapberry_zip::preserve::generated_entry",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 52324208,
+          "bytes": 5418,
+          "name": "soapberry_zip::preserve::generated_entry"
+        }
+      ]
+    },
+    "0x31e5f68": {
+      "file_offset": 52322152,
+      "virtual_address": 52326248,
+      "function": "soapberry_zip::preserve::generated_entry",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 52324208,
+          "bytes": 5418,
+          "name": "soapberry_zip::preserve::generated_entry"
+        }
+      ]
+    },
+    "0x31e6609": {
+      "file_offset": 52323849,
+      "virtual_address": 52327945,
+      "function": "soapberry_zip::preserve::generated_entry",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 52324208,
+          "bytes": 5418,
+          "name": "soapberry_zip::preserve::generated_entry"
+        }
+      ]
+    },
+    "0x31e7b0f": {
+      "file_offset": 52329231,
+      "virtual_address": 52333327,
+      "function": "soapberry_zip::preserve::take_prepared_entry",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52333136,
+          "bytes": 196,
+          "name": "soapberry_zip::preserve::take_prepared_entry"
+        }
+      ]
+    },
+    "0x31eacf1": {
+      "file_offset": 52342001,
+      "virtual_address": 52346097,
+      "function": "core::ptr::drop_in_place<soapberry_zip::writer::ReusableDeflateState>",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.02:?",
+      "covering_symbols": [
+        {
+          "address": 52346080,
+          "bytes": 89,
+          "name": "core::ptr::drop_in_place<soapberry_zip::writer::ReusableDeflateState>"
+        }
+      ]
+    },
+    "0x32008b8": {
+      "file_offset": 52431032,
+      "virtual_address": 52435128,
+      "function": "flate2::deflate::read::DeflateDecoder<R>::new",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 52435088,
+          "bytes": 164,
+          "name": "flate2::deflate::read::DeflateDecoder<R>::new"
+        }
+      ]
+    },
+    "0x32008cb": {
+      "file_offset": 52431051,
+      "virtual_address": 52435147,
+      "function": "flate2::deflate::read::DeflateDecoder<R>::new",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.11:?",
+      "covering_symbols": [
+        {
+          "address": 52435088,
+          "bytes": 164,
+          "name": "flate2::deflate::read::DeflateDecoder<R>::new"
+        }
+      ]
+    },
+    "0x320c3fd": {
+      "file_offset": 52478973,
+      "virtual_address": 52483069,
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "location": "soapberry_zip.483c08126474c7f2-cgu.15:?",
+      "covering_symbols": [
+        {
+          "address": 52482944,
+          "bytes": 175,
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        }
+      ]
+    },
+    "0x321adab": {
+      "file_offset": 52538795,
+      "virtual_address": 52542891,
+      "function": "flate2::mem::Decompress::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52542864,
+          "bytes": 63,
+          "name": "flate2::mem::Decompress::new"
+        }
+      ]
+    },
+    "0x321adfb": {
+      "file_offset": 52538875,
+      "virtual_address": 52542971,
+      "function": "flate2::mem::Compress::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52542944,
+          "bytes": 63,
+          "name": "flate2::mem::Compress::new"
+        }
+      ]
+    },
+    "0x321b08b": {
+      "file_offset": 52539531,
+      "virtual_address": 52543627,
+      "function": "zlib_rs::stable::Deflate::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52543472,
+          "bytes": 276,
+          "name": "zlib_rs::stable::Deflate::new"
+        }
+      ]
+    },
+    "0x321b3b8": {
+      "file_offset": 52540344,
+      "virtual_address": 52544440,
+      "function": "zlib_rs::stable::Inflate::new",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52544320,
+          "bytes": 238,
+          "name": "zlib_rs::stable::Inflate::new"
+        }
+      ]
+    },
+    "0x321efcb": {
+      "file_offset": 52555723,
+      "virtual_address": 52559819,
+      "function": "zlib_rs::deflate::end",
+      "location": "zlib_rs.60155319e0b6da40-cgu.01:?",
+      "covering_symbols": [
+        {
+          "address": 52559712,
+          "bytes": 235,
+          "name": "zlib_rs::deflate::end"
+        }
+      ]
+    },
+    "0x321f53d": {
+      "file_offset": 52557117,
+      "virtual_address": 52561213,
+      "function": "zlib_rs::deflate::init",
+      "location": "zlib_rs.60155319e0b6da40-cgu.01:?",
+      "covering_symbols": [
+        {
+          "address": 52560768,
+          "bytes": 1011,
+          "name": "zlib_rs::deflate::init"
+        }
+      ]
+    },
+    "0x32241bc": {
+      "file_offset": 52576700,
+      "virtual_address": 52580796,
+      "function": "zlib_rs::inflate::init",
+      "location": "zlib_rs.60155319e0b6da40-cgu.00:?",
+      "covering_symbols": [
+        {
+          "address": 52580592,
+          "bytes": 892,
+          "name": "zlib_rs::inflate::init"
+        }
+      ]
+    },
+    "0x32346c1": {
+      "file_offset": 52643521,
+      "virtual_address": 52647617,
+      "function": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 52647072,
+          "bytes": 684,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        }
+      ]
+    },
+    "0x32386ff": {
+      "file_offset": 52659967,
+      "virtual_address": 52664063,
+      "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+      "location": "quick_xml.b87961a3edc75dd2-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 52663968,
+          "bytes": 175,
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        }
+      ]
+    },
+    "0x3238864": {
+      "file_offset": 52660324,
+      "virtual_address": 52664420,
+      "function": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle",
+      "location": "quick_xml.b87961a3edc75dd2-cgu.08:?",
+      "covering_symbols": [
+        {
+          "address": 52664320,
+          "bytes": 142,
+          "name": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle"
+        }
+      ]
+    },
+    "0x328840d": {
+      "file_offset": 52986893,
+      "virtual_address": 52990989,
+      "function": "<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 52990592,
+          "bytes": 610,
+          "name": "<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}"
+        }
+      ]
+    },
+    "0x3289cd7": {
+      "file_offset": 52993239,
+      "virtual_address": 52997335,
+      "function": "__rustc::__rdl_alloc",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 52997264,
+          "bytes": 93,
+          "name": "__rustc::__rdl_alloc"
+        }
+      ]
+    },
+    "0x328c753": {
+      "file_offset": 53004115,
+      "virtual_address": 53008211,
+      "function": "<std::sys::process::unix::common::Command>::spawn",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53008064,
+          "bytes": 4237,
+          "name": "<std::sys::process::unix::common::Command>::spawn"
+        }
+      ]
+    },
+    "0x328d255": {
+      "file_offset": 53006933,
+      "virtual_address": 53011029,
+      "function": "<std::sys::process::unix::common::Command>::spawn",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53008064,
+          "bytes": 4237,
+          "name": "<std::sys::process::unix::common::Command>::spawn"
+        }
+      ]
+    },
+    "0x328e717": {
+      "file_offset": 53012247,
+      "virtual_address": 53016343,
+      "function": "<std::sys::sync::once::futex::Once>::call",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53016096,
+          "bytes": 540,
+          "name": "<std::sys::sync::once::futex::Once>::call"
+        }
+      ]
+    },
+    "0x328e929": {
+      "file_offset": 53012777,
+      "virtual_address": 53016873,
+      "function": "<std::sys::process::unix::common::Stdio>::to_child_stdio",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53016640,
+          "bytes": 404,
+          "name": "<std::sys::process::unix::common::Stdio>::to_child_stdio"
+        }
+      ]
+    },
+    "0x329b2b4": {
+      "file_offset": 53064372,
+      "virtual_address": 53068468,
+      "function": "<std::sys::process::unix::unix::Process>::wait",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53068352,
+          "bytes": 304,
+          "name": "<std::sys::process::unix::unix::Process>::wait"
+        }
+      ]
+    },
+    "0x329c91e": {
+      "file_offset": 53070110,
+      "virtual_address": 53074206,
+      "function": "<std::sys::process::unix::common::Command>::setup_io",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53074128,
+          "bytes": 658,
+          "name": "<std::sys::process::unix::common::Command>::setup_io"
+        }
+      ]
+    },
+    "0x329e8e6": {
+      "file_offset": 53078246,
+      "virtual_address": 53082342,
+      "function": "<std::sys::fs::unix::File>::open_c",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53082112,
+          "bytes": 454,
+          "name": "<std::sys::fs::unix::File>::open_c"
+        }
+      ]
+    },
+    "0x329fa81": {
+      "file_offset": 53082753,
+      "virtual_address": 53086849,
+      "function": "<std::process::Command>::output",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53086800,
+          "bytes": 848,
+          "name": "<std::process::Command>::output"
+        }
+      ]
+    },
+    "0x329fbec": {
+      "file_offset": 53083116,
+      "virtual_address": 53087212,
+      "function": "<std::process::Command>::output",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53086800,
+          "bytes": 848,
+          "name": "<std::process::Command>::output"
+        }
+      ]
+    },
+    "0x329fe2a": {
+      "file_offset": 53083690,
+      "virtual_address": 53087786,
+      "function": "<std::fs::OpenOptions>::_open",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53087648,
+          "bytes": 220,
+          "name": "<std::fs::OpenOptions>::_open"
+        }
+      ]
+    },
+    "0x32a141e": {
+      "file_offset": 53089310,
+      "virtual_address": 53093406,
+      "function": "std::rt::lang_start_internal",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53092688,
+          "bytes": 1739,
+          "name": "std::rt::lang_start_internal"
+        }
+      ]
+    },
+    "0x32a1537": {
+      "file_offset": 53089591,
+      "virtual_address": 53093687,
+      "function": "std::rt::lang_start_internal",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53092688,
+          "bytes": 1739,
+          "name": "std::rt::lang_start_internal"
+        }
+      ]
+    },
+    "0x32a1614": {
+      "file_offset": 53089812,
+      "virtual_address": 53093908,
+      "function": "std::rt::lang_start_internal",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53092688,
+          "bytes": 1739,
+          "name": "std::rt::lang_start_internal"
+        }
+      ]
+    },
+    "0x32a16a1": {
+      "file_offset": 53089953,
+      "virtual_address": 53094049,
+      "function": "std::rt::lang_start_internal",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53092688,
+          "bytes": 1739,
+          "name": "std::rt::lang_start_internal"
+        }
+      ]
+    },
+    "0x32a3e10": {
+      "file_offset": 53100048,
+      "virtual_address": 53104144,
+      "function": "std::thread::functions::available_parallelism",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53103936,
+          "bytes": 6445,
+          "name": "std::thread::functions::available_parallelism"
+        }
+      ]
+    },
+    "0x32a4e19": {
+      "file_offset": 53104153,
+      "virtual_address": 53108249,
+      "function": "std::thread::functions::available_parallelism",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53103936,
+          "bytes": 6445,
+          "name": "std::thread::functions::available_parallelism"
+        }
+      ]
+    },
+    "0x32a63f2": {
+      "file_offset": 53109746,
+      "virtual_address": 53113842,
+      "function": "std::sys::random::linux::hashmap_random_keys",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53113808,
+          "bytes": 48,
+          "name": "std::sys::random::linux::hashmap_random_keys"
+        }
+      ]
+    },
+    "0x32a6476": {
+      "file_offset": 53109878,
+      "virtual_address": 53113974,
+      "function": "std::sys::random::linux::getrandom",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53113856,
+          "bytes": 1443,
+          "name": "std::sys::random::linux::getrandom"
+        }
+      ]
+    },
+    "0x32a9c7b": {
+      "file_offset": 53124219,
+      "virtual_address": 53128315,
+      "function": "std::sys::pal::unix::stack_overflow::imp::drop_handler",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53128192,
+          "bytes": 1362,
+          "name": "std::sys::pal::unix::stack_overflow::imp::drop_handler"
+        }
+      ]
+    },
+    "0x32aa2a4": {
+      "file_offset": 53125796,
+      "virtual_address": 53129892,
+      "function": "std::sys::pal::unix::stack_overflow::imp::make_handler",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53129568,
+          "bytes": 682,
+          "name": "std::sys::pal::unix::stack_overflow::imp::make_handler"
+        }
+      ]
+    },
+    "0x32aa2bb": {
+      "file_offset": 53125819,
+      "virtual_address": 53129915,
+      "function": "std::sys::pal::unix::stack_overflow::imp::make_handler",
+      "location": "std.e28293b1aa0f68bd-cgu.0:?",
+      "covering_symbols": [
+        {
+          "address": 53129568,
+          "bytes": 682,
+          "name": "std::sys::pal::unix::stack_overflow::imp::make_handler"
+        }
+      ]
+    },
+    "0x32aab6b": {
+      "file_offset": 53128043,
+      "virtual_address": 53132139,
+      "function": "std::fs::read_to_string::inner",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53131968,
+          "bytes": 848,
+          "name": "std::fs::read_to_string::inner"
+        }
+      ]
+    },
+    "0x32aaeb7": {
+      "file_offset": 53128887,
+      "virtual_address": 53132983,
+      "function": "std::fs::read::inner",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53132816,
+          "bytes": 754,
+          "name": "std::fs::read::inner"
+        }
+      ]
+    },
+    "0x32ab1c8": {
+      "file_offset": 53129672,
+      "virtual_address": 53133768,
+      "function": "std::fs::write::inner",
+      "location": "??:?",
+      "covering_symbols": [
+        {
+          "address": 53133584,
+          "bytes": 449,
+          "name": "std::fs::write::inner"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "mapping-r1-generated.strace": "8891893fcf066548daa48b79f6ef4b482e5aae2a974777d08dff6b91bd7830b2",
+    "mapping-r1-numbered-list.strace": "71839e29acce7c076dbd6914aa3e71890cc95c4bf3c7e2fbeae02b8c3ba71807",
+    "mapping-r2-generated.strace": "175bb1aac29d75c53e1ed210e9cd6ac3a30e2453e1f92fe2e9c238c1ab4ef760",
+    "mapping-r2-numbered-list.strace": "14fe49e47d366a0d2ee6c2106f4fcb1d2dd01fbeadc3da2a934440f002d2ee7b"
+  },
+  "commands": [
+    {
+      "command": [
+        "/usr/bin/readelf",
+        "-lW",
+        "/home/zhuhe/code/litchi-0718-bin/procfs"
+      ],
+      "exit_code": 0,
+      "stdout": "symbolization-program-headers.txt",
+      "sha256": "a98e4b20ef8c2fa86ac9cce4391604021e5bc4da3d8bf1f4e8d0a850264ad7d7"
+    },
+    {
+      "command": [
+        "/usr/bin/nm",
+        "-n",
+        "-S",
+        "-C",
+        "--defined-only",
+        "/home/zhuhe/code/litchi-0718-bin/procfs"
+      ],
+      "exit_code": 0,
+      "stdout": "symbolization-symbols.txt",
+      "sha256": "19221e902bee73c1442fb9e67063e3237247d9c08f4a8528e081b446944ead70"
+    },
+    {
+      "command": [
+        "/usr/bin/addr2line",
+        "-f",
+        "-C",
+        "-e",
+        "/home/zhuhe/code/litchi-0718-bin/procfs"
+      ],
+      "exit_code": 0,
+      "stdout": "symbolization-resolved.txt",
+      "sha256": "d08a5f8df686361796740c04aaf42b9488e83d10e7512d16459449dd742863bf"
+    }
+  ],
+  "tools": {
+    "/usr/bin/readelf": {
+      "sha256": "2cd76fc8d9bdddc84a7eb1c4f0e80717a7475b95e047e1f67d2203a5f4ecdffd",
+      "bytes": 822408
+    },
+    "/usr/bin/nm": {
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009",
+      "bytes": 48712
+    },
+    "/usr/bin/addr2line": {
+      "sha256": "b2a6c01f1a29ebc82424672a4fcef1d03ccf2d5e160f3238ece1bb17bfecbfd2",
+      "bytes": 31592
+    }
+  },
+  "source_reference": {
+    "url": "https://raw.githubusercontent.com/strace/strace/v6.19/src/unwind-libunwind.c",
+    "file": "strace-unwind-libunwind.c.txt",
+    "sha256": "157b4b860b8b44d4f9594f8ecd399313db9ab87a9be7387c27452ab62694bdfd"
+  },
+  "addresses_sha256": "0ff238a82e564906d71ba2f5f1b8fe46a6185306fb945ffdf1429fa87e5e6b37",
+  "script_sha256": "06673405eb792b7d25c54b29c77edcb660da165657a8c6cbd731b2ec82f4cf38"
+}

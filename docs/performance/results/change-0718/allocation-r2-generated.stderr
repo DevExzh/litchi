@@ -1,0 +1,17 @@
+==2731064== DHAT, a dynamic heap analysis tool
+==2731064== Copyright (C) 2010-2024, and GNU GPL'd, by Mozilla Foundation et al.
+==2731064== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2731064== Command: /home/zhuhe/code/litchi-0718-bin/procfs --warmup 0 --samples 1 --case docx_ordinary_save_counting_publish --json /home/zhuhe/code/litchi/docs/performance/results/change-0718/allocation-r2-generated.json --filesystem-root /home/zhuhe/code/litchi-0718-fs
+==2731064== 
+==2731064== 
+==2731064== Total:     19,162,168 bytes in 86,842 blocks
+==2731064== At t-gmax: 1,145,820 bytes in 732 blocks
+==2731064== At t-end:  592 bytes in 2 blocks
+==2731064== Reads:     26,849,222 bytes
+==2731064== Writes:    21,672,667 bytes
+==2731064== 
+==2731064== To view the resulting profile, open
+==2731064==   file:///usr/libexec/valgrind/dh_view.html
+==2731064== in a web browser, click on "Load...", and then select the file
+==2731064==   /home/zhuhe/code/litchi/docs/performance/results/change-0718/allocation-r2-generated.dhat.json
+==2731064== The text at the bottom explains the abbreviations used in the output.

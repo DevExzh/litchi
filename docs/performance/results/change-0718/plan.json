@@ -1,0 +1,110 @@
+{
+  "cpu": 12,
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "environment_keys": [
+    "LC_ALL",
+    "LANG",
+    "TZ",
+    "RUSTFLAGS",
+    "LD_PRELOAD",
+    "MALLOC_CONF",
+    "GLIBC_TUNABLES",
+    "PERL_HASH_SEED",
+    "PERL_PERTURB_KEYS"
+  ],
+  "environment_overrides": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "expected_environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "schema_version": 1,
+  "revision": "d48a92dc9ae1e04c6d97958614856494211c67e4",
+  "filesystem_root": "/home/zhuhe/code/litchi-0718-fs",
+  "phase": "counting_publish",
+  "order": "Two repeats per lane; second reverses corpus order. Mapping lane completes before allocation lane.",
+  "lanes": {
+    "mapping": {
+      "tool": "/usr/bin/strace",
+      "repeats": 2,
+      "warmup": 100,
+      "samples": 200,
+      "options": [
+        "-k",
+        "--stack-trace-frame-limit=40",
+        "-e",
+        "trace=mmap,mremap,munmap,brk,madvise,mprotect,openat"
+      ]
+    },
+    "allocation": {
+      "tool": "/usr/bin/valgrind",
+      "repeats": 2,
+      "warmup": 0,
+      "samples": 1,
+      "options": [
+        "--tool=dhat",
+        "--num-callers=40"
+      ]
+    }
+  },
+  "expected_children": 8,
+  "owner_frames": [
+    "write_plain",
+    "ordinary_save::run_case"
+  ],
+  "claims": [
+    "Unchanged source; no optimization candidate or acceptance rerun.",
+    "Mapping stacks identify attributed syscall requests, not physical pages or minor-fault causation.",
+    "DHAT records allocation requests under its replacement allocator; it does not preserve native allocator mappings, page faults, timing or RSS.",
+    "Attribute only stacks containing both write_plain and ordinary_save::run_case; retain and report all other contexts separately.",
+    "No native latency claim; all traced/profiled elapsed and procfs values are diagnostic only.",
+    "Fixed repetitions, no discarded results or replacement child.",
+    "An unresolved/truncated stack cannot establish owner absence; fail closed on insufficient owner evidence.",
+    "Mapping traces include100warmups and200measuredphaseinvocations; conservative markerwindows retaincontrol/warmup/measured separation and acquisition-order faultbuckets."
+  ],
+  "marker_protocol": {
+    "paths": [
+      "/proc/self/io",
+      "/proc/self/stat",
+      "/proc/self/status"
+    ],
+    "controls": 32,
+    "snapshots_per_pair": 2,
+    "marker_stack": "ordinary_save::run_case",
+    "window": "after before-snapshot status-open event and before after-snapshot io-open event",
+    "scope": "Conservative operation bracket includes before-probe tail; owner-stack attribution excludes probe calls. This is not the exact clock interval.",
+    "mapping_alignment": "Skip32controlpairs and100warmup iterationpairs; align200remainingwindows with acquisition-order process_probe.sample_deltas."
+  },
+  "stop_rule": "Retain all8fixedchildren. Missing/unresolved marker or owner stacks mean phase attribution unavailable, not zero events. No replacement child; no extra profiling lane to hunt for a desired regime."
+}

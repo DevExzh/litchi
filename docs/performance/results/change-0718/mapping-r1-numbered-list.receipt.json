@@ -1,0 +1,88 @@
+{
+  "job": {
+    "name": "mapping-r1-numbered-list",
+    "lane": "mapping",
+    "repeat": 1,
+    "corpus": {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    },
+    "phase": "counting_publish",
+    "case": "docx_real_file_ordinary_save_counting_publish",
+    "samples": 200,
+    "warmup": 100,
+    "order_index": 1
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/strace",
+    "-k",
+    "--stack-trace-frame-limit=40",
+    "-e",
+    "trace=mmap,mremap,munmap,brk,madvise,mprotect,openat",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0718/mapping-r1-numbered-list.strace",
+    "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_real_file_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0718/mapping-r1-numbered-list.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0718-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T12:21:47.318593+00:00",
+  "seconds": 9.387441501952708,
+  "source_before": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_after": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+  "build_sha256": "0b5dc6499151c597696b721f50341e3ff64063f256e0a60cac0b42787b42d8be",
+  "plan_sha256": "9384c1af315d7fb44402fdf3ece4d3eaf8929d834ee9531865fba6b618b5f355",
+  "script_sha256": "7d7413a4d128c830bd6268c030f0aa94c2238dff0eb5c60d6edcc7fc0a870d36",
+  "tools_sha256": "33fe5f6ab55a41adf8c05b2ed8af1cc16287a21d7f445fc5c4417fe6a7d943e5",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "sha256": "b012f6409ed86d42847e4f86b7d30406ce0b4f355240f42c32a1c94c413d6d3f",
+    "bytes": 63167992
+  },
+  "fixture_before": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "fixture_after": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "mapping-r1-numbered-list.json": "8148afccf8ae29802bb68016f942c305cad9b4e48eaeedeecabb89a35f011497",
+    "mapping-r1-numbered-list.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mapping-r1-numbered-list.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mapping-r1-numbered-list.strace": "71839e29acce7c076dbd6914aa3e71890cc95c4bf3c7e2fbeae02b8c3ba71807"
+  }
+}

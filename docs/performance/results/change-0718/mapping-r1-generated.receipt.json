@@ -1,0 +1,78 @@
+{
+  "job": {
+    "name": "mapping-r1-generated",
+    "lane": "mapping",
+    "repeat": 1,
+    "corpus": {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    "phase": "counting_publish",
+    "case": "docx_ordinary_save_counting_publish",
+    "samples": 200,
+    "warmup": 100,
+    "order_index": 0
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/strace",
+    "-k",
+    "--stack-trace-frame-limit=40",
+    "-e",
+    "trace=mmap,mremap,munmap,brk,madvise,mprotect,openat",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0718/mapping-r1-generated.strace",
+    "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0718/mapping-r1-generated.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0718-fs"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T12:21:33.344246+00:00",
+  "seconds": 13.380308291991241,
+  "source_before": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_after": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+  "build_sha256": "0b5dc6499151c597696b721f50341e3ff64063f256e0a60cac0b42787b42d8be",
+  "plan_sha256": "9384c1af315d7fb44402fdf3ece4d3eaf8929d834ee9531865fba6b618b5f355",
+  "script_sha256": "7d7413a4d128c830bd6268c030f0aa94c2238dff0eb5c60d6edcc7fc0a870d36",
+  "tools_sha256": "33fe5f6ab55a41adf8c05b2ed8af1cc16287a21d7f445fc5c4417fe6a7d943e5",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "sha256": "b012f6409ed86d42847e4f86b7d30406ce0b4f355240f42c32a1c94c413d6d3f",
+    "bytes": 63167992
+  },
+  "fixture_before": null,
+  "fixture_after": null,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "mapping-r1-generated.json": "94ba7554270efe2a497719856fa740fd56237b208ca5a58197007b29d4a230f2",
+    "mapping-r1-generated.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mapping-r1-generated.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mapping-r1-generated.strace": "8891893fcf066548daa48b79f6ef4b482e5aae2a974777d08dff6b91bd7830b2"
+  }
+}

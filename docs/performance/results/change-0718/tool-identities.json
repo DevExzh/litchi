@@ -1,0 +1,18 @@
+{
+  "/usr/bin/strace": {
+    "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5",
+    "bytes": 2374392
+  },
+  "/usr/bin/valgrind": {
+    "sha256": "4652774bd116cb49951ef74115ad4237cad5021b2bd4d80002f09d986ec438b9",
+    "bytes": 528
+  },
+  "/usr/libexec/valgrind/dhat-amd64-linux": {
+    "sha256": "c98c7974b6176c300f338347b6a8f06493b793e49ede6a8c8bf68d393738f871",
+    "bytes": 2559952
+  },
+  "/usr/libexec/valgrind/dh_view.js": {
+    "sha256": "43a7ea302fd5c8d3a7ec52da9203f92910f6340353d192ddcc23bff370f5d548",
+    "bytes": 50377
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "job": {
+    "name": "allocation-r1-generated",
+    "lane": "allocation",
+    "repeat": 1,
+    "corpus": {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    "phase": "counting_publish",
+    "case": "docx_ordinary_save_counting_publish",
+    "samples": 1,
+    "warmup": 0,
+    "order_index": 4
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=dhat",
+    "--num-callers=40",
+    "--dhat-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0718/allocation-r1-generated.dhat.json",
+    "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0718/allocation-r1-generated.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0718-fs"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T12:22:20.917853+00:00",
+  "seconds": 2.6971581740071997,
+  "source_before": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_after": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+  "build_sha256": "0b5dc6499151c597696b721f50341e3ff64063f256e0a60cac0b42787b42d8be",
+  "plan_sha256": "9384c1af315d7fb44402fdf3ece4d3eaf8929d834ee9531865fba6b618b5f355",
+  "script_sha256": "7d7413a4d128c830bd6268c030f0aa94c2238dff0eb5c60d6edcc7fc0a870d36",
+  "tools_sha256": "33fe5f6ab55a41adf8c05b2ed8af1cc16287a21d7f445fc5c4417fe6a7d943e5",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0718-bin/procfs",
+    "sha256": "b012f6409ed86d42847e4f86b7d30406ce0b4f355240f42c32a1c94c413d6d3f",
+    "bytes": 63167992
+  },
+  "fixture_before": null,
+  "fixture_after": null,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "allocation-r1-generated.dhat.json": "d21ea3deabe98966a858b4dde889faeec9d29f346564b9b2956c281befd3e888",
+    "allocation-r1-generated.json": "937849d4f6a640d6596f17815f1290a4e3428437e3dfc71abc19776c24acc39b",
+    "allocation-r1-generated.stderr": "14f7abf036bb0d63de526706a08ac3b37e0ac5b2831712edd5c5831a62e7ef37",
+    "allocation-r1-generated.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

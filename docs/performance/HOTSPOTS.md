@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0718 — DOCX allocation and mapping attribution
+
+[0718](0718-docx-serialization-allocation-mapping.md) retains eight fixed
+unchanged-source profiler children. Generated measured windows contain 399 heap
+growth calls under Deflate initialization; one zero-fault sample has none.
+NumberedList has no measured phase memory syscall. DHAT identifies a 380,032-byte
+compressor allocation per regenerated member. Owner destruction also shrinks
+the heap outside the measured windows. These are scoped mechanism associations,
+not native speedup or causal fault-cost claims. All output parity, eleven
+corruption checks and post-cleanup replay pass. Prior 0715/0618 rejections remain
+unchanged. Future decisions must account for untimed lifetime effects and
+process replication before returning to ranked work-elimination opportunities.
+[Evidence packet](results/change-0718/README.md). The non-iWork goal remains active.
+
 ## 0717 — opt-in DOCX phase process counters
 
 [0717](0717-docx-phase-process-probe.md) retains an opt-in procfs harness feature
