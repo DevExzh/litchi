@@ -1,0 +1,571 @@
+{
+  "schema": "ods-formula-date-time-coverage-v1",
+  "status": "requirements; evidence pending",
+  "normative": "OpenDocument 1.4 Part 4 section 6.10",
+  "functions": {
+    "DATE": {
+      "requirements": [
+        "exact arity 3 with formula-error precedence",
+        "toward-zero Year/Month/Day integer conversion",
+        "positive checked month/day Gregorian rollover",
+        "leap-year and 1900 non-leap behavior",
+        "profile date bounds and checked overflow",
+        "zero or negative Month/Day returns #NUM!"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "DATEDIF": {
+      "requirements": [
+        "exact arity 3 and DateParam/Text conversion",
+        "floored date-only operands and reversed interval #NUM!",
+        "Y/M/D complete-unit calculations with end-of-month clamping",
+        "MD/YM/YD calendar calculations and end-of-month cases",
+        "YM signed month difference then Euclidean modulo 12",
+        "trimmed case-insensitive Y/M/D/MD/YM/YD formats",
+        "empty or unknown format returns #VALUE!"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "DATEVALUE": {
+      "requirements": [
+        "exact arity 1 Text conversion",
+        "fixed ISO/en_US/month-name/datetime parser forms",
+        "combined datetime returns its integer date component",
+        "two-digit year pivot and profile date bounds",
+        "full VALUE numeric grammar fallback without date/clock dispatch",
+        "numeric fallback is floored to an integer date serial"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "DAY": {
+      "requirements": [
+        "exact arity 1 DateParam conversion",
+        "fractional time discarded by date flooring",
+        "Gregorian day component and profile boundary behavior",
+        "malformed text and out-of-domain serial errors"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "DAYS": {
+      "requirements": [
+        "exact arity 2 and ordered EndDate minus StartDate conversion",
+        "finite numeric fractions retained in subtraction",
+        "DateParam text, logical, reference, and formula-error behavior",
+        "no calendar-month normalization"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "DAYS360": {
+      "requirements": [
+        "arity 2-3 with omitted or empty Method default false",
+        "floor date conversion and US/NASD 30US/360 adjustment",
+        "European 30E/360 adjustment with reversed-date sign",
+        "method logical conversion and formula-error precedence",
+        "31st and February-end boundary cases"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "EASTERSUNDAY": {
+      "requirements": [
+        "arity 0-1 with checked explicit Year conversion",
+        "explicit years 1583 through 9956 and Gregorian Easter result",
+        "omitted Year uses explicit calculation timestamp only",
+        "current/following-year selection and timestamp range limits",
+        "typed Unsupported(CalculationClock) without timestamp"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "EDATE": {
+      "requirements": [
+        "exact arity 2 DateParam and Number conversion",
+        "floored start date and toward-zero month addition",
+        "negative and zero month shifts with target month-end clamping",
+        "checked target arithmetic and profile date bounds",
+        "formula-error precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "EOMONTH": {
+      "requirements": [
+        "exact arity 2 DateParam and Integer MonthAdd conversion",
+        "floored start date and toward-zero month addition",
+        "target month final-day result including leap February",
+        "checked target arithmetic and profile date bounds",
+        "formula-error precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "HOUR": {
+      "requirements": [
+        "exact arity 1 TimeParam conversion",
+        "normalized fractional-day extraction using floor",
+        "hour component range 0 through 23 for negative and positive finite times",
+        "malformed text and domain error behavior"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "ISOWEEKNUM": {
+      "requirements": [
+        "exact arity 1 DateParam conversion",
+        "ISO 8601 Monday and first-Thursday week rule",
+        "week-year boundary dates returning adjacent week-years",
+        "profile date flooring and domain errors"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "MINUTE": {
+      "requirements": [
+        "exact arity 1 TimeParam conversion",
+        "selected rounded-total-seconds calculation",
+        "half-away-from-zero rounding and modulo-one-day normalization",
+        "minute component boundary behavior without leap seconds",
+        "formula-error and malformed-time precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "MONTH": {
+      "requirements": [
+        "exact arity 1 DateParam conversion",
+        "fractional time discarded by date flooring",
+        "Gregorian month component range 1 through 12",
+        "malformed text and out-of-domain serial errors"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "NETWORKDAYS": {
+      "requirements": [
+        "arity 2-4 with omitted and explicit-empty optional slots",
+        "inclusive forward and negative reversed interval counting",
+        "default and custom seven-element workweek semantics",
+        "holiday DateSequence conversion, skipping, duplicate handling, and bounds",
+        "all-off workweek returns zero after complete validation",
+        "complete eager sequence scan and formula-error/typed-failure precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "NOW": {
+      "requirements": [
+        "exact arity 0",
+        "explicit timestamp returns its fractional DateTime serial",
+        "typed Unsupported(CalculationClock) without timestamp",
+        "no ambient wall-clock, timezone, locale, or process state access"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "SECOND": {
+      "requirements": [
+        "exact arity 1 TimeParam conversion",
+        "rounded-total-seconds calculation shared with MINUTE",
+        "modulo-one-day normalization and second range 0 through 59",
+        "leap-second rejection and formula-error precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "TIME": {
+      "requirements": [
+        "exact arity 3 finite Number conversion",
+        "direct fractional Hours/Minutes/Seconds formula",
+        "negative fractional and multi-day finite Time values",
+        "checked multiplication, final finiteness, and #NUM! overflow",
+        "formula-error precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "TIMEVALUE": {
+      "requirements": [
+        "exact arity 1 Text conversion",
+        "fixed clock and combined-datetime parser forms",
+        "combined datetime returns fractional day component",
+        "two-digit-free clock validation, 24:00 and leap-second rejection",
+        "full VALUE numeric grammar fallback without date/clock dispatch",
+        "raw finite numeric fallback is preserved as the Time result"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "TODAY": {
+      "requirements": [
+        "exact arity 0",
+        "explicit timestamp returns its integer date component",
+        "typed Unsupported(CalculationClock) without timestamp",
+        "no ambient wall-clock, timezone, locale, or process state access"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "WEEKDAY": {
+      "requirements": [
+        "arity 1-2 with omitted or syntactically empty Type default 1",
+        "DateParam flooring and Gregorian weekday calculation",
+        "accepted Type values 1, 2, 3, and 11 through 17",
+        "returned ranges and first-weekday mappings for every accepted Type",
+        "invalid Type returns #NUM!"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "WEEKNUM": {
+      "requirements": [
+        "arity 1-2 with omitted or syntactically empty Mode default 1",
+        "DateParam flooring and week-start calculation",
+        "accepted modes 1, 2, 11 through 17, 21, and 150",
+        "historical aliases and ISO first-Thursday modes",
+        "finite non-integer and invalid modes return #NUM!"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "WORKDAY": {
+      "requirements": [
+        "arity 2-4 with omitted and explicit-empty optional slots",
+        "DateParam and toward-zero finite Offset conversion",
+        "checked positive/negative workday stepping excluding nonzero start date",
+        "zero offset returns exact input serial including fractional time",
+        "default/custom workweek, holidays, and all-off refusal",
+        "complete eager sequence scan and formula-error/typed-failure precedence"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "YEAR": {
+      "requirements": [
+        "exact arity 1 DateParam conversion",
+        "fractional time discarded by date flooring",
+        "Gregorian year component and profile boundary behavior",
+        "fixed two-digit-year text profile",
+        "malformed text and out-of-domain serial errors"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    "YEARFRAC": {
+      "requirements": [
+        "arity 2-3 with omitted or empty Basis default 0",
+        "DateParam flooring and nonnegative ordered-date result",
+        "basis integer conversion and accepted bases 0 through 4",
+        "US/European 30/360 and actual-day basis procedures",
+        "leap-year, February, 31st, and reversed-date cases",
+        "invalid basis returns #NUM!"
+      ],
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    }
+  },
+  "cross_cutting": [
+    "exact arity and omitted versus explicit-empty argument slots for all 24 functions",
+    "formula errors propagate in source order while typed failures remain evaluation failures",
+    "deterministic Gregorian profile, epoch, serial domain, and no implicit host state",
+    "validated explicit calculation timestamp for NOW/TODAY/EASTERSUNDAY",
+    "fixed-profile borrowed-text parsing, full VALUE numeric grammar fallback without date/clock dispatch, and bounded scratch",
+    "scalar conversion, single-cell references, ReferenceList refusal, and zero-read shape gates",
+    "matrix broadcasting/intersection and typed scalar-reference refusal",
+    "complete DateSequence and LogicalSequence consumption for NETWORKDAYS and WORKDAY",
+    "every inspected reference cell is streamed in descriptor order with work/read/cancellation checks",
+    "source-version and final-cancellation fences surround value evaluation and publication",
+    "checked civil-date arithmetic and bounded date iteration work checkpoints",
+    "bounded parser, sequence, holiday, matrix, and output reservations with explicit drop order",
+    "typed resolver/provider/resource failures supersede retained formula errors and are not caught by IFERROR",
+    "matrix typed failures publish no partial result while formula errors remain result values",
+    "demand-cache entries retain payload/error, position, projected-shape, source, cancellation, and timestamp identity",
+    "timestamp-backed volatile cache hits require the same explicit timestamp and fences",
+    "existing position-sensitive scalar MUNIT criterion cache exclusion remains unchanged",
+    "no package, workbook, formula-cache, locale, filesystem, or process mutation",
+    "independent oracle and native compatibility records corroborate profile results without replacing ODF semantics",
+    "frozen isolated gate receipts and retained raw performance controls with regressions disclosed"
+  ],
+  "cross_cutting_evidence": [
+    {
+      "requirement": "exact arity and omitted versus explicit-empty argument slots for all 24 functions",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "formula errors propagate in source order while typed failures remain evaluation failures",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "deterministic Gregorian profile, epoch, serial domain, and no implicit host state",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "validated explicit calculation timestamp for NOW/TODAY/EASTERSUNDAY",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "fixed-profile borrowed-text parsing, full VALUE numeric grammar fallback without date/clock dispatch, and bounded scratch",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "scalar conversion, single-cell references, ReferenceList refusal, and zero-read shape gates",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "matrix broadcasting/intersection and typed scalar-reference refusal",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "complete DateSequence and LogicalSequence consumption for NETWORKDAYS and WORKDAY",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "every inspected reference cell is streamed in descriptor order with work/read/cancellation checks",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "source-version and final-cancellation fences surround value evaluation and publication",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "checked civil-date arithmetic and bounded date iteration work checkpoints",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "bounded parser, sequence, holiday, matrix, and output reservations with explicit drop order",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "typed resolver/provider/resource failures supersede retained formula errors and are not caught by IFERROR",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "matrix typed failures publish no partial result while formula errors remain result values",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "demand-cache entries retain payload/error, position, projected-shape, source, cancellation, and timestamp identity",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "timestamp-backed volatile cache hits require the same explicit timestamp and fences",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "existing position-sensitive scalar MUNIT criterion cache exclusion remains unchanged",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "no package, workbook, formula-cache, locale, filesystem, or process mutation",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "independent oracle and native compatibility records corroborate profile results without replacing ODF semantics",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    },
+    {
+      "requirement": "frozen isolated gate receipts and retained raw performance controls with regressions disclosed",
+      "evidence": {
+        "schema": "ods-formula-date-time-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+        "bindings": []
+      }
+    }
+  ]
+}
