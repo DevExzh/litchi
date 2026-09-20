@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "packet": "change-0724-xls-checkpoint-attribution",
+  "change": "0724-xls-target-frame-checkpoint-attribution",
+  "purpose": "Attribute the rejected 0723 checkpoint experiment to layout admission and replay selection with a mirrored four-variant capture. This packet records evidence only and has no retention gate.",
+  "baseline_revision": "0d943df447",
+  "cpu": 12,
+  "binary_root": "/home/zhuhe/code/litchi-0724-bin",
+  "capture_root": "captures",
+  "build_manifest": "builds.json",
+  "freeze_record": "freeze.json",
+  "capture_manifest": "captures/manifest.json",
+  "source_roots": [
+    "crates/litchi-cfb",
+    "crates/litchi-xls"
+  ],
+  "probe_roots": [
+    "docs/performance/results/change-0684/repeat-probe",
+    "docs/performance/results/change-0686/probe"
+  ],
+  "binaries": {
+    "native": "xls-index-retry-probe-0686",
+    "repeat": "xls0684-repeat"
+  },
+  "mode": "owned",
+  "variants": [
+    {
+      "variant": "baseline",
+      "description": "The current restored 0d943df447 production sources.",
+      "binary_subdir": "baseline",
+      "source_manifest": "source-baseline.json",
+      "source_archive_dir": "sources/baseline",
+      "changed_paths_from_baseline": []
+    },
+    {
+      "variant": "layout",
+      "description": "The 0723 query-cache layout and checkpoint charge, with baseline source.rs replay code.",
+      "binary_subdir": "layout",
+      "source_manifest": "source-layout.json",
+      "source_archive_dir": "sources/layout",
+      "changed_paths_from_baseline": [
+        "crates/litchi-xls/src/workbook/query_cache.rs"
+      ]
+    },
+    {
+      "variant": "selection",
+      "description": "The 0723 query-cache layout plus replay selection, with the baseline scan_target_cell path.",
+      "binary_subdir": "selection",
+      "source_manifest": "source-selection.json",
+      "source_archive_dir": "sources/selection",
+      "changed_paths_from_baseline": [
+        "crates/litchi-xls/src/workbook/query_cache.rs",
+        "crates/litchi-xls/src/workbook/source.rs"
+      ]
+    },
+    {
+      "variant": "full",
+      "description": "The complete 0723 production candidate sources.",
+      "binary_subdir": "full",
+      "source_manifest": "source-full.json",
+      "source_archive_dir": "sources/full",
+      "changed_paths_from_baseline": [
+        "crates/litchi-xls/src/workbook/query_cache.rs",
+        "crates/litchi-xls/src/workbook/source.rs"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stage": "b0",
+      "round": 1,
+      "variant": "baseline",
+      "order": 0
+    },
+    {
+      "stage": "l0",
+      "round": 1,
+      "variant": "layout",
+      "order": 1
+    },
+    {
+      "stage": "s0",
+      "round": 1,
+      "variant": "selection",
+      "order": 2
+    },
+    {
+      "stage": "f0",
+      "round": 1,
+      "variant": "full",
+      "order": 3
+    },
+    {
+      "stage": "f1",
+      "round": 2,
+      "variant": "full",
+      "order": 0
+    },
+    {
+      "stage": "s1",
+      "round": 2,
+      "variant": "selection",
+      "order": 1
+    },
+    {
+      "stage": "l1",
+      "round": 2,
+      "variant": "layout",
+      "order": 2
+    },
+    {
+      "stage": "b1",
+      "round": 2,
+      "variant": "baseline",
+      "order": 3
+    }
+  ],
+  "mirrored_stage_pairs": [
+    [
+      "b0",
+      "b1"
+    ],
+    [
+      "l0",
+      "l1"
+    ],
+    [
+      "s0",
+      "s1"
+    ],
+    [
+      "f0",
+      "f1"
+    ]
+  ],
+  "cases": [
+    {
+      "case": "54016-first",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "54016-late",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 5095,
+      "column": 106,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "54016-missing",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 108,
+      "budget": 1048576,
+      "expected_status": "missing"
+    },
+    {
+      "case": "Plan1-first",
+      "path": "test-data/ole/xls/WithCustomViews.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "Simple-first",
+      "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    },
+    {
+      "case": "45365-first",
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value"
+    }
+  ],
+  "native": {
+    "probe": "change-0686-xls-index-budget-retry",
+    "queries": 8,
+    "warmups": 3,
+    "samples": 100,
+    "groups": 48,
+    "timing_metrics": [
+      "open",
+      "q1",
+      "q2",
+      "q3",
+      "q8",
+      "q3-to-q8-mean",
+      "open-plus-eight"
+    ],
+    "stats": [
+      "n",
+      "p50",
+      "mean",
+      "p95",
+      "p99",
+      "minimum",
+      "maximum"
+    ],
+    "output_pattern": "{stage}-{case}-native.json",
+    "stderr_pattern": "{stage}-{case}-native.json.stderr"
+  },
+  "repeat": {
+    "probe": "change-0684-xls-repeat",
+    "preparatory_queries": 2,
+    "repetitions": 50000,
+    "processes_per_group": 9,
+    "samples_per_leg": 9,
+    "groups": 48,
+    "output_pattern": "{stage}-{case}-repeat-{sample}.tsv",
+    "stderr_pattern": "{stage}-{case}-repeat-{sample}.tsv.stderr"
+  },
+  "capture": {
+    "native_outputs": 48,
+    "repeat_outputs": 432,
+    "runs": 480,
+    "retain_all_samples": true,
+    "manifest_fields": [
+      "stage",
+      "variant",
+      "case",
+      "lane",
+      "sample",
+      "command",
+      "exit_code",
+      "output",
+      "sha256",
+      "stderr",
+      "stderr_sha256"
+    ],
+    "binding_fields": [
+      "freeze.bindings: relative path -> SHA-256",
+      "freeze.binaries: variant/path/SHA-256/bytes",
+      "manifest.bindings_start",
+      "manifest.bindings_end",
+      "runs.command"
+    ]
+  },
+  "attribution": {
+    "comparison_metrics": [
+      "open",
+      "q1",
+      "q2",
+      "q3",
+      "q8",
+      "q3-to-q8-mean",
+      "open-plus-eight"
+    ],
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99",
+      "minimum",
+      "maximum"
+    ],
+    "effects": [
+      {
+        "name": "layout",
+        "before": "baseline",
+        "after": "layout"
+      },
+      {
+        "name": "selection",
+        "before": "layout",
+        "after": "selection"
+      },
+      {
+        "name": "full",
+        "before": "selection",
+        "after": "full"
+      },
+      {
+        "name": "full-vs-baseline",
+        "before": "baseline",
+        "after": "full"
+      }
+    ],
+    "rounds": [
+      1,
+      2
+    ],
+    "control": "Compare each variant's round-one and round-two captures and report the mirrored order drift. Do not apply a retention or acceptance threshold."
+  },
+  "integrity": {
+    "require_capture_status_complete": true,
+    "require_zero_command_failures": true,
+    "require_exact_run_set": true,
+    "require_exact_raw_hashes": true,
+    "require_binary_hashes": true,
+    "require_source_identity": true,
+    "require_fixture_outcome_parity": true
+  }
+}

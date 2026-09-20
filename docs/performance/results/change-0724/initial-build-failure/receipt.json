@@ -1,0 +1,5 @@
+{
+  "reason": "Diagnostic layout/selection variants intentionally leave checkpoint items unused; crate denies unused. Add narrowly scoped dead_code allowances to diagnostic archived items only; full/baseline and production warning policy unchanged.",
+  "native_captures": 0,
+  "source_restoration_verified": true
+}

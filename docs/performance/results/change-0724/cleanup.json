@@ -1,0 +1,49 @@
+{
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0724",
+    "/home/zhuhe/code/litchi-0724-bin"
+  ],
+  "identities": [
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/baseline/xls0684-repeat",
+      "sha256": "510ec3ae7f8c916b7e57a6946fd2fd8dd4153c59529a7f2ff506b3f94acd6a73",
+      "bytes": 136409480
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/baseline/xls-index-retry-probe-0686",
+      "sha256": "cf7c6d4df5989f8457173a4f60530f42eea8007ddb7585f11d97934b44508a72",
+      "bytes": 136764800
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/layout/xls0684-repeat",
+      "sha256": "b06424df4daf743e9ef20411cb6ce05ba9ebe4dc0bb37106a292ca5d9793806e",
+      "bytes": 136297720
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/layout/xls-index-retry-probe-0686",
+      "sha256": "c9a815b84fecae0e7ce56f06e56e79f1baf8c2af83f9590b10b7aa988761e0ee",
+      "bytes": 136653080
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/selection/xls0684-repeat",
+      "sha256": "ce431876075b8351dadbdaae44594798805a2ba9154e058421121a3f9d9a82c3",
+      "bytes": 136441808
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/selection/xls-index-retry-probe-0686",
+      "sha256": "6b028b31568f242d592aeb0665912b3e0c05103fc4cd8d68213881ab24714b59",
+      "bytes": 136797104
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/full/xls0684-repeat",
+      "sha256": "bbf86c406fc2e585c0f6217b525f239f5bfb39a523b9c5f0bdf59a8a730cb829",
+      "bytes": 136238520
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0724-bin/full/xls-index-retry-probe-0686",
+      "sha256": "84aa04c4a78017b466e7c1f146ff95e68768948fefb553df4b1d31a5dd942d54",
+      "bytes": 136593856
+    }
+  ],
+  "removed": true
+}
