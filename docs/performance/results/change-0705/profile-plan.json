@@ -1,0 +1,25 @@
+{
+  "created_utc": "2026-09-20T04:31:11.370234+00:00",
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "repeats": 2,
+  "warmup": 0,
+  "samples": 1,
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+  ],
+  "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+  "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+  "expected_lifecycle_calls": 5,
+  "expected_measured_calls": 1,
+  "preflight_call_count_note": "The initial three-call lifecycle prediction was wrong: each of the two foreign-source refusal gates also enters publication, so the captured children contain five lifecycle owner calls (no-op, foreign/valid clear, foreign/valid remove) followed by one timed call. This field was corrected after capture; the raw receipts and all numbered dumps are retained.",
+  "scope": "Callgrind guest instructions in SourceBackedEditor::publish_multi_commit_to_stream only; the returned snapshot drop remains in the native publication timer and is outside this owner scope.",
+  "claim": "Attribution only; no latency, hardware-cycle, allocation, or production-change claim."
+}

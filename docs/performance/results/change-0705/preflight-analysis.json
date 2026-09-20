@@ -1,0 +1,615 @@
+{
+  "status": "pass",
+  "claim": "current-head phase attribution; no historical before-after speed claim",
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "revision": "eac6f43db52f4092c50ecc3e1058685024b3bfaf",
+  "native_repeats": 2,
+  "total_samples": 400,
+  "rows": [
+    {
+      "name": "native-r1-medium",
+      "shape": "medium",
+      "repeat": 1,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 16656172,
+        "p95": 16809012,
+        "p99": 16830892,
+        "mean": 16673991.18,
+        "min": 16562501,
+        "max": 17025594
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 81210,
+          "p95": 89021,
+          "p99": 90821,
+          "mean": 81926.99,
+          "min": 78040,
+          "max": 92130
+        },
+        "plan_ns": {
+          "p50": 6266586,
+          "p95": 6337551,
+          "p99": 6352961,
+          "mean": 6272180.02,
+          "min": 6213451,
+          "max": 6362451
+        },
+        "commit_ns": {
+          "p50": 3498992,
+          "p95": 3534217,
+          "p99": 3553087,
+          "mean": 3505667.69,
+          "min": 3477097,
+          "max": 3929220
+        },
+        "publication_ns": {
+          "p50": 6805753,
+          "p95": 6890444,
+          "p99": 6923934,
+          "mean": 6814216.48,
+          "min": 6758594,
+          "max": 6943934
+        },
+        "reopen_ns": {
+          "p50": 30477249,
+          "p95": 30794581,
+          "p99": 31138842,
+          "mean": 30506581.94,
+          "min": 30168278,
+          "max": 31377154
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.004913460077768854,
+        "plan_ns": 0.37616548745229694,
+        "commit_ns": 0.21024766369103956,
+        "publication_ns": 0.40867338877889464
+      }
+    },
+    {
+      "name": "native-r1-dense-sparse",
+      "shape": "dense-sparse",
+      "repeat": 1,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 32763351,
+        "p95": 33250484,
+        "p99": 33813767,
+        "mean": 32823376.3,
+        "min": 32545000,
+        "max": 34200938
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 90470,
+          "p95": 103031,
+          "p99": 106491,
+          "mean": 91598.69,
+          "min": 84310,
+          "max": 110991
+        },
+        "plan_ns": {
+          "p50": 11954689,
+          "p95": 12115470,
+          "p99": 12429811,
+          "mean": 11973404.86,
+          "min": 11784248,
+          "max": 12454901
+        },
+        "commit_ns": {
+          "p50": 6912559,
+          "p95": 6968984,
+          "p99": 7051995,
+          "mean": 6921850.43,
+          "min": 6852044,
+          "max": 7180385
+        },
+        "publication_ns": {
+          "p50": 13787578,
+          "p95": 14037039,
+          "p99": 14843043,
+          "mean": 13836522.32,
+          "min": 13714767,
+          "max": 14925383
+        },
+        "reopen_ns": {
+          "p50": 41404304,
+          "p95": 42042498,
+          "p99": 42217188,
+          "mean": 41441161.69,
+          "min": 40816211,
+          "max": 42376979
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.0027906541107411914,
+        "plan_ns": 0.36478285324962134,
+        "commit_ns": 0.21088173156641415,
+        "publication_ns": 0.4215447610732233
+      }
+    },
+    {
+      "name": "native-r2-medium",
+      "shape": "medium",
+      "repeat": 2,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 16659042,
+        "p95": 16832243,
+        "p99": 16938194,
+        "mean": 16678097.57,
+        "min": 16549652,
+        "max": 17244445
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 81571,
+          "p95": 92621,
+          "p99": 100340,
+          "mean": 83311.78,
+          "min": 77790,
+          "max": 105371
+        },
+        "plan_ns": {
+          "p50": 6276111,
+          "p95": 6332541,
+          "p99": 6350681,
+          "mean": 6278841,
+          "min": 6224611,
+          "max": 6370651
+        },
+        "commit_ns": {
+          "p50": 3507257,
+          "p95": 3547268,
+          "p99": 3579628,
+          "mean": 3508968.06,
+          "min": 3468887,
+          "max": 3588868
+        },
+        "publication_ns": {
+          "p50": 6791629,
+          "p95": 6880163,
+          "p99": 6951024,
+          "mean": 6806976.73,
+          "min": 6706703,
+          "max": 7410077
+        },
+        "reopen_ns": {
+          "p50": 30411059,
+          "p95": 31731127,
+          "p99": 32633541,
+          "mean": 30660657.96,
+          "min": 30130099,
+          "max": 32812842
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.004995280765706661,
+        "plan_ns": 0.37647225492277775,
+        "commit_ns": 0.21039378413949403,
+        "publication_ns": 0.40813868017202154
+      }
+    },
+    {
+      "name": "native-r2-dense-sparse",
+      "shape": "dense-sparse",
+      "repeat": 2,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 33263094,
+        "p95": 34364869,
+        "p99": 34608970,
+        "mean": 33487454.39,
+        "min": 33050503,
+        "max": 34876922
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 97265,
+          "p95": 141891,
+          "p99": 148381,
+          "mean": 107665.22,
+          "min": 89310,
+          "max": 148861
+        },
+        "plan_ns": {
+          "p50": 11876413,
+          "p95": 12333081,
+          "p99": 12437061,
+          "mean": 11966496.61,
+          "min": 11743408,
+          "max": 12662693
+        },
+        "commit_ns": {
+          "p50": 6896979,
+          "p95": 7252206,
+          "p99": 7328266,
+          "mean": 6956758.6,
+          "min": 6807793,
+          "max": 7572647
+        },
+        "publication_ns": {
+          "p50": 14392411,
+          "p95": 14694593,
+          "p99": 14794703,
+          "mean": 14456533.96,
+          "min": 14306250,
+          "max": 14810113
+        },
+        "reopen_ns": {
+          "p50": 40146438,
+          "p95": 42846551,
+          "p99": 43709805,
+          "mean": 40549063.25,
+          "min": 39383614,
+          "max": 44362709
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.0032150912023982004,
+        "plan_ns": 0.3573426773691531,
+        "commit_ns": 0.20774223441950912,
+        "publication_ns": 0.4316999970089396
+      }
+    }
+  ],
+  "repeat_variation_over_five_percent": [
+    {
+      "shape": "medium",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 90821,
+      "repeat2": 100340,
+      "change_percent": 10.481056143402956
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p50",
+      "repeat1": 90470,
+      "repeat2": 97265,
+      "change_percent": 7.510777053166806
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p95",
+      "repeat1": 103031,
+      "repeat2": 141891,
+      "change_percent": 37.7168036804457
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 106491,
+      "repeat2": 148381,
+      "change_percent": 39.336657557915686
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "mean",
+      "repeat1": 91598.69,
+      "repeat2": 107665.22,
+      "change_percent": 17.540130759511953
+    }
+  ],
+  "repeat_drift_over_five_percent": [
+    {
+      "shape": "medium",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 90821,
+      "repeat2": 100340,
+      "change_percent": 10.481056143402956
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p50",
+      "repeat1": 90470,
+      "repeat2": 97265,
+      "change_percent": 7.510777053166806
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p95",
+      "repeat1": 103031,
+      "repeat2": 141891,
+      "change_percent": 37.7168036804457
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 106491,
+      "repeat2": 148381,
+      "change_percent": 39.336657557915686
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "mean",
+      "repeat1": 91598.69,
+      "repeat2": 107665.22,
+      "change_percent": 17.540130759511953
+    }
+  ],
+  "identities": {
+    "medium": {
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226788,
+        "write_calls": 143,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 75,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 64,
+          "bytes_over_65536": 0
+        }
+      },
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+      "untouched_member_count": 12,
+      "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+      "resource_constants": {
+        "implementation": "source-backed",
+        "cache_mode": "unmanaged-control",
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "update_count": 93,
+        "selected_worksheet_count": 4,
+        "source_read_calls": 170,
+        "source_read_bytes": 4233620,
+        "workbook_read_calls": 1,
+        "workbook_read_bytes": 226,
+        "selected_worksheet_read_calls": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "unselected_worksheet_read_calls": 0,
+        "unselected_worksheet_read_bytes": 0,
+        "payload_materializations": 6,
+        "cache_hits": 0,
+        "cache_cold_loads": 6,
+        "cache_waiter_joins": 0,
+        "cache_successful_loads": 6,
+        "cache_failed_loads": 0,
+        "cache_evictions": 0,
+        "cache_bypasses": 0,
+        "cache_oversized_bypasses": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_in_flight_loads": 0,
+        "cache_retained_entries": 6,
+        "cache_retained_bytes": 269785,
+        "cache_budget_managed": false,
+        "payload_memory_limit": null,
+        "publication_planning_memory_headroom": null,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_budget_reservation_failures": 0,
+        "pre_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": 0,
+          "cache_reserved_objects": 0
+        },
+        "post_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": null,
+          "cache_reserved_objects": null
+        },
+        "budget_used_after_package_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_objects_used_after_handles_drop": 0,
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "output_budget_refusal": {
+          "successful_output_ceiling": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "accepted_output_bytes": 0,
+          "source_read_calls": 0,
+          "source_read_bytes": 0,
+          "output_bytes_used": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false,
+          "source_identity_preserved": false
+        }
+      }
+    },
+    "dense-sparse": {
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-sparse",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 17792,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4265472,
+        "archive_bytes": 4251863,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4252436,
+        "write_calls": 143,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 75,
+          "bytes_513_to_4096": 3,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_over_65536": 0
+        }
+      },
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+      "untouched_member_count": 12,
+      "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+      "resource_constants": {
+        "implementation": "source-backed",
+        "cache_mode": "unmanaged-control",
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "update_count": 178,
+        "selected_worksheet_count": 4,
+        "source_read_calls": 170,
+        "source_read_bytes": 4259054,
+        "workbook_read_calls": 1,
+        "workbook_read_bytes": 226,
+        "selected_worksheet_read_calls": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "unselected_worksheet_read_calls": 0,
+        "unselected_worksheet_read_bytes": 0,
+        "payload_materializations": 6,
+        "cache_hits": 0,
+        "cache_cold_loads": 6,
+        "cache_waiter_joins": 0,
+        "cache_successful_loads": 6,
+        "cache_failed_loads": 0,
+        "cache_evictions": 0,
+        "cache_bypasses": 0,
+        "cache_oversized_bypasses": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_in_flight_loads": 0,
+        "cache_retained_entries": 6,
+        "cache_retained_bytes": 509460,
+        "cache_budget_managed": false,
+        "payload_memory_limit": null,
+        "publication_planning_memory_headroom": null,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_budget_reservation_failures": 0,
+        "pre_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": 0,
+          "cache_reserved_objects": 0
+        },
+        "post_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": null,
+          "cache_reserved_objects": null
+        },
+        "budget_used_after_package_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_objects_used_after_handles_drop": 0,
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "output_budget_refusal": {
+          "successful_output_ceiling": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "accepted_output_bytes": 0,
+          "source_read_calls": 0,
+          "source_read_bytes": 0,
+          "output_bytes_used": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false,
+          "source_identity_preserved": false
+        }
+      }
+    }
+  },
+  "uncertainty": "Two fresh serialized children per shape; phase percentiles and aggregate shares are descriptive. Within-child samples are not independent host repetitions. The report contains no historical before-after comparison.",
+  "unavailable": [
+    "operation-local allocations",
+    "peak RSS",
+    "physical provider I/O",
+    "cold cache",
+    "parallel scaling",
+    "native Office producer"
+  ]
+}

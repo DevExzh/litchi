@@ -1,0 +1,14 @@
+==916054== Callgrind, a call-graph generating cache profiler
+==916054== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==916054== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==916054== Command: /home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0705/profile-r1-medium.json
+==916054== 
+==916054== For interactive control, run 'callgrind_control -h'.
+==916054== brk segment overflow in thread #1: can't grow to 0x7bd3000
+==916054== (see section Limitations in user manual)
+==916054== NOTE: further instances of this message will not be shown
+==916054== 
+==916054== Events    : Ir
+==916054== Collected : 170759957
+==916054== 
+==916054== I   refs:      170,759,957

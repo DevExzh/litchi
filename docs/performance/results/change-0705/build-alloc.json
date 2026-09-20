@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0705",
+    "-j",
+    "2"
+  ],
+  "exit_code": 0,
+  "seconds": 92.79242328798864,
+  "binary": "/home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline-alloc",
+  "binary_sha256": "90e1692be1c94fe262b1cec629cb5a7e9e85fd302ee46bdbec351f851327e5f9",
+  "source_manifest_sha256": "8efecea3a3388b92a2ba66f994947b8e54e15b301021a88252c4e824a95a2307"
+}

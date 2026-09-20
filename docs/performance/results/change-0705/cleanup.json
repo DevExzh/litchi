@@ -1,0 +1,25 @@
+{
+  "owned_paths_absent": true,
+  "paths": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0705",
+      "removed": true
+    }
+  ],
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline",
+      "sha256": "96765510fad9eab59d9928a10cfe8a4260f0c5c1f39d9503b532156952089d61",
+      "bytes": 63339216
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline-alloc",
+      "sha256": "90e1692be1c94fe262b1cec629cb5a7e9e85fd302ee46bdbec351f851327e5f9",
+      "bytes": 62980736
+    }
+  ],
+  "temporary_files_removed": [
+    "/tmp/change-0705-analysis.json"
+  ],
+  "scope": "Only the 0705 target and known analysis scratch were removed; unrelated worktrees were preserved."
+}

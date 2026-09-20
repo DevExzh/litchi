@@ -1,5 +1,39 @@
 # Performance hotspot inventory
 
+## 0705 — XLSX publication and planning now outrank commit
+
+[0705](0705-xlsx-edit-save-baseline-refresh.md) refreshes the existing
+source-backed one-percent edit/save route after unchanged-cell readback,
+shared planning traversal and compact layout facts. On medium/dense-sparse
+synthetic shapes, publication is 40.81–43.17% of measured time, planning
+35.73–37.65%, and commit 20.77–21.04%. Planning has the largest allocation
+count and requested-byte volume. For this current synthetic matrix, publication leads the measured phase
+shares; 0520 remains historical context and is not a matched speedup baseline. Source-compatible XML audits account for 54.56–58.13% of publication guest
+instructions, with preservation writing at 41.33–44.71%. The next investigation
+is the auditor and existing typed proof routes, preserving both original and
+replacement validation. The rejected emitted-output parser fusion is not revived.
+
+## 0704 — unchanged slide transforms are reused; capture remains material
+
+[0704](0704-pptx-bounded-slide-mce-retention.md) removes twelve unchanged
+slide transforms from a real one-edit commit and eleven from a two-edit
+commit. Successful owned outputs follow verified raw allocation owners under
+an explicit retention ceiling. Longer total medians improve about 18–19%;
+capture remains about 4.6 ms and commit about 2.9 ms in the initial phase
+measurements. Higher retained memory and allocator peaks are explicit costs.
+The remaining open-through-commit profile contains MCE, namespace parsing,
+byte comparison/copying and notes scanning. Those whole-prefix sample shares
+do not independently attribute capture or justify another parser rewrite.
+
+## 0703 — reuse must be priced by unique owned projections
+
+[0703](0703-pptx-capture-projection-reuse-diagnostic.md) establishes exact
+raw-byte repetition and output ownership before 0704. Real slide projections
+account for 538,356 bytes of unique output capacity; generated projections
+are borrowed. The presentation-only seam was a small historical share and
+was not selected ahead of slide reuse. These are mechanism observations,
+not timing estimates.
+
 ## 0702 — temporary inherited owners removed; early refusal tails remain
 
 [0702](0702-mce-borrowed-inherited-after-marker-search.md) retains borrowed
