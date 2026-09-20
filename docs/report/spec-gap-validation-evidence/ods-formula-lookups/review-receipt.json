@@ -1,0 +1,18 @@
+{
+  "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+  "freeze_sha256": "ec49b19183755117243d5e823222357338022a19b91a2328c746d38c220e9598",
+  "reviews": {
+    "resource": {
+      "path": "resource-review.md",
+      "sha256": "fe82a73675ee3c4d0200e2153a186eb3ef1501f9cd284b8e66cba2fa888474ae",
+      "status": "PASS"
+    },
+    "semantic": {
+      "path": "semantic-review.md",
+      "sha256": "d7db4f94391f12166cad74bf80681848e672e75a552edf8744655be0c926893f",
+      "status": "PASS"
+    }
+  },
+  "schema": "ods-formula-lookups-review-receipt-v1",
+  "status": "PASS"
+}
