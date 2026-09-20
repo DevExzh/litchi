@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "probe": "change-0684-xls-index-budget",
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/45365-2.xls",
+  "input_bytes": 167424,
+  "input_sha256": "8f34695f74d3cec8ef3826c71161b36bcdc2bc939763f346cf8347ac616a5ce0",
+  "worksheet": 0,
+  "row": 0,
+  "column": 0,
+  "max_query_index_bytes": 2097152,
+  "queries_requested": 8,
+  "open_elapsed_ns": 64540,
+  "open_metrics": {
+    "read_calls": 18,
+    "read_bytes": 33523,
+    "version_calls": 16,
+    "len_calls": 1
+  },
+  "open_error": null,
+  "queries": [
+    {
+      "ordinal": 0,
+      "elapsed_ns": 77471,
+      "metrics": {
+        "read_calls": 12,
+        "read_bytes": 132473,
+        "version_calls": 13,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 1,
+      "elapsed_ns": 212151,
+      "metrics": {
+        "read_calls": 12,
+        "read_bytes": 132473,
+        "version_calls": 13,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 2,
+      "elapsed_ns": 1790,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 3,
+      "elapsed_ns": 630,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 4,
+      "elapsed_ns": 500,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 5,
+      "elapsed_ns": 490,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 6,
+      "elapsed_ns": 470,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    },
+    {
+      "ordinal": 7,
+      "elapsed_ns": 460,
+      "metrics": {
+        "read_calls": 3,
+        "read_bytes": 26,
+        "version_calls": 6,
+        "len_calls": 0
+      },
+      "outcome": {
+        "status": "value",
+        "projection": "string:9:02b9520d419e40b7",
+        "error": null
+      },
+      "agrees_with_first": true
+    }
+  ],
+  "all_queries_agree": true,
+  "timing_scope": "elapsed_ns is a diagnostic around one selected query; source counters are the primary comparison and include only the counted owned ReadAt",
+  "source_scope": "counted immutable in-memory ReadAt with stable SourceVersion(684,0); no filesystem or physical-I/O result"
+}

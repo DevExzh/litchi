@@ -1,0 +1,28 @@
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index afec1c787c..bd18f7cc1e 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -3532,6 +3532,14 @@ fn replay_indexed_cell(
+         .sheets
+         .get(sheet_index)
+         .ok_or_else(|| SourceBackedError::WorksheetNotFound(sheet_index.to_string()))?;
++    let slots = index.slots_for(row, column);
++    if slots.is_empty() {
++        if let Some(context) = execution {
++            context.check().map_err(SourceBackedError::from)?;
++        }
++        owner.ensure_current()?;
++        return Ok(None);
++    }
+     let refs = owner
+         .workbook_path
+         .iter()
+@@ -3548,7 +3556,7 @@ fn replay_indexed_cell(
+         |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),
+     );
+     let mut found = None;
+-    for slot in index.slots_for(row, column) {
++    for slot in slots {
+         if let Some(context) = execution {
+             context.check().map_err(SourceBackedError::from)?;
+         }

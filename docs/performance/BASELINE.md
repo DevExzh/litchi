@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0726 — isolated XLS missing-query comparison
+
+[0726](0726-xls-empty-slot-setup-pilot.md) compares baseline `3ad29e42da` with
+one replay-function change using the full 24-native/16-repeat/96-allocator
+matrix. Four native mean checks fail; every native p50 and repeated group passes.
+Missing-query benefit, exact allocation deltas, all 34 budget-source observations
+and independent custody checks pass. Exact source, rejected observations,
+profiles and offline replay are retained in the [packet](results/change-0726/README.md).
+No production baseline advancement is claimed.
+
 ## 0725 — revised XLS checkpoint comparison
 
 [0725](0725-xls-revised-checkpoint-pilot.md) freezes fresh A/A + ABBA captures
