@@ -1,0 +1,1 @@
+The added terminal metadata check initially looked for all_queries_agree at the report level. The actual probe records it per measured owner. Move that assertion to each record; preserve per-query agrees_with_first and exact outcome comparisons. Frozen plan, capture, primary analyzer and raw observations are unchanged.

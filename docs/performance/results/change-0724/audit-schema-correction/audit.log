@@ -1,0 +1,6 @@
+PASS exact four variant contrasts, unchanged CFB and baseline restoration
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0724/audit.py", line 41, in <module>
+    x=read(path);assert x['probe']==plan['native']['probe'] and x['queries']==8 and x['warmups']==3 and x['samples']==100 and x['fresh_owner_per_sample'] is True and x['all_queries_agree'] is True
+                                                                                                                                                                      ~^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'all_queries_agree'

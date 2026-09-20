@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0724 — XLS checkpoint component attribution
+
+[0724](0724-xls-checkpoint-cost-attribution.md) compares baseline, larger layout,
+unpopulated replay selection and the full rejected candidate in mirrored stages.
+Missing-query repeat p50 remains about 7% slower; Simple publication p50 rises
+9.59–12.68%; the late-target loop improves 81.93%. The layout → selection contrast also changes
+scan timing on paths that never execute selection, so differences do not isolate
+constructor instruction costs. Production and the 0723 rejection remain
+unchanged. Next seams are empty-slot setup, borrowed path reuse and transient
+first-target offset capture, all requiring fresh qualification. The goal remains
+active. [Evidence](results/change-0724/README.md).
+
 ## 0723 — rejected XLS target-frame checkpoint
 
 [0723](0723-xls-target-frame-chain-checkpoint.md) removes repeated target-prefix

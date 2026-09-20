@@ -1,0 +1,56 @@
+[
+  {
+    "variant": "baseline",
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "docs/performance/results/change-0684/repeat-probe/Cargo.toml",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 86.9719448320102,
+    "source_manifest": "source-baseline.json",
+    "log": "baseline-xls0684-repeat.build.log",
+    "binary": "/home/zhuhe/code/litchi-0724-bin/baseline/xls0684-repeat",
+    "binary_sha256": "510ec3ae7f8c916b7e57a6946fd2fd8dd4153c59529a7f2ff506b3f94acd6a73",
+    "bytes": 136409480
+  },
+  {
+    "variant": "baseline",
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "docs/performance/results/change-0686/probe/Cargo.toml",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.7753990599885583,
+    "source_manifest": "source-baseline.json",
+    "log": "baseline-xls-index-retry-probe-0686.build.log",
+    "binary": "/home/zhuhe/code/litchi-0724-bin/baseline/xls-index-retry-probe-0686",
+    "binary_sha256": "cf7c6d4df5989f8457173a4f60530f42eea8007ddb7585f11d97934b44508a72",
+    "bytes": 136764800
+  },
+  {
+    "variant": "layout",
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "docs/performance/results/change-0684/repeat-probe/Cargo.toml",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 101,
+    "seconds": 4.863887293031439,
+    "source_manifest": "source-layout.json",
+    "log": "layout-xls0684-repeat.build.log"
+  }
+]

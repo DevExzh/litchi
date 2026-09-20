@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0724 — four-variant XLS diagnostic
+
+[0724](0724-xls-checkpoint-cost-attribution.md) binds eight fresh release binaries
+and 480 processes to restored baseline `0d943df447` and three archived diagnostic
+variants. Six owned-source cases use mirrored stage order, 4,800 measured native
+owners / 38,400 queries and 432 loops / 21.6 million queries. Exact outcomes and
+independent statistics agree. No new production baseline or retention decision
+is established; the earlier rejection stands. All tails, stage drift, source
+contrasts and offline binary witnesses remain in the
+[packet](results/change-0724/README.md).
+
 ## 0723 — rejected XLS checkpoint pilot
 
 [0723](0723-xls-target-frame-chain-checkpoint.md) records A/A and ABBA native

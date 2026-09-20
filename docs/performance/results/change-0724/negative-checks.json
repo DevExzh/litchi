@@ -1,0 +1,36 @@
+{
+  "analyzer_sha256": "5e446183aa1b7072d813abc81bf340db7f081b4b7378e1dd00decbbbecb1aac0",
+  "script_sha256": "57ea07bffd484b0de7335acf3623f45cb824912c0e04dee01cbbcf791c7a4a6f",
+  "checks": [
+    {
+      "name": "positive complete capture",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "raw hash mismatch",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "outcome altered with matching raw hash",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "duplicate run identity",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "repeat count altered with matching raw hash",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "end binding removed",
+      "accepted": false,
+      "expected": false
+    }
+  ]
+}

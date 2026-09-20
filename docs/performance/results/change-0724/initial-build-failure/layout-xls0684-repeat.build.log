@@ -1,0 +1,27 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+error: field `target_chain_checkpoint` is never read
+  --> /home/zhuhe/code/litchi/crates/litchi-xls/src/workbook/query_cache.rs:48:16
+   |
+40 | pub(crate) struct WorksheetCellIndex {
+   |                   ------------------ field in this struct
+...
+48 |     pub(crate) target_chain_checkpoint: Option<(u64, StreamChainCheckpoint)>,
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `WorksheetCellIndex` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `-D dead-code` implied by `-D unused`
+   = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: methods `target_slot_and_chain_checkpoint` and `set_target_chain_checkpoint` are never used
+   --> /home/zhuhe/code/litchi/crates/litchi-xls/src/workbook/query_cache.rs:442:19
+    |
+432 | impl IndexCandidate<'_> {
+    | ----------------------- methods in this implementation
+...
+442 |     pub(crate) fn target_slot_and_chain_checkpoint(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+461 |     pub(crate) fn set_target_chain_checkpoint(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `litchi-xls` (lib) due to 2 previous errors
