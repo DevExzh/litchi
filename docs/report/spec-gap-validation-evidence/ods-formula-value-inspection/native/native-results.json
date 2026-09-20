@@ -1,0 +1,1852 @@
+[
+  {
+    "case": "isblank_empty_ref",
+    "function": "ISBLANK",
+    "formula": "of:=ISBLANK([.$A$2])",
+    "native_formula": "of:=ISBLANK([.$A$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isblank_empty_text_ref",
+    "function": "ISBLANK",
+    "formula": "of:=ISBLANK([.$B$2])",
+    "native_formula": "of:=ISBLANK([.$B$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isblank_error_ref",
+    "function": "ISBLANK",
+    "formula": "of:=ISBLANK([.$E$2])",
+    "native_formula": "of:=ISBLANK([.$E$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iserr_na_ref",
+    "function": "ISERR",
+    "formula": "of:=ISERR([.$E$2])",
+    "native_formula": "of:=ISERR([.$E$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iserr_divzero_ref",
+    "function": "ISERR",
+    "formula": "of:=ISERR([.$F$2])",
+    "native_formula": "of:=ISERR([.$F$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iserror_na_ref",
+    "function": "ISERROR",
+    "formula": "of:=ISERROR([.$E$2])",
+    "native_formula": "of:=ISERROR([.$E$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iserror_divzero_ref",
+    "function": "ISERROR",
+    "formula": "of:=ISERROR([.$F$2])",
+    "native_formula": "of:=ISERROR([.$F$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isna_na_ref",
+    "function": "ISNA",
+    "formula": "of:=ISNA([.$E$2])",
+    "native_formula": "of:=ISNA([.$E$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isna_divzero_ref",
+    "function": "ISNA",
+    "formula": "of:=ISNA([.$F$2])",
+    "native_formula": "of:=ISNA([.$F$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "error_type_na_ref",
+    "function": "ERROR.TYPE",
+    "formula": "of:=ERROR.TYPE([.$E$2])",
+    "native_formula": "of:=ERROR.TYPE([.$E$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 7
+    },
+    "native": {
+      "type": "number",
+      "value": 7
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "error_type_divzero_ref",
+    "function": "ERROR.TYPE",
+    "formula": "of:=ERROR.TYPE([.$F$2])",
+    "native_formula": "of:=ERROR.TYPE([.$F$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 2
+    },
+    "native": {
+      "type": "number",
+      "value": 2
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "error_type_number",
+    "function": "ERROR.TYPE",
+    "formula": "of:=ERROR.TYPE([.$C$2])",
+    "native_formula": "of:=ERROR.TYPE([.$C$2])",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "error-kind-match",
+    "note": "normative generated error; native code may vary"
+  },
+  {
+    "case": "islogical_true_ref",
+    "function": "ISLOGICAL",
+    "formula": "of:=ISLOGICAL([.$D$2])",
+    "native_formula": "of:=ISLOGICAL([.$D$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "islogical_num_ref",
+    "function": "ISLOGICAL",
+    "formula": "of:=ISLOGICAL([.$C$2])",
+    "native_formula": "of:=ISLOGICAL([.$C$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isnumber_num_ref",
+    "function": "ISNUMBER",
+    "formula": "of:=ISNUMBER([.$C$2])",
+    "native_formula": "of:=ISNUMBER([.$C$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isnumber_error_ref",
+    "function": "ISNUMBER",
+    "formula": "of:=ISNUMBER([.$E$2])",
+    "native_formula": "of:=ISNUMBER([.$E$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "istext_text_ref",
+    "function": "ISTEXT",
+    "formula": "of:=ISTEXT([.$G$2])",
+    "native_formula": "of:=ISTEXT([.$G$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "istext_empty_ref",
+    "function": "ISTEXT",
+    "formula": "of:=ISTEXT([.$A$2])",
+    "native_formula": "of:=ISTEXT([.$A$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isnontext_empty_ref",
+    "function": "ISNONTEXT",
+    "formula": "of:=ISNONTEXT([.$A$2])",
+    "native_formula": "of:=ISNONTEXT([.$A$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isnontext_text_ref",
+    "function": "ISNONTEXT",
+    "formula": "of:=ISNONTEXT([.$G$2])",
+    "native_formula": "of:=ISNONTEXT([.$G$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "type_num_ref",
+    "function": "TYPE",
+    "formula": "of:=TYPE([.$C$2])",
+    "native_formula": "of:=TYPE([.$C$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 1
+    },
+    "native": {
+      "type": "number",
+      "value": 8
+    },
+    "comparison": "divergence",
+    "note": "reference to a formula result; native LO exposes formula type 8"
+  },
+  {
+    "case": "type_num_literal",
+    "function": "TYPE",
+    "formula": "of:=TYPE(42)",
+    "native_formula": "of:=TYPE(42)",
+    "normative_profile": {
+      "type": "number",
+      "value": 1
+    },
+    "native": {
+      "type": "number",
+      "value": 1
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "type_logical_literal",
+    "function": "TYPE",
+    "formula": "of:=TYPE(TRUE())",
+    "native_formula": "of:=TYPE(TRUE())",
+    "normative_profile": {
+      "type": "number",
+      "value": 4
+    },
+    "native": {
+      "type": "number",
+      "value": 1
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "type_text_ref",
+    "function": "TYPE",
+    "formula": "of:=TYPE([.$G$2])",
+    "native_formula": "of:=TYPE([.$G$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 2
+    },
+    "native": {
+      "type": "number",
+      "value": 2
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "type_logical_ref",
+    "function": "TYPE",
+    "formula": "of:=TYPE([.$D$2])",
+    "native_formula": "of:=TYPE([.$D$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 4
+    },
+    "native": {
+      "type": "number",
+      "value": 8
+    },
+    "comparison": "divergence",
+    "note": "ODF TYPE code; native LibreOffice uses its own logical code"
+  },
+  {
+    "case": "type_error_ref",
+    "function": "TYPE",
+    "formula": "of:=TYPE([.$E$2])",
+    "native_formula": "of:=TYPE([.$E$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 16
+    },
+    "native": {
+      "type": "number",
+      "value": 16
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "type_array",
+    "function": "TYPE",
+    "formula": "of:=TYPE({1;2})",
+    "native_formula": "of:=TYPE({1;2})",
+    "normative_profile": {
+      "type": "number",
+      "value": 64
+    },
+    "native": {
+      "type": "number",
+      "value": 64
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "type_empty_ref",
+    "function": "TYPE",
+    "formula": "of:=TYPE([.$A$2])",
+    "native_formula": "of:=TYPE([.$A$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 1
+    },
+    "native": {
+      "type": "number",
+      "value": 1
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "n_num_ref",
+    "function": "N",
+    "formula": "of:=N([.$C$2])",
+    "native_formula": "of:=N([.$C$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 42
+    },
+    "native": {
+      "type": "number",
+      "value": 42
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "n_true_ref",
+    "function": "N",
+    "formula": "of:=N([.$D$2])",
+    "native_formula": "of:=N([.$D$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 1
+    },
+    "native": {
+      "type": "number",
+      "value": 1
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "n_text_ref",
+    "function": "N",
+    "formula": "of:=N([.$G$2])",
+    "native_formula": "of:=N([.$G$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 0
+    },
+    "native": {
+      "type": "number",
+      "value": 0
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "n_empty_ref",
+    "function": "N",
+    "formula": "of:=N([.$A$2])",
+    "native_formula": "of:=N([.$A$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 0
+    },
+    "native": {
+      "type": "number",
+      "value": 0
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "n_error_ref",
+    "function": "N",
+    "formula": "of:=N([.$E$2])",
+    "native_formula": "of:=N([.$E$2])",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "na_zero",
+    "function": "NA",
+    "formula": "of:=NA()",
+    "native_formula": "of:=NA()",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "na_one_arg",
+    "function": "NA",
+    "formula": "of:=NA(1)",
+    "native_formula": "of:=NA(1)",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:508"
+    },
+    "comparison": "error-kind-match",
+    "note": "required arity is zero"
+  },
+  {
+    "case": "iseven_zero",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(0)",
+    "native_formula": "of:=ISEVEN(0)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_one",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(1)",
+    "native_formula": "of:=ISEVEN(1)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_neg_one",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(-1)",
+    "native_formula": "of:=ISEVEN(-1)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_two",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(2)",
+    "native_formula": "of:=ISEVEN(2)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_neg_two",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(-2)",
+    "native_formula": "of:=ISEVEN(-2)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_pos_fraction",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(2.5)",
+    "native_formula": "of:=ISEVEN(2.5)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_neg_fraction",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(-2.5)",
+    "native_formula": "of:=ISEVEN(-2.5)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_below_one",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(0.999)",
+    "native_formula": "of:=ISEVEN(0.999)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_neg_below_one",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(-0.999)",
+    "native_formula": "of:=ISEVEN(-0.999)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_2pow53",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(9007199254740992)",
+    "native_formula": "of:=ISEVEN(9.00719925474099E+015)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_2pow53_minus_one",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(9007199254740991)",
+    "native_formula": "of:=ISEVEN(9007199254740991)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_zero",
+    "function": "ISODD",
+    "formula": "of:=ISODD(0)",
+    "native_formula": "of:=ISODD(0)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_one",
+    "function": "ISODD",
+    "formula": "of:=ISODD(1)",
+    "native_formula": "of:=ISODD(1)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_neg_one",
+    "function": "ISODD",
+    "formula": "of:=ISODD(-1)",
+    "native_formula": "of:=ISODD(-1)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_two",
+    "function": "ISODD",
+    "formula": "of:=ISODD(2)",
+    "native_formula": "of:=ISODD(2)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_neg_two",
+    "function": "ISODD",
+    "formula": "of:=ISODD(-2)",
+    "native_formula": "of:=ISODD(-2)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_pos_fraction",
+    "function": "ISODD",
+    "formula": "of:=ISODD(2.5)",
+    "native_formula": "of:=ISODD(2.5)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_neg_fraction",
+    "function": "ISODD",
+    "formula": "of:=ISODD(-2.5)",
+    "native_formula": "of:=ISODD(-2.5)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_below_one",
+    "function": "ISODD",
+    "formula": "of:=ISODD(0.999)",
+    "native_formula": "of:=ISODD(0.999)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_neg_below_one",
+    "function": "ISODD",
+    "formula": "of:=ISODD(-0.999)",
+    "native_formula": "of:=ISODD(-0.999)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_2pow53",
+    "function": "ISODD",
+    "formula": "of:=ISODD(9007199254740992)",
+    "native_formula": "of:=ISODD(9.00719925474099E+015)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_2pow53_minus_one",
+    "function": "ISODD",
+    "formula": "of:=ISODD(9007199254740991)",
+    "native_formula": "of:=ISODD(9007199254740991)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_logical",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(TRUE())",
+    "native_formula": "of:=ISEVEN(TRUE())",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_logical",
+    "function": "ISODD",
+    "formula": "of:=ISODD(TRUE())",
+    "native_formula": "of:=ISODD(TRUE())",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_text",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(\"2\")",
+    "native_formula": "of:=ISEVEN(\"2\")",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:504"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "isodd_text",
+    "function": "ISODD",
+    "formula": "of:=ISODD(\"2\")",
+    "native_formula": "of:=ISODD(\"2\")",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:504"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "iseven_empty_ref",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN([.$A$2])",
+    "native_formula": "of:=ISEVEN([.$A$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:504"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "isodd_empty_ref",
+    "function": "ISODD",
+    "formula": "of:=ISODD([.$A$2])",
+    "native_formula": "of:=ISODD([.$A$2])",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:504"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "iseven_f64_max",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(1.79769313486232E+308)",
+    "native_formula": "of:=ISEVEN(1.7976931348623157E+308)",
+    "normative_profile": {
+      "type": "logical",
+      "value": true
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_f64_max",
+    "function": "ISODD",
+    "formula": "of:=ISODD(1.79769313486232E+308)",
+    "native_formula": "of:=ISODD(1.7976931348623157E+308)",
+    "normative_profile": {
+      "type": "logical",
+      "value": false
+    },
+    "native": {
+      "type": "logical",
+      "value": false
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "iseven_error",
+    "function": "ISEVEN",
+    "formula": "of:=ISEVEN(NA())",
+    "native_formula": "of:=ISEVEN(NA())",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "isodd_error",
+    "function": "ISODD",
+    "formula": "of:=ISODD(NA())",
+    "native_formula": "of:=ISODD(NA())",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "nv_defaults",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1,234.56\")",
+    "native_formula": "of:=NUMBERVALUE(\"1,234.56\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.56
+    },
+    "native": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "nv_us",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1,234.56\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1,234.56\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.56
+    },
+    "native": {
+      "type": "number",
+      "value": 1234.56
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_eu",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1.234,56\";\",\";\".\")",
+    "native_formula": "of:=NUMBERVALUE(\"1.234,56\";\",\";\".\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.56
+    },
+    "native": {
+      "type": "number",
+      "value": 1234.56
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_percent",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\" .5 % \";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\" .5 % \";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.005
+    },
+    "native": {
+      "type": "number",
+      "value": 0.005
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_space_group",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1 234,50\";\",\";\" \")",
+    "native_formula": "of:=NUMBERVALUE(\"1 234,50\";\",\";\" \")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "native": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_leading_decimal",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\".5\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\".5\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.5
+    },
+    "native": {
+      "type": "number",
+      "value": 0.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_exp",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1E3\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1E3\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1000
+    },
+    "native": {
+      "type": "number",
+      "value": 1000
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_plus_space",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\" +1.25 \";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\" +1.25 \";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1.25
+    },
+    "native": {
+      "type": "number",
+      "value": 1.25
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_repeat_percent",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"12%%\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"12%%\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.0012
+    },
+    "native": {
+      "type": "number",
+      "value": 0.0012
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_group_no_decimal",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1,234\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1,234\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234
+    },
+    "native": {
+      "type": "number",
+      "value": 1234
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_group_after_decimal",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1.2,3\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1.2,3\";\".\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_equal_separators",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1,234\";\",\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1,234\";\",\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_bad",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"abc\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"abc\";\".\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_empty",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"\";\".\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_empty_decimal",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1.2\";\"\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1.2\";\"\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_empty_group",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1.2\";\".\";\"\")",
+    "native_formula": "of:=NUMBERVALUE(\"1.2\";\".\";\"\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1.2
+    },
+    "native": {
+      "type": "number",
+      "value": 1.2
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_irregular_group",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"1,23.4\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"1,23.4\";\".\";\",\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 123.4
+    },
+    "native": {
+      "type": "number",
+      "value": 123.4
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "nv_nonfinite",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE(\"INF\";\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE(\"INF\";\".\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#NUM!"
+    },
+    "native": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "nv_error_ref",
+    "function": "NUMBERVALUE",
+    "formula": "of:=NUMBERVALUE([.$E$2];\".\";\",\")",
+    "native_formula": "of:=NUMBERVALUE([.$E$2];\".\";\",\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "value_int",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"123\")",
+    "native_formula": "of:=VALUE(\"123\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 123
+    },
+    "native": {
+      "type": "number",
+      "value": 123
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_signed_exp",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"-1.25E2\")",
+    "native_formula": "of:=VALUE(\"-1.25E2\")",
+    "normative_profile": {
+      "type": "number",
+      "value": -125
+    },
+    "native": {
+      "type": "number",
+      "value": -125
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_percent",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"12%\")",
+    "native_formula": "of:=VALUE(\"12%\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.12
+    },
+    "native": {
+      "type": "number",
+      "value": 0.12
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_currency",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"$1,234.50\")",
+    "native_formula": "of:=VALUE(\"$1,234.50\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "native": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_group_decimal",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1,234.50\")",
+    "native_formula": "of:=VALUE(\"1,234.50\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "native": {
+      "type": "number",
+      "value": 1234.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_fraction",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1 1/2\")",
+    "native_formula": "of:=VALUE(\"1 1/2\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1.5
+    },
+    "native": {
+      "type": "number",
+      "value": 1.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_negative_fraction",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"-1 1/2\")",
+    "native_formula": "of:=VALUE(\"-1 1/2\")",
+    "normative_profile": {
+      "type": "number",
+      "value": -1.5
+    },
+    "native": {
+      "type": "number",
+      "value": -1.5
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_zero_fraction",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"0 3/4\")",
+    "native_formula": "of:=VALUE(\"0 3/4\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.75
+    },
+    "native": {
+      "type": "number",
+      "value": 0.75
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_fraction_99",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1 1/99\")",
+    "native_formula": "of:=VALUE(\"1 1/99\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 1.0101010101010102
+    },
+    "native": {
+      "type": "number",
+      "value": 1.01010101010101
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_fraction_100",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1 1/100\")",
+    "native_formula": "of:=VALUE(\"1 1/100\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "number",
+      "value": 1.01
+    },
+    "comparison": "divergence",
+    "note": "denominator is outside required 1-99 grammar"
+  },
+  {
+    "case": "value_simple_fraction",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"3/4\")",
+    "native_formula": "of:=VALUE(\"3/4\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "number",
+      "value": 46085
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_time_hm",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2:00\")",
+    "native_formula": "of:=VALUE(\"2:00\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.08333333333333333
+    },
+    "native": {
+      "type": "number",
+      "value": 0.0833333333333333
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_time_hms",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"02:03:04\")",
+    "native_formula": "of:=VALUE(\"02:03:04\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.08546296296296296
+    },
+    "native": {
+      "type": "number",
+      "value": 0.085462962962963
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_time_fractional",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"12:34:56.5\")",
+    "native_formula": "of:=VALUE(\"12:34:56.5\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 0.5242650462962963
+    },
+    "native": {
+      "type": "number",
+      "value": 0.524265046296296
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_iso_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2024-02-29\")",
+    "native_formula": "of:=VALUE(\"2024-02-29\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 45351
+    },
+    "native": {
+      "type": "number",
+      "value": 45351
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_short_us_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"5/21/06\")",
+    "native_formula": "of:=VALUE(\"5/21/06\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 38858
+    },
+    "native": {
+      "type": "number",
+      "value": 38858
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_dash_us_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"5-21-2006\")",
+    "native_formula": "of:=VALUE(\"5-21-2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 38858
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_day_short_month_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"29 Oct 2006\")",
+    "native_formula": "of:=VALUE(\"29 Oct 2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 39019
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_date_1900_01_01",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1900-01-01\")",
+    "native_formula": "of:=VALUE(\"1900-01-01\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 2
+    },
+    "native": {
+      "type": "number",
+      "value": 2
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_date_1900_02_28",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1900-02-28\")",
+    "native_formula": "of:=VALUE(\"1900-02-28\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 60
+    },
+    "native": {
+      "type": "number",
+      "value": 60
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_date_1900_03_01",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1900-03-01\")",
+    "native_formula": "of:=VALUE(\"1900-03-01\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 61
+    },
+    "native": {
+      "type": "number",
+      "value": 61
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_invalid_leap",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2023-02-29\")",
+    "native_formula": "of:=VALUE(\"2023-02-29\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "value_iso_datetime",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2024-02-29 12:34:56\")",
+    "native_formula": "of:=VALUE(\"2024-02-29 12:34:56\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 45351.52425925926
+    },
+    "native": {
+      "type": "number",
+      "value": 45351.5242592593
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_iso_t_datetime",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2024-02-29T12:34:56\")",
+    "native_formula": "of:=VALUE(\"2024-02-29T12:34:56\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 45351.52425925926
+    },
+    "native": {
+      "type": "number",
+      "value": 45351.5242592593
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_iso_datetime_hm",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"2024-02-29 12:34\")",
+    "native_formula": "of:=VALUE(\"2024-02-29 12:34\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 45351.52361111111
+    },
+    "native": {
+      "type": "number",
+      "value": 45351.5236111111
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_us_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"5/21/2006\")",
+    "native_formula": "of:=VALUE(\"5/21/2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 38858
+    },
+    "native": {
+      "type": "number",
+      "value": 38858
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_month_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"Oct 29, 2006\")",
+    "native_formula": "of:=VALUE(\"Oct 29, 2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 39019
+    },
+    "native": {
+      "type": "number",
+      "value": 39019
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_full_month_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"29 October 2006\")",
+    "native_formula": "of:=VALUE(\"29 October 2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 39019
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_full_month_comma_date",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"October 29, 2006\")",
+    "native_formula": "of:=VALUE(\"October 29, 2006\")",
+    "normative_profile": {
+      "type": "number",
+      "value": 39019
+    },
+    "native": {
+      "type": "number",
+      "value": 39019
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_invalid_time",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"24:00\")",
+    "native_formula": "of:=VALUE(\"24:00\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "number",
+      "value": 1
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_out_of_domain",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"1899-12-29\")",
+    "native_formula": "of:=VALUE(\"1899-12-29\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#NUM!"
+    },
+    "native": {
+      "type": "number",
+      "value": -1
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_empty_ref",
+    "function": "VALUE",
+    "formula": "of:=VALUE([.$A$2])",
+    "native_formula": "of:=VALUE([.$A$2])",
+    "normative_profile": {
+      "type": "number",
+      "value": 0
+    },
+    "native": {
+      "type": "number",
+      "value": 0
+    },
+    "comparison": "numeric-tolerance"
+  },
+  {
+    "case": "value_empty_text_ref",
+    "function": "VALUE",
+    "formula": "of:=VALUE([.$B$2])",
+    "native_formula": "of:=VALUE([.$B$2])",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "value_error_ref",
+    "function": "VALUE",
+    "formula": "of:=VALUE([.$E$2])",
+    "native_formula": "of:=VALUE([.$E$2])",
+    "normative_profile": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "native": {
+      "type": "error",
+      "value": "#N/A"
+    },
+    "comparison": "exact"
+  },
+  {
+    "case": "value_bad",
+    "function": "VALUE",
+    "formula": "of:=VALUE(\"bogus\")",
+    "native_formula": "of:=VALUE(\"bogus\")",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "error",
+      "value": "Err:502"
+    },
+    "comparison": "error-kind-match"
+  },
+  {
+    "case": "value_number",
+    "function": "VALUE",
+    "formula": "of:=VALUE(42)",
+    "native_formula": "of:=VALUE(42)",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "number",
+      "value": 42
+    },
+    "comparison": "divergence"
+  },
+  {
+    "case": "value_logical",
+    "function": "VALUE",
+    "formula": "of:=VALUE(TRUE())",
+    "native_formula": "of:=VALUE(TRUE())",
+    "normative_profile": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "native": {
+      "type": "logical",
+      "value": true
+    },
+    "comparison": "divergence"
+  }
+]

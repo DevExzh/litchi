@@ -61,6 +61,14 @@
 //! covers the bounded real elementary family (`ABS`, `EXP`, `LN`, `LOG`,
 //! `LOG10`, `MOD`, `POWER`, `QUOTIENT`, `SIGN`, `SQRT`, and `SQRTPI`) through
 //! the same scalar kernels.
+//! Inspection predicates preserve Empty and formula-error identity. `TYPE`
+//! returns `64` for an Array or multi-cell Reference after evaluating all
+//! referenced cells, including every plane of a 3-D Reference. `N` returns
+//! one scalar using reference intersection or an inline Array's first cell.
+//! Other inspection/conversion functions lift over matrices and stream the
+//! current sheet's plane of a 3-D Reference. Reference lists are refused
+//! before cell reads. The fixed conversion profile is documented by
+//! [`super`]; neither document locale nor the host clock is consulted.
 //!
 //! [`Context::new`] defaults to [`Mode::Matrix`]. A bare reference in that mode
 //! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
@@ -173,6 +181,7 @@ mod database;
 mod descriptive;
 #[allow(dead_code)]
 mod geometry;
+mod inspection;
 mod matrix;
 mod order;
 mod owned;
@@ -1558,9 +1567,9 @@ enum ValueFrame<'a> {
     /// evaluation is in matrix mode; direct arrays and multicell references
     /// remain first-class values and are rejected by the conditional kernel.
     VisitConditionalArgument(super::Node<'a>),
-    /// Visit TRANSPOSE's array argument without inheriting a caller's
+    /// Visit a complete Any/Array argument without inheriting a caller's
     /// per-cell projection, while retaining the caller's scalar/matrix mode.
-    VisitTransposeArgument(super::Node<'a>),
+    VisitCompleteArgument(super::Node<'a>),
     /// Visit a scalar parameter with the caller's implicit-intersection
     /// position but without an inherited matrix output projection.  MUNIT
     /// uses this to consume one `[0,0]` input element rather than invoking a
@@ -1945,7 +1954,7 @@ where
                 ValueFrame::VisitConditionalArgument(node) => {
                     self.visit_conditional_argument(node)?
                 },
-                ValueFrame::VisitTransposeArgument(node) => self.visit_transpose_argument(node)?,
+                ValueFrame::VisitCompleteArgument(node) => self.visit_complete_argument(node)?,
                 ValueFrame::VisitScalarArgument(node) => self.visit_scalar_argument(node)?,
                 ValueFrame::RestoreArgumentContext => self.restore_argument_context()?,
                 ValueFrame::Apply(node) => self.apply(node)?,
@@ -2362,10 +2371,12 @@ where
         self.enter_argument_context(node, Mode::Scalar)
     }
 
-    fn visit_transpose_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+    fn visit_complete_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
         // A lazy matrix branch uses scalar execution to request one output
-        // coordinate. Its Array-typed argument still belongs to the enclosing
-        // matrix calculation; do not intersect the argument expression early.
+        // coordinate. Its Any/Array argument still belongs to the enclosing
+        // matrix calculation; do not project a computed Array before its
+        // consumer sees the descriptor. The current position is preserved
+        // for explicitly scalar descendants such as N(reference).
         let mode = if self.projection.is_some() {
             Mode::Matrix
         } else {
@@ -2378,7 +2389,7 @@ where
         // MUNIT does not implicitly iterate over its scalar parameter, but
         // the argument expression still uses the enclosing calculation mode.
         // Its first-element conversion happens after the expression returns.
-        self.visit_transpose_argument(node)
+        self.visit_complete_argument(node)
     }
 
     fn matrix_scalar_parameter(
@@ -2591,6 +2602,12 @@ where
             return self.push_frame(ValueFrame::VisitArgument(value));
         }
 
+        if let Some(function) = super::inspection::Function::from_name(name) {
+            if !function.valid_arity(node.child_count()) {
+                return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+            }
+        }
+
         // A coordinate-independent sequence aggregate may sit inside an
         // array-producing branch. Its arguments normally belong to the eager
         // function schedule, so looking in the cache only from
@@ -2600,6 +2617,7 @@ where
         // its first evaluation.
         let is_sequence = name.eq_ignore_ascii_case("AND")
             || name.eq_ignore_ascii_case("OR")
+            || name.eq_ignore_ascii_case("TYPE")
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
             || statistical::is_statistical_function(name)
@@ -2643,6 +2661,8 @@ where
                 ValueFrame::VisitMatrixArgument(child)
             } else if order::is_order_function(name) && order::matrix_argument(name, index, child) {
                 ValueFrame::VisitMatrixArgument(child)
+            } else if name.eq_ignore_ascii_case("TYPE") || name.eq_ignore_ascii_case("N") {
+                ValueFrame::VisitCompleteArgument(child)
             } else if (statistical::is_statistical_function(name)
                 || descriptive::is_descriptive_function(name))
                 && Self::statistical_matrix_argument(child)
@@ -2722,7 +2742,7 @@ where
                 ))?;
             let frame = match function {
                 MatrixFunction::Unit => ValueFrame::VisitScalarArgument(child),
-                MatrixFunction::Transpose => ValueFrame::VisitTransposeArgument(child),
+                MatrixFunction::Transpose => ValueFrame::VisitCompleteArgument(child),
                 MatrixFunction::Determinant
                 | MatrixFunction::Inverse
                 | MatrixFunction::Multiply => ValueFrame::VisitMatrixArgument(child),
@@ -3152,6 +3172,18 @@ where
             {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if super::inspection::is_inspection_function(name) => {
+                if name.eq_ignore_ascii_case("TYPE")
+                    && node.child_count() == 1
+                    && let Some(child) = node.child(0)
+                    && self.cacheable_sequence_operand(child)?
+                {
+                    // TYPE scans a complete direct descriptor before caching
+                    // its scalar type code; no projection coordinate is used.
+                    return Ok(true);
+                }
+                self.cacheable_conditional_criterion(node)
+            },
             super::Kind::Function { name } if paired::is_paired_function(name) => {
                 self.cacheable_conditional_criterion(node)
             },
@@ -3265,7 +3297,9 @@ where
                         // a different reference cell at each projected output
                         // coordinate. Keep computed text reductions out of
                         // this cache even when their reference geometry is fixed.
-                        if super::text::is_text_function(name) {
+                        if super::text::is_text_function(name)
+                            || super::inspection::is_inspection_function(name)
+                        {
                             return Ok(false);
                         }
                         if order::is_order_function(name)
@@ -3462,6 +3496,7 @@ where
                         return Ok(false);
                     }
                     let full_arguments = aggregate::is_aggregate_function(name)
+                        || name.eq_ignore_ascii_case("TYPE")
                         || statistical::is_statistical_function(name)
                         || descriptive::is_descriptive_function(name)
                         || complex::is_complex_sequence_function(name)
@@ -4143,6 +4178,8 @@ where
                             || descriptive::is_descriptive_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
+                            || name.eq_ignore_ascii_case("TYPE")
+                            || name.eq_ignore_ascii_case("N")
                         {
                             // Database functions, IMSUM and IMPRODUCT reduce their complete
                             // sequence arguments to one scalar value. Do not
@@ -4217,10 +4254,18 @@ where
                     } else if children == 0 {
                         self.push_shape_value(Some(Shape::new(1, 1)?))?;
                     } else {
+                        let base = if node
+                            .function_name()
+                            .is_some_and(super::inspection::is_inspection_function)
+                        {
+                            inspection::shape_base(self, node)?
+                        } else {
+                            None
+                        };
                         self.push_shape_frame(ShapeFrame::Exit {
                             node,
                             children,
-                            base: None,
+                            base,
                         })?;
                         for index in (0..children).rev() {
                             let child =
@@ -5062,10 +5107,23 @@ where
                             || descriptive::is_descriptive_function(name)
                             || conditional::is_conditional_function(name)
                             || database::is_database_function(name)
+                            || name.eq_ignore_ascii_case("TYPE")
+                            || name.eq_ignore_ascii_case("N")
                         {
                             continue;
                         }
-                        kind = match (kind, Self::reference_kind_value_into_kind(child)) {
+                        let child = Self::reference_kind_value_into_kind(child);
+                        let child = if super::inspection::Function::from_name(name)
+                            .is_some_and(|function| function.inspects_errors())
+                            && matches!(child, ReferenceOperandKind::Error(_))
+                        {
+                            // The input error is data for a predicate/type
+                            // inspector; it does not describe the result.
+                            ReferenceOperandKind::Scalar
+                        } else {
+                            child
+                        };
+                        kind = match (kind, child) {
                             (ReferenceOperandKind::Array, _)
                             | (_, ReferenceOperandKind::Array)
                             | (ReferenceOperandKind::Reference, _)
@@ -5708,7 +5766,9 @@ where
                     || statistical::is_statistical_function(name)
                     || descriptive::is_descriptive_function(name)
                     || name.eq_ignore_ascii_case("TRUE")
-                    || name.eq_ignore_ascii_case("FALSE") =>
+                    || name.eq_ignore_ascii_case("FALSE")
+                    || name.eq_ignore_ascii_case("TYPE")
+                    || name.eq_ignore_ascii_case("N") =>
             {
                 Ok(Some(Shape::new(1, 1)?))
             },
@@ -6643,6 +6703,20 @@ where
         if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
             let value = self.apply_sequence(arguments, name.eq_ignore_ascii_case("AND"))?;
             if cacheable_sequence {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if super::inspection::is_inspection_function(name) {
+            let cacheable = name.eq_ignore_ascii_case("TYPE")
+                && self.projection.is_some()
+                && self.cacheable_scalar_branch(node)?;
+            if cacheable && let Some(value) = self.demand_cache_get(node)? {
+                return self.push_value(value);
+            }
+            let value = inspection::apply(self, name, arguments)?;
+            if cacheable {
                 self.demand_cache_put(node, &value)?;
             }
             return self.push_value(value);

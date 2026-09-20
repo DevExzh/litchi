@@ -41,7 +41,19 @@
 //! The section 6.20 text family uses Unicode scalar positions, pinned Unicode
 //! case and category data, literal searches, and bounded owned output. Its
 //! formatting functions use an invariant profile rather than ambient locale
-//! services. The section 6.7 byte-position family is not included.
+//! services. The seven section 6.7 byte-position functions use UTF-8 octets
+//! and preserve complete Unicode scalar boundaries.
+//! Value inspection and conversion cover `ERROR.TYPE`, `ISBLANK`, `ISERR`,
+//! `ISERROR`, `ISEVEN`, `ISLOGICAL`, `ISNA`, `ISNONTEXT`, `ISNUMBER`, `ISODD`,
+//! `ISTEXT`, `N`, `NA`, `NUMBERVALUE`, `TYPE`, and `VALUE`. Formula errors
+//! remain inspectable values; resource, cancellation, and provider failures
+//! remain typed evaluation failures. The value API preserves blank cells
+//! separately from empty Text and supports reference/array inspection.
+//! `VALUE` uses fixed en-US numeric, fraction, date, time, and datetime forms,
+//! the 1899-12-30 Gregorian epoch without a fictitious leap day, and a
+//! 1930-based two-digit-year window. Accepted dates span 1899-12-30 through
+//! 9999-12-31. Document locale and calendar settings are not read implicitly.
+//! `NUMBERVALUE` accepts explicit separators, defaulting to `.` and `,`.
 //! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
@@ -80,7 +92,7 @@
 //! * this bounded profile uses explicit case-sensitive text comparison; a
 //!   future host setting must use a specified Unicode case-folding policy
 //!   before being exposed here;
-//! * text-to-number conversion accepts only locale-independent decimal-point
+//! * ordinary implicit text-to-number conversion accepts only locale-independent decimal-point
 //!   syntax and reports a value error when conversion fails;
 //! * Text used where a Logical is required reports `#VALUE!`; AND/OR follow
 //!   their `NumberSequenceList` signature and convert scalar numeric Text;
@@ -169,6 +181,7 @@ mod descriptive;
 mod discrete;
 mod dyadic;
 mod elementary;
+mod inspection;
 pub(super) mod numerics;
 mod order;
 mod paired;
@@ -979,6 +992,15 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if inspection::is_inspection_function(name) {
+            if inspection::Function::from_name(name)
+                .is_some_and(|function| !function.valid_arity(node.child_count()))
+            {
+                return self.push_value(WorkingValue::Error(ScalarError::Value));
+            }
+            return self.schedule_eager_function(node);
+        }
+
         if text::is_text_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1096,6 +1118,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if discrete::is_discrete_function(name) {
             return discrete::apply(self, node, name);
+        }
+        if inspection::is_inspection_function(name) {
+            return inspection::apply(self, node, name);
         }
         if text::is_text_function(name) {
             return text::apply(self, node, name);
