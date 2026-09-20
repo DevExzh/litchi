@@ -5131,18 +5131,37 @@ fn metadata_expected(case: &Case, index: usize) -> Value<'static> {
     {
         return Value::Error(ScalarError::Value);
     }
-    if name.ends_with("row-matrix") || name.ends_with("row-projected") {
+    if (name.ends_with("row-matrix") || name.ends_with("row-projected"))
+        && !name.starts_with("reference-control-")
+    {
         return number((index + 2) as f64);
     }
-    if name.ends_with("column-matrix") || name.ends_with("column-projected") {
+    if (name.ends_with("column-matrix") || name.ends_with("column-projected"))
+        && !name.starts_with("reference-control-")
+    {
         return number((index + 2) as f64);
     }
-    if name.ends_with("rows-projected") || name.ends_with("columns-projected") {
+    if (name.ends_with("rows-projected") || name.ends_with("columns-projected"))
+        && !name.starts_with("reference-control-")
+    {
         return number(2.0);
     }
     let expected = match name {
-        "reference-control-rows-descriptor" | "reference-control-rows-projected" => 64.0,
-        "reference-control-row-projected" => 1.0,
+        "reference-control-rows-descriptor" => 64.0,
+        "reference-control-rows-projected" => {
+            if index == 0 {
+                64.0
+            } else {
+                0.0
+            }
+        },
+        "reference-control-row-projected" => {
+            if index == 0 {
+                1.0
+            } else {
+                2.0
+            }
+        },
         "reference-metadata-areas-range" | "reference-metadata-areas-3d" => 1.0,
         "reference-metadata-areas-list" | "reference-metadata-areas-duplicate-list" => 2.0,
         "reference-metadata-column-current"
@@ -5706,7 +5725,11 @@ fn eval_scalar<'a>(
 }
 
 fn metadata_mode(case: &Case) -> Mode {
-    if case.operation.is_lookup() && case.shape.is_scalar_input() {
+    if case.name.starts_with("lookup-indirect-projected-dynamic-") {
+        // SUM publishes a scalar, but its IF operand must evaluate every
+        // projected coordinate in this scaling lane.
+        Mode::Matrix
+    } else if case.operation.is_lookup() && case.shape.is_scalar_input() {
         Mode::Scalar
     } else if is_metadata_case(case)
         && (case.name.ends_with("-matrix") || case.name.ends_with("-projected"))
