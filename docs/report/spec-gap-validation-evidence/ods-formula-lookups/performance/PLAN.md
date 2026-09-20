@@ -55,7 +55,7 @@ per-case reads, source identity, and the flat retained manifest. The independent
 field when it is run after raw receipts are retained.
 
 Do not start timing from this preparation tree. Once root freezes the source,
-pin the contract SHA256, update any contract-reviewed read exceptions in the
+verify the pinned contract SHA256, update any contract-reviewed read exceptions in the
 matrix, run syntax/format checks, and invoke the command in `README.md` from
 the repository root. Preserve any failed setup or preflight under a diagnostic
 sibling and record its reason; do not rerun to select a more favorable metric.

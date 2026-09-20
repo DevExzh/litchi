@@ -31,7 +31,7 @@ BASELINE_COMMIT = "635fd2e1348b621426b50909cbd5765c91837306"
 BINARY_NAME = "ods-formula-lookups-performance"
 # The source freeze records the reviewed contract digest. Keeping it in the
 # runner makes a capture fail closed if the contract is changed afterward.
-CONTRACT_SHA256 = "PENDING_LOOKUP_CONTRACT_SHA256"
+CONTRACT_SHA256 = "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf"
 PHASES = ("evaluate", "parse-evaluate")
 MATRIX_PATH = HERE / "case-matrix.json"
 MATRIX = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
