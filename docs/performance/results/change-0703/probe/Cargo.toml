@@ -1,0 +1,18 @@
+[package]
+name = "probe0703"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+
+[[bin]]
+name = "probe0703"
+path = "src/main.rs"
+
+[profile.release]
+debug = 1
+strip = false

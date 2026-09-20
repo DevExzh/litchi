@@ -1,0 +1,7 @@
+probe	0703
+source	test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+archive_bytes	108164
+workflow	one
+iterations	1
+first_target	slide=1	shape=1
+result	workflow=one	iteration=0	changed=true	commit_changed=true	revision=7979a0ad3a37d8c94fac950c495b122ae71da79b8199430bfaf44cf78f3ac841
