@@ -1,0 +1,41 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "elapsed-mean",
+      "rejected": true,
+      "error": "AssertionError('native-r1-generated-edit.elapsed_ns.mean: 351476.4500000001 != 351475.45')"
+    },
+    {
+      "name": "command-cpu",
+      "rejected": true,
+      "error": "AssertionError()"
+    },
+    {
+      "name": "decoded-manifest-size",
+      "rejected": true,
+      "error": "AssertionError('native-r1-numbered-list-edit decoded target manifest identity changed')"
+    },
+    {
+      "name": "failed-measured-file-sync",
+      "rejected": true,
+      "error": "AssertionError('transaction 5: temporary fsync/fdatasync did not succeed')"
+    },
+    {
+      "name": "failed-setup-parent-sync",
+      "rejected": true,
+      "error": "AssertionError('transaction 1: parent-directory fsync/fdatasync did not succeed')"
+    },
+    {
+      "name": "wrong-measured-sync-path",
+      "rejected": true,
+      "error": "AssertionError('transaction 5: temp sync fd/path mismatch')"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "exact_positive_replay": true,
+  "temporary_trace_removed": true,
+  "analysis_sha256": "26fa405144d14487136871f4668cf770268999f741ea34e4ef7dfb064a4c6bb5",
+  "analyzer_sha256": "d7d18c74c34810b6e1253d9a5ebc98b04a5c043eace8252005ab675380e61b1c",
+  "trace_parser_sha256": "d94965290c3b0c1edbfc26aecc9de670e9b1495b8a89a598b0045bd72c407878"
+}

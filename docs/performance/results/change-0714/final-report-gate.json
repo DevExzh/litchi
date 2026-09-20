@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.051554886973463,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0714-docx-atomic-publication-attribution.md": "e084503880f56f9dab560fad7947c6a0fa973599b4d56b0a2792f8870e354256",
+    "docs/performance/BASELINE.md": "cd9bd5ab63cbfe8104e714f4ddcd800834631a3a2e35149c3256d8238440e11c",
+    "docs/performance/HOTSPOTS.md": "24ea47c32747ecc1d51845b703e13b0aaf8ee4362fe68ffafc012751be4610d8",
+    "docs/performance/GOAL_AUDIT.md": "8f24b57e6462a510618a4d505e560d2a91a811d04f9b4937be92e65d0244fd04",
+    "docs/performance/REPORT.md": "fbb451a4b6732d2fc6b01f6f814f9314f3eb20dc8cde6c74ca7c68f1ef71e898",
+    "docs/performance/results/change-0714/README.md": "9a93cfd037e4797c0f31333c5d139aa3a28a0b767560ba4f14736b42d4b2494c"
+  }
+}

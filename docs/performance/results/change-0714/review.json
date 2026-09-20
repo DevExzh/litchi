@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "reviewer": "/root/rank_profiles_0714",
+  "mode": "read-only report, source-path and evidence review; no Cargo/native/strace",
+  "report_sha256": "e084503880f56f9dab560fad7947c6a0fa973599b4d56b0a2792f8870e354256",
+  "analysis_sha256": "26fa405144d14487136871f4668cf770268999f741ea34e4ef7dfb064a4c6bb5",
+  "findings": [
+    "All 16 native and eight trace rows match; all seven native tail flags retained.",
+    "Same-trace sync shares recompute to 90.10%, 94.11%, 94.50%, 90.48%; no native fraction, hardware cause or durability-floor claim.",
+    "Serialization source-path ranking and existing 64 KiB staging / preserved-member passthrough are accurate.",
+    "Reused quality counts and scoped Clippy exceptions accurately disclosed."
+  ],
+  "minor_wording": "Suggested no selected fifth measured publication; existing no measured filesystem publication wording retained because setup publications are explicitly excluded.",
+  "coordinator_correction": "An earlier ranking suggestion divided trace sync time by native phase p50; rejected before reporting. Only within-trace shares admitted.",
+  "parser_review": {
+    "author": "/root/atomic_scope_0714",
+    "positive_traces": 8,
+    "coordinator_negative_checks": 6,
+    "result": "pass after strengthening fd/path and transaction boundary checks; captures unchanged"
+  }
+}

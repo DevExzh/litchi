@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "revision": "649ead6a3ab43d385867997265e83429a55531f0",
+  "created_utc": "2026-09-20T10:01:06.233679+00:00",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0714-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "native": {
+    "repeats": 2,
+    "samples": 100,
+    "warmup": 10,
+    "phases": [
+      "lifecycle",
+      "edit",
+      "atomic_publish",
+      "counting_publish"
+    ]
+  },
+  "trace": {
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0,
+    "phases": [
+      "atomic_publish",
+      "counting_publish"
+    ],
+    "tool": "/usr/bin/strace",
+    "options": [
+      "-ttt",
+      "-T",
+      "-yy",
+      "-s",
+      "256",
+      "-e",
+      "trace=%file,read,pread64,write,pwrite64,writev,lseek,close,fsync,fdatasync,fchmod"
+    ]
+  },
+  "order": "All native children first, then all traces; repeat two reverses phase and corpus order.",
+  "expected_children": {
+    "native": 16,
+    "trace": 8
+  },
+  "trace_selection": {
+    "setup_destinations": [
+      "published.docx",
+      "published.docx",
+      "published-repeat.docx",
+      "published.docx"
+    ],
+    "atomic_measured_destination": "published.docx",
+    "atomic_total_transactions": 5,
+    "counting_total_transactions": 4,
+    "require_setup_cleanup_before_measured": true,
+    "require_temporary_sync_before_rename": true,
+    "require_parent_sync_after_rename": true
+  },
+  "review_spread_percent": 5,
+  "claims": [
+    "Current-source descriptive phase refresh and trace diagnostic only; no before/after optimization claim.",
+    "Native phase distributions are independently sampled and may not be summed/subtracted to reconstruct lifecycle.",
+    "Trace syscall durations include tracing perturbation and are not native elapsed or a hardware/device-cause measurement.",
+    "Count-based atomic transaction attribution must exclude four setup publications and post-save readback/cleanup.",
+    "Preserve temporary flush/sync, replacement and parent-directory sync; do not trade durability for latency."
+  ]
+}
