@@ -2,7 +2,7 @@
   "schema": "ods-formula-date-time-native-v1",
   "status": "captured compatibility observations",
   "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
-  "oracle_sha256": "273421f087314733c9b383e6a1b5c1bb1e43de3b65b0be24aeb1945864e6438d",
+  "oracle_sha256": "b33011089974b18b1fcc0b984adab839600acc98f09dd850e02522348316259f",
   "fixture": {
     "input": "date-time-native.fods",
     "input_sha256": "75894a253c9b9d5eb5ab027ef6ccc677b3e609a03684465e73d4a337dfdcd8d0",
