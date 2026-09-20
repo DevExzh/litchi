@@ -51,3 +51,20 @@ in that snapshot. The temporary standalone harness was removed.
 This does not clear the resource hold: fixed accumulator work accounting and
 the distinction between numerical-domain refusal and typed accumulator-span
 failure still require adapter review and public-evaluator tests.
+
+## Discount cancellation and signed MIRR follow-up
+
+Root compiled reducer snapshot
+`60618d78b87b178f5f7196cf458476c1f8286c00e7129629716eff93d4f1cf82`
+with the unchanged numeric helper. Two independent probes passed:
+
+- `NPV(0.125; [-1e16, 1, 12656250000000000]) = 64/81`, within `1e-12`.
+- `MIRR([110, -100]; 0; -2) = -2.1`, within `1e-12`.
+
+Including the nine embedded reducer tests, the run had **10 passed, 1 failed**.
+The failure was a new fixture expecting `#NUM!` for
+`MIRR([110, -100, 0]; 0; -2)`. Its intermediate ratio is positive `1.1`,
+so the implementation's `sqrt(1.1) - 1` result is correct. A negative-ratio
+nonintegral-power refusal can instead use investment `-2` and reinvestment
+`-2` with the same values. The owner received this fixture correction;
+no tolerance or domain rule was relaxed. Temporary probe files were removed.
