@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.11548135906923562,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0712-docx-active-offset-validation.md": "bceb991d8bf1d60db68b3e061c4fb5072db7e7a93aa560ed2ff02630c1227fb6",
+    "docs/performance/REPORT.md": "67c73484956ad37e89c04dd3a8487949b4838122eb72a5e1a9b47431bd8d33fb",
+    "docs/performance/BASELINE.md": "493a11416f18c724c1012ed1b5ae360b97dfb9c4e04a9a3f875aa122a6541c70",
+    "docs/performance/HOTSPOTS.md": "2e1a4ea327c76f45477e75b7926914cf50450a943f3ec191ed3f13543898f82e",
+    "docs/performance/GOAL_AUDIT.md": "291546174445bb9ca6693ae59abe0c5c88eb7e66f30e089099603fa1dc7567c9",
+    "docs/performance/results/change-0712/README.md": "8589dd0df18404a7053d16c8f018f4964245acfba8f9912f5d58d2492a06d3ca"
+  }
+}

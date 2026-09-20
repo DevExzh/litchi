@@ -1,0 +1,6 @@
+{
+  "current_source_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+  "0711_baseline_identical": true,
+  "historical_profile_relation": "0709 profile edit path unchanged; only 0710 custom-properties publication/test delta; validated by imported 0711 attribution bindings",
+  "production_modified": false
+}

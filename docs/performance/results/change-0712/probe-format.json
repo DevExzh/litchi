@@ -1,0 +1,11 @@
+{
+  "command": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--check",
+    "docs/performance/results/change-0712/oracle/src/main.rs"
+  ],
+  "exit_code": 0,
+  "source_sha256": "8dc8d0847066c91f286de8190618e32dd5392112b7b12aed31b510fed50aa85c"
+}
