@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "verify.py"
+  ],
+  "exit_code": 0,
+  "stderr": "",
+  "verifier_sha256": "d75fd54d93ebc1d8339b4995e531ad4192a7cc6f24b84bf236cd80a2141d60f7",
+  "output": "verification.json",
+  "output_sha256": "fa2504af9b19e8fadc8683b3c590a26097a640a44b0be412bc02599d7254c143"
+}

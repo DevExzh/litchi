@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/tmp/litchi-ods-paired-gates-ckzigjh1/docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/tmp/litchi-ods-paired-gates-ckzigjh1",
+  "target": "/var/tmp/litchi-ods-paired-statistics-candidate-final-pz_ajie0"
+}

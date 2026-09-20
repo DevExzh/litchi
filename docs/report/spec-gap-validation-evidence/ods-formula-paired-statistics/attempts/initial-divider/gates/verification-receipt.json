@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "gates/verify.py"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"failed\": 0, \"focused\": {\"evaluation\": 12, \"limits\": 9, \"native\": 2, \"oracle\": 8}, \"gates\": 7, \"ignored\": 0, \"passed\": 1515, \"verified\": true}\n",
+  "stderr": "",
+  "verifier_sha256": "9514a7a6ff8f924730abb962713c6ae9bb89fa7c4287585929547e4038296306"
+}
