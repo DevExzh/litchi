@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0710 — DOCX clean custom-properties correction
+
+[0710](0710-docx-clean-custom-properties.md) follows the preservation failure
+from 0709 with an edit-intent guard at DOCX publication. The unchanged strict
+oracle and focused regressions pass, including byte-identical clean/refused
+archive outputs; all 1,453 DOCX tests pass. This advances the
+lossless-preservation constraint; it does not establish general Office
+compatibility or any performance improvement. The broader non-iWork goal
+remains active.
+
 ## 0709 — DOCX ordinary-save baseline is diagnostic, with preservation work outstanding
 
 [0709](0709-docx-ordinary-save-baseline.md) refreshes the ordinary DOCX

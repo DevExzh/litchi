@@ -1189,9 +1189,13 @@ impl Package {
                 }
             }
 
-            // Update or remove the custom-properties package graph atomically.
-            self.custom_props
-                .write_for(&mut self.opc, CustomPropsHost::Word)?;
+            // Preserve the original custom XML unless its facade was edited.
+            // Keep edit intent dirty until the complete publication succeeds,
+            // so validation or sink failures remain retryable.
+            if self.custom_props_dirty {
+                self.custom_props
+                    .write_for(&mut self.opc, CustomPropsHost::Word)?;
+            }
 
             // Embed fonts if feature enabled and requested in options
             #[cfg(feature = "automatic-fonts")]

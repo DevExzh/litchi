@@ -1,0 +1,32 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0710-bin/oracle",
+    "--repo-root",
+    "/home/zhuhe/code/litchi",
+    "--marker",
+    "litchi-perf-0638-ordinary-save",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0710/oracle/report.json"
+  ],
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0710-bin/oracle",
+    "sha256": "ad3dcc8c7aa52bfc2ad2742815dfbc4c7bbf265bc071ff5d1e095623b1e451e9",
+    "bytes": 4799168
+  },
+  "probe_manifest_sha256": "e5c83ef672dac241e2291e313e4551fd42ba319120f59dfa8151dde79009c6ab",
+  "workspace_manifest_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+  "artifacts": {
+    "run.stdout": "a0ddf37bee5ded9e6c68ff068325d494665cffe9a0b8660ab86652350994c4b9",
+    "run.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "report.json": "7bbc6b880914250b1148340243e781f29e77cb3709e6658f09e852f7430e391d",
+    "artifacts/refusal-after-refused-edit-save.docx": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+    "artifacts/refusal-after-refused-edit-to-stream.docx": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+    "artifacts/refusal-no-edit-save.docx": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+    "artifacts/refusal-no-edit-to-stream.docx": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+    "artifacts/success-save.docx": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+    "artifacts/success-to-stream.docx": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a"
+  },
+  "expected_preservation_failure": false,
+  "temporary_root": "/home/zhuhe/code/litchi-0710-fs/oracle"
+}

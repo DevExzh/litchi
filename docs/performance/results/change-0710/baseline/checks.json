@@ -1,0 +1,23 @@
+[
+  {
+    "name": "custom-properties",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0710",
+      "-j",
+      "2",
+      "--all-features",
+      "--test",
+      "custom_properties"
+    ],
+    "exit_code": 101,
+    "seconds": 1.2547732630046085,
+    "log_sha256": "0b4b077cfe5d0a105e3b4987502a2514bda5c5436dbb79de778519ed371eab9e",
+    "source_sha256": "ec418fc4a4c26f4cc2c987d539f26b629b8635b7f36f5ebf3b081024c2e89dc3"
+  }
+]

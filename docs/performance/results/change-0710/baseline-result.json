@@ -1,0 +1,13 @@
+{
+  "status": "expected-regression-failures",
+  "passed": 4,
+  "failed": 4,
+  "failed_tests": [
+    "clean_real_fixture_preserves_custom_properties_for_stream_and_path_save",
+    "refused_document_edit_preserves_custom_properties_for_stream_and_path_save",
+    "raw_opc_custom_property_replacement_remains_byte_exact_after_save",
+    "raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear"
+  ],
+  "log_sha256": "0b4b077cfe5d0a105e3b4987502a2514bda5c5436dbb79de778519ed371eab9e",
+  "patch_sha256": "953375b5f6b6c37cf22239305235b4d74eac661137bdab7189f78c5ffa717217"
+}

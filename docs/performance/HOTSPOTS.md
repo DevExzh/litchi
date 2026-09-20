@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0710 — remove unintended custom-properties normalization
+
+[0710](0710-docx-clean-custom-properties.md) fixes the clean custom-properties
+save path identified by 0709. Explicit edits still validate and serialize; clean
+properties retain their bytes. This removes unintended work, but no latency or
+allocation improvement is claimed. The 0709 `document_mut` attribution remains
+a separate performance opportunity requiring a bounded experiment.
+
 ## 0709 — DOCX save is a preservation handoff before optimization
 
 [0709](0709-docx-ordinary-save-baseline.md) supplies a current-source

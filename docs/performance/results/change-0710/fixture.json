@@ -1,0 +1,6 @@
+{
+  "path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+  "bytes": 77621,
+  "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+  "provenance": "Checked-in LibreOffice test fixture; no native Office reopening in this batch"
+}

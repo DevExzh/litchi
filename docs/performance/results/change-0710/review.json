@@ -1,0 +1,7 @@
+{
+  "test_review": "No required changes: both save routes, partial-sink rollback/retry, raw OPC clean-state reload and empty-part explicit removal covered",
+  "code_review": "No blocker: open and raw OPC edits validate/read custom props; only mutable facade marks dirty; guard retains validation and rollback on explicit edits; flag clears after successful stream",
+  "test_count": 1453,
+  "performance_claim": "none",
+  "scope_limit": "Calling custom_props_mut conservatively records edit intent even without a value change; such access can still canonicalize. General no-op edit tracking is not changed."
+}
