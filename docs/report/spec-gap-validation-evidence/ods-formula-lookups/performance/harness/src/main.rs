@@ -5244,7 +5244,7 @@ fn validate_lookup_value(case: &Case, result: &Evaluated<'_>) -> AnyResult<()> {
                 _ => Err(format!("{} returned {observed:?}, expected logical", case.name).into()),
             },
             Expectation::Logical(expected) => match observed {
-                Value::Logical(actual) if *actual == expected => Ok(()),
+                Value::Logical(actual) if actual == expected => Ok(()),
                 _ => Err(format!(
                     "{} returned {observed:?}, expected logical {expected}",
                     case.name
