@@ -81,3 +81,30 @@ precedence without treating them as normative results.
 These limitations are explicit scope boundaries. Within the retained
 contract-bound oracle and native receipt, the corrected fixture and hashes
 are stable and verified.
+
+## Independent addendum: sheet-bound extension refusal
+
+The owner correction for `lookup.reference_extension_sheet_bound_is_na` is
+supported by an independent rerun of the retained oracle. The case remains
+`=LOOKUP(4;[.A1:.A4];[.B16])` with expected `#N/A`; its implementation-
+independent read envelope is now **2–4**. Two key probes can reject the
+out-of-extent result reference, and no result-cell read is required. The
+corresponding JSON entry carries `expected_reads_min: 2` and
+`expected_reads_max: 4`.
+
+`python3 lookup_oracle.py --check` verifies the regenerated 127-observation
+goldens byte-for-byte, and the contract binding is unchanged. The corrected
+artifact identities are:
+
+* `lookup_oracle.py`: SHA-256
+  `a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b`.
+* `lookup-goldens.json`: SHA-256
+  `ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758`.
+* `contract.md`: SHA-256
+  `b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf`.
+
+This addendum supersedes the earlier oracle/goldens pair only for the
+corrected evidence snapshot; the preceding review is retained as historical
+context. It is an oracle-artifact disposition only and does not certify the
+pending production CHOOSE implementation, source freeze, gates, or
+performance capture.
