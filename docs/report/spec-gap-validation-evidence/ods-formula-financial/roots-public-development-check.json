@@ -1,0 +1,15 @@
+{
+  "schema": "financial-roots-public-development-check-v1",
+  "scope": "Two focused public tests only; not a frozen full integration gate. The 31-row corpus includes a parser-only NaN row, covered numerically by the separate resolver-supplied NaN test.",
+  "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_financial_roots_oracle -- --quiet",
+  "working_directory": ".codex-tmp/ods-financial-development",
+  "exit_code": 0,
+  "tests_passed": 2,
+  "files": {
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "crates/litchi-ods/src/codec/formula/evaluation/financial/solver.rs": "387f9791103bc97fb85fa99e46502e0b5e74f8da59586ba755a8785fd18761c8",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/financial.rs": "afe55da777a669729314f7692b3f59d4a59b245af5634f2154838891d70c2501",
+    "crates/litchi-ods/tests/ods_formula_financial_roots_oracle.rs": "513d96950764b4bd9a49bb05ce0e7dc5db7a1543cce1c8e889b051b833c7f95b",
+    "crates/litchi-ods/tests/data/financial-oracle-root-vectors.json": "7ccf4912d470a8d895d92343952d34c199f746d25ab1d88e5df2d9a019501c2e"
+  }
+}
