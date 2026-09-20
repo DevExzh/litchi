@@ -352,6 +352,20 @@ where
     Ok(result)
 }
 
+/// Classify an arbitrary scalar expression for a projected lookup/date
+/// parameter.  The walk is shared with lookup selectors so date parameters
+/// inherit the same position-sensitive treatment for nested `MUNIT` and
+/// explicit arrays without duplicating the bounded AST probe.
+pub(super) fn projected_scalar_expression<'expr, 'scalar, 'exec, 'position, R>(
+    evaluator: &mut ValueEvaluator<'expr, 'scalar, 'exec, 'position, R>,
+    node: super::super::Node<'expr>,
+) -> EvaluationResult<bool>
+where
+    R: Resolver + ?Sized,
+{
+    projected_scalar_node(evaluator, node)
+}
+
 fn scalar_result_barrier(name: &str) -> bool {
     super::aggregate::is_aggregate_function(name)
         || super::statistical::is_statistical_function(name)

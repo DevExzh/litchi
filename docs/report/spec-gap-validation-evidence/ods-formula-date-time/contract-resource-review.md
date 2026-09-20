@@ -6,16 +6,16 @@ listed by that contract and was performed without production, test, or Cargo
 changes. The review applies ADR 0005's finite work, storage, cancellation, and
 source rules and ADR 0006's typed-failure and publication rules.
 
-The contract review disposition is **pass with implementation gates**. The
-revised contract resolves the earlier API contradictions and states a usable
-bounded implementation boundary. It does not claim production support or
-implementation evidence.
+The resource review disposition for the current handoff is **pass pending
+source freeze and gates**. The revised contract resolves the earlier API
+contradictions and states a usable bounded implementation boundary. This
+review does not substitute for the final frozen-source validation evidence.
 
 ## Reviewed contract identity
 
 | Input | SHA-256 |
 | --- | --- |
-| `ods-formula-date-time/contract.md` | `3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413` |
+| `ods-formula-date-time/contract.md` | `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f` |
 
 ## Resolved contract findings
 
@@ -52,11 +52,12 @@ The revised contract now explicitly resolves the earlier review findings:
   The DATEVALUE/TIMEVALUE fallback is likewise explicit: it uses the numeric
   VALUE branch only, with date/time dispatch disabled; DATEVALUE floors a
   finite fallback serial and TIMEVALUE preserves it as the raw finite time
-  serial.
+  serial. The numeric fallback includes both simple fractions such as `1/4`
+  and mixed fractions.
 * Reservation-before-buffer declaration and explicit reservation-before-lease
   release order are stated for local and struct-owned buffers.
 
-## Incremental foundation review (source still in progress)
+## Current foundation and value-adapter review
 
 The calendar and timestamp foundation reviewed against the current working
 tree is fixed-size and checked: civil dates carry three integers, serial
@@ -67,32 +68,30 @@ charges borrowed text bytes, reserves long grouped-input scratch before
 allocation, drops scratch before its reservation, and fences cancellation
 after release.
 
-The following implementation gates remain open while the date/time value
-adapter is being integrated:
+The current value-adapter handoff closes the earlier implementation gates:
 
-* `evaluation/date_time/parser.rs::has_month_name` currently calls
-  `text.to_ascii_lowercase()` once per entry in a 24-entry month table. That
-  allocates temporary owned strings in the date parser and has no reservation
-  or allocation-failure mapping. The probe must become allocation-free (for
-  example, a borrowed ASCII case-insensitive scan) or use explicitly charged,
-  fallible scratch. This is a concrete resource blocker for the adapter.
-* The same adapter currently delegates to the generic `parse_value` entry
-  point. The integrated DATEVALUE/DateParam and TIMEVALUE/TimeParam paths
-  must call the dedicated numeric-fallback parsers, with their caller-owned
-  scratch reservation and post-release cancellation fence. Delegating the
-  full VALUE grammar would re-enable date/time dispatch after the contract's
-  numeric-only fallback gate and can also bypass the long grouped-input
-  reservation path.
-* `date_time/kernel.rs::actual_actual` scans the inclusive year range (up to
-  the 1..=9999 profile) twice for YEARFRAC basis 1. The bounded range is safe
-  for memory, but an unchecked scalar loop can bypass a low execution-work
-  budget or cancellation. The final adapter must either use checked constant
-  time leap/year arithmetic or charge and checkpoint this work at an agreed
-  cadence.
+* The scalar date/time parser adapter now uses the dedicated date/time parser
+  entry points, reserves long grouped-input scratch, drops scratch before its
+  reservation, and fences cancellation after release. The value-side
+  `scalar_date` now routes through that charged adapter as well. Matrix
+  date/time broadcasting uses a fixed four-slot argument stack, so it does not
+  recreate an unreserved argument vector for every output cell.
+* `date_time/kernel.rs::actual_actual` uses checked constant-time leap/year
+  arithmetic for YEARFRAC basis 1. `value/date_time.rs` precharges holiday
+  normalization at `O(n log n)+O(n)`, and the date-step charge includes the
+  logarithmic holiday-membership bound for `binary_search`. These charges are
+  paired with the scalar work/cancellation checks.
+* `ConvertedResult` distinguishes an actual formula Error from a generated
+  conversion error. `effective_error` now selects the earliest actual formula
+  Error across scalar Date/Offset arguments and complete sequences before it
+  considers generated conversion or malformed-sequence errors.
+* The known `Areas(is_list)` preflight preserves an earlier materialized
+  formula Error without reading the list. Computed values still follow the
+  ordinary evaluation path, where reads needed to establish their type are
+  legitimate.
 
-These are review gates rather than a source disposition: the date/time module
-is not yet a frozen, buildable integration in the current shared tree, so this
-document makes no production-support claim.
+The source remains subject to the final frozen-source and gate receipts; no
+production-support claim is made until those receipts are bound.
 
 ## Resource and ownership requirements for implementation
 

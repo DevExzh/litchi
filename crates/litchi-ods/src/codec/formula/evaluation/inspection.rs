@@ -7,7 +7,7 @@
 //! kernel after it has selected one streamed element from an array or
 //! reference.
 
-mod parse_value;
+pub(super) mod parse_value;
 
 use super::{
     EvaluationFailure, EvaluationResult, Evaluator, Node, ScalarError, TextValue, UnsupportedKind,

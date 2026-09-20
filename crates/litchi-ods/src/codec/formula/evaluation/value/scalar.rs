@@ -190,6 +190,7 @@ pub(super) fn eager<'a>(
         && !super::super::rounding::is_rounding_function(name)
         && !super::super::trigonometry::is_trigonometric_function(name)
         && !super::super::elementary::is_elementary_function(name)
+        && !super::super::date_time::is_date_time_function(name)
         && ![
             "COMBIN",
             "COMBINA",

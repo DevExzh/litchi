@@ -178,6 +178,7 @@ mod complex;
 mod conditional;
 mod criteria;
 mod database;
+mod date_time;
 mod descriptive;
 #[allow(dead_code)]
 mod geometry;
@@ -372,6 +373,7 @@ impl<'exec, 'position> Context<'exec, 'position> {
             position,
             options: super::EvaluationOptions {
                 text_case: super::TextCase::Sensitive,
+                calculation_timestamp: None,
             },
             mode: Mode::Matrix,
         }
@@ -2864,6 +2866,7 @@ where
             || complex::is_complex_sequence_function(name)
             || aggregate::is_aggregate_function(name)
             || statistical::is_statistical_function(name)
+            || date_time::is_date_time_function(name)
             || descriptive::is_descriptive_function(name)
             || paired::is_paired_function(name)
             || order::is_order_function(name)
@@ -2900,6 +2903,19 @@ where
                 ValueFrame::VisitMatrixArgument(child)
             } else if lookup::is_lookup_function(name) && lookup::complete_argument(name, index) {
                 ValueFrame::VisitCompleteArgument(child)
+            } else if date_time::is_date_time_function(name)
+                && date_time::complete_argument(name, index)
+            {
+                ValueFrame::VisitCompleteArgument(child)
+            } else if date_time::is_date_time_function(name)
+                && date_time::matrix_argument(name, index, child)
+            {
+                ValueFrame::VisitMatrixArgument(child)
+            } else if date_time::is_date_time_function(name)
+                && self.projection.is_some()
+                && date_time::projected_scalar_argument(self, name, index, child)?
+            {
+                ValueFrame::VisitConditionalArgument(child)
             } else if lookup::is_lookup_function(name)
                 && self.projection.is_some()
                 && lookup::projected_scalar_argument(self, name, index, child)?
@@ -3710,6 +3726,9 @@ where
             {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if date_time::is_date_time_function(name) => {
+                date_time::cacheable_branch(self, node)
+            },
             super::Kind::Function { name } if lookup::is_lookup_function(name) => {
                 lookup::cacheable_branch(self, node)
             },
@@ -4090,6 +4109,8 @@ where
                             order::criterion_full_argument(name, index, child)
                         } else if lookup::is_lookup_function(name) {
                             lookup::criterion_full_argument(name, index, child)
+                        } else if date_time::is_date_time_function(name) {
+                            date_time::criterion_full_argument(name, index, child)
                         } else {
                             full_arguments
                         };
@@ -4842,6 +4863,34 @@ where
                                 let child = node.child(index).ok_or(
                                     EvaluationFailure::InvalidExpression(
                                         "metadata shape argument is missing",
+                                    ),
+                                )?;
+                                self.push_shape_frame(ShapeFrame::Enter {
+                                    node: child,
+                                    demand,
+                                })?;
+                            }
+                            continue;
+                        }
+                        if date_time::is_date_time_function(name) {
+                            let count = node.child_count();
+                            self.scalar
+                                .charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
+                            let children = (0..count)
+                                .filter(|index| !date_time::sequence_argument(name, *index))
+                                .count();
+                            self.push_shape_frame(ShapeFrame::Exit {
+                                node,
+                                children,
+                                base: Some(Shape::new(1, 1)?),
+                            })?;
+                            for index in (0..count).rev() {
+                                if date_time::sequence_argument(name, index) {
+                                    continue;
+                                }
+                                let child = node.child(index).ok_or(
+                                    EvaluationFailure::InvalidExpression(
+                                        "date/time shape argument is missing",
                                     ),
                                 )?;
                                 self.push_shape_frame(ShapeFrame::Enter {
@@ -6110,6 +6159,11 @@ where
                             .is_some_and(|function| function.reference_argument(index))
                         {
                             lookup_data = Some(Self::reference_kind_value_into_kind(child));
+                            continue;
+                        }
+                        if date_time::is_date_time_function(name)
+                            && date_time::sequence_argument(name, index)
+                        {
                             continue;
                         }
                         if name.eq_ignore_ascii_case("AND")
@@ -8128,6 +8182,20 @@ where
                 }
             }
             let value = statistical::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if date_time::is_date_time_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = date_time::apply(self, node, name, arguments)?;
             if cacheable {
                 self.demand_cache_put(node, &value)?;
             }

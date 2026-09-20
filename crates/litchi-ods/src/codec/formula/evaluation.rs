@@ -183,6 +183,7 @@
 mod aggregate;
 mod calendar;
 pub mod complex;
+mod date_time;
 mod descriptive;
 mod discrete;
 mod dyadic;
@@ -198,8 +199,11 @@ mod roman;
 mod rounding;
 mod statistical;
 mod text;
+mod timestamp;
 mod trigonometry;
 pub mod value;
+
+pub use timestamp::{CalculationTimestamp, CalculationTimestampError};
 
 /// Return whether `name` is one of the six OpenFormula conditional aggregate
 /// functions. Their range parameters are reference-only, so the scalar
@@ -335,17 +339,45 @@ pub enum TextCase {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EvaluationOptions {
     text_case: TextCase,
+    calculation_timestamp: Option<CalculationTimestamp>,
 }
 
 impl Default for EvaluationOptions {
     fn default() -> Self {
         Self {
             text_case: TextCase::Sensitive,
+            calculation_timestamp: None,
         }
     }
 }
 
 impl EvaluationOptions {
+    /// Set the immutable date/time snapshot used throughout one evaluation.
+    ///
+    /// The caller supplies the serial in the evaluator's Gregorian profile;
+    /// evaluation never consults the host clock or timezone.
+    ///
+    /// ```
+    /// use litchi_ods::codec::formula::evaluation::{CalculationTimestamp, EvaluationOptions};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let timestamp = CalculationTimestamp::from_serial(46_000.5)?;
+    /// let options = EvaluationOptions::default().with_calculation_timestamp(timestamp);
+    /// assert_eq!(options.calculation_timestamp(), Some(timestamp));
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn with_calculation_timestamp(mut self, timestamp: CalculationTimestamp) -> Self {
+        self.calculation_timestamp = Some(timestamp);
+        self
+    }
+
+    /// Return the caller-supplied calculation timestamp, if present.
+    #[must_use]
+    pub const fn calculation_timestamp(self) -> Option<CalculationTimestamp> {
+        self.calculation_timestamp
+    }
+
     /// Return the configured text comparison policy.
     #[must_use]
     pub const fn text_case(self) -> TextCase {
@@ -368,6 +400,7 @@ impl<'a> EvaluationContext<'a> {
             execution,
             options: EvaluationOptions {
                 text_case: TextCase::Sensitive,
+                calculation_timestamp: None,
             },
         }
     }
@@ -478,6 +511,8 @@ impl<'a> EvaluatedScalar<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UnsupportedKind {
+    /// A date/time function requires an explicit calculation timestamp.
+    CalculationClock,
     /// A reference requires a resolver/context or exceeds the selected profile.
     Reference,
     /// A resolved cell contains a value outside the supported evaluation profile.
@@ -499,6 +534,9 @@ pub enum UnsupportedKind {
 impl Display for UnsupportedKind {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
+            Self::CalculationClock => {
+                "ODS formula evaluation requires an explicit calculation timestamp"
+            },
             Self::Reference => "ODS formula evaluation profile does not support this reference",
             Self::CellValue => "ODS formula evaluation does not support this cell value",
             Self::ReferenceOperator => {
@@ -981,6 +1019,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if date_time::is_date_time_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if descriptive::is_descriptive_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1129,6 +1171,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if statistical::is_statistical_function(name) {
             return statistical::apply(self, node, name);
+        }
+        if date_time::is_date_time_function(name) {
+            return date_time::apply(self, node, name);
         }
         if descriptive::is_descriptive_function(name) {
             return descriptive::apply(self, node, name);
