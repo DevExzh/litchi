@@ -1,0 +1,22 @@
+{
+  "schema": "financial-scalar-oracle-root-check-v1",
+  "scope": "Independent oracle corpus only; no Rust evaluator, sequence, solver, native, resource, or performance validation claimed.",
+  "files": {
+    "contract.md": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+    "oracle_scalar.py": "27854cff70c390ad15895ac32f8586efaa3793481ec1ccf6088a0fbc94636238",
+    "oracle-scalar-vectors.json": "ea5ac92297acd65468eb0fb7879b53de3025abacaec6a74280ebeba0e5ca7095",
+    "test-plan.md": "e029f450065f2c70beef72f48f5ef0f575c7f957a82350ee372933fb5189123c"
+  },
+  "oracle_check": {
+    "command": "python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/oracle_scalar.py --check",
+    "exit_code": 0,
+    "vector_count": 65
+  },
+  "integrity_checks": {
+    "duplicate_vector": "rejected",
+    "changed_expected_result": "rejected",
+    "stale_contract_hash": "rejected",
+    "missing_vector": "rejected"
+  },
+  "remaining": "Rust replay of scalar vectors and validation of the nine sequence/iterative functions remain pending."
+}
