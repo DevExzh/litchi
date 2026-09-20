@@ -16,5 +16,7 @@
     }
   ],
   "capture_temporary_cleanup": "retained in performance/results/capture-summary.json and per-capture target-cleanup.json",
-  "raw_final_evidence_retained": true
+  "raw_final_evidence_retained": true,
+  "owned_staging_directory_removed": true,
+  "owned_staging_directory": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua"
 }
