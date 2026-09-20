@@ -68,3 +68,17 @@ so the implementation's `sqrt(1.1) - 1` result is correct. A negative-ratio
 nonintegral-power refusal can instead use investment `-2` and reinvestment
 `-2` with the same values. The owner received this fixture correction;
 no tolerance or domain rule was relaxed. Temporary probe files were removed.
+
+## XNPV shared reducer follow-up
+
+Root ran the retained `probe_reducers.py .codex-tmp/ods-financial-development`
+harness against reducer SHA256
+`7c0f57f24322dc244dec09763a1f4c057adb63e6e76bc9260ba25e3331127ebe`
+and numeric helper SHA256
+`627ec3d9c5f0f15d43f483fc64b28a861c9235877173a1db087a82c7697ee6e0`.
+All **13 embedded reducer tests passed**, including exact rate-zero XNPV
+cancellation, discounted integer-date cancellation, fractional-date powers,
+and the corrected signed MIRR fixture. Temporary snapshot sources and binary
+were removed automatically. This verifies numerical kernels only; the value
+adapter's streaming, error precedence, charging, and public replay remain
+separate validation requirements.
