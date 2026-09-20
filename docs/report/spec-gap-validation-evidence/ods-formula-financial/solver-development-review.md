@@ -71,3 +71,16 @@ Source review additionally identified bracket tie/probe-order, adjacent RATE
 branch search, unchanged Newton step, and cross-bin compensation concerns.
 Those require targeted fixes and evidence before numerical acceptance; the
 earlier passing scale probes do not establish correctness for these cases.
+
+## Boundary-fix follow-up
+
+The retained root probe passes **15 tests, 0 failures** against snapshot
+`f8bd6a30140b28cc195d809a2c26af4674db031d2c05f1a134eafa5d2302e405`.
+Its embedded tests now include the two failing `-1` cases above, an integral
+RATE search on the negative branch, and an underflowed Newton-ratio check.
+The temporary harness was removed automatically.
+
+This clears the two reproduced boundary regressions for that snapshot.
+It does not clear the remaining source-review findings: a genuine cross-bin
+compensation regression and targeted bracket tie/probe-order evidence are
+still required, along with final resource and public-evaluator validation.
