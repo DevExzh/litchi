@@ -1,0 +1,56 @@
+{
+  "checks": {
+    "contract": {
+      "functions": 24,
+      "sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f"
+    },
+    "coverage": {
+      "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+      "cross_cutting": 20,
+      "cross_cutting_bindings": 54,
+      "function_bindings": 223,
+      "functions": 24,
+      "schema": "ods-formula-date-time-coverage-v1",
+      "scope_sha256": "28a754ded86ad7524d0d94c5856757f775f52dee2f52dd603f8f66353fdbd114",
+      "sha256": "c4c2cd219182d4e40b5a11ecaa67ffc877a632c501b7ce0ccc4bee9a1f50a4ae"
+    },
+    "gates": {
+      "receipt": {
+        "commands": 7,
+        "test_summaries": 130,
+        "tests": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 1745
+        }
+      },
+      "status": "ok",
+      "verified": true
+    },
+    "native": {
+      "results_sha256": "8936eda768c113a39fcfaa04e071cf6d01c1cca722b8ff6e25537c8f6c3c024a",
+      "rows": 132
+    },
+    "oracle": {
+      "corpus": {
+        "expected_only": true,
+        "functions": 24,
+        "sha256": "b33011089974b18b1fcc0b984adab839600acc98f09dd850e02522348316259f",
+        "vectors": 132
+      },
+      "execution_sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda",
+      "observations": 132
+    },
+    "performance": {
+      "audit": "verified",
+      "captures": 2,
+      "report_sha256": "6a2876f11ea81206ceadab02d886cfa675ebbd9d0e3fc24df290e2b9497bd3fe"
+    },
+    "reviews": {
+      "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+      "status": "PASS"
+    }
+  },
+  "status": "ok",
+  "verified": true
+}
