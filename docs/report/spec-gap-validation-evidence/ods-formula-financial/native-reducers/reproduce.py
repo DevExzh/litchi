@@ -32,7 +32,7 @@ CONTENT = ROOT / "content.xml"
 RESULTS = ROOT / "native-results.json"
 PROVENANCE = ROOT / "provenance.json"
 CONTRACT = ROOT.parent / "contract.md"
-ORACLE = ROOT.parent / "oracle-reducer-vectors.json"
+ORACLE = ROOT / "oracle-reducer-vectors.json"
 
 TABLE = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
 OFFICE = "{urn:oasis:names:tc:opendocument:xmlns:office:1.0}"

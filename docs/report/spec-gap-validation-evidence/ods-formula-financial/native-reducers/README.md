@@ -11,6 +11,9 @@ The capture is bound to contract
 `fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b` and reducer
 corpus
 `9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26`.
+That corpus is retained as `oracle-reducer-vectors.json` beside this receipt,
+so later updates to the working reducer corpus cannot silently change the
+historical native comparison.
 `provenance.json` records the input FODS, recalculated ODS, stable
 `content.xml`, converter profile, source mappings, and hashes. The scalar
 11-function receipt in the sibling `native/` directory is unchanged.

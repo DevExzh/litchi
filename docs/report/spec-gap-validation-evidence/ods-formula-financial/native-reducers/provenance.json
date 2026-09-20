@@ -2,6 +2,7 @@
   "schema": "ods-formula-financial-reducer-native-provenance-v1",
   "status": "captured compatibility fixture",
   "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "oracle": "oracle-reducer-vectors.json",
   "oracle_sha256": "9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26",
   "normative_source": {
     "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
