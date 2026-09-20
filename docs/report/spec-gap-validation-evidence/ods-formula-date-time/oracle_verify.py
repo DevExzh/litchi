@@ -19,12 +19,17 @@ import math
 from pathlib import Path
 import re
 from typing import Any
+import zipfile
 
 
 HERE = Path(__file__).resolve().parent
 CONTRACT = HERE / "contract.md"
 VECTORS = HERE / "oracle-vectors.json"
 CONTRACT_SHA256 = "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f"
+NORMATIVE_ARCHIVE = HERE.parents[3] / "3rdparty/specs/OpenDocument-v1.4-os.zip"
+NORMATIVE_ARCHIVE_SHA256 = "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4"
+NORMATIVE_PART4_MEMBER = "part4-formula/OpenDocument-v1.4-os-part4-formula.html"
+NORMATIVE_PART4_SHA256 = "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1"
 
 FUNCTIONS = (
     "DATE",
@@ -106,6 +111,37 @@ class VerificationError(RuntimeError):
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def validate_normative_source(document: dict[str, Any]) -> None:
+    normative = document.get("normative_source")
+    if not isinstance(normative, dict):
+        raise VerificationError("oracle normative-source identity is missing")
+    if normative.get("archive_sha256") != NORMATIVE_ARCHIVE_SHA256:
+        raise VerificationError("oracle normative archive identity is not the pinned SHA-256")
+    if normative.get("part4_member_sha256") != NORMATIVE_PART4_SHA256:
+        raise VerificationError("oracle normative Part 4 identity is not the pinned SHA-256")
+    if not NORMATIVE_ARCHIVE.is_file():
+        raise VerificationError(f"normative archive is absent: {NORMATIVE_ARCHIVE}")
+    observed_archive = sha256(NORMATIVE_ARCHIVE)
+    if observed_archive != NORMATIVE_ARCHIVE_SHA256:
+        raise VerificationError(
+            f"normative archive hash changed: {observed_archive} != {NORMATIVE_ARCHIVE_SHA256}"
+        )
+    try:
+        with zipfile.ZipFile(NORMATIVE_ARCHIVE) as archive:
+            member = archive.read(NORMATIVE_PART4_MEMBER)
+    except (OSError, KeyError, zipfile.BadZipFile) as error:
+        raise VerificationError("normative archive Part 4 member is unreadable") from error
+    observed_member = sha256_bytes(member)
+    if observed_member != NORMATIVE_PART4_SHA256:
+        raise VerificationError(
+            f"normative Part 4 hash changed: {observed_member} != {NORMATIVE_PART4_SHA256}"
+        )
 
 
 def serial(year: int, month: int, day: int) -> int:
@@ -470,6 +506,7 @@ def verify() -> dict[str, Any]:
         raise VerificationError("oracle schema is not date/time v1")
     if document.get("contract_sha256") != CONTRACT_SHA256:
         raise VerificationError("oracle contract identity does not match contract.md")
+    validate_normative_source(document)
     if tuple(document.get("functions", ())) != FUNCTIONS:
         raise VerificationError("oracle function order is not the complete 24-function scope")
     vectors = document.get("vectors")

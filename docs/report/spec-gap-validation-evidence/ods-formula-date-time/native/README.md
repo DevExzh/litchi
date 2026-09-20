@@ -8,10 +8,14 @@ or normative agreement.
 The final capture is bound to contract
 `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f` and
 oracle corpus
-`273421f087314733c9b383e6a1b5c1bb1e43de3b65b0be24aeb1945864e6438d`.
+`b33011089974b18b1fcc0b984adab839600acc98f09dd850e02522348316259f`.
 The input FODS, recalculated ODS, stable `content.xml`, typed observations,
 and their hashes are recorded in `provenance.json`; `capture.log` retains the
 converter, locale, command shape, and comparison counts.
+The corpus identity was later corrected for a missing final hexadecimal
+digit in the normative archive metadata. This is a metadata-only correction:
+all 132 vector IDs, formulas, expected outcomes, and captured native bytes are
+unchanged, and the native conversion was not rerun.
 
 The capture used `/usr/bin/libreoffice` 26.2.5.2 (Build 2), `--headless`, a
 fresh temporary `UserInstallation`, and `C.UTF-8` for `LANG`, `LC_ALL`,

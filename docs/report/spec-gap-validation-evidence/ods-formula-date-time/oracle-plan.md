@@ -16,7 +16,7 @@ retained Part 4 HTML member is SHA-256
 `ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1`.
 `oracle-vectors.json` is bound to the contract hash and currently contains 132
 vectors across all 24 names. Its current SHA-256 is
-`273421f087314733c9b383e6a1b5c1bb1e43de3b65b0be24aeb1945864e6438d`.
+`b33011089974b18b1fcc0b984adab839600acc98f09dd850e02522348316259f`.
 
 The JSON is an independent expected-value corpus, not a production test
 receipt. Each row has an identifier, function, OpenFormula spelling, typed
