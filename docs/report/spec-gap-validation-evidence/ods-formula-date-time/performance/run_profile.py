@@ -526,15 +526,17 @@ def assert_unchanged(before: dict[str, Any], after: dict[str, Any], context: str
             raise RuntimeError(f"{field} changed during {context}")
 
 
-def capture_tree(*, label: str, source_root: Path, output_dir: Path, warmups: int, samples: int, requested_cases: tuple[str, ...] | None, profile_hashes: dict[str, str]) -> dict[str, Any]:
+def capture_tree(*, label: str, source_root: Path, output_dir: Path, warmups: int, samples: int, requested_cases: tuple[str, ...] | None, profile_hashes: dict[str, str], expected_harness: dict[str, str | None] | None = None) -> dict[str, Any]:
     preserve_existing_output(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     raw_dir = output_dir / "raw"
     raw_dir.mkdir()
     harness_root = copy_harness(source_root) if requested_cases is not None else source_root / REL_HARNESS
     harness_manifest = harness_root / "Cargo.toml"
-    target = Path(tempfile.mkdtemp(prefix=f"litchi-ods-date-time-{label}-", dir="/var/tmp"))
     before = source_snapshot(source_root, profile_hashes)
+    if expected_harness is not None and before["harness_sha256"] != expected_harness:
+        raise RuntimeError(f"{label} harness differs from the frozen candidate harness")
+    target = Path(tempfile.mkdtemp(prefix=f"litchi-ods-date-time-{label}-", dir="/var/tmp"))
     build_env = os.environ.copy()
     build_env["CARGO_TARGET_DIR"] = str(target)
     build_env["CARGO_TERM_COLOR"] = "never"
@@ -667,29 +669,41 @@ def main() -> int:
     summaries: list[dict[str, Any]] = []
     candidate_preflight: dict[str, Any] | None = None
     freeze: dict[str, Any] | None = None
+    freeze_receipt: dict[str, Any] | None = None
+    expected_harness: dict[str, str | None] | None = None
     if not args.baseline_only:
         candidate_root = args.candidate_root.resolve()
         freeze = verify_candidate_freeze(candidate_root, args.candidate_freeze.resolve())
+        freeze_receipt = {"path": str(args.candidate_freeze.resolve()),
+                          "sha256": digest(args.candidate_freeze.resolve()), "manifest": freeze}
+        expected_harness = harness_hashes(candidate_root)
+        (results_root / "candidate-freeze.json").write_text(
+            json.dumps(freeze_receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         candidate_preflight = preflight_candidate_tree(candidate_root=candidate_root, output_dir=results_root / "preflight-before-timing", profile_hashes=profile_before)
     baseline_worktree = Path(tempfile.mkdtemp(prefix="litchi-ods-date-time-baseline-", dir="/var/tmp"))
     baseline_worktree.rmdir()
     cleanup: dict[str, Any] = {"baseline_worktree": str(baseline_worktree)}
     try:
         add_baseline_worktree(baseline_worktree, GATE_LOCK)
-        summaries.append(capture_tree(label=f"baseline-{BASELINE_COMMIT}", source_root=baseline_worktree, output_dir=results_root / f"baseline-{BASELINE_COMMIT}", warmups=args.warmups, samples=args.samples, requested_cases=MATCHED_CONTROL_CASES, profile_hashes=profile_before))
+        summaries.append(capture_tree(label=f"baseline-{BASELINE_COMMIT}", source_root=baseline_worktree, output_dir=results_root / f"baseline-{BASELINE_COMMIT}", warmups=args.warmups, samples=args.samples, requested_cases=MATCHED_CONTROL_CASES, profile_hashes=profile_before, expected_harness=expected_harness))
     finally:
         cleanup["baseline_removed"] = remove_worktree(baseline_worktree)
     if not args.baseline_only:
         candidate_root = args.candidate_root.resolve()
         verify_candidate_freeze(candidate_root, args.candidate_freeze.resolve())
-        summaries.append(capture_tree(label="candidate-final", source_root=candidate_root, output_dir=results_root / "candidate-final", warmups=args.warmups, samples=args.samples, requested_cases=None, profile_hashes=profile_before))
+        if freeze_receipt is None or digest(args.candidate_freeze.resolve()) != freeze_receipt["sha256"]:
+            raise RuntimeError("candidate freeze changed during capture")
+        summaries.append(capture_tree(label="candidate-final", source_root=candidate_root, output_dir=results_root / "candidate-final", warmups=args.warmups, samples=args.samples, requested_cases=None, profile_hashes=profile_before, expected_harness=expected_harness))
+        if digest(args.candidate_freeze.resolve()) != freeze_receipt["sha256"]:
+            raise RuntimeError("candidate freeze changed during candidate capture")
+        summaries[-1]["freeze_sha256"] = freeze_receipt["sha256"]
         summaries[-1]["freeze_path"] = str(args.candidate_freeze.resolve())
         summaries[-1]["freeze_base_commit"] = freeze["base_commit"] if freeze else None
     profile_after = profile_input_snapshot()
     if profile_before != profile_after:
         raise RuntimeError("profile inputs changed between captures")
     (results_root / "profile-inputs-after.json").write_text(json.dumps(profile_after, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (results_root / "capture-summary.json").write_text(json.dumps({"baseline_commit": BASELINE_COMMIT, "contract_sha256": CONTRACT_SHA256, "oracle_sha256": ORACLE_SHA256, "controls": list(MATCHED_CONTROL_CASES), "date_cases": list(DATE_CASES), "phases": list(PHASES), "warmups_per_child": args.warmups, "samples_per_group": args.samples, "profile_input_sha256_before": profile_before, "profile_input_sha256_after": profile_after, "candidate_preflight": candidate_preflight, "captures": summaries, "cleanup": cleanup}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (results_root / "capture-summary.json").write_text(json.dumps({"baseline_commit": BASELINE_COMMIT, "contract_sha256": CONTRACT_SHA256, "oracle_sha256": ORACLE_SHA256, "controls": list(MATCHED_CONTROL_CASES), "date_cases": list(DATE_CASES), "phases": list(PHASES), "warmups_per_child": args.warmups, "samples_per_group": args.samples, "profile_input_sha256_before": profile_before, "profile_input_sha256_after": profile_after, "candidate_preflight": candidate_preflight, "candidate_freeze": freeze_receipt, "captures": summaries, "cleanup": cleanup}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
 
 
