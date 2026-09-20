@@ -1,0 +1,11 @@
+LibreOffice financial scalar compatibility capture
+executable=/usr/bin/libreoffice
+version=LibreOffice 26.2.5.2 620(Build:2)
+locale=C.UTF-8
+headless=true
+fresh_profile=true
+command=/usr/bin/libreoffice --headless -env:UserInstallation=file://<temporary-profile> --convert-to ods --outdir <temporary-output> financial-scalar-native.fods
+returncode=0
+stdout=convert financial-scalar-native.fods as a Calc document -> <temporary-output>/financial-scalar-native.ods using filter : calc8
+stderr=
+rows=65
