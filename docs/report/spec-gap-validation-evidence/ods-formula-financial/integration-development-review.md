@@ -65,3 +65,32 @@ threshold. Public execution of those revised fixtures is still pending.
 Source review also found that the intermediate XNPV adapter retained both
 Values and Dates. The contract requires retaining Values slots and streaming
 Dates against them; the integration owner is correcting that memory path.
+
+## Public replay after rich API cleanup
+
+The three focused public targets now compile and run in the isolated tree.
+The run returned exit 101: evaluation **6/13 passed**, limits **19/21 passed**,
+and oracle **1/2 passed** (all 65 scalar vectors passed; six reducer rows
+failed). Remaining observations are:
+
+- Value CUMIPMT basic/beginning and reversed CUMPRINC return `#NUM!`.
+- Paired XIRR skipped text slots return `#VALUE!` instead of the admitted root.
+- Projected FV repeats the first coordinate's value; its fixture geometry is
+  also under review before attributing the cause.
+- MIRR's matrix-reference case returns `#VALUE!`.
+- XNPV non-number values return `#NUM!` instead of `#VALUE!`.
+- Invalid NPV rate hides a later formula error, and varying direct rates
+  cause 16 resolver reads instead of the required eight. The MUNIT and
+  invariant-rate cache regressions now pass.
+- The long NPV underflow-rescue oracle exhausts the default one-million work
+  budget after proper fixed-accumulator charging. Its semantic replay needs
+  an explicit sufficient budget; production limits must not be weakened.
+- A RATE explicit-missing fixture returns `#N/A` instead of its expected
+  `#VALUE!`; parser/arity behavior is under review.
+
+The new roots target also compiles. Its direct resolver-supplied NaN check
+passes. The all-row replay stops at `rate.exact_minus_one_due_boundary`,
+where the scalar API returns `#NUM!`; the solver owner is investigating.
+The test owner is adding per-row failure aggregation so later vectors remain
+observable. These are development results against actively edited sources,
+not frozen gate receipts.
