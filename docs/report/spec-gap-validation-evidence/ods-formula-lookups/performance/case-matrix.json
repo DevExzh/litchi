@@ -1,0 +1,1984 @@
+{
+  "baseline_commit": "635fd2e1348b621426b50909cbd5765c91837306",
+  "scope": [
+    "ADDRESS",
+    "CHOOSE",
+    "HLOOKUP",
+    "INDEX",
+    "INDIRECT",
+    "LOOKUP",
+    "MATCH",
+    "OFFSET",
+    "VLOOKUP"
+  ],
+  "matched_control_count": 33,
+  "lookup_case_count": 88,
+  "candidate_case_count": 88,
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "warmups": 3,
+  "samples": 15,
+  "controls": [
+    "scalar-control-arithmetic",
+    "scalar-control-sin",
+    "scalar-control-imsum",
+    "database-control-dsum",
+    "scalar-control-average",
+    "scalar-control-counta",
+    "scalar-control-var",
+    "scalar-control-stdev",
+    "database-control-dvar",
+    "database-control-dstdev",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-sin",
+    "array-control-16x16-arithmetic",
+    "array-control-16x16-sin",
+    "reference-array-16x4-arithmetic",
+    "scalar-aggregate-sum",
+    "literal-aggregate-4x1-sum",
+    "reference-aggregate-64x4-sum",
+    "reference-conditional-256x4-sumifs",
+    "reference-control-average",
+    "reference-control-counta",
+    "representative-median",
+    "representative-rank",
+    "representative-percentrank",
+    "concat-borrowed-literals",
+    "concat-owned-left",
+    "concat-owned-right",
+    "concat-growth-chain",
+    "reference-control-rows-descriptor",
+    "reference-control-isref-descriptor",
+    "reference-control-rows-projected",
+    "reference-control-isref-projected",
+    "reference-control-row-projected"
+  ],
+  "lookup_cases": [
+    {
+      "name": "lookup-address-a1-absolute",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;1;TRUE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "$C$2"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "a1-absolute",
+      "notes": "text-only; no resolver read"
+    },
+    {
+      "name": "lookup-address-a1-relative",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;4;TRUE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "C2"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "a1-relative"
+    },
+    {
+      "name": "lookup-address-a1-row-absolute",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;2;TRUE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "C$2"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "a1-row-absolute"
+    },
+    {
+      "name": "lookup-address-a1-column-absolute",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;3;TRUE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "$C2"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "a1-column-absolute"
+    },
+    {
+      "name": "lookup-address-r1c1-absolute",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;1;FALSE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "R2C3"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "r1c1-absolute"
+    },
+    {
+      "name": "lookup-address-r1c1-relative",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;4;FALSE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "R[2]C[3]"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "r1c1-relative",
+      "notes": "relative to fixture origin; freeze contract must pin this string"
+    },
+    {
+      "name": "lookup-address-sheet",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(2;3;1;TRUE();\"Data\")",
+      "shape": "scalar",
+      "expected": {
+        "kind": "text",
+        "value": "Data.$C$2"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "sheet-qualified"
+    },
+    {
+      "name": "lookup-address-invalid",
+      "function": "ADDRESS",
+      "source": "=ADDRESS(0;3;1;TRUE())",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-choose-first",
+      "function": "CHOOSE",
+      "source": "=CHOOSE(1;10;20;30)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 10
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "selected-scalar"
+    },
+    {
+      "name": "lookup-choose-middle-lazy",
+      "function": "CHOOSE",
+      "source": "=CHOOSE(2;SUM([.A1:.JP1024]);20;SUM([.A1:.JP1024]))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 20
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "lazy-unselected-reference"
+    },
+    {
+      "name": "lookup-choose-selected-reference",
+      "function": "CHOOSE",
+      "source": "=SUM(CHOOSE(3;[.A1];[.B1];[.C2]))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "selected-value-read"
+    },
+    {
+      "name": "lookup-choose-lazy-if",
+      "function": "CHOOSE",
+      "source": "=IF(FALSE();SUM(CHOOSE(1;[.A1:.JP1024];42));0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 0
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "lazy-if"
+    },
+    {
+      "name": "lookup-choose-projected",
+      "function": "CHOOSE",
+      "source": "=IF({TRUE()|FALSE()};CHOOSE(2;10;20);0)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          20,
+          0
+        ]
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "matrix-projection"
+    },
+    {
+      "name": "lookup-choose-position-sensitive-index",
+      "function": "CHOOSE",
+      "source": "=CHOOSE({1|2};10;20)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          10,
+          20
+        ]
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "position-sensitive-selector",
+      "notes": "matrix index must select a different branch at each output position"
+    },
+    {
+      "name": "lookup-choose-selected-error",
+      "function": "CHOOSE",
+      "source": "=CHOOSE(2;1;#N/A)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#N/A"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "selected-error"
+    },
+    {
+      "name": "lookup-choose-invalid-index",
+      "function": "CHOOSE",
+      "source": "=CHOOSE(0;1;2)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "invalid-index"
+    },
+    {
+      "name": "lookup-choose-selected-index",
+      "function": "CHOOSE",
+      "source": "=IF(TRUE();CHOOSE(3;1;2;SUM([.C2]));0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "selected-value-read"
+    },
+    {
+      "name": "lookup-hlookup-exact-8-start",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(1;[.A100:.H101];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1001
+      },
+      "read_expectation": {
+        "min": 2,
+        "max": 2,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-8"
+    },
+    {
+      "name": "lookup-hlookup-exact-64-end",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(64;[.A100:.BL101];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1064
+      },
+      "read_expectation": {
+        "min": 65,
+        "max": 65,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-64"
+    },
+    {
+      "name": "lookup-hlookup-exact-256-end",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(256;[.A100:.IV101];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1256
+      },
+      "read_expectation": {
+        "min": 257,
+        "max": 257,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-256"
+    },
+    {
+      "name": "lookup-hlookup-approx-8-mid",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(7.5;[.A100:.H101];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1007
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-8"
+    },
+    {
+      "name": "lookup-hlookup-approx-64-mid",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(32.5;[.A100:.BL101];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1032
+      },
+      "read_expectation": {
+        "min": 7,
+        "max": 7,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-64"
+    },
+    {
+      "name": "lookup-hlookup-approx-256-mid",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(128.5;[.A100:.IV101];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1128
+      },
+      "read_expectation": {
+        "min": 9,
+        "max": 9,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-256"
+    },
+    {
+      "name": "lookup-hlookup-invalid-row",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(1;[.A100:.H101];3;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#REF!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-hlookup-miss",
+      "function": "HLOOKUP",
+      "source": "=HLOOKUP(999;[.A100:.H101];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#N/A"
+      },
+      "read_expectation": {
+        "min": 8,
+        "max": 8,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-miss"
+    },
+    {
+      "name": "lookup-index-descriptor",
+      "function": "INDEX",
+      "source": "=ISREF(INDEX([.A1:.D64];2;3))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descriptor-zero-read"
+    },
+    {
+      "name": "lookup-index-descriptor-row",
+      "function": "INDEX",
+      "source": "=ISREF(INDEX([.A1:.D64];0;2))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descriptor-zero-read"
+    },
+    {
+      "name": "lookup-index-consumer",
+      "function": "INDEX",
+      "source": "=SUM(INDEX([.A1:.D64];2;3))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "consumer-selected-read"
+    },
+    {
+      "name": "lookup-index-row-consumer",
+      "function": "INDEX",
+      "source": "=SUM(INDEX([.A1:.D4];2;0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 6008
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact"
+      },
+      "lane": "consumer-selected-row"
+    },
+    {
+      "name": "lookup-index-literal",
+      "function": "INDEX",
+      "source": "=INDEX({10|20|30};2)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 20
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "literal-array"
+    },
+    {
+      "name": "lookup-index-invalid",
+      "function": "INDEX",
+      "source": "=INDEX([.A1:.D4];99;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#REF!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-index-union-list",
+      "function": "INDEX",
+      "source": "=ISREF(INDEX(([.A1:.B2]~[.C1:.D2]);1;1))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "reference-list-admission",
+      "notes": "INDEX selects one logical ReferenceList record and preserves descriptor identity without cell reads"
+    },
+    {
+      "name": "lookup-index-lazy-consumer",
+      "function": "INDEX",
+      "source": "=SUM(IF(TRUE();INDEX([.A1:.D4];2;3);0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "lazy-consumer"
+    },
+    {
+      "name": "lookup-indirect-descriptor-a1",
+      "function": "INDIRECT",
+      "source": "=ISREF(INDIRECT(\"A1\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descriptor-zero-read"
+    },
+    {
+      "name": "lookup-indirect-consumer-a1",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"A1\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "consumer-selected-read"
+    },
+    {
+      "name": "lookup-indirect-range-sum",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"A1:D4\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 24040
+      },
+      "read_expectation": {
+        "min": 16,
+        "max": 16,
+        "kind": "exact"
+      },
+      "lane": "consumer-range-read"
+    },
+    {
+      "name": "lookup-indirect-descriptor-r1c1",
+      "function": "INDIRECT",
+      "source": "=ISREF(INDIRECT(\"R2C3\";FALSE()))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "r1c1-descriptor-zero-read"
+    },
+    {
+      "name": "lookup-indirect-consumer-r1c1",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"R2C3\";FALSE()))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "r1c1-selected-read"
+    },
+    {
+      "name": "lookup-indirect-consumer-r1c1-relative",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"R[1]C[1]\";FALSE()))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "r1c1-relative-consumer",
+      "notes": "relative R1C1 uses the explicit fixture origin and reads the selected B2 cell"
+    },
+    {
+      "name": "lookup-indirect-sheet-consumer",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"Data.B2\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 11002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "sheet-qualified-selected-read"
+    },
+    {
+      "name": "lookup-indirect-invalid-isref",
+      "function": "INDIRECT",
+      "source": "=ISREF(INDIRECT(\"not a ref\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": false
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "invalid-descriptor-inspection",
+      "notes": "ISREF consumes an invalid formula result as FALSE"
+    },
+    {
+      "name": "lookup-indirect-lazy-if",
+      "function": "INDIRECT",
+      "source": "=IF(FALSE();SUM(INDIRECT(\"A1:D1024\"));0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 0
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "lazy-if"
+    },
+    {
+      "name": "lookup-indirect-projected-dynamic-8",
+      "function": "INDIRECT",
+      "source": "=SUM(IF({TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()};INDIRECT([.H1]);0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 80
+      },
+      "read_expectation": {
+        "min": 16,
+        "max": 16,
+        "kind": "exact",
+        "reason": "one H1 selector read and one C1 result read per projected coordinate; no invariant dynamic descriptor reuse"
+      },
+      "lane": "dynamic-descriptor-scaling-8",
+      "notes": "The lookup fixture supplies borrowed Text \"C1\" in H1 and Number 10 in C1 for this lane."
+    },
+    {
+      "name": "lookup-indirect-projected-dynamic-64",
+      "function": "INDIRECT",
+      "source": "=SUM(IF({TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()};INDIRECT([.H1]);0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 640
+      },
+      "read_expectation": {
+        "min": 128,
+        "max": 128,
+        "kind": "exact",
+        "reason": "one H1 selector read and one C1 result read per projected coordinate; no invariant dynamic descriptor reuse"
+      },
+      "lane": "dynamic-descriptor-scaling-64",
+      "notes": "The lookup fixture supplies borrowed Text \"C1\" in H1 and Number 10 in C1 for this lane."
+    },
+    {
+      "name": "lookup-indirect-projected-dynamic-256",
+      "function": "INDIRECT",
+      "source": "=SUM(IF({TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()|TRUE()};INDIRECT([.H1]);0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2560
+      },
+      "read_expectation": {
+        "min": 512,
+        "max": 512,
+        "kind": "exact",
+        "reason": "one H1 selector read and one C1 result read per projected coordinate; no invariant dynamic descriptor reuse"
+      },
+      "lane": "dynamic-descriptor-scaling-256",
+      "notes": "The lookup fixture supplies borrowed Text \"C1\" in H1 and Number 10 in C1 for this lane."
+    },
+    {
+      "name": "lookup-lookup-approx-8",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(7.5;[.A1:.A8];[.B1:.B8])",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1007
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-8"
+    },
+    {
+      "name": "lookup-lookup-approx-64",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(32.5;[.A1:.A64];[.B1:.B64])",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1032
+      },
+      "read_expectation": {
+        "min": 7,
+        "max": 7,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-64"
+    },
+    {
+      "name": "lookup-lookup-approx-256",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(128.5;[.A1:.A256];[.B1:.B256])",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1128
+      },
+      "read_expectation": {
+        "min": 9,
+        "max": 9,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-256"
+    },
+    {
+      "name": "lookup-lookup-approx-last",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(256;[.A1:.A256];[.B1:.B256])",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1256
+      },
+      "read_expectation": {
+        "min": 9,
+        "max": 9,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-last"
+    },
+    {
+      "name": "lookup-lookup-literal-text",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(\"m\";{\"a\"|\"m\"|\"z\"};{10|20|30})",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 20
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "literal-array"
+    },
+    {
+      "name": "lookup-lookup-short-result",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(3;{1|2};{10})",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#N/A"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "short-result-refusal",
+      "notes": "a short inline result Array yields #N/A after the selected search position is unavailable"
+    },
+    {
+      "name": "lookup-lookup-lazy-if",
+      "function": "LOOKUP",
+      "source": "=IF(TRUE();LOOKUP(7.5;[.A1:.A8];[.B1:.B8]);0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1007
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "lazy-consumer"
+    },
+    {
+      "name": "lookup-lookup-descending-result",
+      "function": "LOOKUP",
+      "source": "=LOOKUP(1.5;[.A1:.A8];[.C1:.C8])",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 2001
+      },
+      "read_expectation": {
+        "min": 5,
+        "max": 5,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "four key probes (4, 2, 1, 0) plus selected result read"
+      },
+      "lane": "second-result-vector"
+    },
+    {
+      "name": "lookup-match-exact-8-end",
+      "function": "MATCH",
+      "source": "=MATCH(8;[.A1:.A8];0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 8
+      },
+      "read_expectation": {
+        "min": 8,
+        "max": 8,
+        "kind": "exact",
+        "algorithm": "exact-linear",
+        "reason": "exact search reaches final key"
+      },
+      "lane": "exact-linear-8"
+    },
+    {
+      "name": "lookup-match-exact-64-end",
+      "function": "MATCH",
+      "source": "=MATCH(64;[.A1:.A64];0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 64
+      },
+      "read_expectation": {
+        "min": 64,
+        "max": 64,
+        "kind": "exact",
+        "algorithm": "exact-linear",
+        "reason": "exact search reaches final key"
+      },
+      "lane": "exact-linear-64"
+    },
+    {
+      "name": "lookup-match-exact-256-end",
+      "function": "MATCH",
+      "source": "=MATCH(256;[.A1:.A256];0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 256
+      },
+      "read_expectation": {
+        "min": 256,
+        "max": 256,
+        "kind": "exact",
+        "algorithm": "exact-linear",
+        "reason": "exact search reaches final key"
+      },
+      "lane": "exact-linear-256"
+    },
+    {
+      "name": "lookup-match-approx-8-mid",
+      "function": "MATCH",
+      "source": "=MATCH(7.5;[.A1:.A8];1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 7
+      },
+      "read_expectation": {
+        "min": 3,
+        "max": 3,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "sorted approximate binary search"
+      },
+      "lane": "approx-binary-8"
+    },
+    {
+      "name": "lookup-match-approx-64-mid",
+      "function": "MATCH",
+      "source": "=MATCH(32.5;[.A1:.A64];1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 32
+      },
+      "read_expectation": {
+        "min": 6,
+        "max": 6,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "sorted approximate binary search"
+      },
+      "lane": "approx-binary-64"
+    },
+    {
+      "name": "lookup-match-approx-256-mid",
+      "function": "MATCH",
+      "source": "=MATCH(128.5;[.A1:.A256];1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 128
+      },
+      "read_expectation": {
+        "min": 8,
+        "max": 8,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "sorted approximate binary search"
+      },
+      "lane": "approx-binary-256"
+    },
+    {
+      "name": "lookup-match-projected-invariant",
+      "function": "MATCH",
+      "source": "=IF({TRUE()|TRUE()};MATCH(2;[.A1:.A8];0);0)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          2,
+          2
+        ]
+      },
+      "read_expectation": {
+        "min": 2,
+        "max": 2,
+        "kind": "exact"
+      },
+      "lane": "projected-invariant-cache",
+      "notes": "complete direct search descriptor and scalar key may reuse the invariant MATCH result across projected positions"
+    },
+    {
+      "name": "lookup-match-position-sensitive-key",
+      "function": "MATCH",
+      "source": "=MATCH({2|3};[.A1:.A8];0)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          2,
+          3
+        ]
+      },
+      "read_expectation": {
+        "min": 5,
+        "max": 5,
+        "kind": "exact"
+      },
+      "lane": "position-sensitive-selector",
+      "notes": "array-valued scalar search key must remain coordinate-sensitive; two exact scans read 2 then 3 cells"
+    },
+    {
+      "name": "lookup-match-nested-munit-key",
+      "function": "MATCH",
+      "source": "=IF({TRUE()|TRUE()};MATCH(SUM(MUNIT([.G1:.G2]));[.A1:.A8];0);0)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          1,
+          2
+        ]
+      },
+      "read_expectation": {
+        "min": 5,
+        "max": 5,
+        "kind": "exact",
+        "reason": "two projected MUNIT size reads plus one and two exact MATCH probes"
+      },
+      "lane": "position-sensitive-nested-munit",
+      "notes": "G1=1 and G2=2 make SUM(MUNIT(...)) vary by projected coordinate; MUNIT remains excluded from invariant scalar propagation"
+    },
+    {
+      "name": "lookup-match-exact-miss",
+      "function": "MATCH",
+      "source": "=MATCH(999;[.A1:.A8];0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#N/A"
+      },
+      "read_expectation": {
+        "min": 8,
+        "max": 8,
+        "kind": "exact",
+        "algorithm": "exact-linear",
+        "reason": "exact miss scans all keys"
+      },
+      "lane": "exact-linear-miss"
+    },
+    {
+      "name": "lookup-match-descending",
+      "function": "MATCH",
+      "source": "=MATCH(7.5;{8|7|6|5|4|3|2|1};-1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descending-literal"
+    },
+    {
+      "name": "lookup-offset-descriptor",
+      "function": "OFFSET",
+      "source": "=ISREF(OFFSET([.A1];1;1))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descriptor-zero-read"
+    },
+    {
+      "name": "lookup-offset-large-descriptor",
+      "function": "OFFSET",
+      "source": "=ISREF(OFFSET([.A1];0;0;512;4))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": true
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "descriptor-zero-read"
+    },
+    {
+      "name": "lookup-offset-consumer",
+      "function": "OFFSET",
+      "source": "=SUM(OFFSET([.A1];1;1))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "consumer-selected-read"
+    },
+    {
+      "name": "lookup-offset-range-sum",
+      "function": "OFFSET",
+      "source": "=SUM(OFFSET([.A1];1;1;2;2))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 6010
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact"
+      },
+      "lane": "consumer-range-read"
+    },
+    {
+      "name": "lookup-offset-invalid",
+      "function": "OFFSET",
+      "source": "=OFFSET([.A1];-2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#REF!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-offset-union-isref",
+      "function": "OFFSET",
+      "source": "=ISREF(OFFSET(([.A1]~[.B1]);1;1))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "logical",
+        "value": false
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "invalid-descriptor-inspection",
+      "notes": "ISREF consumes OFFSET list refusal as FALSE"
+    },
+    {
+      "name": "lookup-offset-zero-size",
+      "function": "OFFSET",
+      "source": "=OFFSET([.A1];1;1;0;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-offset-lazy-if",
+      "function": "OFFSET",
+      "source": "=SUM(IF(TRUE();OFFSET([.A1];1;1);0))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1002
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "lazy-consumer"
+    },
+    {
+      "name": "lookup-vlookup-exact-8-start",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(1;[.A1:.C8];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1001
+      },
+      "read_expectation": {
+        "min": 2,
+        "max": 2,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-8"
+    },
+    {
+      "name": "lookup-vlookup-exact-64-end",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(64;[.A1:.C64];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1064
+      },
+      "read_expectation": {
+        "min": 65,
+        "max": 65,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-64"
+    },
+    {
+      "name": "lookup-vlookup-exact-256-end",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(256;[.A1:.C256];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1256
+      },
+      "read_expectation": {
+        "min": 257,
+        "max": 257,
+        "kind": "exact"
+      },
+      "lane": "exact-linear-256"
+    },
+    {
+      "name": "lookup-vlookup-approx-8-mid",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(7.5;[.A1:.C8];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1007
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-8"
+    },
+    {
+      "name": "lookup-vlookup-approx-64-mid",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(32.5;[.A1:.C64];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1032
+      },
+      "read_expectation": {
+        "min": 7,
+        "max": 7,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-64"
+    },
+    {
+      "name": "lookup-vlookup-approx-256-mid",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(128.5;[.A1:.C256];2;1)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "number",
+        "value": 1128
+      },
+      "read_expectation": {
+        "min": 9,
+        "max": 9,
+        "kind": "exact",
+        "algorithm": "sorted-binary",
+        "reason": "binary search plus selected result read"
+      },
+      "lane": "approx-binary-256"
+    },
+    {
+      "name": "lookup-vlookup-invalid-column",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(1;[.A1:.C8];4;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#REF!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "shape-refusal"
+    },
+    {
+      "name": "lookup-vlookup-exact-miss",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(999;[.A1:.C8];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#N/A"
+      },
+      "read_expectation": {
+        "min": 8,
+        "max": 8,
+        "kind": "exact",
+        "algorithm": "exact-linear",
+        "reason": "exact miss scans all keys"
+      },
+      "lane": "exact-linear-miss"
+    },
+    {
+      "name": "lookup-resource-match",
+      "function": "MATCH",
+      "source": "=MATCH(256;[.A1:.IV256];0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "reference-cells"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "resource-refusal",
+      "notes": "max_reference_cells=0; zero resolver reads"
+    },
+    {
+      "name": "lookup-resource-vlookup",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(256;[.A1:.C256];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "reference-cells"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "resource-refusal",
+      "notes": "max_reference_cells=0; zero resolver reads"
+    },
+    {
+      "name": "lookup-cancel-vlookup",
+      "function": "VLOOKUP",
+      "source": "=VLOOKUP(256;[.A1:.C256];2;0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "cancelled"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 1,
+        "kind": "bounded",
+        "reason": "sticky cancellation after first attempted read"
+      },
+      "lane": "cancellation"
+    },
+    {
+      "name": "lookup-cancel-indirect",
+      "function": "INDIRECT",
+      "source": "=SUM(INDIRECT(\"A1:C4\"))",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "cancelled"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 1,
+        "kind": "bounded",
+        "reason": "sticky cancellation after first attempted read"
+      },
+      "lane": "cancellation"
+    },
+    {
+      "name": "lookup-output-index-row",
+      "function": "INDEX",
+      "source": "=INDEX([.A1:.D4];2;0)+0",
+      "shape": {
+        "rows": 1,
+        "columns": 4
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          1,
+          4
+        ],
+        "values": [
+          2,
+          1002,
+          2002,
+          3002
+        ]
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact"
+      },
+      "lane": "matrix-output"
+    },
+    {
+      "name": "lookup-output-offset-matrix",
+      "function": "OFFSET",
+      "source": "=OFFSET([.A1];1;1;2;2)+0",
+      "shape": {
+        "rows": 2,
+        "columns": 2
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          2
+        ],
+        "values": [
+          1002,
+          2002,
+          1003,
+          2003
+        ]
+      },
+      "read_expectation": {
+        "min": 4,
+        "max": 4,
+        "kind": "exact"
+      },
+      "lane": "matrix-output"
+    },
+    {
+      "name": "lookup-shape-refusal-union",
+      "function": "MATCH",
+      "source": "=MATCH(1;([.A1:.B2]~[.C1:.D2]);0)",
+      "shape": "scalar",
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!"
+      },
+      "read_expectation": {
+        "min": 0,
+        "max": 0,
+        "kind": "exact"
+      },
+      "lane": "reference-list-refusal"
+    },
+    {
+      "name": "lookup-lazy-index-projection",
+      "function": "INDEX",
+      "source": "=IF({TRUE()|FALSE()};SUM(INDEX([.A1:.D4];2;3));0)",
+      "shape": {
+        "rows": 2,
+        "columns": 1
+      },
+      "expected": {
+        "kind": "number-array",
+        "shape": [
+          2,
+          1
+        ],
+        "values": [
+          2002,
+          0
+        ]
+      },
+      "read_expectation": {
+        "min": 1,
+        "max": 1,
+        "kind": "exact"
+      },
+      "lane": "lazy-projected-consumer"
+    }
+  ],
+  "case_order": [
+    "scalar-control-arithmetic",
+    "scalar-control-sin",
+    "scalar-control-imsum",
+    "database-control-dsum",
+    "scalar-control-average",
+    "scalar-control-counta",
+    "scalar-control-var",
+    "scalar-control-stdev",
+    "database-control-dvar",
+    "database-control-dstdev",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-sin",
+    "array-control-16x16-arithmetic",
+    "array-control-16x16-sin",
+    "reference-array-16x4-arithmetic",
+    "scalar-aggregate-sum",
+    "literal-aggregate-4x1-sum",
+    "reference-aggregate-64x4-sum",
+    "reference-conditional-256x4-sumifs",
+    "reference-control-average",
+    "reference-control-counta",
+    "representative-median",
+    "representative-rank",
+    "representative-percentrank",
+    "concat-borrowed-literals",
+    "concat-owned-left",
+    "concat-owned-right",
+    "concat-growth-chain",
+    "reference-control-rows-descriptor",
+    "reference-control-isref-descriptor",
+    "reference-control-rows-projected",
+    "reference-control-isref-projected",
+    "reference-control-row-projected",
+    "lookup-address-a1-absolute",
+    "lookup-address-a1-relative",
+    "lookup-address-a1-row-absolute",
+    "lookup-address-a1-column-absolute",
+    "lookup-address-r1c1-absolute",
+    "lookup-address-r1c1-relative",
+    "lookup-address-sheet",
+    "lookup-address-invalid",
+    "lookup-choose-first",
+    "lookup-choose-middle-lazy",
+    "lookup-choose-selected-reference",
+    "lookup-choose-lazy-if",
+    "lookup-choose-projected",
+    "lookup-choose-position-sensitive-index",
+    "lookup-choose-selected-error",
+    "lookup-choose-invalid-index",
+    "lookup-choose-selected-index",
+    "lookup-hlookup-exact-8-start",
+    "lookup-hlookup-exact-64-end",
+    "lookup-hlookup-exact-256-end",
+    "lookup-hlookup-approx-8-mid",
+    "lookup-hlookup-approx-64-mid",
+    "lookup-hlookup-approx-256-mid",
+    "lookup-hlookup-invalid-row",
+    "lookup-hlookup-miss",
+    "lookup-index-descriptor",
+    "lookup-index-descriptor-row",
+    "lookup-index-consumer",
+    "lookup-index-row-consumer",
+    "lookup-index-literal",
+    "lookup-index-invalid",
+    "lookup-index-union-list",
+    "lookup-index-lazy-consumer",
+    "lookup-indirect-descriptor-a1",
+    "lookup-indirect-consumer-a1",
+    "lookup-indirect-range-sum",
+    "lookup-indirect-descriptor-r1c1",
+    "lookup-indirect-consumer-r1c1",
+    "lookup-indirect-consumer-r1c1-relative",
+    "lookup-indirect-sheet-consumer",
+    "lookup-indirect-invalid-isref",
+    "lookup-indirect-lazy-if",
+    "lookup-indirect-projected-dynamic-8",
+    "lookup-indirect-projected-dynamic-64",
+    "lookup-indirect-projected-dynamic-256",
+    "lookup-lookup-approx-8",
+    "lookup-lookup-approx-64",
+    "lookup-lookup-approx-256",
+    "lookup-lookup-approx-last",
+    "lookup-lookup-literal-text",
+    "lookup-lookup-short-result",
+    "lookup-lookup-lazy-if",
+    "lookup-lookup-descending-result",
+    "lookup-match-exact-8-end",
+    "lookup-match-exact-64-end",
+    "lookup-match-exact-256-end",
+    "lookup-match-approx-8-mid",
+    "lookup-match-approx-64-mid",
+    "lookup-match-approx-256-mid",
+    "lookup-match-projected-invariant",
+    "lookup-match-position-sensitive-key",
+    "lookup-match-nested-munit-key",
+    "lookup-match-exact-miss",
+    "lookup-match-descending",
+    "lookup-offset-descriptor",
+    "lookup-offset-large-descriptor",
+    "lookup-offset-consumer",
+    "lookup-offset-range-sum",
+    "lookup-offset-invalid",
+    "lookup-offset-union-isref",
+    "lookup-offset-zero-size",
+    "lookup-offset-lazy-if",
+    "lookup-vlookup-exact-8-start",
+    "lookup-vlookup-exact-64-end",
+    "lookup-vlookup-exact-256-end",
+    "lookup-vlookup-approx-8-mid",
+    "lookup-vlookup-approx-64-mid",
+    "lookup-vlookup-approx-256-mid",
+    "lookup-vlookup-invalid-column",
+    "lookup-vlookup-exact-miss",
+    "lookup-resource-match",
+    "lookup-resource-vlookup",
+    "lookup-cancel-vlookup",
+    "lookup-cancel-indirect",
+    "lookup-output-index-row",
+    "lookup-output-offset-matrix",
+    "lookup-shape-refusal-union",
+    "lookup-lazy-index-projection"
+  ],
+  "read_contract": {
+    "description": "reference_reads are per child and measured after the untimed preflight. Bounds are carried per case; cancellation accepts 0..1 because the first cancelled child may stop before or after the resolver charge.",
+    "normalization": "elapsed_ns_p50 / repeat is retained as an exact float before cross-sample medians, deltas, and bootstrap intervals.",
+    "resolver": "Main/Data/Archive/Hidden; ordinary vertical tables use A:C, horizontal tables use rows 100:101; metadata controls are zero-read descriptors.; dynamic projected INDIRECT lanes use Main H1=\"C1\" and C1=10"
+  },
+  "correctness_requirements": [
+    "preflight compares exact scalar result kind/value or every matrix coordinate for all lookup cases",
+    "ADDRESS covers A1 and R1C1 absolute/relative formatting and sheet qualification",
+    "CHOOSE and IF preserve lazy branch selection without reading unselected references",
+    "MATCH exact lanes use linear scans while sorted approximate MATCH/LOOKUP/HLOOKUP/VLOOKUP lanes expose binary-search scaling",
+    "HLOOKUP/VLOOKUP and LOOKUP validate selected-result-only reads in addition to search-vector reads",
+    "INDEX/OFFSET/INDIRECT descriptor probes are zero-read; INDEX admits ReferenceList records and consumer probes read only selected cells or requested matrix cells",
+    "typed resource, cancellation, shape/refusal, formula-error, output-matrix, and lazy projected lanes are checked before timing",
+    "invalid INDIRECT and OFFSET results consumed by ISREF validate exact FALSE rather than propagating a formula error",
+    "matched controls retain the existing SUMIFS evaluate and parse-evaluate lanes plus direct/projected ROWS and ISREF metadata controls",
+    "projected invariant numeric MATCH may reuse a complete direct search descriptor, while array-valued and nested MUNIT keys remain position-sensitive",
+    "manifest is a flat relative-path to SHA256 map and excludes itself; no wrapper object is accepted",
+    "projected dynamic INDIRECT descriptors scale linearly: each coordinate reads its H1 text selector and selected C1 result without invariant reuse"
+  ],
+  "normalization_fields": [
+    "elapsed_ns_p50",
+    "repeat",
+    "elapsed_ns_per_repeat_exact"
+  ],
+  "retained_manifest": "results/retained-files.json",
+  "expected_timing_rows": {
+    "baseline": 990,
+    "candidate": 3630,
+    "total": 4620
+  },
+  "notes": "Read bounds for approximate search are deliberately per-case. If the frozen contract chooses a different binary probe count, update only the case-matrix read_contract and the generated verifier mapping before capture; do not replace it with a global zero or an unbounded assertion. Dynamic projected INDIRECT lanes intentionally expect 2N reads for N output coordinates.",
+  "candidate_total_case_count": 121,
+  "candidate_cases": [
+    "lookup-address-a1-absolute",
+    "lookup-address-a1-relative",
+    "lookup-address-a1-row-absolute",
+    "lookup-address-a1-column-absolute",
+    "lookup-address-r1c1-absolute",
+    "lookup-address-r1c1-relative",
+    "lookup-address-sheet",
+    "lookup-address-invalid",
+    "lookup-choose-first",
+    "lookup-choose-middle-lazy",
+    "lookup-choose-selected-reference",
+    "lookup-choose-lazy-if",
+    "lookup-choose-projected",
+    "lookup-choose-position-sensitive-index",
+    "lookup-choose-selected-error",
+    "lookup-choose-invalid-index",
+    "lookup-choose-selected-index",
+    "lookup-hlookup-exact-8-start",
+    "lookup-hlookup-exact-64-end",
+    "lookup-hlookup-exact-256-end",
+    "lookup-hlookup-approx-8-mid",
+    "lookup-hlookup-approx-64-mid",
+    "lookup-hlookup-approx-256-mid",
+    "lookup-hlookup-invalid-row",
+    "lookup-hlookup-miss",
+    "lookup-index-descriptor",
+    "lookup-index-descriptor-row",
+    "lookup-index-consumer",
+    "lookup-index-row-consumer",
+    "lookup-index-literal",
+    "lookup-index-invalid",
+    "lookup-index-union-list",
+    "lookup-index-lazy-consumer",
+    "lookup-indirect-descriptor-a1",
+    "lookup-indirect-consumer-a1",
+    "lookup-indirect-range-sum",
+    "lookup-indirect-descriptor-r1c1",
+    "lookup-indirect-consumer-r1c1",
+    "lookup-indirect-consumer-r1c1-relative",
+    "lookup-indirect-sheet-consumer",
+    "lookup-indirect-invalid-isref",
+    "lookup-indirect-lazy-if",
+    "lookup-indirect-projected-dynamic-8",
+    "lookup-indirect-projected-dynamic-64",
+    "lookup-indirect-projected-dynamic-256",
+    "lookup-lookup-approx-8",
+    "lookup-lookup-approx-64",
+    "lookup-lookup-approx-256",
+    "lookup-lookup-approx-last",
+    "lookup-lookup-literal-text",
+    "lookup-lookup-short-result",
+    "lookup-lookup-lazy-if",
+    "lookup-lookup-descending-result",
+    "lookup-match-exact-8-end",
+    "lookup-match-exact-64-end",
+    "lookup-match-exact-256-end",
+    "lookup-match-approx-8-mid",
+    "lookup-match-approx-64-mid",
+    "lookup-match-approx-256-mid",
+    "lookup-match-projected-invariant",
+    "lookup-match-position-sensitive-key",
+    "lookup-match-nested-munit-key",
+    "lookup-match-exact-miss",
+    "lookup-match-descending",
+    "lookup-offset-descriptor",
+    "lookup-offset-large-descriptor",
+    "lookup-offset-consumer",
+    "lookup-offset-range-sum",
+    "lookup-offset-invalid",
+    "lookup-offset-union-isref",
+    "lookup-offset-zero-size",
+    "lookup-offset-lazy-if",
+    "lookup-vlookup-exact-8-start",
+    "lookup-vlookup-exact-64-end",
+    "lookup-vlookup-exact-256-end",
+    "lookup-vlookup-approx-8-mid",
+    "lookup-vlookup-approx-64-mid",
+    "lookup-vlookup-approx-256-mid",
+    "lookup-vlookup-invalid-column",
+    "lookup-vlookup-exact-miss",
+    "lookup-resource-match",
+    "lookup-resource-vlookup",
+    "lookup-cancel-vlookup",
+    "lookup-cancel-indirect",
+    "lookup-output-index-row",
+    "lookup-output-offset-matrix",
+    "lookup-shape-refusal-union",
+    "lookup-lazy-index-projection"
+  ],
+  "expected_reference_reads": {
+    "by_case": {
+      "scalar-control-arithmetic": 0,
+      "scalar-control-sin": 0,
+      "scalar-control-imsum": 0,
+      "database-control-dsum": 7,
+      "scalar-control-average": 0,
+      "scalar-control-counta": 0,
+      "scalar-control-var": 0,
+      "scalar-control-stdev": 0,
+      "database-control-dvar": 7,
+      "database-control-dstdev": 7,
+      "array-control-4x4-arithmetic": 0,
+      "array-control-4x4-sin": 0,
+      "array-control-16x16-arithmetic": 0,
+      "array-control-16x16-sin": 0,
+      "reference-array-16x4-arithmetic": 64,
+      "scalar-aggregate-sum": 0,
+      "literal-aggregate-4x1-sum": 0,
+      "reference-aggregate-64x4-sum": 256,
+      "reference-conditional-256x4-sumifs": 1792,
+      "reference-control-average": 256,
+      "reference-control-counta": 256,
+      "representative-median": 0,
+      "representative-rank": 0,
+      "representative-percentrank": 0,
+      "concat-borrowed-literals": 0,
+      "concat-owned-left": 0,
+      "concat-owned-right": 0,
+      "concat-growth-chain": 0,
+      "reference-control-rows-descriptor": 0,
+      "reference-control-isref-descriptor": 0,
+      "reference-control-rows-projected": 0,
+      "reference-control-isref-projected": 0,
+      "reference-control-row-projected": 0,
+      "lookup-address-a1-absolute": 0,
+      "lookup-address-a1-relative": 0,
+      "lookup-address-a1-row-absolute": 0,
+      "lookup-address-a1-column-absolute": 0,
+      "lookup-address-r1c1-absolute": 0,
+      "lookup-address-r1c1-relative": 0,
+      "lookup-address-sheet": 0,
+      "lookup-address-invalid": 0,
+      "lookup-choose-first": 0,
+      "lookup-choose-middle-lazy": 0,
+      "lookup-choose-selected-reference": 1,
+      "lookup-choose-lazy-if": 0,
+      "lookup-choose-projected": 0,
+      "lookup-choose-position-sensitive-index": 0,
+      "lookup-choose-selected-error": 0,
+      "lookup-choose-invalid-index": 0,
+      "lookup-choose-selected-index": 1,
+      "lookup-hlookup-exact-8-start": 2,
+      "lookup-hlookup-exact-64-end": 65,
+      "lookup-hlookup-exact-256-end": 257,
+      "lookup-hlookup-approx-8-mid": 4,
+      "lookup-hlookup-approx-64-mid": 7,
+      "lookup-hlookup-approx-256-mid": 9,
+      "lookup-hlookup-invalid-row": 0,
+      "lookup-hlookup-miss": 8,
+      "lookup-index-descriptor": 0,
+      "lookup-index-descriptor-row": 0,
+      "lookup-index-consumer": 1,
+      "lookup-index-row-consumer": 4,
+      "lookup-index-literal": 0,
+      "lookup-index-invalid": 0,
+      "lookup-index-union-list": 0,
+      "lookup-index-lazy-consumer": 1,
+      "lookup-indirect-descriptor-a1": 0,
+      "lookup-indirect-consumer-a1": 1,
+      "lookup-indirect-range-sum": 16,
+      "lookup-indirect-descriptor-r1c1": 0,
+      "lookup-indirect-consumer-r1c1": 1,
+      "lookup-indirect-consumer-r1c1-relative": 1,
+      "lookup-indirect-sheet-consumer": 1,
+      "lookup-indirect-invalid-isref": 0,
+      "lookup-indirect-lazy-if": 0,
+      "lookup-indirect-projected-dynamic-8": 16,
+      "lookup-indirect-projected-dynamic-64": 128,
+      "lookup-indirect-projected-dynamic-256": 512,
+      "lookup-lookup-approx-8": 4,
+      "lookup-lookup-approx-64": 7,
+      "lookup-lookup-approx-256": 9,
+      "lookup-lookup-approx-last": 9,
+      "lookup-lookup-literal-text": 0,
+      "lookup-lookup-short-result": 0,
+      "lookup-lookup-lazy-if": 4,
+      "lookup-lookup-descending-result": 5,
+      "lookup-match-exact-8-end": 8,
+      "lookup-match-exact-64-end": 64,
+      "lookup-match-exact-256-end": 256,
+      "lookup-match-approx-8-mid": 3,
+      "lookup-match-approx-64-mid": 6,
+      "lookup-match-approx-256-mid": 8,
+      "lookup-match-projected-invariant": 2,
+      "lookup-match-position-sensitive-key": 5,
+      "lookup-match-nested-munit-key": 5,
+      "lookup-match-exact-miss": 8,
+      "lookup-match-descending": 0,
+      "lookup-offset-descriptor": 0,
+      "lookup-offset-large-descriptor": 0,
+      "lookup-offset-consumer": 1,
+      "lookup-offset-range-sum": 4,
+      "lookup-offset-invalid": 0,
+      "lookup-offset-union-isref": 0,
+      "lookup-offset-zero-size": 0,
+      "lookup-offset-lazy-if": 1,
+      "lookup-vlookup-exact-8-start": 2,
+      "lookup-vlookup-exact-64-end": 65,
+      "lookup-vlookup-exact-256-end": 257,
+      "lookup-vlookup-approx-8-mid": 4,
+      "lookup-vlookup-approx-64-mid": 7,
+      "lookup-vlookup-approx-256-mid": 9,
+      "lookup-vlookup-invalid-column": 0,
+      "lookup-vlookup-exact-miss": 8,
+      "lookup-resource-match": 0,
+      "lookup-resource-vlookup": 0,
+      "lookup-cancel-vlookup": 1,
+      "lookup-cancel-indirect": 1,
+      "lookup-output-index-row": 4,
+      "lookup-output-offset-matrix": 4,
+      "lookup-shape-refusal-union": 0,
+      "lookup-lazy-index-projection": 1
+    }
+  }
+}
