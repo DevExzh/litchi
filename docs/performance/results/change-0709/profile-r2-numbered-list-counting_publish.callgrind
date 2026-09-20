@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 1757987
+cmd:  /home/zhuhe/code/litchi-0709-bin/baseline-native --warmup 0 --samples 1 --case docx_real_file_ordinary_save_counting_publish --json /home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-numbered-list-counting_publish.json --filesystem-root /home/zhuhe/code/litchi-0709-fs --ooxml-file test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx
+part: 6
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 15850773 - 71522091
+desc: Trigger: Program termination
+
+positions: line
+events: Ir
+summary: 0
+
+
+totals: 0

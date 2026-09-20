@@ -1,0 +1,10 @@
+{
+  "native": "Independent ZIP metadata checks, generated manifest invariants, exact source artifact names and full frozen argv validation; seven negative checks pass",
+  "profiles": [
+    "Runtime revision checked against exact packet-only commit transition instead of assuming checkout HEAD equals compiled-source base.",
+    "Imported retained parser diagnostic root rebound to this packet; retained helper source unchanged.",
+    "Live and cleanup witness binary validation yield identical normalized custody.",
+    "Native parity artifacts required for all eight profiles."
+  ],
+  "semantic": "Expected strict preservation failure remains exit 1 and oracle_pass false; public API build and Clippy pass; decoded/no-edit controls retain six output archives"
+}

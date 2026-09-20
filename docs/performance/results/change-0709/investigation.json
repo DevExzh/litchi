@@ -1,0 +1,32 @@
+{
+  "status": "60 native/allocator children and 8 profiles verified; strict preservation oracle fails with matching no-edit controls; no performance claim",
+  "previous_turn": "progress:0708 committed rejection,tests,evidence;productionrestored",
+  "selection": "ordinary DOCX documented open/append/save path",
+  "rationale": [
+    "Recent0706 and0708 XLSX allocation reductions missed native gates; no unmeasured retry.",
+    "0638 ordinary DOCX baseline predates subsequent OPC/DOCX changes and its real fixture refused the edit.",
+    "Refresh admitted and refused outcomes with generated control and separate edit/counting/atomic/lifecycle boundaries before selecting production work."
+  ],
+  "production_changed": false,
+  "scope_limits": [
+    "Independent phase distributions cannot be added or subtracted as matched lifecycle components.",
+    "Atomic save includes filesystem sync costs; no physical cold-cache or hardware-device latency claim.",
+    "Counting byte-identical payloads do not prove production compressed passthrough.",
+    "No producer compatibility claim from archive provenance alone."
+  ],
+  "iwork": "excluded",
+  "harness_changed": true,
+  "harness_change": "Correct compressed-versus-decoded real-file corpus manifest metadata before final baseline acquisition",
+  "preservation_finding": {
+    "fixture": "alt-chunk-header",
+    "member": "docProps/custom.xml",
+    "semantic_text_equal": true,
+    "main_compressed_payload_equal": true,
+    "oracle_pass": false,
+    "classification": "untouched custom properties are unconditionally canonicalized by write_plain",
+    "decoded_source_bytes": 632,
+    "decoded_output_bytes": 602,
+    "no_edit_controls_reproduce": true,
+    "next_action": "Guard custom_props.write_for with custom_props_dirty and verify refusal/no-edit/retry/raw-OPC behavior in follow-up batch"
+  }
+}

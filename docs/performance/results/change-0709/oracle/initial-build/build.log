@@ -1,0 +1,89 @@
+   Compiling unicode-ident v1.0.26
+   Compiling cfg-if v1.0.5
+   Compiling generic-array v0.14.7
+   Compiling proc-macro2 v1.0.107
+   Compiling crossbeam-utils v0.8.23
+   Compiling writeable v0.6.4
+   Compiling quote v1.0.47
+   Compiling litemap v0.8.3
+   Compiling syn v3.0.6
+   Compiling crossbeam-epoch v0.9.21
+   Compiling hybrid-array v0.4.15
+   Compiling crossbeam-deque v0.8.8
+   Compiling smallvec v1.16.1
+   Compiling synstructure v0.14.0
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling num-traits v0.2.19
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.3
+   Compiling zerofrom v0.1.8
+   Compiling zerovec-derive v0.11.6
+   Compiling yoke v0.8.3
+   Compiling displaydoc v0.2.7
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling icu_locale_core v2.3.0
+   Compiling icu_collections v2.3.0
+   Compiling cpufeatures v0.3.1
+   Compiling getrandom v0.4.3
+   Compiling icu_provider v2.3.1
+   Compiling serde_derive v1.0.229
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling zerocopy v0.8.57
+   Compiling rustix v1.1.5
+   Compiling crc32fast v1.5.2
+   Compiling digest v0.11.3
+   Compiling digest v0.10.7
+   Compiling serde v1.0.229
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling rayon-core v1.13.0
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.20
+   Compiling syn v2.0.119
+   Compiling bitflags v2.13.2
+   Compiling zlib-rs v0.6.8
+   Compiling either v1.18.0
+   Compiling sha2 v0.10.9
+   Compiling flate2 v1.1.10
+   Compiling chrono v0.4.45
+   Compiling rayon v1.12.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling thiserror v2.0.20
+   Compiling rand v0.10.2
+   Compiling idna_adapter v1.2.2
+   Compiling sha2 v0.11.0
+   Compiling fast-float2 v0.2.4
+   Compiling tinyvec v1.13.3
+   Compiling tempfile v3.27.0
+   Compiling unicode-normalization v0.1.25
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling caseless v0.2.2
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling docx-ordinary-save-oracle-0709 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle)
+error[E0596]: cannot borrow `reopened` as mutable, as it is not declared as mutable
+   --> src/main.rs:438:35
+    |
+438 |     let after = semantic_snapshot(&mut reopened);
+    |                                   ^^^^^^^^^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+437 |     let mut reopened = Package::from_reader(Cursor::new(output.as_slice()))?;
+    |         +++
+
+For more information about this error, try `rustc --explain E0596`.
+error: could not compile `docx-ordinary-save-oracle-0709` (bin "docx-ordinary-save-oracle-0709") due to 1 previous error

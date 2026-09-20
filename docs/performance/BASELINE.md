@@ -1,5 +1,28 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0709 — current DOCX ordinary-save baseline exposes clean custom-property rewrite
+
+[0709](0709-docx-ordinary-save-baseline.md) refreshes the documented DOCX
+open/edit/save route with a deterministic 200-paragraph generated corpus, an
+admitted `NumberedList.docx`, and the typed-refusal `alt-chunk-header.docx`.
+The native lane completes 36 children at three repeats, 100 samples, and 10
+warmups; the allocator lane completes 24 children at two repeats, three
+samples, and no warmup. The four phase distributions are independent and are
+never summed. The formal analysis verifies custody, statistics, and
+harness-output parity, while retaining 18 native repeat-spread flags; no
+performance claim is admitted. Eight Callgrind profiles pass as scoped instruction
+attribution; `document_mut` exceeds 99.95% of the edit-owner instructions.
+
+The strict public-API oracle verifies the admitted marker edit on both
+publication doors, but the refused fixture fails preservation: `to_stream` and
+`save` rewrite decoded `docProps/custom.xml` from 632 to 602 bytes even on
+no-edit controls, with the same output archive hash as the refused-edit
+routes. The main document and semantic text remain intact. Source tracing
+points to the clean-state `write_plain`/`custom_props.write_for` path. The next
+priority is a dirty-state guard with clean-save, dirty-property, retry, and raw
+OPC tests. No production optimization or workflow-correctness promotion
+follows this baseline. [Evidence packet](results/change-0709/README.md).
+
 ## 0708 — rejected XLSX validator name-storage candidate
 
 [0708](0708-xlsx-validator-name-storage.md) tests static modeled XML names,

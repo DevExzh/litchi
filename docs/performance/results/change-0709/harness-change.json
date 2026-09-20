@@ -1,0 +1,10 @@
+{
+  "path": "tools/perf-baseline/src/ordinary_save.rs",
+  "patch_sha256": "463efee320bb15af3cb8e7f51c964ca988bac23dc04de0f6f5cf1c69c3316dc7",
+  "production_changed": false,
+  "semantics": "Real-file target size/hash refer to decoded main member; aggregate uncompressed bytes sum checked archive metadata hints; compressed byte-split accounting unchanged",
+  "tests": [
+    "real_file_manifest_uses_decoded_main_and_checked_member_totals",
+    "real_file_manifest_rejects_uncompressed_member_total_overflow"
+  ]
+}

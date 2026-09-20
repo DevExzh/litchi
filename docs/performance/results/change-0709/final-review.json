@@ -1,0 +1,8 @@
+{
+  "native_allocator_review": "No blocker: decoded metadata, exact source artifact paths, full frozen argv checks and seven negative checks pass; final packet seal binds receipts.",
+  "oracle_review": "Strict refusal and no-edit preservation failure reproduced; all four outputs identical; paragraph projection passes for admitted fixture but full-package preservation not established.",
+  "profile_review": "Pass: all eight exact run_case-to-owner measured edges have one call; edit part5, generated publication part6, real publication part5; all setup caller counts match; self plus immediate children reconciles; no nested double counting, warnings empty; scripts-only revision transition verified",
+  "analysis_sha256": "91adab432e23d142a0ac052ae17f228e4a0c658913aee8ac45f3ef7ac6e5da3a",
+  "oracle_report_sha256": "d4807c2486529dc34594d9a556536bcc11a237f20479a2bf2192a4fc51696aa6",
+  "profile_analysis_sha256": "2b0b99aefee994eb6371dc76f599c03a6f3ac27fd0ce92444e0356e9685fbcc9"
+}

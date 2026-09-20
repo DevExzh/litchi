@@ -1,0 +1,13 @@
+{
+  "shared_versions_match": true,
+  "extra_packages": [
+    [
+      "docx-ordinary-save-oracle-0709",
+      "0.1.0",
+      null
+    ]
+  ],
+  "harness_lock_sha256": "bf43c8397f137a81127ad1c57da2d0855a8227e9310ac960347de502ba0fd09b",
+  "oracle_lock_sha256": "8834a6704df3867855f934513c2f76335ddeb34af45f226444cf3649bff56050",
+  "scope": "All oracle dependency package name/version/source identities are present in the measured harness lock; features may differ"
+}

@@ -1,0 +1,97 @@
+[
+  {
+    "name": "crate-boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 262.8525754750008,
+    "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  },
+  {
+    "name": "claims",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "exit_code": 0,
+    "seconds": 70.77278290607501,
+    "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  },
+  {
+    "name": "claims-structural",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "exit_code": 0,
+    "seconds": 0.2966629540314898,
+    "log_sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  },
+  {
+    "name": "report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.2999643199145794,
+    "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  },
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.29579078999813646,
+    "log_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  },
+  {
+    "name": "non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "exit_code": 0,
+    "seconds": 4.272433536942117,
+    "log_sha256": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2",
+    "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+  }
+]

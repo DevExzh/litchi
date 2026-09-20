@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.05260948196519166,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0709-docx-ordinary-save-baseline.md": "d4ca5896f2598ded51bfa0ce34818dbab44cb0c41bf11a638a19cb79b89d8067",
+    "docs/performance/BASELINE.md": "919d91d62c12cef9e0e01ff8f086def6be5b690d4942428a0ed68b5a99c9211a",
+    "docs/performance/HOTSPOTS.md": "7aa4f00ff74340c662a33af2adf035092e4f07e9ffed842cac2c5044a2fd0a05",
+    "docs/performance/GOAL_AUDIT.md": "66da6f2ec579bf592e484dc5fb2e19500c059e1b6e89968425767783c4eecfff",
+    "docs/performance/results/change-0709/README.md": "80c7615d2cb9b6dad099a81c77d7365391ea3be8dcbd6a5f2c2b95f010117f35"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "reason": "Remove unnecessary mutable borrow in oracle refusal stream route. Seed oracle lock from measured harness lock so shared dependency versions match rather than fresh offline resolution.",
+  "archived": "initial-build/"
+}

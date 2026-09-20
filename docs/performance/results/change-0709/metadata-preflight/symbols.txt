@@ -1,0 +1,73 @@
+0000000001c165b0 t litchi_ods::streaming::write_plain_span_or_scalars
+000000000167f680 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain
+000000000167f850 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain
+000000000167fa20 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain
+000000000167fbf0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain
+000000000167fdc0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}
+00000000016862c0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}
+000000000168c7c0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}
+0000000001692cc0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}
+00000000016991c0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699250 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016992e0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699380 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699410 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016994a0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699520 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016995a0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699630 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016996c0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699750 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016997e0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699850 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+00000000016998e0 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699970 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000001699a00 t litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}::{{closure}}
+0000000002eb46e0 T litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut
+00000000014bd900 t litchi_perf_baseline::ordinary_save::byte_split
+00000000014be170 t litchi_perf_baseline::ordinary_save::build_corpus
+00000000014c1e10 t litchi_perf_baseline::ordinary_save::build_corpus::{{closure}}
+00000000014c1e70 t litchi_perf_baseline::ordinary_save::member_facts
+00000000014c26c0 t litchi_perf_baseline::ordinary_save::read_bounded
+00000000014c2960 t litchi_perf_baseline::ordinary_save::classify_inputs
+00000000014c2f30 t litchi_perf_baseline::ordinary_save::pptx_edit_target::{{closure}}
+00000000014c2f90 t litchi_perf_baseline::ordinary_save::publish_reference
+00000000014c3730 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::ByteSplit>::serialize
+00000000014c3a90 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::ByteSplit>::serialize
+00000000014c3ce0 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::SaveEvidence>::serialize
+00000000014c4140 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::SaveEvidence>::serialize
+00000000014c4450 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>::serialize
+00000000014c4770 t litchi_perf_baseline::ordinary_save::_::<impl serde_core::ser::Serialize for litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>::serialize
+00000000014c4970 t litchi_perf_baseline::ordinary_save::Owner::edit
+00000000014c5c40 t litchi_perf_baseline::ordinary_save::Owner::open
+00000000014c6bf0 t litchi_perf_baseline::ordinary_save::Owner::save
+00000000014c6fa0 t litchi_perf_baseline::ordinary_save::run_case
+000000000151d2f0 t core::ptr::drop_in_place<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts)>
+0000000001300dd0 t core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts)>>
+00000000015225f0 t core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts)>>
+000000000186d2d0 t core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts)>>
+0000000000f1ace0 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+00000000013c3150 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+00000000015cc550 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+000000000175ae20 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+000000000186d670 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+000000000193e7b0 t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>>>
+0000000001802e70 t core::ptr::drop_in_place<soapberry_zip::office::StreamingArchiveWriter<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::ordinary_save::BoundedSink>>>
+0000000001940030 t core::ptr::drop_in_place<alloc::vec::in_place_drop::InPlaceDstDataSrcBufDrop<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts),alloc::string::String>>
+0000000001804000 t core::ptr::drop_in_place<soapberry_zip::writer::ZipArchiveWriter<soapberry_zip::office::BoundedOutput<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::ordinary_save::BoundedSink>>>>
+00000000019402e0 t core::ptr::drop_in_place<soapberry_zip::writer::ZipArchiveWriter<soapberry_zip::office::BoundedOutput<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::ordinary_save::BoundedSink>>>>
+00000000013029a0 t core::ptr::drop_in_place<alloc::collections::btree::dedup_sorted_iter::DedupSortedIter<alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts,alloc::vec::into_iter::IntoIter<(alloc::string::String,litchi_perf_baseline::ordinary_save::MemberFacts)>>>
+000000000152c220 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::Owner>
+0000000000f3ca90 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::Workspace>
+000000000152d680 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::Workspace>
+0000000000f3da20 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::SaveCorpus>
+0000000000f3f420 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::OoxmlInputs>
+000000000152df40 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::OoxmlInputs>
+0000000000f40460 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::SaveEvidence>
+000000000152e2e0 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::SaveEvidence>
+000000000152f620 t core::ptr::drop_in_place<litchi_perf_baseline::ordinary_save::OrdinarySaveSummary>
+0000000001545c60 T <litchi_perf_baseline::ordinary_save::BoundedSink as std::io::Write>::write
+0000000001545e00 t <litchi_perf_baseline::ordinary_save::BoundedSink as std::io::Write>::write::{{closure}}
+0000000001545ed0 t <litchi_perf_baseline::ordinary_save::BoundedSink as std::io::Write>::write::{{closure}}
+0000000001546a70 t <litchi_perf_baseline::ordinary_save::SaveEvidence as core::clone::Clone>::clone
+0000000001546f60 T <litchi_perf_baseline::ordinary_save::Workspace as core::ops::drop::Drop>::drop

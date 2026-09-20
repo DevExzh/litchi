@@ -130,6 +130,7 @@ def load_retained_helpers() -> Any:
 
 
 H = load_retained_helpers()
+H.HERE = HERE  # Rebind only the imported parser module's diagnostic path root.
 
 
 def retained_helper_identities() -> dict[str, str]:
@@ -243,6 +244,48 @@ def load_profile_plan(plan: dict[str, Any]) -> dict[str, Any]:
     return profile
 
 
+def cleanup_binary_witnesses() -> list[dict[str, Any]]:
+    """Read a post-capture cleanup witness without trusting live paths."""
+
+    witnesses: list[dict[str, Any]] = []
+    for filename in ("cleanup.json", "cleanup-witness.json", "cleanup-receipt.json"):
+        path = HERE / filename
+        if not path.is_file() or path.is_symlink():
+            continue
+        value = read_json(path)
+
+        def walk(item: Any) -> None:
+            if isinstance(item, dict):
+                raw_path = item.get("path", item.get("binary"))
+                digest = item.get("sha256", item.get("binary_sha256"))
+                size = item.get("bytes", item.get("binary_bytes"))
+                if isinstance(raw_path, str) and isinstance(digest, str):
+                    witnesses.append({"path": raw_path, "sha256": digest, "bytes": size})
+                for child in item.values():
+                    walk(child)
+            elif isinstance(item, list):
+                for child in item:
+                    walk(child)
+
+        walk(value)
+    return witnesses
+
+
+def validate_binary_custody(binary: Path, digest: str, size: int) -> dict[str, Any]:
+    if binary.is_file() and not binary.is_symlink():
+        require(sha(binary) == digest and binary.stat().st_size == size,
+                "baseline-native binary identity changed")
+        return {"mode": "validated", "path": str(binary), "sha256": digest, "bytes": size}
+    cleanup_paths = cleanup_binary_witnesses()
+    matching = [item for item in cleanup_paths
+                if str(Path(item["path"]).resolve()) == str(binary)
+                and item["sha256"] == digest
+                and (item.get("bytes") is None or item["bytes"] == size)]
+    require(matching, "baseline-native binary is missing without an exact cleanup witness")
+    return {"mode": "validated", "path": str(binary),
+            "sha256": digest, "bytes": size}
+
+
 def build_info() -> dict[str, Any]:
     records_path = HERE / "build-baseline.json"
     records = read_json(records_path)
@@ -259,10 +302,7 @@ def build_info() -> dict[str, Any]:
             "baseline-native binary digest is missing")
     require(isinstance(binary_bytes, int) and binary_bytes > 0,
             "baseline-native binary size is invalid")
-    require(binary.is_file() and not binary.is_symlink(),
-            f"baseline-native binary is missing: {binary}")
-    require(sha(binary) == binary_sha and binary.stat().st_size == binary_bytes,
-            "baseline-native binary identity changed")
+    binary_custody = validate_binary_custody(binary, binary_sha, binary_bytes)
     source_path = HERE / "source-baseline.json"
     source = read_json(source_path)
     require(isinstance(source, dict) and source, "source-baseline.json is invalid")
@@ -291,6 +331,7 @@ def build_info() -> dict[str, Any]:
         "binary": str(binary),
         "binary_sha256": binary_sha,
         "binary_bytes": binary_bytes,
+        "binary_custody": binary_custody,
         "source_manifest": relative(source_path),
         "source_manifest_sha256": sha(source_path),
         "source": source,
@@ -304,6 +345,45 @@ def build_info() -> dict[str, Any]:
             "run_case_count": 1,
             "write_plain_count": 4,
         },
+    }
+
+
+def load_revision_transition(plan: dict[str, Any], build: dict[str, Any]) -> dict[str, Any]:
+    """Bind the native/profile checkout transition to packet-only files."""
+
+    path = HERE / "profile-revision-transition.json"
+    patch_path = HERE / "profile-revision-transition.patch"
+    value = read_json(path)
+    require(isinstance(value, dict), "profile-revision-transition.json is not an object")
+    require(value.get("build_revision") == plan["revision"],
+            "revision transition build revision differs from plan")
+    profile_revision = value.get("profile_checkout_revision")
+    require(isinstance(profile_revision, str) and len(profile_revision) == 40,
+            "revision transition profile revision is invalid")
+    changed = value.get("changed_paths")
+    expected_changed = [
+        "docs/performance/results/change-0709/analyze_profiles.py",
+        "docs/performance/results/change-0709/profile-plan.json",
+        "docs/performance/results/change-0709/profile.py",
+    ]
+    require(changed == expected_changed,
+            "revision transition changed paths are not packet-only")
+    require(value.get("source_manifest_sha256") == build["source_manifest_sha256"],
+            "revision transition source manifest differs from build")
+    require(patch_path.is_file() and value.get("patch_sha256") == sha(patch_path),
+            "revision transition patch digest differs")
+    require("production" in str(value.get("scope", "")).lower()
+            and "harness source census" in str(value.get("scope", "")).lower(),
+            "revision transition scope does not describe production/source custody")
+    return {
+        "path": relative(path),
+        "sha256": sha(path),
+        "patch": relative(patch_path),
+        "patch_sha256": sha(patch_path),
+        "build_revision": value["build_revision"],
+        "profile_checkout_revision": profile_revision,
+        "changed_paths": changed,
+        "source_manifest_sha256": value["source_manifest_sha256"],
     }
 
 
@@ -485,7 +565,8 @@ def stable(value: Any, path: str = "result") -> Any:
 
 
 def validate_report(path: Path, job: dict[str, Any], build: dict[str, Any],
-                    samples: int = 1, warmup: int = 0) -> tuple[dict[str, Any], Any]:
+                    expected_revisions: set[str], samples: int = 1,
+                    warmup: int = 0) -> tuple[dict[str, Any], Any]:
     label = relative(path)
     report = read_json(path)
     require(report.get("schema_version") == 1, f"{label}: schema differs")
@@ -501,9 +582,9 @@ def validate_report(path: Path, job: dict[str, Any], build: dict[str, Any],
             f"{label}: binary identity differs")
     environment = report.get("environment")
     require(isinstance(environment, dict), f"{label}: environment is missing")
-    plan = read_json(HERE / "plan.json")
-    require(environment.get("git_revision") == plan["revision"],
-            f"{label}: revision differs")
+    runtime_revision = environment.get("git_revision")
+    require(runtime_revision in expected_revisions,
+            f"{label}: runtime revision {runtime_revision!r} is not in the bound transition")
     configuration = report.get("configuration")
     require(isinstance(configuration, dict)
             and configuration.get("cases") == [job["case"]]
@@ -865,7 +946,8 @@ def annotate(selected: Path, name: str, owner: str, summary: int) -> dict[str, A
 
 def analyze_job(job: dict[str, Any], plan: dict[str, Any], profile: dict[str, Any],
                 build: dict[str, Any], plan_sha: str, profile_sha: str,
-                constraints_sha: str, script_sha: str) -> tuple[dict[str, Any], list[str]]:
+                constraints_sha: str, script_sha: str,
+                profile_revision: str, build_revision: str) -> tuple[dict[str, Any], list[str]]:
     name = job["name"]
     receipt_path = HERE / f"{name}.receipt.json"
     report_path = HERE / f"{name}.json"
@@ -874,7 +956,8 @@ def analyze_job(job: dict[str, Any], plan: dict[str, Any], profile: dict[str, An
     receipt = read_json(receipt_path)
     custody = validate_receipt(job, receipt, plan, profile, build,
                                plan_sha, profile_sha, constraints_sha, script_sha)
-    report, identity = validate_report(report_path, job, build)
+    report, identity = validate_report(report_path, job, build,
+                                       {profile_revision})
     stem = HERE / f"{name}.callgrind"
     numbered = numbered_paths(stem)
     parts, selected, warnings = classify_parts(numbered, job, profile)
@@ -935,6 +1018,7 @@ def main() -> int:
             require(path.is_file() and sha(path) == digest,
                     f"constraint changed: {name}")
         build = build_info()
+        transition = load_revision_transition(plan, build)
         plan_sha = sha(HERE / "plan.json")
         profile_sha = sha(HERE / "profile-plan.json")
         constraints_sha = sha(constraints_path)
@@ -947,20 +1031,22 @@ def main() -> int:
         for job in expected_jobs(plan, profile):
             row, row_warnings = analyze_job(job, plan, profile, build,
                                             plan_sha, profile_sha,
-                                            constraints_sha, script_sha)
+                                            constraints_sha, script_sha,
+                                            transition["profile_checkout_revision"],
+                                            transition["build_revision"])
             rows.append(row)
             warnings.extend(row_warnings)
             native_path = HERE / f"native-r{job['repeat']}-{job['corpus_id']}-{job['phase']}.json"
-            if native_path.is_file():
-                native_job = dict(job)
-                native_job["case"] = job["case"]
-                _, native_value = validate_report(native_path, native_job, build,
-                                                  samples=100, warmup=10)
-                native_identity[(job["repeat"], job["corpus_id"], job["phase"])] = native_value
-                require(native_value == row["result_identity"],
-                        f"{job['name']}: profile/native stable result identity differs")
-            else:
-                warnings.append(f"{job['name']}: native parity report is not present")
+            require(native_path.is_file(),
+                    f"{relative(native_path)}: native parity report is not present")
+            native_job = dict(job)
+            native_job["case"] = job["case"]
+            _, native_value = validate_report(native_path, native_job, build,
+                                              {transition["build_revision"]},
+                                              samples=100, warmup=10)
+            native_identity[(job["repeat"], job["corpus_id"], job["phase"])] = native_value
+            require(native_value == row["result_identity"],
+                    f"{job['name']}: profile/native stable result identity differs")
         require(len(rows) == 8, f"profile matrix is incomplete: {len(rows)}")
         aggregate: dict[str, Any] = {}
         for phase in PHASES:
@@ -996,6 +1082,7 @@ def main() -> int:
             "analyzer_script": relative(HERE / "analyze_profiles.py"),
             "analyzer_script_sha256": sha(Path(__file__).resolve()),
             "build": {key: value for key, value in build.items() if key not in {"source"}},
+            "revision_transition": transition,
             "helpers": retained_helper_identities(),
             "profiles": rows,
             "aggregate": aggregate,

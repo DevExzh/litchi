@@ -1,0 +1,41 @@
+{
+  "status": "pass",
+  "analyzer_sha256": "3e2c252ebc2922f0fe90cf4c1e41ed558553d8a73efd444994375e650c2761d0",
+  "checks": [
+    {
+      "name": "actual-stale-compressed-manifest",
+      "rejected": true,
+      "message": "stale decoded target manifest identity changed"
+    },
+    {
+      "name": "manifest-generator",
+      "rejected": true,
+      "message": "negative real-file manifest generator changed"
+    },
+    {
+      "name": "manifest-target_payload_bytes",
+      "rejected": true,
+      "message": "negative decoded target manifest identity changed"
+    },
+    {
+      "name": "manifest-uncompressed_payload_bytes",
+      "rejected": true,
+      "message": "negative checked uncompressed member total changed"
+    },
+    {
+      "name": "manifest-target_payload_sha256",
+      "rejected": true,
+      "message": "negative decoded target manifest identity changed"
+    },
+    {
+      "name": "stale-mean",
+      "rejected": true,
+      "message": "negative.elapsed_ns.mean: 125417.80999999998 != 125416.81"
+    },
+    {
+      "name": "wrong-timing-scope",
+      "rejected": true,
+      "message": "negative timing scope changed"
+    }
+  ]
+}

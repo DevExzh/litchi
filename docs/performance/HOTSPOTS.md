@@ -1,5 +1,26 @@
 # Performance hotspot inventory
 
+## 0709 — DOCX save is a preservation handoff before optimization
+
+[0709](0709-docx-ordinary-save-baseline.md) supplies a current-source
+ordinary DOCX baseline over generated medium, admitted `NumberedList`, and
+refused `alt-chunk-header` corpora. Native p50s put the independent save-to-path
+interval around 5.2–5.5 ms, while edit and counting-sink intervals are much
+smaller on these workloads; phase values are descriptive and non-additive.
+Allocator observations remain operation-relative, and 18 native repeat-spread
+flags stay visible. No speedup or causal device claim is made. Eight profiles pass as scoped
+instruction attribution, with `document_mut` exceeding 99.95% of edit-owner
+instructions on the two admitted corpora.
+
+The strict oracle confirms the admitted marker edit but finds a preservation
+defect before any edit is accepted on the refused fixture: clean `to_stream` and
+`save` both rewrite decoded `docProps/custom.xml` from 632 to 602 bytes, and
+no-edit controls produce the same archive hashes. The main document and
+semantic text are unchanged. The immediate work is to guard
+`custom_props.write_for` behind the dirty state and add clean-save, dirty
+custom-property, failed-write retry, and raw OPC tests before considering an
+optimization. [Packet](results/change-0709/README.md).
+
 ## 0708 — validator name storage reduces allocations but fails native admission
 
 [0708](0708-xlsx-validator-name-storage.md) tests the validator's private

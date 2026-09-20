@@ -1,0 +1,30 @@
+{
+  "reason": "Real-file corpus manifest mislabeled compressed main-part bytes/hash as decoded target and aggregate uncompressed bytes; preserve preflight, correct harness before formal measurement, rebuild.",
+  "archived_files": [
+    "build-baseline.json",
+    "build-baseline-native.log",
+    "build-baseline-alloc.log",
+    "source-baseline.json",
+    "source-final.json",
+    "symbols.txt",
+    "symbols.json",
+    "evidence",
+    "source-policy.json",
+    "source-policy.log"
+  ],
+  "binaries": [
+    {
+      "original_path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+      "archive_path": "/home/zhuhe/code/litchi-0709-bin/preflight-native",
+      "sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+      "bytes": 63339216
+    },
+    {
+      "original_path": "/home/zhuhe/code/litchi-0709-bin/baseline-alloc",
+      "archive_path": "/home/zhuhe/code/litchi-0709-bin/preflight-alloc",
+      "sha256": "38722d2b49b721dec045fd66642c13e79033fa2bfd870dfb47589acbaae55760",
+      "bytes": 62980736
+    }
+  ],
+  "preflight_measurements": "Admission/CLI witnesses only, excluded from formal latency evidence"
+}

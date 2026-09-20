@@ -1,0 +1,75 @@
+{
+  "scope": "One-sample admission and command preflight only; excluded from latency evidence",
+  "rows": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+        "--case",
+        "docx_real_file_ordinary_save_counting_publish",
+        "--ooxml-file",
+        "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+        "--warmup",
+        "0",
+        "--samples",
+        "1",
+        "--filesystem-root",
+        "/home/zhuhe/code/litchi-0709-fs",
+        "--json",
+        "docs/performance/results/change-0709/preflight/numbered-list.json"
+      ],
+      "exit_code": 0,
+      "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577",
+      "build_record_sha256": "ab10cf3ed61772bc19a7435fe34880ae192648eb3ed0bb75cfefc47449359b08",
+      "binary_sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+      "fixture": {
+        "label": "numbered-list",
+        "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+        "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+        "bytes": 55519,
+        "expected_edit_admitted": true
+      }
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+        "--case",
+        "docx_real_file_ordinary_save_counting_publish",
+        "--ooxml-file",
+        "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+        "--warmup",
+        "0",
+        "--samples",
+        "1",
+        "--filesystem-root",
+        "/home/zhuhe/code/litchi-0709-fs",
+        "--json",
+        "docs/performance/results/change-0709/preflight/alt-chunk-header.json"
+      ],
+      "exit_code": 0,
+      "source_manifest_sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577",
+      "build_record_sha256": "ab10cf3ed61772bc19a7435fe34880ae192648eb3ed0bb75cfefc47449359b08",
+      "binary_sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+      "fixture": {
+        "label": "alt-chunk-header",
+        "path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+        "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+        "bytes": 77621,
+        "expected_edit_admitted": false
+      }
+    }
+  ],
+  "artifacts": {
+    "preflight/alt-chunk-header.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preflight/alt-chunk-header.json": "795d19b959ae01815576df7b2952e07ca2fc30ffa7988377af874c10e6dbeb28",
+    "preflight/alt-chunk-header.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preflight/numbered-list.json": "698d11c8c2a8e0157595db9f08b18fba354d41dcf7369127acb1ffffc3173112",
+    "preflight/numbered-list.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preflight/numbered-list.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
