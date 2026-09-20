@@ -6,16 +6,43 @@ listed by that contract and was performed without production, test, or Cargo
 changes. The review applies ADR 0005's finite work, storage, cancellation, and
 source rules and ADR 0006's typed-failure and publication rules.
 
-The resource review disposition for the current handoff is **pass pending
-source freeze and gates**. The revised contract resolves the earlier API
-contradictions and states a usable bounded implementation boundary. This
-review does not substitute for the final frozen-source validation evidence.
+The resource review disposition for the frozen handoff is **pass**. The
+revised contract resolves the earlier API contradictions and states a usable
+bounded implementation boundary. The final isolated validation receipts are
+bound below.
 
 ## Reviewed contract identity
 
 | Input | SHA-256 |
 | --- | --- |
 | `ods-formula-date-time/contract.md` | `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f` |
+
+## Frozen source identity
+
+The frozen source map is [`gates/freeze.json`](gates/freeze.json), candidate
+commit `d16039ce48cb441c35461318c8634a49ae0b2437`, with 103 selected inputs.
+The freeze manifest SHA-256 is
+`461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561`.
+The isolated gate checkout uses the retained `Cargo.lock` with SHA-256
+`58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3`.
+The ambient root lock is `aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02`;
+the gate copy is the frozen validation input.
+
+Principal frozen implementation, integration, contract, and focused-test
+hashes are:
+
+| Frozen file | SHA-256 |
+| --- | --- |
+| `crates/litchi-ods/src/codec/formula/evaluation.rs` | `6db733541c9ab49e53628aab8e0fc823af8411b3a74ae47f88c50ba977446a1b` |
+| `crates/litchi-ods/src/codec/formula/evaluation/date_time.rs` | `29f1495a55aac7effee9f6509deef38e5d5f747ba2b87c65a188d8759c1265e3` |
+| `crates/litchi-ods/src/codec/formula/evaluation/date_time/kernel.rs` | `2bc377db1a01e28dbc4940c99c61fb43a308919b315bfc37a92ce86a67e5d0cc` |
+| `crates/litchi-ods/src/codec/formula/evaluation/date_time/parser.rs` | `e71f8cb4075f4815a8c8a43ba5de48e0f5a411143e47c575c4a6de8bc4ac7149` |
+| `crates/litchi-ods/src/codec/formula/evaluation/value.rs` | `e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3` |
+| `crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs` | `1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159` |
+| `crates/litchi-ods/tests/ods_formula_date_time_evaluation.rs` | `d9644432fd5dcac9272dcd3f942e4b669865db22fb6fe866a706ebd05bf04ea1` |
+| `crates/litchi-ods/tests/ods_formula_date_time_limits.rs` | `fbf6ba638d7b80ebcda36d1091641ef45e42be07f9bc20a987583a3987fed411` |
+| `crates/litchi-ods/tests/ods_formula_date_time_oracle.rs` | `6ab4f5845c58aa88b5890abc766229a4970409cfe581b924228bb4b595e97a05` |
+| `docs/report/spec-gap-validation-evidence/ods-formula-date-time/contract.md` | `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f` |
 
 ## Resolved contract findings
 
@@ -90,8 +117,9 @@ The current value-adapter handoff closes the earlier implementation gates:
   ordinary evaluation path, where reads needed to establish their type are
   legitimate.
 
-The source remains subject to the final frozen-source and gate receipts; no
-production-support claim is made until those receipts are bound.
+The source is bound to the frozen manifest above, and the isolated gate
+receipts below confirm that the selected source remained stable throughout
+validation.
 
 ## Resource and ownership requirements for implementation
 
@@ -172,9 +200,51 @@ publication. Typed failures are never converted to formula Errors, cached, or
 caught by IFERROR/IFNA; a matrix result is published only after every selected
 cell and sequence has completed successfully at the typed level.
 
-## Focused validation required before an implementation disposition
+## Validation evidence
 
-The implementation evidence should cover:
+The frozen focused handoff currently supplies:
+
+| Target | Result |
+| --- | --- |
+| `ods_formula_date_time_evaluation` | 22/22 |
+| `ods_formula_date_time_limits` | 11/11 |
+| `ods_formula_date_time_oracle` | 1/1 test, 132 contract vectors |
+
+The focused cases cover direct cuboid references, rejected ReferenceLists with
+zero resolver reads, row-major sequence precedence, inline and direct
+Workdays admission, duplicate and fractional holidays, retained formula
+Errors followed by typed provider failures, cancellation/read/storage/work
+limits, borrowed text, zero and fractional WORKDAY offsets, all-off workweeks,
+projected lazy IF branches, nested MUNIT scalar positions, timestamp fencing,
+source changes, final cancellation, and the generated-versus-actual formula
+error precedence regression.
+
+The final custody-corrected isolated seven-gate run completed with 7/7 gates at exit 0. The
+package gate ran 1,745 tests with no failures or ignored tests. The receipt
+hashes are:
+
+| Gate | Log SHA-256 |
+| --- | --- |
+| `ods-tests` | `026363768e8ef5a9a289523f29357ead967bcfeaa015d14f2cd17ca2b36149bb` |
+| `clippy` | `a10a8c897c98b2b5da0baaae0dd26f30d0973e95ad5b076cc9d034e3b5792194` |
+| `rustdoc` | `3745d757a8ba5e41843d6e62b12c97299674435efa21e178f6a49b0a14354e01` |
+| `format` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `batch-format` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `boundaries` | `cdea9514ba7c77c160a8e73b2eeaf093accc70aefd1c3591af13d73e8b871fa` |
+| `diff-check` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+The aggregate receipt `gates/results.json` has SHA-256
+`fa5dfab0bef43d1403b22204185ae7e2e8fffe31e753c07860fb4768c228286a`.
+The `source-before.json` and `source-after.json` receipts each have SHA-256
+`864ccd3b76cc866e23c7db2cbdc1111702984e225cb7b630adc0befc2bde6a1e` and
+contain identical selected-source maps. The verification receipt
+`gates/verification.json` has SHA-256
+`bdeb941ccf550e43a341df081dcd54e1ba9e70779744ecb80e785cca71739243` and
+records `all_required_checks_passed: true` and `stable_sources: true`.
+These receipts bind the frozen source and focused semantic/resource evidence;
+they make no performance claim.
+
+The implementation evidence should also cover:
 
 * direct cuboid references, rejected ReferenceLists with zero resolver reads,
   row-major/sheet-order error precedence, and computed IF reference results;
@@ -191,6 +261,5 @@ The implementation evidence should cover:
   MUNIT in scalar date/offset positions, timestamp changes across evaluator
   contexts, timestamp absence, source changes, and final cancellation.
 
-No source or test PASS is claimed by this document. The resource contract is
-ready for implementation once these gates preserve the stated typed-failure,
-work-charge, cache-identity, and ownership rules.
+Performance acceptance remains outside this resource review and requires its
+own receipt; no timing, allocation, RSS, or throughput claim is made.

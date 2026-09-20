@@ -1,0 +1,12 @@
+{
+  "RUSTDOCFLAGS": "-D warnings",
+  "RUSTFLAGS": null,
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "freeze_base_commit": "45e56928edfc334b45132330d405bc4c7b6f7b4c",
+  "gate_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "head": "45e56928edfc334b45132330d405bc4c7b6f7b4c",
+  "kernel": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux",
+  "repo": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/checkout",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "target": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/target"
+}
