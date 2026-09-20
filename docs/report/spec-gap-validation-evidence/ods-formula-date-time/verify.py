@@ -80,7 +80,20 @@ EVIDENCE_KEYS = {"schema", "status", "contract_sha256", "bindings"}
 CROSS_EVIDENCE_KEYS = {"requirement", "evidence"}
 BINDING_KEYS = {"kind", "root", "path", "sha256", "identifiers", "requirements", "receipt"}
 RECEIPT_KEYS = {"root", "path", "sha256"}
-BINDING_KINDS = {"focused_test", "resource", "oracle", "native", "performance", "gate"}
+BINDING_KINDS = {"focused_test", "resource", "oracle", "native", "performance", "gate", "source_review"}
+SOURCE_REVIEW_SCHEMA = "ods-formula-date-time-source-review-v1"
+SOURCE_REVIEW_RECEIPT_KEYS = {
+    "schema",
+    "contract_sha256",
+    "freeze_sha256",
+    "reviewer",
+    "report",
+    "review_receipt",
+    "proofs",
+}
+SOURCE_REVIEW_REPORT_KEYS = {"root", "path", "sha256"}
+SOURCE_REVIEW_PROOF_KEYS = {"id", "source", "requirements"}
+SOURCE_REVIEW_SOURCE_KEYS = {"root", "path", "sha256"}
 PENDING_WORDS = {"pending", "planning", "incomplete", "hold"}
 PASS_WORDS = {"pass", "passed", "ok", "verified", "complete", "captured"}
 HEX_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -375,6 +388,165 @@ def _typed_outcome(row: dict[str, Any]) -> bool:
     return any(key in row for key in ("expected", "result", "value", "error", "kind", "type", "expected_type", "native"))
 
 
+def _nonempty_string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "\n" in value or "\r" in value:
+        raise VerificationError(f"{label} must be a nonempty single-line string")
+    return value
+
+
+def validate_source_review_receipt(
+    value: Any,
+    receipt_path: Path,
+    receipt_relative: str,
+    identifiers: list[str],
+    mapped_requirements: list[str] | None,
+    source_binding: dict[str, Any] | None,
+    label: str,
+    contract_hash: str | None,
+) -> None:
+    """Validate a source proof bound to the frozen source map.
+
+    Source review is deliberately a separate receipt kind.  It has no status
+    field: the coverage binding becomes usable only when this complete,
+    hash-bound receipt exists.  The review report remains mutable evidence and
+    is therefore hashed here rather than included in the source freeze.
+    """
+
+    if not isinstance(value, dict) or set(value) != SOURCE_REVIEW_RECEIPT_KEYS:
+        raise VerificationError(f"{label} source-review receipt has unexpected fields")
+    equal(f"{label} source-review schema", value.get("schema"), SOURCE_REVIEW_SCHEMA)
+    if contract_hash is None:
+        raise VerificationError(f"{label} source-review receipt has no contract identity")
+    equal(f"{label} source-review contract hash", value.get("contract_sha256"), contract_hash)
+    reviewer = _nonempty_string(value.get("reviewer"), f"{label} source-review reviewer")
+    # Keep the local binding alive so a future refactor cannot accidentally
+    # make reviewer identity dead metadata.
+    if not reviewer.strip():
+        raise VerificationError(f"{label} source-review reviewer is empty")
+    if mapped_requirements is None or source_binding is None:
+        raise VerificationError(f"{label} source-review binding context is absent")
+    if len(mapped_requirements) != len(set(mapped_requirements)):
+        raise VerificationError(f"{label} source-review binding requirements are duplicated")
+    if len(identifiers) != len(set(identifiers)):
+        raise VerificationError(f"{label} source-review binding identifiers are duplicated")
+    expected_requirements = set(mapped_requirements)
+    if not expected_requirements:
+        raise VerificationError(f"{label} source-review binding has no mapped requirements")
+
+    freeze_path = GATES / "freeze.json"
+    if not freeze_path.is_file():
+        raise PendingReceipt(f"{label} source-review freeze is absent")
+    freeze = read_json(freeze_path)
+    if not isinstance(freeze, dict):
+        raise VerificationError(f"{label} source-review freeze is not an object")
+    selected = freeze.get("selected_files")
+    if not isinstance(selected, dict) or not selected:
+        raise VerificationError(f"{label} source-review freeze has no selected_files map")
+    equal(f"{label} source-review freeze hash", value.get("freeze_sha256"), digest(freeze_path))
+
+    source_root = source_binding.get("root")
+    source_relative = source_binding.get("path")
+    source_hash = source_binding.get("sha256")
+    if source_root != "repo" or not isinstance(source_relative, str):
+        raise VerificationError(f"{label} source-review source must be repository-rooted")
+    frozen_hash = selected.get(source_relative)
+    if frozen_hash is None:
+        raise VerificationError(f"{label} source-review source is outside the source freeze: {source_relative}")
+    validate_sha(frozen_hash, f"{label} frozen source hash")
+    equal(f"{label} source-review frozen source hash", frozen_hash, source_hash)
+    source = resolve_bound("repo", source_relative, f"{label} source-review source", allow_missing=False)
+    equal(f"{label} source-review source hash", digest(source), source_hash)
+
+    report = value.get("report")
+    if not isinstance(report, dict) or set(report) != SOURCE_REVIEW_REPORT_KEYS:
+        raise VerificationError(f"{label} source-review report identity is malformed")
+    if report.get("root") != "evidence":
+        raise VerificationError(f"{label} source-review report must be evidence-rooted")
+    report_relative = report.get("path")
+    relative_path(HERE, report_relative, f"{label} source-review report")
+    if report_relative == receipt_relative:
+        raise VerificationError(f"{label} source-review report cannot be its own receipt")
+    report_hash = validate_sha(report.get("sha256"), f"{label} source-review report hash")
+    report_path = resolve_bound("evidence", report_relative, f"{label} source-review report", allow_missing=False)
+    equal(f"{label} source-review report hash", digest(report_path), report_hash)
+
+    review_receipt = value.get("review_receipt")
+    if not isinstance(review_receipt, dict) or set(review_receipt) != SOURCE_REVIEW_REPORT_KEYS:
+        raise VerificationError(f"{label} source-review final review receipt identity is malformed")
+    if review_receipt.get("root") != "evidence":
+        raise VerificationError(f"{label} source-review final review receipt must be evidence-rooted")
+    review_receipt_relative = review_receipt.get("path")
+    relative_path(HERE, review_receipt_relative, f"{label} source-review final review receipt")
+    try:
+        expected_review_receipt = str(REVIEW_RECEIPT.resolve().relative_to(HERE.resolve()))
+    except ValueError as error:
+        raise VerificationError(f"{label} configured final review receipt escapes evidence root") from error
+    equal(
+        f"{label} source-review final review receipt path",
+        review_receipt_relative,
+        expected_review_receipt,
+    )
+    review_receipt_hash = validate_sha(
+        review_receipt.get("sha256"),
+        f"{label} source-review final review receipt hash",
+    )
+    review_receipt_path = resolve_bound(
+        "evidence",
+        review_receipt_relative,
+        f"{label} source-review final review receipt",
+        allow_missing=False,
+    )
+    equal(
+        f"{label} source-review final review receipt hash",
+        digest(review_receipt_path),
+        review_receipt_hash,
+    )
+    # Reuse the independent final-review validator.  In particular this keeps
+    # a source proof from manufacturing a PASS status of its own.
+    verify_reviews(contract_hash)
+
+    proofs = value.get("proofs")
+    if not isinstance(proofs, list) or not proofs:
+        raise VerificationError(f"{label} source-review proofs are absent")
+    proof_ids: set[str] = set()
+    mapped: set[str] = set()
+    for index, proof in enumerate(proofs):
+        proof_label = f"{label} source-review proof {index}"
+        if not isinstance(proof, dict) or set(proof) != SOURCE_REVIEW_PROOF_KEYS:
+            raise VerificationError(f"{proof_label} has unexpected fields")
+        proof_id = _nonempty_string(proof.get("id"), f"{proof_label} id")
+        if proof_id in proof_ids:
+            raise VerificationError(f"{label} source-review proof identifiers are duplicated")
+        proof_ids.add(proof_id)
+        proof_source = proof.get("source")
+        if not isinstance(proof_source, dict) or set(proof_source) != SOURCE_REVIEW_SOURCE_KEYS:
+            raise VerificationError(f"{proof_label} source identity is malformed")
+        if proof_source.get("root") != "repo":
+            raise VerificationError(f"{proof_label} source must be repository-rooted")
+        equal(f"{proof_label} source path", proof_source.get("path"), source_relative)
+        equal(f"{proof_label} source hash", proof_source.get("sha256"), source_hash)
+        proof_requirement_values = strings(proof.get("requirements"), f"{proof_label} requirements")
+        if len(proof_requirement_values) != len(set(proof_requirement_values)):
+            raise VerificationError(f"{proof_label} requirements are duplicated")
+        proof_requirements = set(proof_requirement_values)
+        if not proof_requirements <= expected_requirements:
+            raise VerificationError(
+                f"{proof_label} requirements are not an exact mapped subset: "
+                f"{sorted(proof_requirements - expected_requirements)}"
+            )
+        mapped.update(proof_requirements)
+    if proof_ids != set(identifiers):
+        raise VerificationError(
+            f"{label} source-review proof identifiers do not match binding identifiers: "
+            f"expected={sorted(identifiers)}, observed={sorted(proof_ids)}"
+        )
+    if mapped != expected_requirements:
+        raise VerificationError(
+            f"{label} source-review proof requirements do not exactly cover binding requirements: "
+            f"missing={sorted(expected_requirements - mapped)}, extra={sorted(mapped - expected_requirements)}"
+        )
+
+
 def validate_expected_oracle_corpus(path: Path, contract_hash: str) -> dict[str, Any]:
     """Validate expected vectors while keeping them separate from execution."""
 
@@ -412,11 +584,25 @@ def validate_structured_receipt(
     identifiers: list[str],
     label: str,
     contract_hash: str | None = None,
+    *,
+    mapped_requirements: list[str] | None = None,
+    source_binding: dict[str, Any] | None = None,
 ) -> None:
-    """Validate structured oracle/native/performance/gate receipt semantics."""
+    """Validate structured evidence receipt semantics."""
 
     value = load_structured_receipt(receipt_path, label)
-    if kind == "oracle":
+    if kind == "source_review":
+        validate_source_review_receipt(
+            value,
+            receipt_path,
+            receipt_relative,
+            identifiers,
+            mapped_requirements,
+            source_binding,
+            label,
+            contract_hash,
+        )
+    elif kind == "oracle":
         if not isinstance(value, dict) or "oracle" not in str(value.get("schema", "")).lower():
             raise VerificationError(f"{label} schema is not an independent date/time oracle receipt")
         schema_text = str(value.get("schema", "")).lower()
@@ -556,13 +742,13 @@ def validate_binding_schema(binding: Any, expected: set[str], label: str) -> dic
     receipt_hash = validate_sha(receipt.get("sha256"), f"{label} receipt hash")
     if kind in {"oracle", "native", "performance", "gate"} and root_name != "evidence":
         raise VerificationError(f"{label} {kind} source must be evidence-rooted")
-    if kind in {"focused_test", "resource"} and root_name != "repo":
+    if kind in {"focused_test", "resource", "source_review"} and root_name != "repo":
         raise VerificationError(f"{label} {kind} source must be repository-rooted")
     source_prefix = {"native": "native/", "performance": "performance/", "gate": "gates/"}.get(kind)
     if source_prefix and not binding["path"].startswith(source_prefix):
         raise VerificationError(f"{label} {kind} source must be under {source_prefix}")
     receipt_path = receipt["path"]
-    if kind in {"focused_test", "resource"} and not receipt_path.startswith("gates/"):
+    if kind in {"focused_test", "resource", "source_review"} and not receipt_path.startswith("gates/"):
         raise VerificationError(f"{label} {kind} receipt must be under gates/")
     expected_prefix = {"native": "native/", "performance": "performance/", "gate": "gates/"}.get(kind)
     if expected_prefix and not receipt_path.startswith(expected_prefix):
@@ -621,6 +807,8 @@ def validate_binding(
                 normalized["identifiers"],
                 label,
                 contract_hash,
+                mapped_requirements=normalized["requirements"],
+                source_binding=normalized,
             )
     return pending
 
