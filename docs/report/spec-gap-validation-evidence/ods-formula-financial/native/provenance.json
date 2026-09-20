@@ -1,0 +1,54 @@
+{
+  "schema": "ods-formula-financial-scalar-native-provenance-v1",
+  "status": "captured compatibility fixture",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "oracle_sha256": "15bb7e32bd47dc64de2656cb24a8995f59916a9d87d13fffaa836aa82c302531",
+  "normative_source": {
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": "6.12.19-6.12.20, 6.12.23, 6.12.25, 6.12.28-6.12.29, 6.12.35-6.12.37, 6.12.41, 6.12.44 plus repository profiles"
+  },
+  "fixture": {
+    "input": "financial-scalar-native.fods",
+    "input_sha256": "6e75bac88a7941b8262356085a7d23b97ab76a9d887af431eeb1e8822409c916",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "30765f6178a83691a7e3b8264e6310ed35984d84d5ad6a6d5fcb667a3e0e45d5",
+    "content_xml": "content.xml",
+    "content_xml_sha256": "dc29956432c5096a7142d7d3777a27a3d5c639018461e6dd353aa35ced22c3a1",
+    "rows": 65
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "locale": "C.UTF-8",
+    "headless": true,
+    "fresh_profile": true
+  },
+  "command": [
+    "/usr/bin/libreoffice",
+    "--headless",
+    "-env:UserInstallation=file://<temporary-profile>",
+    "--convert-to",
+    "ods",
+    "--outdir",
+    "<temporary-output>",
+    "financial-scalar-native.fods"
+  ],
+  "temporary_profile_cleaned": true,
+  "comparison_counts": {
+    "numeric-tolerance": 40,
+    "error-kind-match": 11,
+    "divergence": 11,
+    "error-code-match": 3
+  },
+  "native_results_sha256": "731a5bf1f21d276045ed564e92aa52e636835b68d55608176047a34b83ef7f33",
+  "observation_policy": {
+    "numeric_tolerance": "Corpus relative tolerance 1e-12; zero-valued rows require exact signed-zero equality.",
+    "error_kind_match": "Both sides are formula errors; LibreOffice raw Err codes are retained without relabeling to the profile code.",
+    "native_divergence": "A numeric/type mismatch is documented as compatibility evidence and does not alter the normative corpus."
+  },
+  "capture_log": "capture.log",
+  "capture_log_sha256": "32f594b31d936bb23b102e5d6c04b02f7d00c54e4fbf50ff01c48fc9c47803d2"
+}
