@@ -1,0 +1,146 @@
+{
+  "schema": "ods-formula-financial-coverage-scope-v1",
+  "normative": "OpenDocument 1.4 Part 4 section 6.12",
+  "functions": {
+    "CUMIPMT": [
+      "exact arity 6 and Integer Start/End/Type truncation-toward-zero with exact Type 0 or 1",
+      "Rate > 0, Value > 0, and 1 <= Start <= End <= Periods",
+      "sum of IPMT terms from Start through End preserves source sign and Type timing"
+    ],
+    "CUMPRINC": [
+      "exact arity 6 and Integer Start/End/Type truncation-toward-zero with exact Type 0 or 1",
+      "Type is validated even for a reversed empty interval, which returns zero after validation",
+      "each included PPMT term applies 0 < Period < Nper without copying CUMIPMT outer constraints",
+      "CUMPRINC delegates period arithmetic to the selected PPMT profile"
+    ],
+    "EFFECT": [
+      "exact arity 2 with Integer Payments truncation-toward-zero",
+      "Rate >= 0 and Payments > 0",
+      "effective-rate compounding equation, exact zero-rate result, and finite numeric output"
+    ],
+    "FV": [
+      "exact arity 3-5; omitted Pv and PayType use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "PayType is a Number control accepted only as exact 0 or 1",
+      "ordinary and annuity-due balance equations with an explicit zero-rate branch",
+      "finite result and checked non-finite intermediate handling, including finite negative-base powers"
+    ],
+    "FVSCHEDULE": [
+      "exact arity 2 and complete ordered NumberSequence schedule admission",
+      "principal times the sequence-order product of one plus every schedule element",
+      "zero and negative schedule factors, formula-error retention, and finite product behavior"
+    ],
+    "IPMT": [
+      "exact arity 4-6; omitted FV and Type use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "Type is a Number control accepted only as exact 0 or 1",
+      "Type 0 uses IPMT = -B * Rate; Type 1 has zero first-period interest and later IPMT = -B * Rate / (1 + Rate), with PPMT = Payment - IPMT",
+      "zero-rate interest branch and finite payment/intermediate handling"
+    ],
+    "IRR": [
+      "exact arity 1-2; omitted Guess defaults to 0.1, while an explicit missing Guess uses the existing missing-argument error policy",
+      "complete NumberSequence source-order admission with required positive and negative cash-flow variation",
+      "positive-base and eligible integral-period negative-base root branches",
+      "guess is an initial estimate for deterministic bounded root selection and convergence"
+    ],
+    "ISPMT": [
+      "exact arity 4 and Number conversion for Rate, Period, Nper, and Pv",
+      "documented ISPMT equation Rate * Pv * (Period / Nper - 1)",
+      "finite result and checked zero-divisor or non-finite arithmetic behavior"
+    ],
+    "MIRR": [
+      "exact arity 3 and explicit Array Values admission",
+      "Text and Empty elements are omitted while Logical elements convert to 0 or 1",
+      "positive and negative NPV masks retain shared positions and the retained element count",
+      "at least one positive and one negative retained value with the MathML MIRR equation ((-NPV(ReinvestRate; PositiveMask) * (1 + ReinvestRate)^n) / (NPV(Investment; NegativeMask) * (1 + Investment)))^(1/(n - 1)) - 1"
+    ],
+    "NOMINAL": [
+      "exact arity 2 with Integer CompoundingPeriods truncation-toward-zero",
+      "EffectiveRate > 0 and CompoundingPeriods > 0",
+      "inverse EFFECT compounding equation, finite result, and checked intermediate arithmetic"
+    ],
+    "NPER": [
+      "exact arity 3-5; omitted Fv and PayType use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "PayType is a Number control accepted only as exact 0 or 1",
+      "ordinary and annuity-due period equation with an explicit zero-rate branch",
+      "negative-rate Medium/Large profile and finite non-finite-domain handling"
+    ],
+    "NPV": [
+      "minimum arity 2 with one or more complete NumberSequenceList arguments",
+      "discounted values use one-based exponents and preserve argument, area, and row-major order",
+      "finite rates below -1 use checked signed integer powers where real arithmetic admits them",
+      "Rate = -1 zero denominator and non-finite intermediates use the fixed numeric error profile"
+    ],
+    "PDURATION": [
+      "exact arity 3 with Rate > 0, CurrentValue > 0, and SpecifiedValue > 0",
+      "logarithmic period equation with equal-value, zero-denominator, and finite-result checks"
+    ],
+    "PMT": [
+      "exact arity 3-5; omitted Fv and PayType use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "Integer Nper truncates toward zero before Nper > 0 validation",
+      "PayType is a Number control accepted only as exact 0 or 1",
+      "ordinary and annuity-due payment equations with an explicit zero-rate branch"
+    ],
+    "PPMT": [
+      "exact arity 4-6 with Integer Period/Nper truncation-toward-zero and optional Future/Type defaults",
+      "Rate > 0, Present > 0, and 0 < Period < Nper",
+      "Type is a Number control accepted only as exact 0 or 1",
+      "selected amortization profile returns Payment minus IPMT for each admitted period"
+    ],
+    "PV": [
+      "exact arity 3-5; omitted Fv and PayType use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "PayType is a Number control accepted only as exact 0 or 1",
+      "ordinary and annuity-due present-value equations with an explicit zero-rate branch",
+      "finite result and checked denominator or non-finite intermediate handling"
+    ],
+    "RATE": [
+      "exact arity 3-6; omitted Fv, PayType, and Guess use listed defaults, while explicit missing slots use the existing missing-argument error policy",
+      "Nper > 0 and PayType is accepted only as exact 0 or 1",
+      "guess selects the deterministic bounded positive or eligible integral negative-base branch",
+      "guarded Rate = -1 boundary, scaled residual, bracket, iteration, and evaluation caps"
+    ],
+    "RRI": [
+      "exact arity 3 with Nper > 0",
+      "negative ratios use the real POWER profile only when binary64 1 / Nper is exactly integral, then checked signed integer power; no odd-root extension",
+      "log-magnitude arithmetic avoids premature ratio overflow and rejects invalid domains"
+    ],
+    "XIRR": [
+      "exact arity 2-3; omitted Guess defaults to 0.1, while an explicit missing Guess uses the existing missing-argument error policy",
+      "complete NumberSequence Values and DateSequence Dates preserve paired source order and equal admitted size",
+      "XIRR preserves original flattened slot indices, pairs only matching indices, and returns generated #VALUE! for one-sided admission masks",
+      "DateSequence scalar Number, Text, and Logical inputs use Number conversion rather than DateParam text parsing and admitted values are profile Date serials",
+      "first admitted cash flow is negative and at least one admitted cash flow is positive",
+      "date-weighted positive-base solver uses deterministic guess, bracket, scale, iteration, and convergence rules"
+    ],
+    "XNPV": [
+      "exact arity 3 with Reference or Array Values and Dates shape admission",
+      "Values and Dates pair by row-major element index with equal counts even for differing rectangular geometries",
+      "every admitted value is Number, every date is at least the first date, and Rate > -1",
+      "first admitted cash flow is negative and at least one admitted cash flow is positive",
+      "date-weighted NPV uses the days-divided-by-365 exponent and fixed formula-error profile"
+    ]
+  },
+  "cross_cutting": [
+    "exact arity, omitted-slot defaults, and explicit missing-slot conversion/error handling for all 20 functions",
+    "Number and Integer conversion preserve finite values, Logical mapping, borrowed Text parsing, and truncation only for declared Integer slots",
+    "Type and PayType controls use exact 0 or 1 semantics without arbitrary truthiness coercion",
+    "formula errors retain source order while typed resolver, allocation, resource, cancellation, and source failures remain typed",
+    "known wrong pseudotypes and ReferenceList shapes are refused before resolver reads with zero-read shape gates",
+    "complete NumberSequence, NumberSequenceList, DateSequence, and Array descriptors preserve their admitted source order and row-major traversal",
+    "DateSequence scalar Number, Text, and Logical inputs use Number conversion rather than DateParam text parsing and reject non-Date serials",
+    "scalar rates, payments, guesses, controls, and MIRR scalar children retain projected position semantics while complete sequences stay complete",
+    "every inspected reference cell is charged for work and reads with cancellation checks before and after the resolver call",
+    "borrowed referenced Text remains borrowed through conversion and is not cloned into retained cell state",
+    "source-version and final-cancellation fences surround evaluation, cache lookup, and result publication",
+    "streaming reducers do not materialize cell or Text vectors; repeated root evaluation retains only bounded numeric scratch",
+    "all numeric vectors, sequence metadata, arrays, outputs, and solver scratch use checked reservations and release storage after drop on every exit",
+    "CUMIPMT and CUMPRINC period ranges use checked cardinality, per-period work, and cancellation without unchecked loop overflow",
+    "IRR, RATE, and XIRR use bounded branch-aware solver work with guess, scale, bracket, iteration, evaluation, and cancellation limits",
+    "scaled signed sums preserve cancellation-sensitive terms, finite intermediates, 2048-unit term span, and fixed #NUM! nonconvergence mapping",
+    "non-iterative negative-base and zero-rate branches do not inherit a blanket Rate > -1 gate and never expose NaN or infinity",
+    "XIRR retains original flattened slot indices and XNPV pairs row-major element positions, with equal-count, date-order, sign, and late typed-failure checks",
+    "demand-cache keys retain complete sequence descriptors and values, ordered ReferenceList areas, scalar position, source identity, controls, and projected shape",
+    "only final finite numeric results or stable formula-error payloads are cacheable; partial state, borrowed Text, typed failures, and pre-fence results are not",
+    "MIRR Text/Empty omission and shared-position positive/negative masks are preserved; direct scalar Reference or ReferenceList shape refusal is explicit",
+    "no financial function consults ambient clock, locale, filesystem, network, workbook recalculation, randomness, or external rate providers",
+    "independent normative oracle, native compatibility, focused gate, and retained performance records corroborate the profile without replacing ODF semantics"
+  ]
+}
