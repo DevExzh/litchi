@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.051938261021859944,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0718-docx-serialization-allocation-mapping.md": "aa2055409969c90e9ffe9b74ce21e3e9da17d0a271cfe799ffb31d9c11561c51",
+    "docs/performance/BASELINE.md": "3a9ee59af73ee78dbce6eaffa28d106bebdaa320c15a3fe894f29cab94ca55f9",
+    "docs/performance/HOTSPOTS.md": "65f52e01225d1cdde37bcacb762f7c009f657b4c6754b5de76b29f43bcd54b2b",
+    "docs/performance/GOAL_AUDIT.md": "e7a4e687e1962a5c53699f212d31526c6e9f78731a03df0c48a694cac0a11acd",
+    "docs/performance/REPORT.md": "1a4895f307474d83aeaeaf20df607d6f0ff477a07a92d11098c00e3923052ae8",
+    "docs/performance/results/change-0718/README.md": "59e7c3ab9b5100c3760f6b9f3c7bba173228d20aa93dd8ff3ae807e81783b9bf"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "packet": "docs/performance/results/change-0717",
+  "files": {
+    "analysis.json": "273ae44a007dc8d2cf88a7be26a787b54d21e32096cdbf840aea541a282da091",
+    "source.json": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "builds.json": "df39ab222b9cbecad4cf6ef7e7a1722884ea1274a42fcc3b956695c71fd18388",
+    "artifact-manifest.json": "b90c145e3caff9615d628728bcd12f1335a94eaf5a38a39a447b37f6333b332c"
+  },
+  "question": "Identify allocations and mapping calls under DOCX serialization; distinguish phase from setup; do not infer native fault cost or reverse0715."
+}

@@ -1,0 +1,67 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "elapsed-mean",
+      "rejected": true,
+      "error": "mapping-r1-generated.elapsed_ns.mean: 7932588.045000001 != 7932587.045"
+    },
+    {
+      "name": "command-cpu",
+      "rejected": true,
+      "error": "('mapping-r1-generated', 'job/command')"
+    },
+    {
+      "name": "decoded-target-size",
+      "rejected": true,
+      "error": "mapping-r1-numbered-list decoded target manifest identity changed"
+    },
+    {
+      "name": "instrumentation",
+      "rejected": true,
+      "error": "mapping-r1-generated instrumentation changed: 'none'"
+    },
+    {
+      "name": "process-alignment",
+      "rejected": true,
+      "error": "mapping-r1-generated.minor_faults vector is not aligned to sample_order"
+    },
+    {
+      "name": "control-count",
+      "rejected": true,
+      "error": "mapping-r1-generated control count changed"
+    },
+    {
+      "name": "negative-allocation",
+      "rejected": true,
+      "error": "DHAT PP 0 tb must be a nonnegative integer"
+    },
+    {
+      "name": "allocation-frame",
+      "rejected": true,
+      "error": "DHAT PP 0 frame index 99999999 is out of range"
+    },
+    {
+      "name": "symbol-offset",
+      "rejected": true,
+      "error": ""
+    },
+    {
+      "name": "marker-triplet",
+      "rejected": true,
+      "error": "malformed procfs marker triplet near event 77"
+    },
+    {
+      "name": "brk-request-failure",
+      "rejected": true,
+      "error": "retained trace contains failed brk request; do not count as successful growth"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "positive_exact_replay": true,
+  "analysis_sha256": "78d552b6359c9573cae90a9f60f100b19d721860d2b51a9797c69a3977bf9d3e",
+  "analyzer_sha256": "8524b798e322cd62ab1407ba79679717e4c50cfbc086985f98909f15a4a1d50e",
+  "attribution_sha256": "528c900969dc4c2b09e656318b4e4d1c9dbd22bc9c1692b4263165b7b1c9c34e",
+  "brk_analysis_sha256": "8aae912ad52405338afc46598c640306e7a215dd2efee676fbd42d41ebe52b27",
+  "brk_analyzer_sha256": "bb804def269abadf56f499d8c1acf7548c558cf68220e2a74c49184b8d0ff6a3"
+}

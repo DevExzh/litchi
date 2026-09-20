@@ -1,0 +1,18 @@
+{
+  "decision": "proceed with fixed unchanged-source diagnostic matrix",
+  "independent_review": [
+    "Strace6.19 has libunwind stacks and demangling; DHAT3.26 is available.",
+    "Mapping syscalls do not identify physical page faults or the faulting instruction.",
+    "Require resolved local owner/caller stacks; unavailable or truncated stacks cannot establish owner absence.",
+    "Existing procfs snapshot calls can bracket iterations without source changes.",
+    "DHAT replacement allocator changes mapping behavior; only stack-attributed cumulative allocation observations are used."
+  ],
+  "coordinator_resolution": [
+    "Trace openat plus six memory syscalls. Use the before status-open to after io-open bracket, which conservatively contains the phase plus before-probe tail.",
+    "Only events with both write_plain and ordinary_save::run_case are attributed to serialization; probe activity remains separate.",
+    "Require ordered io/stat/status triplets,64 control snapshots and600 iteration snapshots; skip100warmup pairs and align200measured pairs with raw acquisition-order deltas.",
+    "Retain all8children even if no desired fault regime appears; no replacement or adaptive profiling lane.",
+    "The standalone harness has its own workspace; root workspace LTO settings are not assumed to apply. Actual stack resolution remains mandatory."
+  ],
+  "prior_decisions": "0715 section collection and0618 preservation compressor pooling remain rejected."
+}
