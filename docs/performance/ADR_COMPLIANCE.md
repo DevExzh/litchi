@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0721 — private DOCX structural scan fusion pilot
+
+[0721](0721-docx-structural-scan-fusion-pilot.md) rejects the candidate on its
+frozen performance gates and restores all production bytes. It keeps the accepted constraint
+hashes unchanged. The candidate stays in the DOCX format owner and exposes no
+new public API or dependency (ADRs 0001/0002/0024). Exact public output and
+edited-package bytes are compared across the frozen sources; publication and
+immutable-source contracts remain in place (ADR 0003). Separate bounded scan
+state preserves namespace rules, limits, fallible-reservation labels and error
+precedence, while the two ordered MCE decisions remain distinct (ADRs
+0005/0006). Interleaved allocation lifetimes do not establish identical host
+allocator-exhaustion scheduling. Native, allocator and debug tracing evidence
+remain separate, with exact source/build identities and a frozen rejection
+rule (ADR 0008). The pilot does not add unsafe code, a cache, parallel execution,
+or ambient I/O to the library. No coverage promotion is claimed.
+
 ## 0692 — capture-local slide root/name projection
 
 [0692](0692-pptx-capture-name-projection.md) keeps all 33 constraint hashes

@@ -1,0 +1,299 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling zeroize v1.9.0
+   Compiling cfg-if v1.0.4
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling libc v0.2.189
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling hybrid-array v0.4.14
+   Compiling const-oid v0.9.6
+   Compiling subtle v2.6.1
+   Compiling serde_core v1.0.229
+   Compiling libm v0.2.16
+   Compiling autocfg v1.5.1
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling pkg-config v0.3.34
+   Compiling synstructure v0.13.2
+   Compiling getrandom v0.2.17
+   Compiling zerocopy v0.8.56
+   Compiling rand_core v0.6.4
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling smallvec v1.16.0
+   Compiling find-msvc-tools v0.1.11
+   Compiling base64ct v1.6.0
+   Compiling shlex v2.0.1
+   Compiling cc v1.4.4
+   Compiling pem-rfc7468 v0.7.0
+   Compiling digest v0.10.7
+   Compiling zerofrom-derive v0.1.6
+   Compiling der_derive v0.7.3
+   Compiling cmov v0.5.4
+   Compiling flagset v0.4.7
+   Compiling cpufeatures v0.3.1
+   Compiling crossbeam-utils v0.8.22
+   Compiling der v0.7.10
+   Compiling ctutils v0.4.2
+   Compiling zerofrom v0.1.4
+   Compiling yoke-derive v0.7.5
+   Compiling const-oid v0.10.2
+   Compiling crossbeam-epoch v0.9.20
+   Compiling stable_deref_trait v1.2.1
+   Compiling memchr v2.8.3
+   Compiling yoke v0.7.4
+   Compiling digest v0.11.3
+   Compiling spki v0.7.3
+   Compiling zerovec-derive v0.10.4
+   Compiling syn v3.0.4
+   Compiling zmij v1.0.19
+   Compiling once_cell v1.21.4
+   Compiling rand_core v0.10.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling either v1.18.0
+   Compiling getrandom v0.4.3
+   Compiling serde v1.0.229
+   Compiling zerovec v0.10.4
+   Compiling serde_derive v1.0.229
+   Compiling displaydoc v0.2.6
+   Compiling serde_json v1.0.149
+   Compiling rayon-core v1.13.0
+   Compiling thiserror v2.0.18
+   Compiling chacha20 v0.10.2
+   Compiling pkcs8 v0.10.2
+   Compiling thiserror-impl v2.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling tinystr v0.7.6
+   Compiling sha2 v0.11.0
+   Compiling vcpkg v0.2.15
+   Compiling fast-float2 v0.2.4
+   Compiling writeable v0.5.5
+   Compiling base64 v0.22.1
+   Compiling litemap v0.7.3
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling spin v0.9.9
+   Compiling icu_locid v1.5.0
+   Compiling lazy_static v1.5.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling libz-sys v1.1.29
+   Compiling rayon v1.12.0
+   Compiling ff v0.13.1
+   Compiling icu_provider_macros v1.5.0
+   Compiling cpufeatures v0.2.17
+   Compiling base16ct v0.2.0
+   Compiling crc32fast v1.5.1
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_provider v1.5.0
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling quick-xml v0.41.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling crypto-bigint v0.5.5
+   Compiling bitflags v2.13.1
+   Compiling zerocopy-derive v0.8.56
+   Compiling encoding_rs v0.8.35
+   Compiling semver v1.0.28
+   Compiling fixedbitset v0.5.7
+   Compiling icu_normalizer_data v1.5.1
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling rustc_version v0.4.1
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling icu_locid_transform v1.5.0
+   Compiling sha2 v0.10.9
+   Compiling icu_collections v1.5.0
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling num-integer v0.1.47
+   Compiling num-bigint-dig v0.8.6
+   Compiling zlib-rs v0.6.7
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.12.0
+   Compiling num-iter v0.1.46
+   Compiling rfc6979 v0.4.0
+   Compiling icu_properties v1.5.1
+   Compiling flate2 v1.1.10
+   Compiling rand v0.8.8
+   Compiling pathfinder_simd v0.5.6
+   Compiling block-padding v0.4.2
+   Compiling proc-macro2-diagnostics v0.10.1
+   Compiling rustversion v1.0.23
+   Compiling utf16_iter v1.0.5
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.3.4
+   Compiling utf8_iter v1.0.4
+   Compiling write16 v1.0.0
+   Compiling icu_normalizer v1.5.0
+   Compiling inout v0.2.2
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling sha1 v0.10.7
+   Compiling pkcs1 v0.7.5
+   Compiling freetype-sys v0.20.1
+   Compiling yeslogic-fontconfig-sys v6.0.1
+   Compiling yansi v1.0.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling idna_adapter v1.2.0
+   Compiling cipher v0.5.2
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling x509-cert v0.2.5
+   Compiling libloading v0.8.8
+   Compiling option-ext v0.2.0
+   Compiling byteorder v1.5.0
+   Compiling fastrand v2.5.0
+   Compiling unicode-canonical-combining-class v1.0.0
+   Compiling heck v0.4.1
+   Compiling percent-encoding v2.3.2
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling unicode-general-category v1.1.0
+   Compiling debug_unsafe v0.1.4
+   Compiling unicode-joining-type v1.0.0
+   Compiling log v0.4.29
+   Compiling pathfinder_geometry v0.5.1
+   Compiling atoi_simd v0.18.1
+   Compiling alloc-stdlib v0.2.4
+   Compiling form_urlencoded v1.2.2
+   Compiling ouroboros_macro v0.18.5
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling tempfile v3.27.0
+   Compiling dirs-sys v0.5.0
+   Compiling dlib v0.5.3
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling idna v1.1.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling unicode-normalization v0.1.25
+   Compiling enumflags2_derive v0.7.12
+   Compiling font-kit v0.14.3
+   Compiling static_assertions v1.1.0
+   Compiling same-file v1.0.6
+   Compiling aliasable v0.1.3
+   Compiling ouroboros v0.18.5
+   Compiling walkdir v2.5.0
+   Compiling enumflags2 v0.7.12
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling dirs v6.0.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling brotli-decompressor v5.0.3
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling itertools v0.14.0
+   Compiling bitreader v0.3.11
+   Compiling float-ord v0.3.2
+   Compiling ryu v1.0.22
+   Compiling glyph-names v0.2.0
+   Compiling ucd-trie v0.1.7
+   Compiling cpubits v0.1.1
+   Compiling bytemuck v1.25.2
+   Compiling rustc-hash v2.1.3
+   Compiling allsorts v0.17.0
+   Compiling roaring v0.11.1
+   Compiling aes v0.9.3
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling cbc v0.2.1
+   Compiling rc4 v0.2.0
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling sha1 v0.11.0
+   Compiling hmac v0.13.0
+   Compiling litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: unused import: `std::collections::BTreeSet`
+  --> crates/litchi-docx/src/parts/document_part.rs:25:5
+   |
+25 | use std::collections::BTreeSet;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error[E0618]: expected function, found `Vec<u32>`
+   --> crates/litchi-docx/src/alt/codec.rs:405:20
+    |
+219 | pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
+    | -------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+377 |     let active = active(xml, &offsets)?;
+    |         ------ `active` has type `Vec<u32>`
+...
+405 |     let selected = active(xml, &starts)?.into_iter().collect::<BTreeSet<_>>();
+    |                    ^^^^^^--------------
+    |                    |
+    |                    call expression requires function
+
+error[E0308]: arguments to this function are incorrect
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:744:41
+    |
+744 |             ScanEvent::Empty(target) => emit(target, event_start, event_end)?,
+    |                                         ^^^^         -----------  --------- expected `u32`, found `usize`
+    |                                                      |
+    |                                                      expected `u32`, found `usize`
+    |
+note: type parameter defined here
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:626:15
+    |
+626 |     mut emit: impl FnMut(usize, u32, u32) -> Result<()>,
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+    |
+744 |             ScanEvent::Empty(target) => emit(target, event_start.try_into().unwrap(), event_end)?,
+    |                                                                 ++++++++++++++++++++
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+    |
+744 |             ScanEvent::Empty(target) => emit(target, event_start, event_end.try_into().unwrap())?,
+    |                                                                            ++++++++++++++++++++
+
+error[E0308]: arguments to this function are incorrect
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:760:21
+    |
+760 |                     emit(target, start, event_end)?;
+    |                     ^^^^         -----  --------- expected `u32`, found `usize`
+    |                                  |
+    |                                  expected `u32`, found `usize`
+    |
+note: type parameter defined here
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:626:15
+    |
+626 |     mut emit: impl FnMut(usize, u32, u32) -> Result<()>,
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+    |
+760 |                     emit(target, start.try_into().unwrap(), event_end)?;
+    |                                       ++++++++++++++++++++
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+    |
+760 |                     emit(target, start, event_end.try_into().unwrap())?;
+    |                                                  ++++++++++++++++++++
+
+error: unreachable expression
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:771:5
+    |
+643 | /     loop {
+644 | |         let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+645 | |             Error::InvalidFormat("Word XML offset does not fit usize".to_string())
+646 | |         })?;
+...   |
+770 | |     }
+    | |_____- any code following this expression is unreachable
+771 |       Ok(())
+    |       ^^^^^^ unreachable expression
+    |
+    = note: `-D unreachable-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unreachable_code)]`
+
+For more information about this error, try `rustc --explain E0618`.
+error: could not compile `litchi-docx` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0308, E0618.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-docx` (lib test) due to 5 previous errors

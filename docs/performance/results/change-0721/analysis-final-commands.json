@@ -1,0 +1,31 @@
+[
+  {
+    "command": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls-analyze.py",
+      "analyze",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls-analysis.json"
+    ],
+    "exit_code": 0,
+    "script_sha256": "b06972ca944a6dd71fc989bd832da9e2e7332be7967b50ea6d53d15a0f7181c2",
+    "log": "analysis-final-read-controls.log",
+    "log_sha256": "6b83d458c0b3345a2ce497b4ca6eada47d1c27ee74d10a09aa2dc349a8f9c99b",
+    "output_sha256": "fa7a42ab6ef6d4db0caaf696d295687f464fef584bb86441823a8798e66f5350"
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/analyze-final.py",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/analysis.json"
+    ],
+    "exit_code": 0,
+    "script_sha256": "47d7fbc337aeb608f4ce37dcec7b471b18be693259f1e05c7faf7747599cc8da",
+    "log": "analysis-final-primary.log",
+    "log_sha256": "b6c330066bd5c772bcaf624974115be230d2137a4f65469567ae7c2847a78036",
+    "output_sha256": "2393c89087ce3bfd10d37856d2bf4162da9c4f2b2cb576d7c655544dbd519731"
+  }
+]

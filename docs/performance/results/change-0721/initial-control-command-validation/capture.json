@@ -1,0 +1,20 @@
+[
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A1",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "baseline-A1"
+    ],
+    "exit_code": 1
+  }
+]

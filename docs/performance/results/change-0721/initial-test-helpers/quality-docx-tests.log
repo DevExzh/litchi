@@ -1,0 +1,18 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error: function `span` is never used
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:106:4
+    |
+106 | fn span(xml: &[u8], literal: &str) -> (usize, u32) {
+    |    ^^^^
+    |
+    = note: `-D dead-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `range` is never used
+   --> crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs:125:4
+    |
+125 | fn range(xml: &[u8], target: usize, literal: &str) -> BlockRange {
+    |    ^^^^^
+
+error: could not compile `litchi-docx` (lib test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

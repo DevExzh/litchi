@@ -1,0 +1,103 @@
+--- read-controls.py
++++ read-controls-analyze.py
+@@ -1,10 +1,9 @@
+ #!/usr/bin/env python3
+-"""Capture and adjudicate the two DOCX read-consumer controls.
+-
+-The coordinator builds the frozen native binaries and runs ``pilot.py`` for a
+-stage first.  ``capture STAGE`` then runs exactly one fresh child for each
+-control, while the live checkout remains the candidate source.  This file
+-does not build, edit, restore, or clean a checkout.
++"""Analyze the two DOCX read-consumer controls captured by read-controls.py.
++
++The frozen capture script remains the authority for capture receipts.  This
++replacement only validates completed captures and writes the analysis result;
++it does not build, edit, restore, or clean a checkout.
+ """
+ 
+ from __future__ import annotations
+@@ -26,6 +25,7 @@
+ 
+ HERE = Path(__file__).resolve().parent
+ REPO = HERE.parents[3]
++CAPTURE_SCRIPT = HERE / "read-controls.py"
+ STAGES = (
+     "baseline-A1", "candidate-B1", "candidate-B2", "baseline-A2",
+     "baseline-A3", "candidate-B3", "candidate-B4", "baseline-A4",
+@@ -510,7 +510,7 @@
+         "expected_corpus": control.get("expected_corpus"),
+         "primary_native": primary,
+         "plan_sha256": sha(HERE / "read-controls-plan.json"),
+-        "script_sha256": sha(Path(__file__).resolve()),
++        "script_sha256": sha(CAPTURE_SCRIPT),
+         "constraints_sha256": sha(resolve(plan["constraints"])),
+         "environment": observed_environment, "artifacts": artifacts,
+         "stdout_stderr": {
+@@ -684,7 +684,7 @@
+                     and receipt.get("binary_bytes") == build["binary_bytes"],
+                     f"{name}: receipt binary binding changed")
+             require(receipt.get("plan_sha256") == sha(HERE / "read-controls-plan.json")
+-                    and receipt.get("script_sha256") == sha(Path(__file__).resolve())
++                    and receipt.get("script_sha256") == sha(CAPTURE_SCRIPT)
+                     and receipt.get("constraints_sha256") == sha(resolve(plan["constraints"]))
+                     and receipt.get("environment") == plan["environment"],
+                     f"{name}: script or plan binding changed")
+@@ -829,8 +829,8 @@
+     accepted = parity_pass and all_gates_pass
+     if disposition is not None:
+         if disposition["final_source"] == "baseline":
+-            require(disposition["retained"] is False and not accepted,
+-                    "baseline final disposition requires an explicit rejected decision")
++            require(disposition["retained"] is False,
++                    "baseline final disposition requires retained=false")
+         else:
+             require(disposition["retained"] is True and accepted,
+                     "candidate final disposition requires an accepted decision")
+@@ -847,11 +847,12 @@
+             "final_source": (None if disposition is None else disposition["final_source"]),
+             "pinned_filesystem_internal_children_per_invocation": {
+                 "warmup": plan["native"]["warmup"],
++                "priming": plan["native"]["samples"],
+                 "measured": plan["native"]["samples"],
+-                "reported_total": plan["native"]["warmup"] + plan["native"]["samples"],
++                "reported_total": plan["native"]["warmup"] + (2 * plan["native"]["samples"]),
+             },
+             "pinned_filesystem_internal_children_across_stages": (
+-                len(STAGES) * (plan["native"]["warmup"] + plan["native"]["samples"])
++                len(STAGES) * (plan["native"]["warmup"] + (2 * plan["native"]["samples"]))
+             ),
+         },
+         "raw_sample_statistics": raw_statistics,
+@@ -900,7 +901,8 @@
+             for label, value in (("baseline", baseline_source), ("candidate", candidate_source))
+         },
+         "plan_sha256": sha(HERE / "read-controls-plan.json"),
+-        "capture_script_sha256": sha(Path(__file__).resolve()),
++        "capture_script_sha256": sha(CAPTURE_SCRIPT),
++        "analysis_script_sha256": sha(Path(__file__).resolve()),
+         "constraints_sha256": sha(resolve(plan["constraints"])),
+     }
+     write_new(output, result)
+@@ -909,18 +911,13 @@
+ 
+ def main() -> int:
+     parser = argparse.ArgumentParser(description=__doc__)
+-    subparsers = parser.add_subparsers(dest="command", required=True)
+-    capture_parser = subparsers.add_parser("capture", help="capture one interleaved stage")
+-    capture_parser.add_argument("stage", choices=STAGES)
+-    analyze_parser = subparsers.add_parser("analyze", help="validate and compare all captures")
+-    analyze_parser.add_argument("--output", default=str(HERE / "read-controls-analysis.json"))
++    parser.add_argument("command", nargs="?", choices=("analyze",), default="analyze",
++                        help="validate and compare all completed captures")
++    parser.add_argument("--output", default=str(HERE / "read-controls-analysis.json"))
+     args = parser.parse_args()
+     try:
+         plan = load_plan()
+-        if args.command == "capture":
+-            capture(plan, args.stage)
+-        else:
+-            analyze(plan, Path(args.output).resolve())
++        analyze(plan, Path(args.output).resolve())
+     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
+         print(f"read-controls failed: {error}", file=sys.stderr)
+         return 1

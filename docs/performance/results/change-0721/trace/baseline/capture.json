@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0721-bin/baseline-trace",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0721/trace/baseline/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "elapsed_seconds": 0.13769568700809032,
+  "exit_code": 0,
+  "report_sha256": "bea0e3f26e446d4de32cb4aa1b2398adf82da76045fb70de49957ba4a9ac24f0",
+  "schema": "litchi.docx-trace-capture-0721.v1",
+  "stderr_sha256": "74659ad0b9bb76efa4ac9f5b9e0e29ef2d3bf159b6fef6490099d640547edb8c",
+  "stdout_sha256": "e44ad71084d643b5f62e3b03707abe91286e02daf35ce2ff2b51667f3b05f732"
+}

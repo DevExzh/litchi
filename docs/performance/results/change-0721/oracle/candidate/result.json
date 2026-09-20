@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0721-bin/candidate-oracle",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0721/oracle/candidate/report.json"
+  ],
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0721-bin/candidate-oracle",
+    "sha256": "84207953928475b8e5870b049664180f3201b23fd2c3a46f5df02449b9f8cdcb",
+    "bytes": 4462848
+  },
+  "source_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+  "probe_sha256": "463b440c46530610be2f44322105d478a0c8adbf103af8ccf931f3564c8a61b4",
+  "artifacts": {
+    "report.json": "bea0e3f26e446d4de32cb4aa1b2398adf82da76045fb70de49957ba4a9ac24f0",
+    "stdout": "ebe76e14bd3da7520a1771ee18bd304e5d6ec067ac8c43fad5ea32bbb9ebe0c9",
+    "stderr": "20c70688cded49aa81a79d268d656a135d32edd97c3bab1f7506948a58bed379"
+  }
+}

@@ -1,0 +1,257 @@
+{
+  "checks": [
+    {
+      "error": "baseline-A1-native-generated-edit.elapsed_ns.samples length changed",
+      "error_type": "AssertionError",
+      "name": "primary-raw-elapsed-vector-length",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-native-generated-edit.json",
+        "results[0].elapsed_ns.samples"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-edit.elapsed_ns.mean: 355652.0050000001 != 355651.005",
+      "error_type": "AssertionError",
+      "name": "primary-raw-elapsed-summary",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-native-generated-edit.json",
+        "results[0].elapsed_ns.mean"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-lifecycle result/source archive size mismatch",
+      "error_type": "AssertionError",
+      "name": "primary-semantic-corpus-identity",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-native-generated-lifecycle.json",
+        "results[0].corpus.archive_bytes"
+      ]
+    },
+    {
+      "error": "baseline-A1-read-generated-medium-list-paragraphs.json: report summary does not match its raw vector",
+      "error_type": "RuntimeError",
+      "name": "read-control-raw-elapsed-summary",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-read-generated-medium-list-paragraphs.json",
+        "results[0].elapsed_ns.p50"
+      ]
+    },
+    {
+      "error": "baseline-A1-read-generated-medium-list-paragraphs.json: generated medium corpus scope changed",
+      "error_type": "RuntimeError",
+      "name": "read-control-semantic-corpus-identity",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-read-generated-medium-list-paragraphs.json",
+        "results[0].corpus.shape"
+      ]
+    },
+    {
+      "error": "('generated-medium', 0): active_calls differs\nbaseline=[{'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [], 'output_offsets': [], 'result_kind': 'ok', 'result_debug': None}, {'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'output_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'result_kind': 'ok', 'result_debug': None}]\ncandidate=[{'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [], 'output_offsets': [], 'result_kind': 'ok', 'result_debug': None}, {'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [440, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'output_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'result_kind': 'ok', 'result_debug': None}]",
+      "error_type": "TraceError",
+      "name": "trace-mce-input-vector",
+      "rejected": true,
+      "target": [
+        "trace/candidate/stderr",
+        "document_end.active_calls.input_offsets[0]"
+      ]
+    },
+    {
+      "error": "('generated-medium', 0): candidate performed 1 range reader calls",
+      "error_type": "TraceError",
+      "name": "trace-reader-proof-fake-range-owner",
+      "rejected": true,
+      "target": [
+        "trace/candidate/stderr",
+        "document_end.reader_reads"
+      ]
+    },
+    {
+      "error": "live candidate/native binary hash changed: /home/zhuhe/code/litchi-0721-bin/candidate-native",
+      "error_type": "AuditError",
+      "name": "binary-receipt-sha256",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/build-candidate.json",
+        "native.binary_sha256"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-edit: binary source manifest binding changed",
+      "error_type": "AssertionError",
+      "name": "primary-receipt-source-manifest-sha256",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0721/baseline-A1-native-generated-edit.receipt.json",
+        "build_source_manifest_sha256"
+      ]
+    }
+  ],
+  "inputs": {
+    "docs/performance/results/change-0721/analysis.json": {
+      "bytes": 3910050,
+      "path": "docs/performance/results/change-0721/analysis.json",
+      "sha256": "2393c89087ce3bfd10d37856d2bf4162da9c4f2b2cb576d7c655544dbd519731"
+    },
+    "docs/performance/results/change-0721/analyze-final.py": {
+      "bytes": 47091,
+      "path": "docs/performance/results/change-0721/analyze-final.py",
+      "sha256": "47d7fbc337aeb608f4ce37dcec7b471b18be693259f1e05c7faf7747599cc8da"
+    },
+    "docs/performance/results/change-0721/analyze.py": {
+      "bytes": 46106,
+      "path": "docs/performance/results/change-0721/analyze.py",
+      "sha256": "e21783674d5571e85c6ccc85a7c3c034c4a0f6f3631f3bf8585e98504f8d8e72"
+    },
+    "docs/performance/results/change-0721/audit.py": {
+      "bytes": 56209,
+      "path": "docs/performance/results/change-0721/audit.py",
+      "sha256": "800d52e9ae7b1f2bcc9c300eb1ab514c2cd885695bed2aa5d03b0c7cd78e4cce"
+    },
+    "docs/performance/results/change-0721/baseline-A1-native-generated-edit.json": {
+      "bytes": 44724,
+      "path": "docs/performance/results/change-0721/baseline-A1-native-generated-edit.json",
+      "sha256": "1b85adac3bf1e2791221a6da924400b0d97525014077a345640b7e031c163f0d"
+    },
+    "docs/performance/results/change-0721/baseline-A1-native-generated-lifecycle.json": {
+      "bytes": 61106,
+      "path": "docs/performance/results/change-0721/baseline-A1-native-generated-lifecycle.json",
+      "sha256": "3272d8d53a7cc21b9074bb103f3330161c834569143541283d06558e57d560d9"
+    },
+    "docs/performance/results/change-0721/baseline-A1-read-generated-medium-list-paragraphs.json": {
+      "bytes": 11863,
+      "path": "docs/performance/results/change-0721/baseline-A1-read-generated-medium-list-paragraphs.json",
+      "sha256": "b9c0aacd77c34523b46dd21ab10038d199eac90089486cf69fbd996aee96a30a"
+    },
+    "docs/performance/results/change-0721/build-baseline.json": {
+      "bytes": 1541,
+      "path": "docs/performance/results/change-0721/build-baseline.json",
+      "sha256": "f4a0040cc6b13fe0cbf1ce5c1fe327c06f7eb6166ea1eab8a8f8bef360276108"
+    },
+    "docs/performance/results/change-0721/build-candidate.json": {
+      "bytes": 1543,
+      "path": "docs/performance/results/change-0721/build-candidate.json",
+      "sha256": "9932b18a0c29e0cb4670e11a02906720ddc3ad3d5e7955c5a4ac1a269f7d99c1"
+    },
+    "docs/performance/results/change-0721/disposition.json": {
+      "bytes": 54,
+      "path": "docs/performance/results/change-0721/disposition.json",
+      "sha256": "a35889b599c08a679d04d7ca8cf917133da21bdae62bfe5947eb62c6f7de7acd"
+    },
+    "docs/performance/results/change-0721/negative-checks.py": {
+      "bytes": 20672,
+      "path": "docs/performance/results/change-0721/negative-checks.py",
+      "sha256": "76b807f151024469a1233d1fb08497072c5085efcd9b31eecbf12e8a8d804b91"
+    },
+    "docs/performance/results/change-0721/pilot.py": {
+      "bytes": 22618,
+      "path": "docs/performance/results/change-0721/pilot.py",
+      "sha256": "43d85ce4f0c9145f6249d1acecdb5316998d2c46edfb7b179b2cc63ce69ba44e"
+    },
+    "docs/performance/results/change-0721/plan.json": {
+      "bytes": 4410,
+      "path": "docs/performance/results/change-0721/plan.json",
+      "sha256": "46c07062f7090bda7c41cbdb7189c56bb1e689863e573dcfa23477d2a2a09663"
+    },
+    "docs/performance/results/change-0721/read-controls-analysis.json": {
+      "bytes": 26485,
+      "path": "docs/performance/results/change-0721/read-controls-analysis.json",
+      "sha256": "fa7a42ab6ef6d4db0caaf696d295687f464fef584bb86441823a8798e66f5350"
+    },
+    "docs/performance/results/change-0721/read-controls-analyze.py": {
+      "bytes": 47756,
+      "path": "docs/performance/results/change-0721/read-controls-analyze.py",
+      "sha256": "b06972ca944a6dd71fc989bd832da9e2e7332be7967b50ea6d53d15a0f7181c2"
+    },
+    "docs/performance/results/change-0721/read-controls-plan.json": {
+      "bytes": 7641,
+      "path": "docs/performance/results/change-0721/read-controls-plan.json",
+      "sha256": "9a9affcefa9c6906846004626710934e28f209bfd128730cf804a3037d312b15"
+    },
+    "docs/performance/results/change-0721/read-controls.py": {
+      "bytes": 47954,
+      "path": "docs/performance/results/change-0721/read-controls.py",
+      "sha256": "e7cd4ec7336c561899060a6911cf3936a21babb2b20e8cb995db9742fc806375"
+    },
+    "docs/performance/results/change-0721/source-baseline.json": {
+      "bytes": 887523,
+      "path": "docs/performance/results/change-0721/source-baseline.json",
+      "sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7"
+    },
+    "docs/performance/results/change-0721/source-candidate.json": {
+      "bytes": 887651,
+      "path": "docs/performance/results/change-0721/source-candidate.json",
+      "sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa"
+    },
+    "docs/performance/results/change-0721/source-final.json": {
+      "bytes": 887523,
+      "path": "docs/performance/results/change-0721/source-final.json",
+      "sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7"
+    },
+    "docs/performance/results/change-0721/trace-analyze.py": {
+      "bytes": 18630,
+      "path": "docs/performance/results/change-0721/trace-analyze.py",
+      "sha256": "432f532d8893af9328f91c55cea866967a4574025c57f30e14292ef70e383b16"
+    },
+    "docs/performance/results/change-0721/trace/baseline/stderr": {
+      "bytes": 214700,
+      "path": "docs/performance/results/change-0721/trace/baseline/stderr",
+      "sha256": "74659ad0b9bb76efa4ac9f5b9e0e29ef2d3bf159b6fef6490099d640547edb8c"
+    },
+    "docs/performance/results/change-0721/trace/candidate/stderr": {
+      "bytes": 135622,
+      "path": "docs/performance/results/change-0721/trace/candidate/stderr",
+      "sha256": "248210e658b6c027c76b4505c2d427eccc156529d296c9c5dfe275c86b6bf75e"
+    }
+  },
+  "packet": "change-0721-docx-negative-checks",
+  "positive_replays": [
+    {
+      "name": "primary-elapsed-vector-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-semantic-identity-retained",
+      "passed": true
+    },
+    {
+      "name": "read-control-report-retained",
+      "passed": true
+    },
+    {
+      "name": "trace-differential-retained",
+      "passed": true
+    },
+    {
+      "name": "binary-custody-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-receipt-source-binding-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-analysis-exact-replay",
+      "output": "docs/performance/results/change-0721/analysis.json",
+      "passed": true
+    },
+    {
+      "name": "read-control-analysis-exact-replay",
+      "output": "docs/performance/results/change-0721/read-controls-analysis.json",
+      "passed": true
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "schema_version": 1,
+  "scope": {
+    "check_count": 9,
+    "mutated_retained_artifacts": false,
+    "native_or_profiler_invocations": 0,
+    "temporary_mutation_files": true
+  },
+  "status": "pass"
+}
