@@ -1,8 +1,12 @@
 # Date/time isolated gate preparation
 
-This directory contains preparation tooling for the ODF 1.4 §6.10 date/time
-batch. It has no frozen candidate or gate result yet. The scripts do not carry
-historical test totals, source hashes, or identifiers from another batch.
+This directory contains isolated gate tooling for the ODF 1.4 §6.10 date/time
+batch. The current freeze is pending after measurement-harness corrections;
+previous runs are archived under the history directories. The replacement
+`freeze.json` will bind the selected source closure using the retained isolated
+lock. Execution receipts are recorded
+by `run.py` and checked by `verify.py`; only a successful verifier establishes
+that all gates finished and the selected source remained unchanged.
 
 `stage.py` reads the date/time `baseline.json`, requires the isolated checkout
 to be at `preparation_commit`, and copies the retained isolated `Cargo.lock`

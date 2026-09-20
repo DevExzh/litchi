@@ -201,3 +201,29 @@ prepared outside measurement, and scalar `NumberAny` date expectations must
 be checked numerically rather than accepting any number. Both measurement
 phases must pass for every workload before another freeze or capture.
 No timings from these incomplete attempts support a performance claim.
+
+
+## Measurement preparation and custody corrections
+
+The harness now prepares independent expectations once, before timing, checks
+scalar numeric date results against those expectations, and uses fixed fixture
+serials during resolver reads. Preflight and measurement share result
+validation/checksum handling. Timed JSON samples are arrays and normalized
+work/read/time ratios retain fractional values. Cached-value comparisons
+remain timed; the performance plan explicitly describes that instrumentation.
+
+Strict smoke validation exposed two stale harness expectations: DATE(2020;2;30)
+is 2020-03-01, and European DAYS360 from January 31 to February 29 is 29.
+Geometry checks also corrected four projected date rows to 2x1 and the matrix
+SUM control to 1x1 execution geometry, while preserving its scalar result.
+Root's locked/offline builds and measurement-path smoke checks passed all
+240 candidate and 68 baseline case/phase combinations with default repeat
+counts, one warmup and one measured child. These checks validate execution
+and accounting; they are not comparative performance evidence.
+
+Candidate preflight and capture use the staged, frozen harness directly.
+Freeze verification requires all harness inputs and the preparation checkout
+HEAD, and capture checks source, harness and lock hashes before and after.
+The root candidate commit identifies injected source; it is intentionally
+different from the isolated checkout's preparation HEAD. Final freeze, full
+gates, uncertainty analysis and comparative capture remain outstanding.

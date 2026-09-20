@@ -13,6 +13,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -356,6 +357,29 @@ def preflight_matrix_row(case: str) -> dict[str, Any]:
     raise RuntimeError(f"case has no matrix row: {case}")
 
 
+def same_expected_outcome(observed: Any, expected: Any) -> bool:
+    """Compare typed oracle outcomes with the harness numeric tolerance."""
+    if isinstance(expected, bool):
+        return isinstance(observed, bool) and observed == expected
+    if isinstance(expected, (int, float)):
+        return (
+            isinstance(observed, (int, float))
+            and not isinstance(observed, bool)
+            and math.isfinite(observed)
+            and math.isfinite(expected)
+            and abs(observed - expected) <= max(abs(expected), 1.0) * 1.0e-10
+        )
+    if isinstance(expected, list):
+        return isinstance(observed, list) and len(observed) == len(expected) and all(
+            same_expected_outcome(actual, wanted) for actual, wanted in zip(observed, expected)
+        )
+    if isinstance(expected, dict):
+        return isinstance(observed, dict) and observed.keys() == expected.keys() and all(
+            same_expected_outcome(observed[key], value) for key, value in expected.items()
+        )
+    return type(observed) is type(expected) and observed == expected
+
+
 def run_preflight(*, binary: Path, source_root: Path, env: dict[str, str], output_dir: Path, cases: list[str]) -> dict[str, Any]:
     stdout_path = output_dir / "preflight.stdout.log"
     receipt: dict[str, Any] = {
@@ -383,22 +407,31 @@ def run_preflight(*, binary: Path, source_root: Path, env: dict[str, str], outpu
             except json.JSONDecodeError as error:
                 raise RuntimeError(f"preflight emitted invalid formula description for {case}: {error}") from error
             row = preflight_matrix_row(case)
-            for field in ("source", "evaluation_path"):
+            for field in ("source", "evaluation_path", "shape"):
                 if description.get(field) != row.get(field):
                     raise RuntimeError(
                         f"preflight {field} mismatch for {case}: matrix={row.get(field)!r}, observed={description.get(field)!r}"
                     )
+            if "expected" not in description or not same_expected_outcome(description["expected"], row["expected"]):
+                raise RuntimeError(
+                    f"preflight expected outcome mismatch for {case}: "
+                    f"matrix={row['expected']!r}, harness={description.get('expected')!r}"
+                )
             match = re.search(r"reference_reads=(\d+)", measurement)
             if match is None:
                 raise RuntimeError(f"preflight omitted reference reads for {case}")
             reads = int(match.group(1))
             expected = preflight_read_bound(case)
+            if description.get("reference_reads") != reads:
+                raise RuntimeError(f"preflight JSON/text read count differs for {case}")
             if reads != expected:
                 raise RuntimeError(f"preflight read bound failed for {case}: expected {expected}, observed {reads}")
             receipt["reference_reads"][case] = reads
             receipt["descriptions"][case] = {
                 "source": description["source"],
                 "evaluation_path": description["evaluation_path"],
+                "shape": description["shape"],
+                "expected": description["expected"],
             }
     receipt["stdout"] = str(stdout_path.relative_to(output_dir))
     receipt["status"] = "ok"
@@ -425,7 +458,8 @@ def staged_cases(binary: Path, *, source_root: Path, env: dict[str, str]) -> lis
 def preflight_candidate_tree(*, candidate_root: Path, output_dir: Path, profile_hashes: dict[str, str]) -> dict[str, Any]:
     preserve_existing_output(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    harness_manifest = copy_harness(candidate_root) / "Cargo.toml"
+    harness_manifest = candidate_root / REL_HARNESS / "Cargo.toml"
+    before = source_snapshot(candidate_root, profile_hashes)
     target = Path(tempfile.mkdtemp(prefix="litchi-ods-date-time-candidate-preflight-", dir="/var/tmp"))
     build_env = os.environ.copy()
     build_env["CARGO_TARGET_DIR"] = str(target)
@@ -441,6 +475,7 @@ def preflight_candidate_tree(*, candidate_root: Path, output_dir: Path, profile_
             raise RuntimeError(f"missing release binary: {binary}")
         cases = staged_cases(binary, source_root=candidate_root, env=build_env)
         preflight = run_preflight(binary=binary, source_root=candidate_root, env=build_env, output_dir=output_dir, cases=cases)
+        assert_unchanged(before, source_snapshot(candidate_root, profile_hashes), "candidate preflight")
         result = {"status": "ok", "cases": len(cases), "binary_sha256": digest(binary), "contract_sha256": CONTRACT_SHA256, "profile_input_sha256": profile_hashes, "preflight": preflight}
         (output_dir / "summary.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return result
@@ -475,7 +510,20 @@ def verify_candidate_freeze(candidate_root: Path, freeze_path: Path) -> dict[str
         raise RuntimeError("candidate freeze base differs from recorded preparation commit")
     if freeze.get("production_commit") != BASELINE_COMMIT:
         raise RuntimeError("candidate freeze production commit differs from matched baseline")
+    if git_head(candidate_root) != preparation:
+        raise RuntimeError("candidate checkout HEAD differs from frozen preparation base")
+    for relative in ("Cargo.toml", "Cargo.lock", "src/main.rs"):
+        key = str(REL_HARNESS / relative)
+        if key not in selected:
+            raise RuntimeError(f"candidate freeze does not bind harness input: {key}")
     return freeze
+
+
+def assert_unchanged(before: dict[str, Any], after: dict[str, Any], context: str) -> None:
+    for field in ("git_head", "source_sha256", "workspace_source_sha256",
+                  "workspace_lock_sha256", "harness_sha256", "profile_input_sha256"):
+        if before[field] != after[field]:
+            raise RuntimeError(f"{field} changed during {context}")
 
 
 def capture_tree(*, label: str, source_root: Path, output_dir: Path, warmups: int, samples: int, requested_cases: tuple[str, ...] | None, profile_hashes: dict[str, str]) -> dict[str, Any]:
@@ -483,7 +531,8 @@ def capture_tree(*, label: str, source_root: Path, output_dir: Path, warmups: in
     output_dir.mkdir(parents=True, exist_ok=True)
     raw_dir = output_dir / "raw"
     raw_dir.mkdir()
-    harness_manifest = copy_harness(source_root) / "Cargo.toml"
+    harness_root = copy_harness(source_root) if requested_cases is not None else source_root / REL_HARNESS
+    harness_manifest = harness_root / "Cargo.toml"
     target = Path(tempfile.mkdtemp(prefix=f"litchi-ods-date-time-{label}-", dir="/var/tmp"))
     before = source_snapshot(source_root, profile_hashes)
     build_env = os.environ.copy()
@@ -549,8 +598,7 @@ def capture_tree(*, label: str, source_root: Path, output_dir: Path, warmups: in
         environment["measurement_context_after"] = measurement_context(build_env)
         (output_dir / "environment.json").write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         after = source_snapshot(source_root, profile_hashes)
-        if before["source_sha256"] != after["source_sha256"] or before["workspace_source_sha256"] != after["workspace_source_sha256"]:
-            raise RuntimeError(f"selected source changed during {label} capture")
+        assert_unchanged(before, after, f"{label} capture")
         if profile_hashes != profile_input_snapshot():
             raise RuntimeError(f"profile inputs changed during {label} capture")
         (output_dir / "source-manifest.json").write_text(json.dumps({"before": before, "after": after, "source_sha256_unchanged": True, "workspace_source_sha256_unchanged": True, "profile_input_sha256_unchanged": True, "binary_sha256": binary_hash}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -633,6 +681,7 @@ def main() -> int:
         cleanup["baseline_removed"] = remove_worktree(baseline_worktree)
     if not args.baseline_only:
         candidate_root = args.candidate_root.resolve()
+        verify_candidate_freeze(candidate_root, args.candidate_freeze.resolve())
         summaries.append(capture_tree(label="candidate-final", source_root=candidate_root, output_dir=results_root / "candidate-final", warmups=args.warmups, samples=args.samples, requested_cases=None, profile_hashes=profile_before))
         summaries[-1]["freeze_path"] = str(args.candidate_freeze.resolve())
         summaries[-1]["freeze_base_commit"] = freeze["base_commit"] if freeze else None

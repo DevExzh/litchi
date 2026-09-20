@@ -925,7 +925,7 @@
       "name": "literal-aggregate-4x1-sum",
       "source": "=SUM({1|2|3|4})",
       "expected": 10.0,
-      "shape": "scalar",
+      "shape": "1x1",
       "reference_reads": 0,
       "reference": false,
       "fixture_mode": "control",
@@ -1563,7 +1563,7 @@
       "function": "DAYS360",
       "lane": "boundary",
       "source": "=DAYS360(DATE(2024;1;31);DATE(2024;2;29);TRUE())",
-      "expected": 30,
+      "expected": 29,
       "shape": "scalar",
       "reference_reads": 0,
       "timestamp": false,
@@ -1966,7 +1966,7 @@
         22,
         22
       ],
-      "shape": "scalar",
+      "shape": "2x1",
       "reference_reads": 46,
       "timestamp": false,
       "fixture_mode": "DateNormal",
@@ -1981,7 +1981,7 @@
         45385,
         45385
       ],
-      "shape": "scalar",
+      "shape": "2x1",
       "reference_reads": 46,
       "timestamp": false,
       "fixture_mode": "DateNormal",
@@ -1996,7 +1996,7 @@
         29,
         1
       ],
-      "shape": "scalar",
+      "shape": "2x1",
       "reference_reads": 0,
       "timestamp": false,
       "fixture_mode": "DateNormal",
@@ -2011,7 +2011,7 @@
         0,
         0
       ],
-      "shape": "scalar",
+      "shape": "2x1",
       "reference_reads": 0,
       "timestamp": false,
       "fixture_mode": "DateNormal",
