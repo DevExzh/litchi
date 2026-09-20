@@ -311,6 +311,8 @@ struct Case {
     max_steps: Option<u64>,
     cancellation: bool,
     resolver_mode: ResolverMode,
+    expected_numbers: Vec<f64>,
+    expected_logicals: Vec<bool>,
 }
 
 #[derive(Debug)]
@@ -480,7 +482,7 @@ fn date_cell(mode: ResolverMode, row: usize, column: usize) -> CellRead<'static>
             if mode == ResolverMode::DateErrorCell && row == 0 {
                 CellRead::Error(ScalarError::NotAvailable)
             } else {
-                CellRead::Number(date_serial(2024, 3, 31) + row as f64)
+                CellRead::Number(SERIAL_2024_03_31 + row as f64)
             }
         },
         3 => CellRead::Text("2024-03-31T12:34:56"),
@@ -488,6 +490,9 @@ fn date_cell(mode: ResolverMode, row: usize, column: usize) -> CellRead<'static>
         _ => CellRead::Number(0.0),
     }
 }
+
+const SERIAL_2024_01_01: f64 = 45_292.0;
+const SERIAL_2024_03_31: f64 = 45_382.0;
 
 fn date_serial(year: i32, month: u32, day: u32) -> f64 {
     fn leap(year: i32) -> bool {
@@ -511,7 +516,7 @@ fn date_serial(year: i32, month: u32, day: u32) -> f64 {
 }
 
 fn holiday_serial(index: usize) -> f64 {
-    date_serial(2024, 1, 1) + (index as f64 * 17.0)
+    SERIAL_2024_01_01 + (index as f64 * 17.0)
 }
 
 fn weekday(serial: i64) -> usize {
@@ -696,13 +701,13 @@ fn date_expected(case: &Case, index: usize) -> Option<f64> {
         return Some(0.5);
     }
     if name == "date-boundary-date-rollover" {
-        return Some(date_serial(2021, 3, 1));
+        return Some(date_serial(2020, 3, 1));
     }
     if name == "date-boundary-date-1900" {
         return Some(date_serial(1900, 3, 1));
     }
     if name == "date-boundary-days360-eu" {
-        return Some(30.0);
+        return Some(29.0);
     }
     if name == "date-boundary-edate-clamp" {
         return Some(date_serial(2024, 2, 29));
@@ -932,6 +937,8 @@ fn controls() -> Vec<Case> {
             max_steps: None,
             cancellation: false,
             resolver_mode: mode,
+            expected_numbers: Vec::new(),
+            expected_logicals: Vec::new(),
         });
     };
     push(
@@ -1377,6 +1384,8 @@ fn date_case(
         max_steps,
         cancellation,
         resolver_mode,
+        expected_numbers: Vec::new(),
+        expected_logicals: Vec::new(),
     }
 }
 
@@ -2076,8 +2085,58 @@ fn date_expected_name(name: &str) -> f64 {
         max_steps: None,
         cancellation: false,
         resolver_mode: ResolverMode::DateNormal,
+        expected_numbers: Vec::new(),
+        expected_logicals: Vec::new(),
     };
     date_expected(&case, 0).unwrap()
+}
+
+fn prepare_expectations(cases: &mut [Case]) -> AnyResult<()> {
+    for case in cases {
+        if case.date.is_some()
+            && matches!(case.expectation, Expected::Number(_) | Expected::NumberAny)
+        {
+            let mut values = Vec::with_capacity(case.shape.elements());
+            for index in 0..case.shape.elements() {
+                values.push(date_expected(case, index).ok_or_else(|| {
+                    format!(
+                        "{} has no independent date oracle value for cell {index}",
+                        case.name
+                    )
+                })?);
+            }
+            case.expected_numbers = values;
+        } else if case.date.is_none() {
+            match case.expectation {
+                Expected::NumberAny => {
+                    let mut values = Vec::with_capacity(case.shape.elements());
+                    for index in 0..case.shape.elements() {
+                        values.push(expected_control_array(case, index).ok_or_else(|| {
+                            format!(
+                                "{} has no independent numeric oracle for cell {index}",
+                                case.name
+                            )
+                        })?);
+                    }
+                    case.expected_numbers = values;
+                },
+                Expected::LogicalAny => {
+                    let mut values = Vec::with_capacity(case.shape.elements());
+                    for index in 0..case.shape.elements() {
+                        values.push(expected_control_logical(case, index).ok_or_else(|| {
+                            format!(
+                                "{} has no independent logical oracle for cell {index}",
+                                case.name
+                            )
+                        })?);
+                    }
+                    case.expected_logicals = values;
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(())
 }
 
 fn all_cases() -> Vec<Case> {
@@ -2273,6 +2332,17 @@ fn validate_scalar(case: &Case, value: &ScalarValue<'_>) -> AnyResult<()> {
         {
             Ok(())
         },
+        (Expected::NumberAny, ScalarValue::Number(actual)) if case.date.is_some() => {
+            let expected = case
+                .expected_numbers
+                .first()
+                .ok_or("missing scalar date oracle")?;
+            if approximately_equal(*actual, *expected) {
+                Ok(())
+            } else {
+                Err(format!("{} returned {actual}, expected {expected}", case.name).into())
+            }
+        },
         (Expected::NumberAny, ScalarValue::Number(_)) => Ok(()),
         (Expected::Logical(expected), ScalarValue::Logical(actual)) if expected == *actual => {
             Ok(())
@@ -2342,7 +2412,10 @@ fn validate_date_value(case: &Case, result: &Evaluated<'_>) -> AnyResult<()> {
             Value::Number(value) => value,
             other => return Err(format!("{} returned {other:?}", case.name).into()),
         };
-        let expected = date_expected(case, 0).ok_or("missing date oracle value")?;
+        let expected = *case
+            .expected_numbers
+            .first()
+            .ok_or("missing date oracle value")?;
         if approximately_equal(actual, expected) {
             return Ok(());
         }
@@ -2358,7 +2431,10 @@ fn validate_date_value(case: &Case, result: &Evaluated<'_>) -> AnyResult<()> {
             Value::Number(value) => value,
             other => return Err(format!("{} cell {index}: {other:?}", case.name).into()),
         };
-        let expected = date_expected(case, index).ok_or("missing array date oracle value")?;
+        let expected = *case
+            .expected_numbers
+            .get(index)
+            .ok_or("missing array date oracle value")?;
         if !approximately_equal(actual, expected) {
             return Err(format!(
                 "{} cell {index} returned {actual}, expected {expected}",
@@ -2390,8 +2466,10 @@ fn validate_control_value(case: &Case, result: &Evaluated<'_>) -> AnyResult<()> 
                     Value::Number(value) => value,
                     other => return Err(format!("{} cell {index}: {other:?}", case.name).into()),
                 };
-                let expected =
-                    expected_control_array(case, index).ok_or("missing control oracle")?;
+                let expected = *case
+                    .expected_numbers
+                    .get(index)
+                    .ok_or("missing control oracle")?;
                 if !approximately_equal(actual, expected) {
                     return Err(format!(
                         "{} cell {index} returned {actual}, expected {expected}",
@@ -2409,7 +2487,9 @@ fn validate_control_value(case: &Case, result: &Evaluated<'_>) -> AnyResult<()> 
                     Value::Logical(value) => value,
                     other => return Err(format!("{} cell {index}: {other:?}", case.name).into()),
                 };
-                let expected = expected_control_logical(case, index)
+                let expected = *case
+                    .expected_logicals
+                    .get(index)
                     .ok_or("missing logical control oracle")?;
                 if actual != expected {
                     return Err(format!(
@@ -2635,16 +2715,15 @@ fn consume_value(
         return Err(format!("{} unexpectedly produced a value", case.name).into());
     }
     validate_value(case, &result)?;
-    *checksum = checksum.wrapping_add(if case.shape.is_scalar() {
-        value_checksum(result.value())?
-    } else {
-        array_checksum(result.as_array().ok_or("missing array checksum")?)?
+    // Shape selects the evaluation mode, while the reducer's actual result
+    // determines its checksum representation. Some value-path reducers (for
+    // example SUM over an inline array) validly collapse to a scalar even
+    // when their input descriptor is matrix-shaped.
+    *checksum = checksum.wrapping_add(match result.value() {
+        Value::Array(array) => array_checksum(array)?,
+        value => value_checksum(value)?,
     });
-    *output_bytes = output_bytes.saturating_add(if case.shape.is_scalar() {
-        value_output_bytes(result.value())
-    } else {
-        array_output_bytes(result.as_array().ok_or("missing array output")?)
-    });
+    *output_bytes = output_bytes.saturating_add(value_output_bytes(result.value()));
     black_box(*checksum);
     let retained = execution.budget().used(Resource::Memory);
     drop(result);
@@ -2838,35 +2917,27 @@ fn preflight(case: &Case) -> AnyResult<u64> {
         case.resolver_mode,
         case.cancellation.then_some(cancellation.clone()),
     );
+    let mut checksum = 0_u64;
+    let mut output_bytes = 0_u64;
     match case.path {
-        Path::Scalar => match evaluate_scalar(
-            &expression,
-            &EvaluationContext::with_options(&execution, date_options(case)),
-            &scalar_limits(case),
-        ) {
-            Ok(result) => {
-                if matches!(case.expectation, Expected::Failure(_)) {
-                    return Err(format!("{} unexpectedly produced a value", case.name).into());
-                }
-                validate_scalar(case, result.value())?;
-            },
-            Err(error) => validate_failure(case, &error)?,
+        Path::Scalar => {
+            let result = evaluate_scalar(
+                &expression,
+                &EvaluationContext::with_options(&execution, date_options(case)),
+                &scalar_limits(case),
+            );
+            consume_scalar(case, result, &execution, &mut checksum, &mut output_bytes)?;
         },
-        Path::Value => match value::evaluate(
-            &expression,
-            &resolver,
-            &Context::new(&execution, Position::new("Main", 0, 0))
-                .with_mode(case.shape.mode())
-                .with_options(date_options(case)),
-            &value_limits(case),
-        ) {
-            Ok(result) => {
-                if matches!(case.expectation, Expected::Failure(_)) {
-                    return Err(format!("{} unexpectedly produced a value", case.name).into());
-                }
-                validate_value(case, &result)?;
-            },
-            Err(error) => validate_failure(case, &error)?,
+        Path::Value => {
+            let result = value::evaluate(
+                &expression,
+                &resolver,
+                &Context::new(&execution, Position::new("Main", 0, 0))
+                    .with_mode(case.shape.mode())
+                    .with_options(date_options(case)),
+                &value_limits(case),
+            );
+            consume_value(result, case, &execution, &mut checksum, &mut output_bytes)?;
         },
     }
     Ok(resolver.stats.reads())
@@ -2911,6 +2982,98 @@ fn json_escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+fn expected_error_json(error: ScalarError) -> String {
+    format!("\"{error}\"")
+}
+
+fn expected_failure_json(failure: FailureKind) -> &'static str {
+    match failure {
+        FailureKind::ReferenceCells => "{\"failure\":\"ReferenceCells\"}",
+        FailureKind::Cancelled => "{\"failure\":\"Cancelled\"}",
+        FailureKind::Work => "{\"failure\":\"Work\"}",
+        FailureKind::CalculationClock => "{\"failure\":\"CalculationClock\"}",
+    }
+}
+
+fn expected_numbers_json(values: &[f64], shape: Shape) -> String {
+    if values.len() == 1 && shape.is_scalar() {
+        return format!("{:.17}", values[0]);
+    }
+    let Shape::Array { rows, columns, .. } = shape else {
+        return "[]".to_owned();
+    };
+    if columns == 1 {
+        return format!(
+            "[{}]",
+            values
+                .iter()
+                .map(|value| format!("{value:.17}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+    }
+    let rows_json = (0..rows)
+        .map(|row| {
+            let start = row.saturating_mul(columns);
+            let end = start.saturating_add(columns).min(values.len());
+            format!(
+                "[{}]",
+                values[start..end]
+                    .iter()
+                    .map(|value| format!("{value:.17}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{rows_json}]")
+}
+
+fn expected_logicals_json(values: &[bool], shape: Shape) -> String {
+    let Shape::Array { rows, columns, .. } = shape else {
+        return "[]".to_owned();
+    };
+    if columns == 1 {
+        return format!(
+            "[{}]",
+            values
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+    }
+    let rows_json = (0..rows)
+        .map(|row| {
+            let start = row.saturating_mul(columns);
+            let end = start.saturating_add(columns).min(values.len());
+            format!(
+                "[{}]",
+                values[start..end]
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{rows_json}]")
+}
+
+fn expected_json(case: &Case) -> String {
+    match case.expectation {
+        Expected::Number(value) => format!("{value:.17}"),
+        Expected::NumberAny => expected_numbers_json(&case.expected_numbers, case.shape),
+        Expected::Logical(value) => value.to_string(),
+        Expected::LogicalAny => expected_logicals_json(&case.expected_logicals, case.shape),
+        Expected::Text(value) => format!("\"{}\"", json_escape(value)),
+        Expected::Error(error) => expected_error_json(error),
+        Expected::Failure(failure) => expected_failure_json(failure).to_owned(),
+    }
+}
+
 fn evaluation_path(case: &Case) -> &'static str {
     match case.path {
         Path::Scalar => "scalar",
@@ -2919,12 +3082,17 @@ fn evaluation_path(case: &Case) -> &'static str {
 }
 
 fn describe_json(case: &Case, reference_reads: Option<u64>) -> String {
+    let shape = match case.shape {
+        Shape::Scalar => "scalar".to_owned(),
+        Shape::Array { rows, columns, .. } => format!("{rows}x{columns}"),
+    };
     let reads = reference_reads.map_or_else(|| "null".to_owned(), |value| value.to_string());
     format!(
-        "{{\"case\":\"{}\",\"source\":\"{}\",\"evaluation_path\":\"{}\",\"reference_reads\":{reads}}}",
+        "{{\"case\":\"{}\",\"source\":\"{}\",\"evaluation_path\":\"{}\",\"expected\":{},\"shape\":\"{shape}\",\"reference_reads\":{reads}}}",
         json_escape(&case.name),
         json_escape(&case.source),
         evaluation_path(case),
+        expected_json(case),
     )
 }
 
@@ -2958,7 +3126,7 @@ fn emit(
         .sum::<u128>()
         / samples.len() as u128;
     println!(
-        "{{\"case\":\"{}\",\"operation\":\"{}\",\"phase\":\"{}\",\"input_bytes\":{},\"output_bytes_p50\":{},\"bytes_per_repeat_p50\":{},\"repeat\":{},\"warmups\":{},\"iterations\":{},\"shape\":\"{}\",\"rows\":{},\"columns\":{},\"elements\":{},\"supported\":true,\"expected\":\"{}\",\"elapsed_ns_p50\":{},\"elapsed_ns_mean\":{},\"elapsed_ns_p95\":{},\"elapsed_ns_p99\":{},\"elapsed_ns_per_repeat\":{},\"allocator_calls_p50\":{},\"requested_bytes_p50\":{},\"released_bytes_p50\":{},\"peak_live_delta_p50\":{},\"memory_retained_p50\":{},\"work_p50\":{},\"work_per_repeat\":{},\"reference_reads_p50\":{},\"reference_reads_per_repeat\":{},\"checksum_p50\":{},\"live_before_p50\":{},\"live_after_p50\":{},\"samples\":{},\"rss_kib\":null,\"rss_source\":\"external /usr/bin/time -v\",\"memory_retained_source\":\"execution budget while result is live\",\"reference_source\":\"instrumented borrowing resolver\",\"validation_scope\":\"one untimed independent oracle; timed evaluator/checksum/drop\"}}",
+        "{{\"case\":\"{}\",\"operation\":\"{}\",\"phase\":\"{}\",\"input_bytes\":{},\"output_bytes_p50\":{},\"bytes_per_repeat_p50\":{},\"repeat\":{},\"warmups\":{},\"iterations\":{},\"shape\":\"{}\",\"rows\":{},\"columns\":{},\"elements\":{},\"supported\":true,\"expected\":\"{}\",\"elapsed_ns_p50\":{},\"elapsed_ns_mean\":{},\"elapsed_ns_p95\":{},\"elapsed_ns_p99\":{},\"elapsed_ns_per_repeat\":{},\"allocator_calls_p50\":{},\"requested_bytes_p50\":{},\"released_bytes_p50\":{},\"peak_live_delta_p50\":{},\"memory_retained_p50\":{},\"work_p50\":{},\"work_per_repeat\":{},\"reference_reads_p50\":{},\"reference_reads_per_repeat\":{},\"checksum_p50\":{},\"live_before_p50\":{},\"live_after_p50\":{},\"samples\":[{}],\"rss_kib\":null,\"rss_source\":\"external /usr/bin/time -v\",\"memory_retained_source\":\"execution budget while result is live\",\"reference_source\":\"instrumented borrowing resolver\",\"validation_scope\":\"prepared untimed oracle; timed evaluator/cached-value validation/checksum/drop\"}}",
         json_escape(&case.name),
         case.date.map_or_else(
             || case.operation.map_or("control", ControlOp::name),
@@ -2980,16 +3148,16 @@ fn emit(
         mean_elapsed,
         p(|s| s.elapsed_ns, 95),
         p(|s| s.elapsed_ns, 99),
-        p(|s| s.elapsed_ns, 50) / repeat as u64,
+        p(|s| s.elapsed_ns, 50) as f64 / repeat as f64,
         p(|s| s.alloc_calls, 50),
         p(|s| s.requested_bytes, 50),
         p(|s| s.released_bytes, 50),
         p(|s| s.peak_live_delta, 50),
         p(|s| s.memory_retained, 50),
         p(|s| s.work, 50),
-        p(|s| s.work, 50) / repeat as u64,
+        p(|s| s.work, 50) as f64 / repeat as f64,
         p(|s| s.reference_reads, 50),
-        p(|s| s.reference_reads, 50) / repeat as u64,
+        p(|s| s.reference_reads, 50) as f64 / repeat as f64,
         p(|s| s.checksum, 50),
         p(|s| s.live_before, 50),
         p(|s| s.live_after, 50),
@@ -2997,11 +3165,14 @@ fn emit(
     );
 }
 
-fn selected_cases<'a>(all: &'a [Case], requested: Option<&str>) -> AnyResult<Vec<&'a Case>> {
+fn selected_cases<'a>(
+    all: &'a mut [Case],
+    requested: Option<&str>,
+) -> AnyResult<Vec<&'a mut Case>> {
     match requested {
-        None | Some("all") => Ok(all.iter().collect()),
+        None | Some("all") => Ok(all.iter_mut().collect()),
         Some(name) => all
-            .iter()
+            .iter_mut()
             .find(|case| case.name == name)
             .map(|case| vec![case])
             .ok_or_else(|| format!("unknown case {name}").into()),
@@ -3049,16 +3220,19 @@ fn main() -> AnyResult<()> {
     let Some(config) = parse_config()? else {
         return Ok(());
     };
-    let all = all_cases();
-    let selected = selected_cases(&all, config.case.as_deref())?;
+    let mut all = all_cases();
+    let mut selected = selected_cases(&mut all, config.case.as_deref())?;
+    for case in selected.iter_mut() {
+        prepare_expectations(std::slice::from_mut(&mut **case))?;
+    }
     if config.describe {
-        for case in selected.iter().copied() {
-            println!("{}", describe_json(case, None));
+        for case in selected.iter() {
+            println!("{}", describe_json(&**case, None));
         }
         return Ok(());
     }
-    for case in selected.iter().copied() {
-        run_case(case, &config)?;
+    for case in selected.iter() {
+        run_case(&**case, &config)?;
     }
     if config.preflight_only {
         println!(

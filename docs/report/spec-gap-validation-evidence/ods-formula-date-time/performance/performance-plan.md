@@ -51,7 +51,9 @@ The reviewed matrix is bounded at 34 matched controls and 86 candidate date
 cases (120 named cases total). Each side has 68 timed case-phase groups for
 the matched controls; the candidate has 240 groups after the date rows are
 added. `case-matrix.json` is the authoritative name, formula, exact-output,
-shape, and preflight-read declaration for this workload.
+shape, and preflight-read declaration for this workload. The shape field denotes
+evaluation geometry; expected payloads independently declare result shape. A
+reducer evaluated in a 1x1 matrix context may return a scalar number.
 
 | group | planned coverage | read contract |
 | --- | --- | --- |
@@ -132,7 +134,10 @@ The runner uses the established two-phase process protocol: evaluate a
 pre-parsed expression and parse-evaluate the expression in the child. Setup,
 oracle work, resolver construction, source fixture construction, and profile
 hashing remain outside the evaluate timer. The timed boundary includes the
-evaluation, checksum of the complete result, and result drop. Each phase uses
+evaluation, comparison against prepared expected values, checksum of the complete
+result, and result drop. Independent oracle calculations run before timing;
+per-repeat comparisons remain timed to detect repeat-dependent semantic failures.
+Reported latency therefore includes this validation instrumentation. Each phase uses
 three warmups and fifteen fresh child samples unless the final handoff records
 a different count.
 
@@ -165,6 +170,9 @@ per repeat for latency and KiB for RSS), the signed relative delta, the exact
 sample count, and a descriptive uncertainty interval from a seeded bootstrap
 over the retained normalized samples. A trigger requires review and explicit
 scope; it does not establish a regression cause or justify a favorable rerun.
+Baseline samples are collected before candidate samples; CPU affinity is not
+pinned and recorded system load is not used as a rejection threshold. These
+ordering and shared-host noise limitations accompany every comparison.
 Latency and RSS changes remain descriptive until repeated, isolated evidence
 supports a scoped claim.
 
