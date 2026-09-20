@@ -1,0 +1,6 @@
+{
+  "status": "superseded-runner-provenance-correction",
+  "commands": "all seven exit zero",
+  "verification": "refused: root runner changed after freeze to record freeze SHA256 and full manifest; isolated source unchanged",
+  "performance_claim": false
+}

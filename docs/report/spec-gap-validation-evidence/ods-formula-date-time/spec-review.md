@@ -1,9 +1,9 @@
 # ODS date and time contract semantic review
 
-Status: **contract semantic PASS; source semantic review provisional PASS
-pending the final frozen-source gates**. This review covers the complete
-twenty-four-function family in ODF 1.4 Part 4 §6.10. It does not claim final
-production support, frozen-gate passage, native parity, or performance.
+Status: **contract semantic PASS; frozen-source and isolated-gate PASS**. This
+review covers the complete twenty-four-function family in ODF 1.4 Part 4
+§6.10. Performance capture remains separate and pending; native parity is
+not claimed.
 
 The reviewed contract is
 [`contract.md`](contract.md), SHA-256
@@ -19,6 +19,53 @@ The review also checked the existing `EvaluationOptions`,
 `EvaluationContext`, value `Context`, calendar helpers, and accepted ADRs
 0001, 0004, 0005, 0006, 0008, and 0023. No production, test, Cargo, or
 oracle files were changed by this review.
+
+## Frozen source identity
+
+The reviewed candidate is the selected source in
+[`gates/freeze.json`](gates/freeze.json), SHA-256
+`461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561`, at
+candidate commit `d16039ce48cb441c35461318c8634a49ae0b2437`. The manifest
+contains 103 selected files and uses isolated `Cargo.lock` SHA-256
+`58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3`.
+The Rust implementation and focused test hashes are unchanged from the
+reviewed candidate; the corrected freeze adds the final oracle corpus and
+provenance bindings.
+The directly reviewed implementation and test inputs have these manifest
+hashes:
+
+| Input | SHA-256 |
+| --- | --- |
+| `evaluation/date_time.rs` | `29f1495a55aac7effee9f6509deef38e5d5f747ba2b87c65a188d8759c1265e3` |
+| `evaluation/date_time/kernel.rs` | `2bc377db1a01e28dbc4940c99c61fb43a308919b315bfc37a92ce86a67e5d0cc` |
+| `evaluation/date_time/parser.rs` | `e71f8cb4075f4815a8c8a43ba5de48e0f5a411143e47c575c4a6de8bc4ac7149` |
+| `evaluation/inspection/parse_value.rs` | `7124afd22adbe4f1e3f0182feecbabb228844f5c6b93734761f214675137f2f7` |
+| `evaluation/value/date_time.rs` | `1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159` |
+| `evaluation/value.rs` | `e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3` |
+| `tests/ods_formula_date_time_evaluation.rs` | `d9644432fd5dcac9272dcd3f942e4b669865db22fb6fe866a706ebd05bf04ea1` |
+| `tests/ods_formula_date_time_limits.rs` | `fbf6ba638d7b80ebcda36d1091641ef45e42be07f9bc20a987583a3987fed411` |
+| `tests/ods_formula_date_time_oracle.rs` | `6ab4f5845c58aa88b5890abc766229a4970409cfe581b924228bb4b595e97a05` |
+| `oracle-vectors.json` | `b33011089974b18b1fcc0b984adab839600acc98f09dd850e02522348316259f` |
+
+The `evaluation/value/date_time.rs` hash above is the frozen source hash from
+the manifest. The current isolated receipt reports all seven required
+commands successful, stable sources, and 1,745 package tests with no failures
+or ignored tests. Its hashes are:
+
+| Receipt | SHA-256 |
+| --- | --- |
+| `gates/results.json` | `fa5dfab0bef43d1403b22204185ae7e2e8fffe31e753c07860fb4768c228286a` |
+| `gates/verification.json` | `bdeb941ccf550e43a341df081dcd54e1ba9e70779744ecb80e785cca71739243` |
+| `gates/source-before.json` | `864ccd3b76cc866e23c7db2cbdc1111702984e225cb7b630adc0befc2bde6a1e` |
+| `gates/source-after.json` | `864ccd3b76cc866e23c7db2cbdc1111702984e225cb7b630adc0befc2bde6a1e` |
+
+The superseded provenance-typo receipt remains retained for historical
+custody:
+
+| Receipt | SHA-256 |
+| --- | --- |
+| `gates/history-provenance-typo/results.json` | `0a011cd5c6e6ee18e61c8327a3d27f1d41f9f3f6836d55c6148ebf56164ba2d3` |
+| `gates/history-provenance-typo/verification.json` | `bdeb941ccf550e43a341df081dcd54e1ba9e70779744ecb80e785cca71739243` |
 
 ## Normative scope and profile decisions
 
@@ -106,9 +153,11 @@ day/second modulo operations; a finite input whose multiplication becomes
 non-finite therefore reaches the existing `#NUM!` boundary. This means
 `MINUTE(-0.5/86400)` and `SECOND(-0.5/86400)` are both 59 under the selected
 half-away-from-zero rule. The current oracle row
-`second.negative_fraction` still expects 0, which is the rejected
-normalized-fraction alternative and must be corrected before oracle evidence
-is accepted; this is an evidence-fixture issue, not a source semantic defect.
+`second.negative_fraction` now expects 59 with the raw half-away basis. The
+earlier expectation of 0 was the rejected normalized-fraction alternative;
+that historical finding was corrected before the frozen oracle replay.
+The corrected corpus and its 132-vector Rust replay are therefore consistent
+with the source profile.
 TIME accepts any finite component values as §6.10.18 permits, with checked
 arithmetic, and TIMEVALUE distinguishes clock parsing from its permitted
 numeric fallback.
@@ -117,9 +166,14 @@ The independent source review of `date_time.rs`, `date_time/kernel.rs`, and
 the shared date/time parser found no additional semantic blocker. The recent
 WEEKNUM exact-mode validation, EASTERSUNDAY no-Year boundary handling,
 fractional-second parsing, and negative-subnormal HOUR decomposition agree
-with the contract. Diagnostic focused checks reported by the implementation
-owners are evidence for the pending gate run only; they do not replace the
-frozen receipts.
+with the contract. The frozen value adapter keeps scalar local references in
+the scalar-demand path, leaves projected computed and array-valued date/time
+parameters position-sensitive, and only treats complete sequence arguments as
+invariant. Timestamp functions cache a scalar payload only when an explicit
+calculation snapshot exists; the added volatile-cache unit coverage checks
+both that reuse and the typed clock refusal. Diagnostic focused checks
+reported by the implementation owners (22 semantic and 11 resource cases)
+are supporting evidence only; they do not replace the final gate receipts.
 
 NETWORKDAYS and WORKDAY match the §6.10.15 and §6.10.23 signatures and
 default workweek. Their sequence rules correctly distinguish scalar sequence
@@ -195,19 +249,20 @@ cancellation identity, and timestamp identity.
 ## Disposition
 
 No remaining normative, API-design, or source-semantic blocker was found for
-contract `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`.
-The resource companion review on disk is bound to this same contract hash;
-its streaming, bounded-state, typed-precedence, timestamp-cache, and
-source-fence findings may be cited with the final frozen receipts. The
-source disposition remains provisional until those receipts are complete,
-and the stale `second.negative_fraction` oracle expectation must be corrected
-before the oracle corpus can serve as final evidence.
+the frozen candidate under contract
+`cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`. The
+resource companion review on disk is bound to this same contract hash; its
+streaming, bounded-state, typed-precedence, timestamp-cache, and source-fence
+findings may be cited with the final gate receipts. The frozen source
+disposition is **PASS**, and the current isolated seven-command receipt is
+**PASS**, including the corrected 132-vector oracle replay and stable-source
+verification. The corrected corpus and provenance bindings supersede the
+historical provenance-typo manifest; the prior `second.negative_fraction`
+discrepancy is resolved and is no longer a semantic or evidence blocker.
 
-Before implementation acceptance, the production work must still prove the
-dedicated clock error variant, the separate VALUE/date-family domains,
-negative-date floor behavior, numeric-only fallback, the selected MINUTE
-formula, ordered YEARFRAC procedures, all sequence/error precedence cases,
-and the timestamp-aware cache/source fences. Those are validation gates, not
-open contract findings. The historical production baseline at commit
-`6fa3b8af6a` lacked date/time dispatch; the current working tree is under
-implementation review, so this report makes no production-support claim.
+The package and current gate receipts cover the dedicated clock error variant,
+separate VALUE/date-family domains, negative-date floor behavior, numeric-only
+fallback, the selected MINUTE formula, ordered YEARFRAC procedures,
+sequence/error precedence, and timestamp-aware cache/source fences.
+Performance capture remains pending; the historical production baseline at
+commit `6fa3b8af6a` lacked date/time dispatch.
