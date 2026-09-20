@@ -15,7 +15,9 @@ use litchi_ods::codec::formula::{
     evaluation::value::{
         self, CellRead, Context, Limits, Mode, Position, Resolver, SheetExtent, Value,
     },
-    evaluation::{EvaluationFailure, ScalarError, UnsupportedKind},
+    evaluation::{
+        CalculationTimestamp, EvaluationFailure, EvaluationOptions, ScalarError, UnsupportedKind,
+    },
     expression::Expression,
 };
 
@@ -215,6 +217,32 @@ fn evaluate_source(
 ) -> Result<Observed, EvaluationFailure> {
     let expression = parse(source);
     let context = Context::new(execution, Position::new("Main", 0, 0)).with_mode(Mode::Matrix);
+    let result = value::evaluate(&expression, resolver, &context, limits)?;
+    Ok(match result.value() {
+        Value::Number(value) => Observed::Number(value),
+        Value::Error(error) => Observed::Error(error),
+        Value::Array(array) if array.shape().rows() == 1 && array.shape().columns() == 1 => {
+            match array.get(0) {
+                Some(Value::Number(value)) => Observed::Number(value),
+                Some(Value::Error(error)) => Observed::Error(error),
+                _ => Observed::Other,
+            }
+        },
+        _ => Observed::Other,
+    })
+}
+
+fn evaluate_source_with_options(
+    source: &str,
+    resolver: &LimitsResolver,
+    execution: &ExecutionContext,
+    limits: &Limits,
+    options: EvaluationOptions,
+) -> Result<Observed, EvaluationFailure> {
+    let expression = parse(source);
+    let context = Context::new(execution, Position::new("Main", 0, 0))
+        .with_options(options)
+        .with_mode(Mode::Matrix);
     let result = value::evaluate(&expression, resolver, &context, limits)?;
     Ok(match result.value() {
         Value::Number(value) => Observed::Number(value),
@@ -437,4 +465,223 @@ fn long_date_intervals_are_bounded_by_work_even_without_reference_reads() {
     ));
     assert_eq!(resolver.reads(), 0);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn workday_consumes_holiday_and_workweek_sequences_before_zero_and_all_off_results() {
+    let mut resolver = LimitsResolver::standard();
+    for row in 0..16 {
+        resolver.set(row, 0, FixtureCell::Number(40_000.0 + row as f64));
+    }
+    for row in 0..7 {
+        resolver.set(row, 1, FixtureCell::Logical(true));
+    }
+
+    let (budget, _cancellation, execution) =
+        make_execution("ods-formula-date-time-workday-sequence-complete");
+    let source = "=WORKDAY(DATE(2024;1;5);0;[.A1:.A16];[.B1:.B7])";
+    let result = evaluate_source(source, &resolver, &execution, &Limits::default())
+        .expect("zero offset remains a value after complete sequence scans");
+    assert_eq!(result, Observed::Number(45_296.0));
+    assert_eq!(
+        resolver.reads(),
+        23,
+        "holiday and workweek ranges are eager"
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    resolver.clear();
+    let result = evaluate_source(
+        "=WORKDAY(DATE(2024;1;5);1;[.A1:.A16];[.B1:.B7])",
+        &resolver,
+        &execution,
+        &Limits::default(),
+    )
+    .expect("all-off workweek returns a formula result");
+    assert_eq!(result, Observed::Error(ScalarError::Number));
+    assert_eq!(
+        resolver.reads(),
+        23,
+        "all-off still consumes both sequences"
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    resolver.clear();
+    resolver.set(0, 0, FixtureCell::Error(ScalarError::NotAvailable));
+    resolver.fail_after_read(16, UnsupportedKind::CellValue);
+    let error = evaluate_source(source, &resolver, &execution, &Limits::default())
+        .expect_err("a later typed sequence failure supersedes a retained formula error");
+    assert!(matches!(
+        error,
+        EvaluationFailure::Unsupported(UnsupportedKind::CellValue)
+    ));
+    assert_eq!(
+        resolver.reads(),
+        17,
+        "the failure occurs after all holidays"
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn matrix_workday_typed_failure_publishes_no_partial_result() {
+    let mut resolver = LimitsResolver::standard();
+    resolver.fail_after_read(0, UnsupportedKind::CellValue);
+    let (budget, _cancellation, execution) = make_execution("ods-formula-date-time-matrix-failure");
+    let error = evaluate_source(
+        "=IF({TRUE()|TRUE()};WORKDAY(DATE(2024;1;5);0;[.A1:.A4];[.B1:.B7]);0)",
+        &resolver,
+        &execution,
+        &Limits::default(),
+    )
+    .expect_err("typed failure must abort matrix publication");
+    assert!(matches!(
+        error,
+        EvaluationFailure::Unsupported(UnsupportedKind::CellValue)
+    ));
+    assert_eq!(resolver.reads(), 1);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    resolver.clear();
+    resolver.set(0, 0, FixtureCell::Text("2020-01-01".to_owned()));
+    resolver.set(1, 0, FixtureCell::Text("2020-01-02".to_owned()));
+    resolver.fail_after_read(1, UnsupportedKind::CellValue);
+    let error = evaluate_source(
+        "=IF({TRUE()|TRUE()};DATEVALUE([.A1:.A2]);0)",
+        &resolver,
+        &execution,
+        &Limits::default(),
+    )
+    .expect_err("a later matrix cell failure must discard the earlier cell result");
+    assert!(matches!(
+        error,
+        EvaluationFailure::Unsupported(UnsupportedKind::CellValue)
+    ));
+    assert_eq!(resolver.reads(), 2);
+    assert_eq!(resolver.read_order.borrow().as_slice(), &[(0, 0), (1, 0)]);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn long_grouped_parser_matrix_and_holiday_storage_release_resources() {
+    let mut grouped = "0".repeat(1_100);
+    grouped.push_str("45,292");
+
+    let mut resolver = LimitsResolver::standard();
+    resolver.set(0, 0, FixtureCell::Text(grouped.clone()));
+    let (budget, _cancellation, execution) = make_execution("ods-formula-date-time-long-parser");
+    let result = evaluate_source(
+        "=DATEVALUE([.A1])",
+        &resolver,
+        &execution,
+        &Limits::default(),
+    )
+    .expect("long grouped date text is parsed with bounded scratch");
+    assert_eq!(result, Observed::Number(45_292.0));
+    assert_eq!(resolver.reads(), 1);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    resolver.clear();
+    resolver.set(1, 0, FixtureCell::Text(grouped.clone()));
+    {
+        let expression = parse("=DATEVALUE([.A1:.A2])");
+        let context = Context::new(&execution, Position::new("Main", 0, 0)).with_mode(Mode::Matrix);
+        let result = value::evaluate(&expression, &resolver, &context, &Limits::default())
+            .expect("matrix parsing of long grouped text");
+        let array = result.as_array().expect("matrix DATEVALUE result");
+        assert_eq!(array.shape().rows(), 2);
+        assert_eq!(array.shape().columns(), 1);
+        assert_eq!(array.get(0), Some(Value::Number(45_292.0)));
+        assert_eq!(array.get(1), Some(Value::Number(45_292.0)));
+    }
+    assert_eq!(resolver.reads(), 2);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    resolver.clear();
+    resolver.set(0, 0, FixtureCell::Text(grouped));
+    let error = evaluate_source(
+        "=DATEVALUE([.A1])",
+        &resolver,
+        &execution,
+        &Limits::default().with_max_storage_bytes(1_105),
+    )
+    .expect_err("scratch reservation must be bounded before parsing");
+    assert!(matches!(
+        error,
+        EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory
+    ));
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn explicit_timestamp_contexts_change_results_and_remain_fenced() {
+    let timestamp_one = CalculationTimestamp::from_serial(46_000.5).expect("timestamp one");
+    let timestamp_two = CalculationTimestamp::from_serial(46_001.25).expect("timestamp two");
+    let options_one = EvaluationOptions::default().with_calculation_timestamp(timestamp_one);
+    let options_two = EvaluationOptions::default().with_calculation_timestamp(timestamp_two);
+
+    let resolver = LimitsResolver::standard();
+    let (budget, _cancellation, execution) =
+        make_execution("ods-formula-date-time-timestamp-contexts");
+    let first = evaluate_source_with_options(
+        "=NOW()",
+        &resolver,
+        &execution,
+        &Limits::default(),
+        options_one,
+    )
+    .expect("first explicit timestamp");
+    let second = evaluate_source_with_options(
+        "=NOW()",
+        &resolver,
+        &execution,
+        &Limits::default(),
+        options_two,
+    )
+    .expect("second explicit timestamp");
+    assert_eq!(first, Observed::Number(46_000.5));
+    assert_eq!(second, Observed::Number(46_001.25));
+    assert_ne!(
+        first, second,
+        "timestamp identity must affect volatile values"
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let resolver = LimitsResolver::standard();
+    let expected = SourceVersion::new(0x5449_4d45, 0);
+    let observed = SourceVersion::new(0x5449_4d45, 1);
+    resolver.set_source_versions(expected, observed);
+    let (source_budget, _cancellation, source_execution) =
+        make_execution("ods-formula-date-time-timestamp-source");
+    let error = evaluate_source_with_options(
+        "=TODAY()",
+        &resolver,
+        &source_execution,
+        &Limits::default(),
+        options_two,
+    )
+    .expect_err("source change must fence timestamp-backed publication");
+    assert!(matches!(
+        error,
+        EvaluationFailure::SourceChanged {
+            expected: got_expected,
+            observed: got_observed
+        } if got_expected == expected && got_observed == observed
+    ));
+    assert_eq!(source_budget.used(Resource::Memory), 0);
+
+    let resolver = LimitsResolver::standard();
+    let (cancel_budget, cancellation, cancel_execution) =
+        make_execution("ods-formula-date-time-timestamp-cancel");
+    cancellation.cancel();
+    let error = evaluate_source_with_options(
+        "=NOW()",
+        &resolver,
+        &cancel_execution,
+        &Limits::default(),
+        options_one,
+    )
+    .expect_err("final cancellation must prevent timestamp publication");
+    assert!(matches!(error, EvaluationFailure::Cancelled));
+    assert_eq!(cancel_budget.used(Resource::Memory), 0);
 }

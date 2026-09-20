@@ -753,6 +753,27 @@ fn matrix_date_arguments_preserve_shape_and_elementwise_results() {
 }
 
 #[test]
+fn projected_datevalue_reference_preserves_each_date_and_reads_once_per_cell() {
+    let mut resolver = DateResolver::standard();
+    resolver.set(0, 0, FixtureCell::Text("2020-01-01".to_owned()));
+    resolver.set(1, 0, FixtureCell::Text("2020-01-02".to_owned()));
+    let (_budget, _cancellation, execution) =
+        execution("ods-formula-date-time-projected-datevalue");
+    let expression = parse("=IF({TRUE()|TRUE()};DATEVALUE([.A1:.A2]);0)");
+    let context = Context::new(&execution, Position::new("Main", 0, 0))
+        .with_options(options())
+        .with_mode(Mode::Matrix);
+    let result = value::evaluate(&expression, &resolver, &context, &Limits::default())
+        .expect("projected DATEVALUE reference");
+    let array = result.as_array().expect("projected DATEVALUE array");
+    assert_eq!(array.shape().rows(), 2);
+    assert_eq!(array.shape().columns(), 1);
+    assert_eq!(array.get(0), Some(Value::Number(43_831.0)));
+    assert_eq!(array.get(1), Some(Value::Number(43_832.0)));
+    assert_eq!(resolver.reads(), 2);
+}
+
+#[test]
 fn complete_holiday_and_workweek_sequences_survive_projected_if() {
     let resolver = DateResolver::standard();
     let (_budget, _cancellation, execution) = execution("ods-formula-date-time-sequences");
