@@ -9,7 +9,8 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
 use super::{
-    invalid, processed_xml, processed_xml_with_source, related_part_by_type, validate_content_type,
+    MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
+    related_part_by_type, validate_content_type,
 };
 use crate::notes::SlideRootProof;
 use crate::shape::Scene;
@@ -909,6 +910,27 @@ impl<'a> SlidePart<'a> {
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_source(part)?;
+        Self::finish_from_processed(part, collect_notes_proof, xml)
+    }
+
+    /// Capture variant that may reuse a default-profile transformed slide
+    /// projection already retained by the opened snapshot. Every source,
+    /// root, name, notes-proof, and MCE limit check still runs for this call.
+    pub(crate) fn from_part_with_name_with_capture<'parent>(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+        capture: &mut MceCapture<'a, 'parent>,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+        validate_content_type(part, ct::PML_SLIDE)?;
+        let xml = processed_xml_with_capture(part, capture)?;
+        Self::finish_from_processed(part, collect_notes_proof, xml)
+    }
+
+    fn finish_from_processed(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+        xml: super::ProcessedXml<'a>,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
         }

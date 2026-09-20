@@ -1,0 +1,765 @@
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+index 4a2d79ea34..0677de0fdf 100644
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -8,7 +8,7 @@ use litchi_opc::constants::relationship_type as rt;
+ use litchi_opc::{OpcPackage, PackURI};
+ use sha2::{Digest, Sha256};
+ 
+-use crate::parts::PresentationPart;
++use crate::parts::{MceCapture, PresentationPart, RetainedMce};
+ use crate::{Error, Result};
+ 
+ /// Maximum selector/value pairs in one atomic same-slide text batch.
+@@ -294,6 +294,10 @@ pub struct Snapshot {
+     /// accelerator for [`package_fingerprint`] and nothing else: a miss is an
+     /// ordinary hash and no value, refusal or published byte depends on a hit.
+     pub(crate) part_digests: Arc<PartDigests>,
++    /// Default-profile transformed slide XML retained for later captures.
++    /// This table is optional, bounded by `Limits`, and shares cheaply across
++    /// snapshot clones without changing the snapshot's semantic meaning.
++    pub(crate) retained_mce: Option<Arc<RetainedMce>>,
+ }
+ 
+ /// Memoized per-part payload digests, keyed by payload allocation address and
+@@ -331,6 +335,15 @@ impl PartDigests {
+         self.entries.get(&key).map(|(_blob, digest)| *digest)
+     }
+ 
++    /// Return the package-owned payload allocation for an exact memo key.
++    /// Retention callers use this after the owned package has been fingerprinted
++    /// so foreign `blob_arc` implementations cannot donate an unverified owner.
++    fn owner_for(&self, key: (usize, usize)) -> Option<Arc<Vec<u8>>> {
++        self.entries
++            .get(&key)
++            .map(|(blob, _digest)| Arc::clone(blob))
++    }
++
+     /// [`Self::get`] for the ABA gate, which keys by address directly.
+     #[cfg(test)]
+     pub(crate) fn get_for_test(&self, key: (usize, usize)) -> Option<[u8; 32]> {
+@@ -437,6 +450,7 @@ impl fmt::Debug for Snapshot {
+             .field("slides", &self.slides)
+             .field("revision", &self.revision)
+             .field("limits", &self.limits)
++            .field("retained_mce_bytes", &self.retained_mce_bytes())
+             .finish_non_exhaustive()
+     }
+ }
+@@ -474,6 +488,15 @@ impl Snapshot {
+             "opened-presentation snapshot rebound to a different package"
+         );
+         let owned = Arc::new(package.clone());
++        let part_digests = Arc::new(
++            self.part_digests
++                .project(owned.as_ref())
++                .unwrap_or_else(|_error| PartDigests::default()),
++        );
++        let retained_mce = self
++            .retained_mce
++            .as_ref()
++            .and_then(|retained| retained.project_with_owner(|key| part_digests.owner_for(key)));
+         Self {
+             // `packages_equal` proves the fingerprint inputs are identical; it
+             // says nothing about ZIP ordering, compression, or retained source
+@@ -486,16 +509,35 @@ impl Snapshot {
+             // the new package does not hold, so the memo still pins nothing
+             // the snapshot does not own. A projection that cannot allocate
+             // falls back to an empty memo, which only costs a later hash.
+-            part_digests: Arc::new(
+-                self.part_digests
+-                    .project(owned.as_ref())
+-                    .unwrap_or_else(|_error| PartDigests::default()),
+-            ),
++            part_digests,
++            // The digest projection proves that each surviving MCE key still
++            // names an allocation owned by the rebound package. Entries whose
++            // source allocation was replaced are simply dropped.
++            retained_mce,
+             package: owned,
+             ..self.clone()
+         }
+     }
+ 
++    /// Aggregate charged bytes held by this snapshot's optional MCE table.
++    ///
++    /// This is the charge for this owner. Snapshot clones may report the same
++    /// value while sharing one physical table, so per-owner values are not
++    /// additive physical-memory measurements.
++    #[must_use]
++    pub fn retained_mce_bytes(&self) -> usize {
++        self.retained_mce
++            .as_deref()
++            .map_or(0, RetainedMce::retained_bytes)
++    }
++
++    /// Release this snapshot's reference to retained transformed slide XML
++    /// while preserving every captured slide, revision, policy, and package
++    /// byte. Snapshot clones may keep the shared table alive.
++    pub fn release_retained_mce(&mut self) {
++        self.retained_mce = None;
++    }
++
+     /// Resource policy inherited by edits and patches.
+     #[must_use]
+     pub const fn limits(&self) -> Limits {
+@@ -531,7 +573,13 @@ pub(crate) fn capture_with_provenance(
+     limits: Limits,
+     physical_source_provenance: bool,
+ ) -> Result<Snapshot> {
+-    capture_internal(package, limits, physical_source_provenance, Revision::Cold)
++    capture_internal(
++        package,
++        limits,
++        physical_source_provenance,
++        Revision::Cold,
++        None,
++    )
+ }
+ 
+ /// Capture `package`, reusing `parent`'s payload digest for every payload
+@@ -551,6 +599,7 @@ pub(crate) fn capture_with_parent_digests(
+         limits,
+         physical_source_provenance,
+         Revision::Parent(parent),
++        None,
+     )
+ }
+ 
+@@ -574,27 +623,24 @@ pub(crate) fn capture_with_revision(
+         limits,
+         physical_source_provenance,
+         Revision::Known(revision, PartDigests::default()),
++        None,
+     )
+ }
+ 
+-/// Capture `package` with a revision the caller computed from this exact
+-/// content, together with the payload digests it filled while computing it.
+-///
+-/// The memo describes `package`'s own payload allocations, so carrying it onto
+-/// the snapshot preserves the invariant that every entry names an allocation
+-/// the snapshot holds.
+-pub(crate) fn capture_with_revision_and_digests(
++pub(crate) fn capture_with_revision_and_digests_and_mce(
+     package: &OpcPackage,
+     limits: Limits,
+     physical_source_provenance: bool,
+     revision: [u8; 32],
+     digests: PartDigests,
++    parent_mce: Option<&RetainedMce>,
+ ) -> Result<Snapshot> {
+     capture_internal(
+         package,
+         limits,
+         physical_source_provenance,
+         Revision::Known(revision, digests),
++        parent_mce,
+     )
+ }
+ 
+@@ -614,6 +660,7 @@ fn capture_internal(
+     limits: Limits,
+     physical_source_provenance: bool,
+     revision: Revision<'_>,
++    parent_mce: Option<&RetainedMce>,
+ ) -> Result<Snapshot> {
+     let presentation = PresentationPart::from_package(package)?;
+     let presentation_name = presentation.part().partname().clone();
+@@ -625,7 +672,8 @@ fn capture_internal(
+         });
+     }
+     let view = crate::presentation::Presentation::new(presentation, package);
+-    let captured = view.capture_slides()?;
++    let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
++    let captured = view.capture_slides_with_mce(&mut mce_capture)?;
+     if references.len() != captured.slides.len() {
+         return Err(invalid(
+             "opened-presentation slide references do not resolve one-to-one",
+@@ -730,6 +778,7 @@ fn capture_internal(
+         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
+         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
+     };
++    let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
+     Ok(Snapshot {
+         package: owned,
+         presentation_name,
+@@ -740,6 +789,7 @@ fn capture_internal(
+         physical_source_provenance,
+         physical_revision: Arc::new(OnceLock::new()),
+         part_digests: Arc::new(part_digests),
++        retained_mce,
+     })
+ }
+ 
+diff --git a/crates/litchi-pptx/src/opened/transaction.rs b/crates/litchi-pptx/src/opened/transaction.rs
+index 582e2845c2..292173e6e1 100644
+--- a/crates/litchi-pptx/src/opened/transaction.rs
++++ b/crates/litchi-pptx/src/opened/transaction.rs
+@@ -56,6 +56,21 @@ impl Transaction {
+             .is_ok_and(|(revision, _digests)| revision != self.source.revision)
+     }
+ 
++    /// Aggregate charged bytes held by the source snapshot's optional MCE
++    /// projection table. Cloned snapshots may report the same shared charge,
++    /// so per-owner values are not additive physical-memory measurements.
++    #[must_use]
++    pub fn retained_mce_bytes(&self) -> usize {
++        self.source.retained_mce_bytes()
++    }
++
++    /// Release this transaction's source reference to retained transformed
++    /// slide projections. Its staged package and semantic edits are unchanged;
++    /// snapshot clones may keep the shared table alive.
++    pub fn release_retained_mce(&mut self) {
++        self.source.release_retained_mce();
++    }
++
+     /// Move one slide between checked zero-based positions.
+     ///
+     /// # Errors
+@@ -1231,12 +1246,13 @@ impl Transaction {
+                 patch,
+             });
+         }
+-        let snapshot = super::model::capture_with_revision_and_digests(
++        let snapshot = super::model::capture_with_revision_and_digests_and_mce(
+             &working,
+             self.source.limits,
+             self.source.physical_source_provenance,
+             revision,
+             digests,
++            self.source.retained_mce.as_deref(),
+         )?;
+         Ok(Commit { snapshot, patch })
+     }
+@@ -1906,6 +1922,20 @@ impl Commit {
+         &self.snapshot
+     }
+ 
++    /// Aggregate charged bytes held by the candidate snapshot's optional MCE
++    /// projection table. Cloned snapshots may report the same shared charge,
++    /// so per-owner values are not additive physical-memory measurements.
++    #[must_use]
++    pub fn retained_mce_bytes(&self) -> usize {
++        self.snapshot.retained_mce_bytes()
++    }
++
++    /// Release this commit's reference to retained transformed slide
++    /// projections without changing its semantic or physical meaning.
++    pub fn release_retained_mce(&mut self) {
++        self.snapshot.release_retained_mce();
++    }
++
+     /// Durable exact-source patch for this commit.
+     #[must_use]
+     pub const fn patch(&self) -> &Patch {
+diff --git a/crates/litchi-pptx/src/parts/mod.rs b/crates/litchi-pptx/src/parts/mod.rs
+index 4550eee6fd..bb65ab396b 100644
+--- a/crates/litchi-pptx/src/parts/mod.rs
++++ b/crates/litchi-pptx/src/parts/mod.rs
+@@ -11,8 +11,10 @@ pub use presentation::{PresentationPart, SlideReference};
+ pub use slide::{SlideLayoutPart, SlideMasterPart, SlidePart};
+ 
+ use std::borrow::Cow;
++use std::mem::size_of;
++use std::sync::Arc;
+ 
+-use litchi_ooxml_common::mce::process_part;
++use litchi_ooxml_common::mce::{Error as MceError, Limits as MceLimits, process_part};
+ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
+ use quick_xml::events::BytesStart;
+@@ -23,27 +25,375 @@ use crate::{Error, Result};
+ pub(crate) const MAX_PART_XML_BYTES: usize = 64 * 1024 * 1024;
+ pub(crate) const MAX_SLIDES: usize = 100_000;
+ 
++pub(crate) type MceKey = (usize, usize);
++
++/// One successful, default-profile transformed slide projection retained by an
++/// immutable opened snapshot. The raw owner is held solely for the address/
++/// length key's ABA proof; the package already owns that allocation.
++#[derive(Clone)]
++struct RetainedMceEntry {
++    key: MceKey,
++    raw: Arc<Vec<u8>>,
++    processed: Arc<Vec<u8>>,
++}
++
++/// Capture-local default-profile MCE outputs. This is deliberately private to
++/// the opened PPTX capture path; semantic readers and public part views keep
++/// their existing processing APIs and ownership behavior.
++pub(crate) struct RetainedMce {
++    entries: Vec<RetainedMceEntry>,
++    charged_bytes: usize,
++}
++
++impl RetainedMce {
++    pub(crate) fn retained_bytes(&self) -> usize {
++        self.charged_bytes
++    }
++
++    fn from_candidates(
++        candidates: Vec<RetainedMceEntry>,
++        maximum: usize,
++    ) -> Option<Arc<RetainedMce>> {
++        debug_assert!(
++            candidates
++                .windows(2)
++                .all(|entries| entries[0].key < entries[1].key)
++        );
++        for count in (1..=candidates.len()).rev() {
++            let mut entries = Vec::new();
++            if entries.try_reserve_exact(count).is_err() {
++                continue;
++            }
++            entries.extend(candidates.iter().take(count).cloned());
++            let Some(charged_bytes) = retained_mce_charge(&entries) else {
++                continue;
++            };
++            if charged_bytes > maximum {
++                continue;
++            }
++            return Some(Arc::new(Self {
++                entries,
++                charged_bytes,
++            }));
++        }
++        None
++    }
++
++    fn lookup(&self, source: &[u8]) -> Option<Arc<Vec<u8>>> {
++        let key = mce_key(source);
++        let index = self
++            .entries
++            .binary_search_by_key(&key, |entry| entry.key)
++            .ok()?;
++        let entry = &self.entries[index];
++        std::ptr::eq(entry.raw.as_slice().as_ptr(), source.as_ptr())
++            .then(|| Arc::clone(&entry.processed))
++    }
++
++    fn entry(&self, key: MceKey) -> Option<&RetainedMceEntry> {
++        let index = self
++            .entries
++            .binary_search_by_key(&key, |entry| entry.key)
++            .ok()?;
++        Some(&self.entries[index])
++    }
++
++    pub(crate) fn project_with_owner(
++        &self,
++        owner: impl Fn(MceKey) -> Option<Arc<Vec<u8>>>,
++    ) -> Option<Arc<RetainedMce>> {
++        let mut candidates = Vec::new();
++        candidates.try_reserve(self.entries.len()).ok()?;
++        for entry in &self.entries {
++            let Some(raw) = owner(entry.key) else {
++                continue;
++            };
++            candidates.push(RetainedMceEntry {
++                key: entry.key,
++                raw,
++                processed: Arc::clone(&entry.processed),
++            });
++        }
++        Self::from_candidates(candidates, self.charged_bytes)
++    }
++}
++
++/// Bytes retained by one transformed vector, excluding the final entry-vector
++/// allocation. The raw owner is already part of the immutable package and is
++/// not charged a second time merely because this table keeps a strong reference
++/// to it.
++fn retained_mce_entry_charge(processed_capacity: usize) -> Option<usize> {
++    retained_mce_output_charge(processed_capacity)?.checked_add(size_of::<RetainedMceEntry>())
++}
++
++fn retained_mce_output_charge(processed_capacity: usize) -> Option<usize> {
++    processed_capacity
++        .checked_add(size_of::<Vec<u8>>())?
++        .checked_add(2 * size_of::<usize>())
++}
++
++fn retained_mce_outer_charge() -> Option<usize> {
++    size_of::<RetainedMce>().checked_add(2 * size_of::<usize>())
++}
++
++fn retained_mce_charge(entries: &[RetainedMceEntry]) -> Option<usize> {
++    let entries_bytes = entries
++        .capacity()
++        .checked_mul(size_of::<RetainedMceEntry>())?;
++    let output_bytes = entries.iter().try_fold(0usize, |total, entry| {
++        retained_mce_output_charge(entry.processed.capacity())
++            .and_then(|charge| total.checked_add(charge))
++    })?;
++    retained_mce_outer_charge()?
++        .checked_add(entries_bytes)?
++        .checked_add(output_bytes)
++}
++
++fn mce_key(source: &[u8]) -> MceKey {
++    (source.as_ptr() as usize, source.len())
++}
++
++struct PendingMce<'a> {
++    source: &'a [u8],
++    key: MceKey,
++    processed: Arc<Vec<u8>>,
++}
++
++/// Capture-local handoff between slide processing and the owned package's
++/// already-built [`PartDigests`]. No `blob` or `blob_arc` observation occurs
++/// here: source identity comes from the exact second observation made by the
++/// raw preflight, while final retention accepts only owned digest entries.
++pub(crate) struct MceCapture<'source, 'parent> {
++    parent: Option<&'parent RetainedMce>,
++    maximum: usize,
++    pending: Vec<PendingMce<'source>>,
++    used: Vec<MceKey>,
++}
++
++impl<'source, 'parent> MceCapture<'source, 'parent> {
++    pub(crate) fn new(parent: Option<&'parent RetainedMce>, maximum: usize) -> Self {
++        Self {
++            parent,
++            maximum,
++            pending: Vec::new(),
++            used: Vec::new(),
++        }
++    }
++
++    fn mark_used(&mut self, key: MceKey) -> bool {
++        if self.used.contains(&key) {
++            return true;
++        }
++        if self.used.try_reserve(1).is_err() {
++            return false;
++        }
++        self.used.push(key);
++        true
++    }
++
++    fn cached(&mut self, source: &[u8]) -> Option<ProcessedBytes<'source>> {
++        let key = mce_key(source);
++        if let Some(parent) = self.parent
++            && parent.retained_bytes() <= self.maximum
++            && let Some(processed) = parent.lookup(source)
++            && retained_mce_entry_charge(processed.capacity())
++                .is_some_and(|charge| charge <= self.maximum)
++        {
++            return Some(ProcessedBytes::Retained(processed));
++        }
++        let Some(entry) = self
++            .pending
++            .iter()
++            .find(|entry| entry.key == key && mce_key(entry.source) == key)
++        else {
++            return None;
++        };
++        let processed = Arc::clone(&entry.processed);
++        Some(ProcessedBytes::Retained(processed))
++    }
++
++    pub(crate) fn process(&mut self, source: &'source [u8]) -> Result<ProcessedBytes<'source>> {
++        if let Some(cached) = self.cached(source) {
++            if validate_cached_mce(source, cached.as_ref()).is_ok() {
++                #[cfg(debug_assertions)]
++                debug_assert_cached_mce(source, cached.as_ref());
++                let _ = self.mark_used(mce_key(source));
++                return Ok(cached);
++            }
++        }
++        let processed = litchi_ooxml_common::mce::process_ooxml(source)?;
++        match processed {
++            Cow::Borrowed(_) => Ok(ProcessedBytes::Borrowed(source)),
++            Cow::Owned(processed) => {
++                if self.maximum == 0 {
++                    return Ok(ProcessedBytes::Owned(processed));
++                }
++                let Some(charged) = retained_mce_entry_charge(processed.capacity()) else {
++                    return Ok(ProcessedBytes::Owned(processed));
++                };
++                let key = mce_key(source);
++                let mut current = retained_mce_outer_charge();
++                for entry in &self.pending {
++                    current = current.and_then(|total| {
++                        retained_mce_entry_charge(entry.processed.capacity())
++                            .and_then(|item| total.checked_add(item))
++                    });
++                }
++                let Some(current) = current else {
++                    return Ok(ProcessedBytes::Owned(processed));
++                };
++                let Some(total) = current.checked_add(charged) else {
++                    return Ok(ProcessedBytes::Owned(processed));
++                };
++                if total > self.maximum || self.pending.try_reserve(1).is_err() {
++                    return Ok(ProcessedBytes::Owned(processed));
++                }
++                if !self.mark_used(key) {
++                    return Ok(ProcessedBytes::Owned(processed));
++                }
++                // Arc::new is the same infallible allocation primitive used by
++                // the surrounding library. Global OOM remains process-fatal;
++                // every table/vector reservation that can return a typed
++                // allocation error is handled above by falling back uncached.
++                let processed = Arc::new(processed);
++                self.pending.push(PendingMce {
++                    source,
++                    key,
++                    processed: Arc::clone(&processed),
++                });
++                Ok(ProcessedBytes::Retained(processed))
++            },
++        }
++    }
++
++    /// Finish only keys visited by this capture and proved to be owned by the
++    /// captured package's digest memo. A foreign clone that returns a copied
++    /// `blob_arc` therefore drops back to ordinary processing automatically.
++    pub(crate) fn finish(
++        self,
++        owner: impl Fn(MceKey) -> Option<Arc<Vec<u8>>>,
++    ) -> Option<Arc<RetainedMce>> {
++        let Self {
++            parent,
++            maximum,
++            pending,
++            used,
++        } = self;
++        if maximum == 0 || used.is_empty() {
++            return None;
++        }
++        let mut keys = used;
++        keys.sort_unstable();
++        keys.dedup();
++        let mut candidates = Vec::new();
++        candidates.try_reserve(keys.len()).ok()?;
++        for key in keys {
++            let Some(raw) = owner(key) else {
++                continue;
++            };
++            let Some(processed) = pending
++                .iter()
++                .find(|entry| entry.key == key && mce_key(entry.source) == key)
++                .map(|entry| Arc::clone(&entry.processed))
++                .or_else(|| {
++                    parent
++                        .and_then(|parent| parent.entry(key))
++                        .map(|entry| Arc::clone(&entry.processed))
++                })
++            else {
++                continue;
++            };
++            candidates.push(RetainedMceEntry {
++                key,
++                raw,
++                processed,
++            });
++        }
++        RetainedMce::from_candidates(candidates, maximum)
++    }
++}
++
++pub(crate) enum ProcessedBytes<'a> {
++    Borrowed(&'a [u8]),
++    Owned(Vec<u8>),
++    Retained(Arc<Vec<u8>>),
++}
++
++impl AsRef<[u8]> for ProcessedBytes<'_> {
++    fn as_ref(&self) -> &[u8] {
++        match self {
++            Self::Borrowed(bytes) => bytes,
++            Self::Owned(bytes) => bytes,
++            Self::Retained(bytes) => bytes.as_slice(),
++        }
++    }
++}
++
+ /// The exact source slice and its temporary MCE projection used by one
+ /// capture-local reader.  Keeping the source slice beside the projection
+ /// prevents a later consumer from mistaking a projection of one foreign
+ /// `Part::blob()` result for a projection of another result.
+ pub(crate) struct ProcessedXml<'a> {
+     pub(crate) source: &'a [u8],
+-    pub(crate) processed: Cow<'a, [u8]>,
++    pub(crate) processed: ProcessedBytes<'a>,
+ }
+ 
+-/// Process one exact source observation while retaining that observation for
+-/// a capture-local proof.  The first `blob()` call preserves the established
+-/// raw-size preflight; the second call is the exact slice supplied to MCE.
+-pub(crate) fn processed_xml_with_source(part: &dyn Part) -> Result<ProcessedXml<'_>> {
++fn raw_xml(part: &dyn Part) -> Result<&[u8]> {
+     if part.blob().len() > MAX_PART_XML_BYTES {
+         return Err(Error::Limit {
+             resource: "PresentationML part XML",
+             limit: MAX_PART_XML_BYTES,
+         });
+     }
+-    let source = part.blob();
++    Ok(part.blob())
++}
++
++fn validate_cached_mce(source: &[u8], processed: &[u8]) -> Result<()> {
++    let limits = MceLimits::default();
++    if source.len() > limits.max_input_bytes {
++        return Err(Error::MarkupCompatibility(MceError::LimitExceeded(
++            "input bytes".to_owned(),
++        )));
++    }
++    if processed.len() > limits.max_output_bytes {
++        return Err(Error::MarkupCompatibility(MceError::LimitExceeded(
++            "output bytes".to_owned(),
++        )));
++    }
++    Ok(())
++}
++
++#[cfg(debug_assertions)]
++fn debug_assert_cached_mce(source: &[u8], cached: &[u8]) {
++    let recomputed = litchi_ooxml_common::mce::process_ooxml(source);
++    debug_assert!(
++        recomputed.is_ok(),
++        "a retained MCE source must remain processable"
++    );
++    if let Ok(recomputed) = recomputed {
++        debug_assert_eq!(recomputed.as_ref(), cached);
++    }
++}
++
++/// Process one exact source observation while retaining that observation for
++/// a capture-local proof.  The first `blob()` call preserves the established
++/// raw-size preflight; the second call is the exact slice supplied to MCE.
++pub(crate) fn processed_xml_with_source(part: &dyn Part) -> Result<ProcessedXml<'_>> {
++    let source = raw_xml(part)?;
+     let processed = litchi_ooxml_common::mce::process_ooxml(source)?;
++    let processed = match processed {
++        Cow::Borrowed(_) => ProcessedBytes::Borrowed(source),
++        Cow::Owned(bytes) => ProcessedBytes::Owned(bytes),
++    };
++    Ok(ProcessedXml { source, processed })
++}
++
++pub(crate) fn processed_xml_with_capture<'a, 'parent>(
++    part: &'a dyn Part,
++    capture: &mut MceCapture<'a, 'parent>,
++) -> Result<ProcessedXml<'a>> {
++    let source = raw_xml(part)?;
++    let processed = capture.process(source)?;
+     Ok(ProcessedXml { source, processed })
+ }
+ 
+diff --git a/crates/litchi-pptx/src/parts/slide.rs b/crates/litchi-pptx/src/parts/slide.rs
+index 3ea86f4d7c..412bf561c9 100644
+--- a/crates/litchi-pptx/src/parts/slide.rs
++++ b/crates/litchi-pptx/src/parts/slide.rs
+@@ -9,7 +9,8 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
+ use quick_xml::reader::{NsReader, Reader};
+ 
+ use super::{
+-    invalid, processed_xml, processed_xml_with_source, related_part_by_type, validate_content_type,
++    MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
++    related_part_by_type, validate_content_type,
+ };
+ use crate::notes::SlideRootProof;
+ use crate::shape::Scene;
+@@ -909,6 +910,27 @@ impl<'a> SlidePart<'a> {
+     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+         validate_content_type(part, ct::PML_SLIDE)?;
+         let xml = processed_xml_with_source(part)?;
++        Self::finish_from_processed(part, collect_notes_proof, xml)
++    }
++
++    /// Capture variant that may reuse a default-profile transformed slide
++    /// projection already retained by the opened snapshot. Every source,
++    /// root, name, notes-proof, and MCE limit check still runs for this call.
++    pub(crate) fn from_part_with_name_with_capture<'parent>(
++        part: &'a dyn Part,
++        collect_notes_proof: bool,
++        capture: &mut MceCapture<'a, 'parent>,
++    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
++        validate_content_type(part, ct::PML_SLIDE)?;
++        let xml = processed_xml_with_capture(part, capture)?;
++        Self::finish_from_processed(part, collect_notes_proof, xml)
++    }
++
++    fn finish_from_processed(
++        part: &'a dyn Part,
++        collect_notes_proof: bool,
++        xml: super::ProcessedXml<'a>,
++    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
+             return Err(invalid("slide part does not have a p:sld root"));
+         }
+diff --git a/crates/litchi-pptx/src/presentation/model.rs b/crates/litchi-pptx/src/presentation/model.rs
+index 20895fc6ed..d646e058ee 100644
+--- a/crates/litchi-pptx/src/presentation/model.rs
++++ b/crates/litchi-pptx/src/presentation/model.rs
+@@ -205,6 +205,13 @@ impl<'a> Presentation<'a> {
+         package::capture_slides(self)
+     }
+ 
++    pub(crate) fn capture_slides_with_mce<'parent>(
++        &self,
++        capture: &mut crate::parts::MceCapture<'a, 'parent>,
++    ) -> Result<package::CaptureSlides<'a>> {
++        package::capture_slides_with_mce(self, capture)
++    }
++
+     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
+     ///
+     /// # Errors
+diff --git a/crates/litchi-pptx/src/presentation/package.rs b/crates/litchi-pptx/src/presentation/package.rs
+index 3a38387ccd..bf84659f88 100644
+--- a/crates/litchi-pptx/src/presentation/package.rs
++++ b/crates/litchi-pptx/src/presentation/package.rs
+@@ -11,7 +11,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use std::io::Write;
+ 
+ use crate::notes::SlideRootProof;
+-use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference};
++use crate::parts::{MceCapture, PresentationPart, SlideMasterPart, SlidePart, SlideReference};
+ use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
+ use crate::{Error, Result};
+ 
+@@ -47,6 +47,20 @@ pub(super) fn validate_slide_catalog(
+ }
+ 
+ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
++    capture_slides_inner(presentation, None)
++}
++
++pub(crate) fn capture_slides_with_mce<'a, 'parent>(
++    presentation: &Presentation<'a>,
++    capture: &mut MceCapture<'a, 'parent>,
++) -> Result<CaptureSlides<'a>> {
++    capture_slides_inner(presentation, Some(capture))
++}
++
++fn capture_slides_inner<'a, 'parent>(
++    presentation: &Presentation<'a>,
++    mut capture: Option<&mut MceCapture<'a, 'parent>>,
++) -> Result<CaptureSlides<'a>> {
+     let package = presentation.package();
+     let references = presentation.catalog()?;
+     let mut slides = Vec::new();
+@@ -73,8 +87,14 @@ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<Capt
+             |part| part.content_type(),
+         )?;
+         let (slide_part, name) = if first_name_error.is_none() {
+-            let (slide_part, name, notes_proof) =
+-                SlidePart::from_part_with_name(part, collect_notes_proofs)?;
++            let (slide_part, name, notes_proof) = match capture.as_deref_mut() {
++                Some(capture) => SlidePart::from_part_with_name_with_capture(
++                    part,
++                    collect_notes_proofs,
++                    capture,
++                )?,
++                None => SlidePart::from_part_with_name(part, collect_notes_proofs)?,
++            };
+             if let Some(proof) = notes_proof {
+                 if let Some(proofs) = slide_root_proofs.as_mut() {
+                     proofs.push(proof);

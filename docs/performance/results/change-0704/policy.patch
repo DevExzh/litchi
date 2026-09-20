@@ -1,0 +1,85 @@
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -62,6 +62,7 @@
+     max_history_entries: usize,
+     max_history_bytes: usize,
+     max_retained_candidate_bytes: usize,
++    max_retained_mce_bytes: usize,
+ }
+ 
+ impl Limits {
+@@ -73,6 +74,7 @@
+         max_history_entries: 64,
+         max_history_bytes: 256 * 1024 * 1024,
+         max_retained_candidate_bytes: 64 * 1024 * 1024,
++        max_retained_mce_bytes: 1024 * 1024,
+     };
+ 
+     /// Construct a finite, nonzero policy.
+@@ -101,6 +103,7 @@
+                 max_history_entries,
+                 max_history_bytes,
+                 max_retained_candidate_bytes,
++                max_retained_mce_bytes: Self::DEFAULT.max_retained_mce_bytes,
+             })
+         }
+     }
+@@ -163,6 +166,28 @@
+     #[must_use]
+     pub const fn max_retained_candidate_bytes(self) -> usize {
+         self.max_retained_candidate_bytes
++    }
++
++    /// Set the optional retained slide-MCE projection budget in bytes.
++    ///
++    /// Zero disables retention. Exceeding this ceiling falls back to ordinary
++    /// preprocessing and never changes a value, refusal, or published byte.
++    /// Existing six-argument construction uses the one-MiB default.
++    #[must_use]
++    pub const fn with_max_retained_mce_bytes(mut self, maximum: usize) -> Self {
++        self.max_retained_mce_bytes = maximum;
++        self
++    }
++
++    /// Maximum aggregate charge for retained slide-MCE projections.
++    ///
++    /// This separate one-MiB default ceiling covers owned output vector
++    /// capacity and conservatively accounted memo metadata. It is not an RSS
++    /// estimate. Zero disables retention; each snapshot reports its charge and
++    /// can release its retained projections without changing its meaning.
++    #[must_use]
++    pub const fn max_retained_mce_bytes(self) -> usize {
++        self.max_retained_mce_bytes
+     }
+ }
+ 
+--- a/crates/litchi-pptx/src/opened/patch.rs
++++ b/crates/litchi-pptx/src/opened/patch.rs
+@@ -1068,6 +1068,12 @@
+         left.max_retained_candidate_bytes()
+             .min(right.max_retained_candidate_bytes()),
+     )
++    .map(|limits| {
++        limits.with_max_retained_mce_bytes(
++            left.max_retained_mce_bytes()
++                .min(right.max_retained_mce_bytes()),
++        )
++    })
+     .ok_or_else(|| invalid("opened-presentation patch limits are invalid"))
+ }
+ 
+--- a/crates/litchi-pptx/src/opened/cross_copy_plan.rs
++++ b/crates/litchi-pptx/src/opened/cross_copy_plan.rs
+@@ -1881,6 +1881,12 @@
+         left.max_retained_candidate_bytes()
+             .min(right.max_retained_candidate_bytes()),
+     )
++    .map(|limits| {
++        limits.with_max_retained_mce_bytes(
++            left.max_retained_mce_bytes()
++                .min(right.max_retained_mce_bytes()),
++        )
++    })
+     .ok_or_else(|| invalid("cross-slide copy limits are invalid"))
+ }
+ 

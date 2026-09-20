@@ -16,6 +16,8 @@ mod transaction;
 mod xml;
 
 #[cfg(test)]
+mod mce_retention_tests;
+#[cfg(test)]
 mod tests;
 
 pub use copy_plan::{SlideCopyPart, SlideCopyPlan};

@@ -8,7 +8,7 @@ use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
 use sha2::{Digest, Sha256};
 
-use crate::parts::PresentationPart;
+use crate::parts::{MceCapture, PresentationPart, RetainedMce};
 use crate::{Error, Result};
 
 /// Maximum selector/value pairs in one atomic same-slide text batch.
@@ -62,6 +62,7 @@ pub struct Limits {
     max_history_entries: usize,
     max_history_bytes: usize,
     max_retained_candidate_bytes: usize,
+    max_retained_mce_bytes: usize,
 }
 
 impl Limits {
@@ -73,6 +74,7 @@ impl Limits {
         max_history_entries: 64,
         max_history_bytes: 256 * 1024 * 1024,
         max_retained_candidate_bytes: 64 * 1024 * 1024,
+        max_retained_mce_bytes: 1024 * 1024,
     };
 
     /// Construct a finite, nonzero policy.
@@ -101,6 +103,7 @@ impl Limits {
                 max_history_entries,
                 max_history_bytes,
                 max_retained_candidate_bytes,
+                max_retained_mce_bytes: Self::DEFAULT.max_retained_mce_bytes,
             })
         }
     }
@@ -154,8 +157,8 @@ impl Limits {
     /// opens, so the transient peak during one application carries the
     /// retained bytes twice.
     ///
-    /// Zero is not a policy: like every other member, it is rejected by
-    /// [`Self::new`].  Pass `1` to turn retention off, since no ZIP archive is
+    /// Zero is rejected for this field by [`Self::new`]. Pass `1` to turn
+    /// candidate retention off, since no ZIP archive is
     /// one byte long.
     ///
     /// [`CrossSlideCopyPlan::retained_candidate_bytes`]: crate::opened::CrossSlideCopyPlan::retained_candidate_bytes
@@ -163,6 +166,28 @@ impl Limits {
     #[must_use]
     pub const fn max_retained_candidate_bytes(self) -> usize {
         self.max_retained_candidate_bytes
+    }
+
+    /// Set the optional retained slide-MCE projection budget in bytes.
+    ///
+    /// Zero disables retention. Exceeding this ceiling falls back to ordinary
+    /// preprocessing and never changes a value, refusal, or published byte.
+    /// Existing six-argument construction uses the one-MiB default.
+    #[must_use]
+    pub const fn with_max_retained_mce_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_mce_bytes = maximum;
+        self
+    }
+
+    /// Maximum aggregate charge for retained slide-MCE projections.
+    ///
+    /// This separate one-MiB default ceiling covers owned output vector
+    /// capacity and conservatively accounted memo metadata. It is not an RSS
+    /// estimate. Zero disables retention; each snapshot reports its charge and
+    /// can release its retained projections without changing its meaning.
+    #[must_use]
+    pub const fn max_retained_mce_bytes(self) -> usize {
+        self.max_retained_mce_bytes
     }
 }
 
@@ -294,6 +319,10 @@ pub struct Snapshot {
     /// accelerator for [`package_fingerprint`] and nothing else: a miss is an
     /// ordinary hash and no value, refusal or published byte depends on a hit.
     pub(crate) part_digests: Arc<PartDigests>,
+    /// Default-profile transformed slide XML retained for later captures.
+    /// This table is optional, bounded by `Limits`, and shares cheaply across
+    /// snapshot clones without changing the snapshot's semantic meaning.
+    pub(crate) retained_mce: Option<Arc<RetainedMce>>,
 }
 
 /// Memoized per-part payload digests, keyed by payload allocation address and
@@ -329,6 +358,15 @@ impl PartDigests {
     /// Digest memoized for exactly this allocation, if any.
     fn get(&self, key: (usize, usize)) -> Option<[u8; 32]> {
         self.entries.get(&key).map(|(_blob, digest)| *digest)
+    }
+
+    /// Return the package-owned payload allocation for an exact memo key.
+    /// Retention callers use this after the owned package has been fingerprinted
+    /// so foreign `blob_arc` implementations cannot donate an unverified owner.
+    fn owner_for(&self, key: (usize, usize)) -> Option<Arc<Vec<u8>>> {
+        self.entries
+            .get(&key)
+            .map(|(blob, _digest)| Arc::clone(blob))
     }
 
     /// [`Self::get`] for the ABA gate, which keys by address directly.
@@ -437,6 +475,7 @@ impl fmt::Debug for Snapshot {
             .field("slides", &self.slides)
             .field("revision", &self.revision)
             .field("limits", &self.limits)
+            .field("retained_mce_bytes", &self.retained_mce_bytes())
             .finish_non_exhaustive()
     }
 }
@@ -474,6 +513,15 @@ impl Snapshot {
             "opened-presentation snapshot rebound to a different package"
         );
         let owned = Arc::new(package.clone());
+        let part_digests = Arc::new(
+            self.part_digests
+                .project(owned.as_ref())
+                .unwrap_or_else(|_error| PartDigests::default()),
+        );
+        let retained_mce = self
+            .retained_mce
+            .as_ref()
+            .and_then(|retained| retained.project_with_owner(|key| part_digests.owner_for(key)));
         Self {
             // `packages_equal` proves the fingerprint inputs are identical; it
             // says nothing about ZIP ordering, compression, or retained source
@@ -486,14 +534,37 @@ impl Snapshot {
             // the new package does not hold, so the memo still pins nothing
             // the snapshot does not own. A projection that cannot allocate
             // falls back to an empty memo, which only costs a later hash.
-            part_digests: Arc::new(
-                self.part_digests
-                    .project(owned.as_ref())
-                    .unwrap_or_else(|_error| PartDigests::default()),
-            ),
+            part_digests,
+            // The digest projection proves that each surviving MCE key still
+            // names an allocation owned by the rebound package. Entries whose
+            // source allocation was replaced are simply dropped.
+            retained_mce,
             package: owned,
             ..self.clone()
         }
+    }
+
+    /// Aggregate charged bytes held by this snapshot's optional MCE table.
+    ///
+    /// Counts output vector capacity and table/Arc metadata. Clones may share
+    /// these allocations, so charges across snapshots are not additive
+    /// physical memory. This charge excludes the already-owned raw package.
+    ///
+    /// This is the charge for this owner. Snapshot clones may report the same
+    /// value while sharing one physical table, so per-owner values are not
+    /// additive physical-memory measurements.
+    #[must_use]
+    pub fn retained_mce_bytes(&self) -> usize {
+        self.retained_mce
+            .as_deref()
+            .map_or(0, RetainedMce::retained_bytes)
+    }
+
+    /// Release this snapshot's reference to retained transformed slide XML
+    /// while preserving every captured slide, revision, policy, and package
+    /// byte. Snapshot clones may keep the shared table alive.
+    pub fn release_retained_mce(&mut self) {
+        self.retained_mce = None;
     }
 
     /// Resource policy inherited by edits and patches.
@@ -531,7 +602,13 @@ pub(crate) fn capture_with_provenance(
     limits: Limits,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    capture_internal(package, limits, physical_source_provenance, Revision::Cold)
+    capture_internal(
+        package,
+        limits,
+        physical_source_provenance,
+        Revision::Cold,
+        None,
+    )
 }
 
 /// Capture `package`, reusing `parent`'s payload digest for every payload
@@ -551,6 +628,7 @@ pub(crate) fn capture_with_parent_digests(
         limits,
         physical_source_provenance,
         Revision::Parent(parent),
+        None,
     )
 }
 
@@ -574,27 +652,24 @@ pub(crate) fn capture_with_revision(
         limits,
         physical_source_provenance,
         Revision::Known(revision, PartDigests::default()),
+        None,
     )
 }
 
-/// Capture `package` with a revision the caller computed from this exact
-/// content, together with the payload digests it filled while computing it.
-///
-/// The memo describes `package`'s own payload allocations, so carrying it onto
-/// the snapshot preserves the invariant that every entry names an allocation
-/// the snapshot holds.
-pub(crate) fn capture_with_revision_and_digests(
+pub(crate) fn capture_with_revision_and_digests_and_mce(
     package: &OpcPackage,
     limits: Limits,
     physical_source_provenance: bool,
     revision: [u8; 32],
     digests: PartDigests,
+    parent_mce: Option<&RetainedMce>,
 ) -> Result<Snapshot> {
     capture_internal(
         package,
         limits,
         physical_source_provenance,
         Revision::Known(revision, digests),
+        parent_mce,
     )
 }
 
@@ -614,6 +689,7 @@ fn capture_internal(
     limits: Limits,
     physical_source_provenance: bool,
     revision: Revision<'_>,
+    parent_mce: Option<&RetainedMce>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
@@ -625,7 +701,8 @@ fn capture_internal(
         });
     }
     let view = crate::presentation::Presentation::new(presentation, package);
-    let captured = view.capture_slides()?;
+    let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
+    let captured = view.capture_slides_with_mce(&mut mce_capture)?;
     if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",
@@ -730,6 +807,7 @@ fn capture_internal(
         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
+    let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
     Ok(Snapshot {
         package: owned,
         presentation_name,
@@ -740,6 +818,7 @@ fn capture_internal(
         physical_source_provenance,
         physical_revision: Arc::new(OnceLock::new()),
         part_digests: Arc::new(part_digests),
+        retained_mce,
     })
 }
 
@@ -1009,4 +1088,22 @@ fn feed(digest: &mut Sha256, value: &[u8]) {
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+#[cfg(test)]
+pub(crate) mod mce_retention_test_hooks {
+    use super::*;
+
+    pub(crate) fn slide_output(snapshot: &Snapshot, index: usize) -> Option<Arc<Vec<u8>>> {
+        let slide = snapshot.slides.get(index)?;
+        let part = snapshot.package.get_part(&slide.part_name).ok()?;
+        snapshot.retained_mce.as_deref()?.lookup(part.blob())
+    }
+
+    pub(crate) fn checked_charge_for_test(
+        entries_capacity: usize,
+        output_capacity: usize,
+    ) -> Option<usize> {
+        crate::parts::checked_mce_charge_for_test(entries_capacity, output_capacity)
+    }
 }

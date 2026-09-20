@@ -1,0 +1,33 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.76s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0704/debug/deps/litchi_pptx-2f276d6ead2eba17)
+
+running 25 tests
+test opened::cross_copy_plan::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders ... ok
+test opened::mce_retention_tests::a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route ... ok
+test opened::mce_retention_tests::a_clone_shares_outputs_release_is_local_and_drop_does_not_evict_the_original ... ok
+test opened::mce_retention_tests::a_notes_edit_runs_notes_validation_while_unchanged_slide_outputs_hit ... ok
+test opened::mce_retention_tests::a_root_relationship_edit_runs_capture_validation_while_slide_outputs_hit ... ok
+test opened::mce_retention_tests::changed_content_type_on_an_unchanged_raw_slide_remains_a_typed_refusal ... ok
+test opened::mce_retention_tests::changed_notes_root_remains_a_typed_refusal_while_slides_are_cache_hits ... ok
+test opened::mce_retention_tests::changed_root_relationship_metadata_remains_a_typed_refusal_on_slide_cache_hits ... ok
+test opened::mce_retention_tests::checked_retention_charge_rejects_entry_and_output_overflow ... ok
+test opened::mce_retention_tests::disabled_retention_keeps_the_same_snapshot_semantics_without_owned_outputs ... ok
+test opened::mce_retention_tests::foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_payloads ... ok
+test opened::mce_retention_tests::fresh_captures_are_equal_but_snapshot_local_retention_is_not_a_global_cache ... ok
+test opened::mce_retention_tests::malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence ... ok
+test opened::mce_retention_tests::marker_free_slides_never_create_a_retained_mce_projection ... ok
+test opened::mce_retention_tests::no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it ... ok
+test opened::mce_retention_tests::one_edit_misses_the_changed_slide_but_shares_the_untouched_slide_through_publication ... ok
+test opened::mce_retention_tests::rebound_drops_unproven_foreign_owners ... ok
+test opened::mce_retention_tests::rebound_keeps_a_package_owned_allocation_but_new_equal_slide_bytes_miss ... ok
+test opened::mce_retention_tests::retained_bytes_are_aggregate_capacity_and_metadata_and_partial_admission_is_a_fallback ... ok
+test opened::mce_retention_tests::the_exact_observed_budget_fits_and_one_byte_below_falls_back_without_refusal ... ok
+test opened::mce_retention_tests::the_retention_policy_defaults_to_one_mib_and_zero_disables_only_mce_retention ... ok
+test opened::mce_retention_tests::tiny_ceilings_and_maximum_usize_are_fallbacks_or_successes_never_refusals ... ok
+test opened::mce_retention_tests::transaction_and_commit_release_hooks_are_value_preserving ... ok
+test opened::mce_retention_tests::two_edits_keep_the_previous_unchanged_output_and_miss_each_newly_changed_slide ... ok
+test opened::patch::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.84s
+

@@ -1,0 +1,117 @@
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -1444,10 +1444,108 @@
+     Ok(())
+ }
+-/// Applies the baseline OOXML markup-compatibility profile.
+-/// # Errors
+-///
+-/// Returns an error when input violates OOXML constraints, exceeds a configured
+-/// bound, or an underlying XML or package operation fails.
++static LITCHI_0704_MECHANISM_TRACE_CALL: std::sync::atomic::AtomicU64 =
++    std::sync::atomic::AtomicU64::new(0);
++
++fn litchi_0704_mechanism_trace_phase() -> String {
++    let Some(path) = std::env::var_os("LITCHI_0704_MECHANISM_PHASE_FILE") else {
++        return "unset".to_owned();
++    };
++    std::fs::read_to_string(path)
++        .ok()
++        .map(|value| value.trim().to_owned())
++        .filter(|value| !value.is_empty())
++        .unwrap_or_else(|| "unknown".to_owned())
++}
++
++fn litchi_0704_mechanism_digest(bytes: &[u8]) -> String {
++    litchi_core::EvidenceDigest::of(bytes).to_string()
++}
++
++/// Applies the baseline OOXML markup-compatibility profile.
++/// # Errors
++///
++/// Returns an error when input violates OOXML constraints, exceeds a configured
++/// bound, or an underlying XML or package operation fails.
+ pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
+-    process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
++    let call = LITCHI_0704_MECHANISM_TRACE_CALL.fetch_add(
++        1,
++        std::sync::atomic::Ordering::Relaxed,
++    );
++    let phase = litchi_0704_mechanism_trace_phase();
++    let raw_ptr = x.as_ptr() as usize;
++    let raw_len = x.len();
++    let raw_sha256 = litchi_0704_mechanism_digest(x);
++    let capabilities = Capabilities::default();
++    let limits = Limits::default();
++    let result = process_markup_compatibility(x, &capabilities, &limits).map(|x| x.xml);
++    match &result {
++        Ok(Cow::Borrowed(output)) => eprintln!(
++            concat!(
++                "LITCHI0704_MCE call={} phase={} profile=default-ooxml ",
++                "raw_ptr=0x{:x} raw_len={} raw_sha256={} output_ptr=0x{:x} ",
++                "output_len={} output_capacity=0 ownership=borrowed output_sha256={} ",
++                "limits_input={} limits_output={} limits_depth={} limits_bindings={} ",
++                "limits_directives={} limits_choices={} status=ok",
++            ),
++            call,
++            phase,
++            raw_ptr,
++            raw_len,
++            raw_sha256,
++            output.as_ptr() as usize,
++            output.len(),
++            litchi_0704_mechanism_digest(output),
++            limits.max_input_bytes,
++            limits.max_output_bytes,
++            limits.max_depth,
++            limits.max_namespace_bindings,
++            limits.max_directive_tokens,
++            limits.max_choices_per_alternate,
++        ),
++        Ok(Cow::Owned(output)) => eprintln!(
++            concat!(
++                "LITCHI0704_MCE call={} phase={} profile=default-ooxml ",
++                "raw_ptr=0x{:x} raw_len={} raw_sha256={} output_ptr=0x{:x} ",
++                "output_len={} output_capacity={} ownership=owned output_sha256={} ",
++                "limits_input={} limits_output={} limits_depth={} limits_bindings={} ",
++                "limits_directives={} limits_choices={} status=ok",
++            ),
++            call,
++            phase,
++            raw_ptr,
++            raw_len,
++            raw_sha256,
++            output.as_ptr() as usize,
++            output.len(),
++            output.capacity(),
++            litchi_0704_mechanism_digest(output),
++            limits.max_input_bytes,
++            limits.max_output_bytes,
++            limits.max_depth,
++            limits.max_namespace_bindings,
++            limits.max_directive_tokens,
++            limits.max_choices_per_alternate,
++        ),
++        Err(_) => eprintln!(
++            concat!(
++                "LITCHI0704_MCE call={} phase={} profile=default-ooxml ",
++                "raw_ptr=0x{:x} raw_len={} raw_sha256={} output_ptr=0x0 ",
++                "output_len=0 output_capacity=0 ownership=error output_sha256=none ",
++                "limits_input={} limits_output={} limits_depth={} limits_bindings={} ",
++                "limits_directives={} limits_choices={} status=error",
++            ),
++            call,
++            phase,
++            raw_ptr,
++            raw_len,
++            raw_sha256,
++            limits.max_input_bytes,
++            limits.max_output_bytes,
++            limits.max_depth,
++            limits.max_namespace_bindings,
++            limits.max_directive_tokens,
++            limits.max_choices_per_alternate,
++        ),
++    }
++    result
+ }

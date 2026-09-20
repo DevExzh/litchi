@@ -1,0 +1,7 @@
+probe	0704-mechanism
+source	generated:12x8
+archive_bytes	40634
+workflow	one
+iterations	1
+first_target	slide=0	shape=0
+result	workflow=one	iteration=0	changed=true	commit_changed=true	revision=3ec560736299f22740713f620f576936fb43eabc9c8f26be60ba6f4f7a05fc8a

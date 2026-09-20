@@ -1,0 +1,35 @@
+{
+  "source": "crates/litchi-pptx/src/opened/mce_retention_tests.rs",
+  "filter": "mce_retention",
+  "minimum_additional_tests": 2,
+  "required_additional_tests": [
+    "cross_copy_plan::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders",
+    "patch::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders"
+  ],
+  "tests": [
+    "the_retention_policy_defaults_to_one_mib_and_zero_disables_only_mce_retention",
+    "marker_free_slides_never_create_a_retained_mce_projection",
+    "disabled_retention_keeps_the_same_snapshot_semantics_without_owned_outputs",
+    "fresh_captures_are_equal_but_snapshot_local_retention_is_not_a_global_cache",
+    "the_exact_observed_budget_fits_and_one_byte_below_falls_back_without_refusal",
+    "tiny_ceilings_and_maximum_usize_are_fallbacks_or_successes_never_refusals",
+    "checked_retention_charge_rejects_entry_and_output_overflow",
+    "a_failed_optional_table_reservation_releases_both_candidate_owners",
+    "a_clone_shares_outputs_release_is_local_and_drop_does_not_evict_the_original",
+    "transaction_and_commit_release_hooks_are_value_preserving",
+    "no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it",
+    "one_edit_misses_the_changed_slide_but_shares_the_untouched_slide_through_publication",
+    "two_edits_keep_the_previous_unchanged_output_and_miss_each_newly_changed_slide",
+    "a_root_relationship_edit_runs_capture_validation_while_slide_outputs_hit",
+    "a_notes_edit_runs_notes_validation_while_unchanged_slide_outputs_hit",
+    "changed_content_type_on_an_unchanged_raw_slide_remains_a_typed_refusal",
+    "changed_root_relationship_metadata_remains_a_typed_refusal_on_slide_cache_hits",
+    "changed_notes_root_remains_a_typed_refusal_while_slides_are_cache_hits",
+    "a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route",
+    "retained_bytes_are_aggregate_capacity_and_metadata_and_partial_admission_is_a_fallback",
+    "malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence",
+    "foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_payloads",
+    "rebound_drops_unproven_foreign_owners",
+    "rebound_keeps_a_package_owned_allocation_but_new_equal_slide_bytes_miss"
+  ]
+}

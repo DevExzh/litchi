@@ -1,0 +1,6 @@
+{
+  "failed_log_sha256": "92cb39ec75ab8d49e2c6466c74d2707d3d7992fc37cf0349f6521c04da48b5db",
+  "source_restored_to_baseline": true,
+  "baseline_source_count": 602,
+  "failed_native_build_used": false
+}

@@ -1,0 +1,56 @@
+{
+  "probe": "0704-retention-observer",
+  "repeats": 2,
+  "binary": "/home/zhuhe/code/litchi-0704-bin/retention-observer",
+  "binary_sha256": "b716213f1442ad38dcbfd584bd7700c59e7ae03c1138636429a3b708f7db9d15",
+  "production_source_hash": "2ec61a36993e9b321348b1bee205cf4557e81e845e9fb1f8694ebe03f34f910b",
+  "probe_source_hash": "bb4a2521386265a669a637cf82b4ed0406e061b3b3ffb07deae3c4ec72b1f015",
+  "source_hash": "554bb5f2552c68ec426423ecebd2b9d07a850684570544be5646317d945e1345",
+  "cases": [
+    {
+      "label": "real",
+      "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "command": [
+        "/home/zhuhe/code/litchi-0704-bin/retention-observer",
+        "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+        "2"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.31352234189398587,
+      "output": "retention-probe/results/real.tsv",
+      "output_sha256": "306780cbcbc037b52cbcc247ca83cc1ec27d785f15a37956ea17a246bba91013",
+      "stderr": "retention-probe/results/real.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "binary": "/home/zhuhe/code/litchi-0704-bin/retention-observer",
+      "binary_sha256": "b716213f1442ad38dcbfd584bd7700c59e7ae03c1138636429a3b708f7db9d15",
+      "production_source_hash": "2ec61a36993e9b321348b1bee205cf4557e81e845e9fb1f8694ebe03f34f910b",
+      "probe_source_hash": "bb4a2521386265a669a637cf82b4ed0406e061b3b3ffb07deae3c4ec72b1f015",
+      "source_hash": "554bb5f2552c68ec426423ecebd2b9d07a850684570544be5646317d945e1345"
+    },
+    {
+      "label": "generated",
+      "source": "generated:12x8",
+      "source_sha256": null,
+      "command": [
+        "/home/zhuhe/code/litchi-0704-bin/retention-observer",
+        "generated:12x8",
+        "2"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "seconds": 0.03372910001780838,
+      "output": "retention-probe/results/generated.tsv",
+      "output_sha256": "bd6941db8250bc7cdb4776aeb0355ccf438a428ac135a74dd46573f79cf00a5d",
+      "stderr": "retention-probe/results/generated.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "binary": "/home/zhuhe/code/litchi-0704-bin/retention-observer",
+      "binary_sha256": "b716213f1442ad38dcbfd584bd7700c59e7ae03c1138636429a3b708f7db9d15",
+      "production_source_hash": "2ec61a36993e9b321348b1bee205cf4557e81e845e9fb1f8694ebe03f34f910b",
+      "probe_source_hash": "bb4a2521386265a669a637cf82b4ed0406e061b3b3ffb07deae3c4ec72b1f015",
+      "source_hash": "554bb5f2552c68ec426423ecebd2b9d07a850684570544be5646317d945e1345"
+    }
+  ],
+  "performance_claim": "none"
+}

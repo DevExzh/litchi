@@ -1,0 +1,7 @@
+probe	0704-mechanism
+source	/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+archive_bytes	108164
+workflow	noop
+iterations	1
+first_target	slide=1	shape=1
+result	workflow=noop	iteration=0	changed=false	commit_changed=false	revision=0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41

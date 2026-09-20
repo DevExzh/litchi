@@ -201,8 +201,16 @@ impl<'a> Presentation<'a> {
         package::slides(self)
     }
 
+    #[cfg(test)]
     pub(crate) fn capture_slides(&self) -> Result<package::CaptureSlides<'a>> {
         package::capture_slides(self)
+    }
+
+    pub(crate) fn capture_slides_with_mce<'parent>(
+        &self,
+        capture: &mut crate::parts::MceCapture<'a, 'parent>,
+    ) -> Result<package::CaptureSlides<'a>> {
+        package::capture_slides_with_mce(self, capture)
     }
 
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.

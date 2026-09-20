@@ -1,0 +1,7 @@
+probe	0704-mechanism
+source	generated:12x8
+archive_bytes	40634
+workflow	noop
+iterations	1
+first_target	slide=0	shape=0
+result	workflow=noop	iteration=0	changed=false	commit_changed=false	revision=dffa8930703ef990da61d29364dc1092f7da82121524a59c043eb81a903b0018

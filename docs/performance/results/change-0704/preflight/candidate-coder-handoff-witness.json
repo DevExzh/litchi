@@ -1,0 +1,29 @@
+{
+  "baseline": "d48523eec2",
+  "candidate_worktree": "/home/zhuhe/code/litchi-0704-mce-candidate",
+  "candidate_patch": "preflight/candidate-coder-handoff.patch",
+  "candidate_patch_sha256": "1b75a4e32ad8bab29be379a32a12ff2269a4f8af8fa391e071c0a84afafd8051",
+  "candidate_source_sha256": {
+    "crates/litchi-pptx/src/opened/model.rs": "48b81679bed5aed3efaee2f67cbce6eccf848bb3991a248b30d763bb89cf42ca",
+    "crates/litchi-pptx/src/opened/transaction.rs": "05cb7d1586e8a2c076c91676be302a37db26377f50bf36ac477d35f2248f9353",
+    "crates/litchi-pptx/src/parts/mod.rs": "c4fb4d597e761f12885ff7682c3d824d3ff06fa3d0ba987c476092851ef18d36",
+    "crates/litchi-pptx/src/parts/slide.rs": "600c480a648d4837db7436292a30d7fe48156a3d71ed953d76b54e2a190057d9",
+    "crates/litchi-pptx/src/presentation/model.rs": "47123cb2de89ecaf84dcec5980e02b19c82ff6d05639d973a8f19f103e6b49e4",
+    "crates/litchi-pptx/src/presentation/package.rs": "1c263d4666dd8e7e66a82387db338ee7e46fe3d42741c73813c602037708051d"
+  },
+  "candidate_patch_files": [
+    "crates/litchi-pptx/src/opened/model.rs",
+    "crates/litchi-pptx/src/opened/transaction.rs",
+    "crates/litchi-pptx/src/parts/mod.rs",
+    "crates/litchi-pptx/src/parts/slide.rs",
+    "crates/litchi-pptx/src/presentation/model.rs",
+    "crates/litchi-pptx/src/presentation/package.rs"
+  ],
+  "policy_files_excluded": [
+    "crates/litchi-pptx/src/opened/model.rs",
+    "crates/litchi-pptx/src/opened/patch.rs",
+    "crates/litchi-pptx/src/opened/cross_copy_plan.rs"
+  ],
+  "cargo_or_performance_run": false,
+  "historical_role": "isolated coder handoff; not the final candidate source"
+}

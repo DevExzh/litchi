@@ -1,0 +1,16 @@
+[
+  {
+    "case": "early-name-error",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 5.235198702351984,
+    "delta_ns": 1291
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 7.402155416903011,
+    "delta_ns": 5220
+  }
+]

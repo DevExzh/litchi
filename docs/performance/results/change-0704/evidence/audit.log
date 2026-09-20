@@ -1,0 +1,5 @@
+PASS: 0704 follow-up 52 native and 40 refusal rows; 264 comparisons
+PASS: 603-file source binding, codec restoration, build receipt, and 12 traces audit
+PASS: independently recomputed 468 native summaries, 312 comparisons and 156 allocation summaries
+PASS: independently recomputed 60 refusal summaries, exact fixture/error bindings and pair comparisons
+0704 audit PASS: PPTX-only source boundary, probes, observer, measurements, profiles, tests, gates, and cleanup
