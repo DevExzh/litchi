@@ -182,6 +182,7 @@ mod descriptive;
 #[allow(dead_code)]
 mod geometry;
 mod inspection;
+mod lookup;
 mod matrix;
 mod order;
 mod owned;
@@ -1117,6 +1118,10 @@ struct RuntimeAreaSet<'a> {
     area_reservation: Option<Reservation>,
     record_reservation: Option<Reservation>,
     is_list: bool,
+    /// Preserve this descriptor when it is the selected result of a
+    /// constructor or lazy CHOOSE in scalar publication mode.  Bare
+    /// references leave this false and continue to use implicit intersection.
+    preserve_scalar_result: bool,
 }
 
 /// Runtime ownership for the public reference-list view.  The evaluator
@@ -1139,7 +1144,13 @@ impl<'a> RuntimeAreaSet<'a> {
             area_reservation: None,
             record_reservation: None,
             is_list: false,
+            preserve_scalar_result: false,
         }
+    }
+
+    fn mark_scalar_result(mut self) -> Self {
+        self.preserve_scalar_result = true;
+        self
     }
 
     fn direct<R: Resolver + ?Sized>(
@@ -1560,6 +1571,13 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     shape_mask_reservation: Option<Reservation>,
     demand_cache: Vec<DemandCacheEntry>,
     demand_cache_reservation: Option<Reservation>,
+    /// Complete results retained by the projected lookup shape planner.  A
+    /// dynamic INDEX/OFFSET/INDIRECT result may need to be probed before a
+    /// lazy matrix branch can publish its output shape.  Keeping the complete
+    /// value here lets the final matrix continuation consume that exact probe
+    /// result instead of repeating resolver reads.
+    lookup_probe_cache: Vec<LookupProbeContext<'expr, 'position>>,
+    lookup_probe_cache_reservation: Option<Reservation>,
     /// Exact invariant regression fits shared by projected FORECAST queries.
     /// Drop the payload buffer before releasing its capacity reservation.
     forecast_cache: Vec<paired::ForecastCacheEntry>,
@@ -1618,6 +1636,12 @@ enum ValueFrame<'a> {
         reference_kind_only: bool,
         reject_source_reference: bool,
     },
+    ChooseAfterIndex {
+        node: super::Node<'a>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    },
+    ChooseAfterBranch,
     MatrixStep,
     MatrixCollect,
     FinishArray {
@@ -1667,6 +1691,10 @@ enum MatrixKind<'a> {
         alternative: super::Node<'a>,
         catches_not_available: bool,
     },
+    /// A matrix-valued CHOOSE keeps the index array and selects one branch
+    /// for each demanded output coordinate.  The branch AST stays here so
+    /// unselected branches are never visited or shape-probed.
+    Choose { node: super::Node<'a> },
 }
 
 struct MatrixState<'a, 'position> {
@@ -1688,6 +1716,8 @@ struct MatrixState<'a, 'position> {
     then_cacheable: bool,
     else_cacheable: bool,
     alternative_cacheable: bool,
+    restore_reference_kind_only: bool,
+    restore_reject_source_reference: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -1700,6 +1730,24 @@ enum MatrixCacheSlot {
 struct DemandCacheEntry {
     node: usize,
     value: DemandCacheValue,
+}
+
+struct LookupProbeContext<'a, 'position> {
+    node: usize,
+    demand: Shape,
+    demand_invariant: bool,
+    base_position: Position<'position>,
+    mode: Mode,
+    reference_kind_only: bool,
+    reject_source_reference: bool,
+    entries: Vec<Option<LookupProbeEntry<'a, 'position>>>,
+    reservation: Option<Reservation>,
+}
+
+struct LookupProbeEntry<'a, 'position> {
+    position: Position<'position>,
+    shape: Shape,
+    value: RuntimeValue<'a>,
 }
 
 #[derive(Clone, Copy)]
@@ -1785,6 +1833,13 @@ enum ShapeFrame<'a> {
     MatrixExit {
         function: MatrixFunction,
         children: usize,
+    },
+    /// Probe one dynamic lookup result per selected projected coordinate.
+    /// The complete result is retained in the evaluator's bounded lookup
+    /// probe cache for the final matrix continuation.
+    Lookup {
+        node: super::Node<'a>,
+        demand: ShapeDemand,
     },
     Exit {
         node: super::Node<'a>,
@@ -1968,6 +2023,8 @@ where
             shape_mask_reservation: None,
             demand_cache: Vec::new(),
             demand_cache_reservation: None,
+            lookup_probe_cache: Vec::new(),
+            lookup_probe_cache_reservation: None,
             forecast_cache: Vec::new(),
             forecast_cache_reservation: None,
             condition_cache_shapes: Vec::new(),
@@ -2039,6 +2096,12 @@ where
                     reference_kind_only,
                     reject_source_reference,
                 } => self.finish_if_error(node, reference_kind_only, reject_source_reference)?,
+                ValueFrame::ChooseAfterIndex {
+                    node,
+                    reference_kind_only,
+                    reject_source_reference,
+                } => self.finish_choose(node, reference_kind_only, reject_source_reference)?,
+                ValueFrame::ChooseAfterBranch => self.finish_choose_branch()?,
                 ValueFrame::MatrixStep => self.matrix_step()?,
                 ValueFrame::MatrixCollect => self.matrix_collect()?,
                 ValueFrame::FinishArray {
@@ -2071,10 +2134,15 @@ where
                 )),
                 value => Ok(value),
             },
-            Mode::Scalar if matches!(&value, RuntimeValue::Array(array) if array.preserve_scalar_result) => {
-                Ok(value)
+            Mode::Scalar => match value {
+                RuntimeValue::Array(array) if array.preserve_scalar_result => {
+                    Ok(RuntimeValue::Array(array))
+                },
+                RuntimeValue::Areas(areas) if areas.preserve_scalar_result => {
+                    Ok(RuntimeValue::Areas(areas))
+                },
+                value => self.project_scalar(value),
             },
-            Mode::Scalar => self.project_scalar(value),
         }
     }
 
@@ -2730,6 +2798,38 @@ where
             return self.push_frame(ValueFrame::VisitArgument(value));
         }
 
+        if let Some(function) = super::lookup::Function::from_name(name) {
+            if !function.valid_arity(node.child_count()) {
+                return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+            }
+            // A dynamic reference result may already have been evaluated by
+            // the projected shape planner. Consume that complete value before
+            // scheduling any argument visits; doing so preserves the probe's
+            // resolver reads and its projected selector coordinate.
+            if (lookup::is_dynamic_shape_function(name) || name.eq_ignore_ascii_case("CHOOSE"))
+                && self.projection.is_some()
+            {
+                if let Some(value) = self.lookup_probe_take(node)? {
+                    return self.push_value(value);
+                }
+            }
+            if function.is_lazy() {
+                let index = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                    "CHOOSE index is missing",
+                ))?;
+                let reference_kind_only = self.reference_kind_only;
+                let reject_source_reference = self.reject_source_reference;
+                self.reference_kind_only = false;
+                self.reject_source_reference = false;
+                self.push_frame(ValueFrame::ChooseAfterIndex {
+                    node,
+                    reference_kind_only,
+                    reject_source_reference,
+                })?;
+                return self.push_frame(ValueFrame::VisitArgument(index));
+            }
+        }
+
         if let Some(function) = super::inspection::Function::from_name(name) {
             if !function.valid_arity(node.child_count()) {
                 return self.push_scalar(WorkingValue::Error(ScalarError::Value));
@@ -2746,8 +2846,10 @@ where
         // retain the metadata policy only for their selected descriptor
         // branches; all other nested calls must retain the normal typed
         // external-reference refusal.
-        self.reference_kind_only = false;
-        self.reject_source_reference = false;
+        if !name.eq_ignore_ascii_case("INDIRECT") {
+            self.reference_kind_only = false;
+            self.reject_source_reference = false;
+        }
 
         // A coordinate-independent sequence aggregate may sit inside an
         // array-producing branch. Its arguments normally belong to the eager
@@ -2765,6 +2867,7 @@ where
             || descriptive::is_descriptive_function(name)
             || paired::is_paired_function(name)
             || order::is_order_function(name)
+            || lookup::is_lookup_function(name)
             || reference_metadata::is_reference_metadata_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
@@ -2791,7 +2894,31 @@ where
             // In a projected lazy matrix branch, a complex sequence consumes
             // the complete array/reference argument. Enter matrix context so
             // an inline array is not reduced to the one selected cell.
-            let frame = if database::is_database_function(name) {
+            let frame = if lookup::is_lookup_function(name)
+                && lookup::matrix_argument(name, index, child)
+            {
+                ValueFrame::VisitMatrixArgument(child)
+            } else if lookup::is_lookup_function(name) && lookup::complete_argument(name, index) {
+                ValueFrame::VisitCompleteArgument(child)
+            } else if lookup::is_lookup_function(name)
+                && self.projection.is_some()
+                && lookup::projected_scalar_argument(self, name, index, child)?
+            {
+                // Computed lookup selectors such as SUM(MUNIT(range)) must
+                // evaluate at the requested projected position. Literal
+                // Arrays are excluded by the helper so VisitArgument keeps
+                // their per-coordinate matrix projection.
+                ValueFrame::VisitConditionalArgument(child)
+            } else if lookup::scalar_argument(name, index) {
+                if self.projection.is_some() {
+                    // Keep computed scalar descendants at the requested
+                    // position. Inline arrays remain complete until the
+                    // lookup's first-element parameter conversion.
+                    ValueFrame::VisitConditionalArgument(child)
+                } else {
+                    ValueFrame::VisitScalarArgument(child)
+                }
+            } else if database::is_database_function(name) {
                 if index == 1 && node.child_count() == 3 {
                     ValueFrame::VisitScalarArgument(child)
                 } else {
@@ -2987,6 +3114,109 @@ where
         self.push_frame(ValueFrame::VisitArgument(alternative))
     }
 
+    fn finish_choose(
+        &mut self,
+        node: super::Node<'expr>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    ) -> EvaluationResult<()> {
+        let raw_index = self.pop_value()?;
+        self.reference_kind_only = reference_kind_only;
+        self.reject_source_reference = reject_source_reference;
+        if self.mode == Mode::Matrix && raw_index.is_array_like() && self.projection.is_none() {
+            // An array-valued index is a lazy matrix selector.  Start the
+            // dedicated continuation before touching any branch; it will
+            // shape-probe and evaluate only branches selected by at least
+            // one index coordinate.
+            return self.start_matrix_choose(node, raw_index);
+        }
+        let index = self.project_scalar(raw_index)?;
+        let RuntimeValue::Scalar(index) = index else {
+            return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+        };
+        let index = match super::to_integer(index, &mut self.scalar)? {
+            Ok(value) if value >= 1.0 && value <= (node.child_count() - 1) as f64 => value as usize,
+            Ok(_) => return self.push_scalar(WorkingValue::Error(ScalarError::Value)),
+            Err(error) => return self.push_scalar(WorkingValue::Error(error)),
+        };
+        let branch = node
+            .child(index)
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE selected branch is missing",
+            ))?;
+        self.push_frame(ValueFrame::ChooseAfterBranch)?;
+        if branch.is_missing() {
+            self.push_value(RuntimeValue::Empty)
+        } else {
+            self.push_frame(ValueFrame::Visit(branch))
+        }
+    }
+
+    fn finish_choose_branch(&mut self) -> EvaluationResult<()> {
+        let value = self.pop_value()?;
+        let value = self.preserve_choose_result(value);
+        self.push_value(value)
+    }
+
+    fn preserve_choose_result(&self, value: RuntimeValue<'expr>) -> RuntimeValue<'expr> {
+        match value {
+            RuntimeValue::Array(mut array) => {
+                array.preserve_scalar_result = true;
+                RuntimeValue::Array(array)
+            },
+            RuntimeValue::Areas(areas) => RuntimeValue::Areas(areas.mark_scalar_result()),
+            value => value,
+        }
+    }
+
+    fn start_matrix_choose(
+        &mut self,
+        node: super::Node<'expr>,
+        index: RuntimeValue<'expr>,
+    ) -> EvaluationResult<()> {
+        let index = self.materialize_for_array(index)?;
+        let RuntimeValue::Array(index) = index else {
+            return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+        };
+        let restore_reference_kind_only = self.reference_kind_only;
+        let restore_reject_source_reference = self.reject_source_reference;
+        let shape = self.choose_matrix_shape(node, &index)?;
+        let cells =
+            shape
+                .cell_count()
+                .ok_or(EvaluationFailure::ResourceLimit(self.local_limit(
+                    Resource::Objects,
+                    u64::MAX,
+                    self.limits.max_array_cells,
+                )))?;
+        let (output, reservation) = self.new_element_vec(cells)?;
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
+        self.matrix = Some(MatrixState {
+            kind: MatrixKind::Choose { node },
+            shape,
+            condition: Some(index),
+            value: None,
+            output,
+            output_reservation: reservation,
+            index: 0,
+            restore_mode: self.mode,
+            restore_position: self.position,
+            restore_projection: self.projection,
+            pending: false,
+            pending_cache: None,
+            then_cache: None,
+            else_cache: None,
+            alternative_cache: None,
+            then_cacheable: false,
+            else_cacheable: false,
+            alternative_cacheable: false,
+            restore_reference_kind_only,
+            restore_reject_source_reference,
+        });
+        self.push_frame(ValueFrame::MatrixStep)
+    }
+
     fn start_matrix_if(
         &mut self,
         node: super::Node<'expr>,
@@ -2994,13 +3224,19 @@ where
     ) -> EvaluationResult<()> {
         // Matrix branches publish cell values, not reference descriptors.
         // A source reference here requires the unsupported external provider.
+        let restore_reference_kind_only = self.reference_kind_only;
+        let restore_reject_source_reference = self.reject_source_reference;
         self.reference_kind_only = false;
         self.reject_source_reference = false;
         let condition = self.materialize_for_array(condition)?;
         let RuntimeValue::Array(condition) = condition else {
+            self.reference_kind_only = restore_reference_kind_only;
+            self.reject_source_reference = restore_reject_source_reference;
             return self.push_scalar(WorkingValue::Error(ScalarError::Value));
         };
         if node.child_count() == 1 {
+            self.reference_kind_only = restore_reference_kind_only;
+            self.reject_source_reference = restore_reject_source_reference;
             return self.push_value(RuntimeValue::Array(condition));
         }
         let then_node = node.child(1);
@@ -3063,6 +3299,8 @@ where
             then_cacheable,
             else_cacheable,
             alternative_cacheable: false,
+            restore_reference_kind_only,
+            restore_reject_source_reference,
         });
         self.push_frame(ValueFrame::MatrixStep)
     }
@@ -3072,10 +3310,14 @@ where
         node: super::Node<'expr>,
         value: RuntimeValue<'expr>,
     ) -> EvaluationResult<()> {
+        let restore_reference_kind_only = self.reference_kind_only;
+        let restore_reject_source_reference = self.reject_source_reference;
         self.reference_kind_only = false;
         self.reject_source_reference = false;
         let value = self.materialize_for_array(value)?;
         let RuntimeValue::Array(value) = value else {
+            self.reference_kind_only = restore_reference_kind_only;
+            self.reject_source_reference = restore_reject_source_reference;
             return self.push_scalar(WorkingValue::Error(ScalarError::Value));
         };
         let value_shape = value.shape;
@@ -3130,6 +3372,8 @@ where
             then_cacheable: false,
             else_cacheable: false,
             alternative_cacheable,
+            restore_reference_kind_only,
+            restore_reject_source_reference,
         });
         self.push_frame(ValueFrame::MatrixStep)
     }
@@ -3276,6 +3520,114 @@ where
         Ok((then_mask, else_mask))
     }
 
+    /// Compute the broadcast shape for an array-indexed CHOOSE.  Each branch
+    /// is shape-probed only when at least one valid index coordinate selects
+    /// it.  Repeating the bounded pass after a broadcast growth preserves the
+    /// same selected-mask semantics as IF without retaining one mask per
+    /// branch in the runtime matrix state.
+    fn choose_matrix_shape(
+        &mut self,
+        node: super::Node<'expr>,
+        index: &RuntimeArrayValue<'expr>,
+    ) -> EvaluationResult<Shape> {
+        let mut shape = index.shape;
+        let maximum = self
+            .expression
+            .node_count()
+            .saturating_add(1)
+            .min(self.limits.scalar.max_stack_entries.max(1));
+        for _ in 0..maximum {
+            let mut grew = false;
+            for branch_index in 1..node.child_count() {
+                let mask = self.choose_branch_mask(index, node.child_count() - 1, branch_index)?;
+                if mask.indexes.is_empty() {
+                    continue;
+                }
+                let mask = self.expand_shape_mask(mask, index.shape, shape)?;
+                let branch =
+                    node.child(branch_index)
+                        .ok_or(EvaluationFailure::InvalidExpression(
+                            "CHOOSE branch is missing",
+                        ))?;
+                let Some(branch_shape) = self.shape_hint_demand(branch, shape, Some(&mask))? else {
+                    continue;
+                };
+                let next = broadcast_shape(shape, branch_shape).ok_or(
+                    EvaluationFailure::InvalidExpression("incompatible CHOOSE branch shapes"),
+                )?;
+                if next != shape {
+                    shape = next;
+                    grew = true;
+                }
+            }
+            if !grew {
+                return Ok(shape);
+            }
+        }
+        Err(EvaluationFailure::ResourceLimit(self.local_limit(
+            Resource::Objects,
+            u64::try_from(maximum.saturating_add(1)).unwrap_or(u64::MAX),
+            maximum,
+        )))
+    }
+
+    fn choose_branch_mask(
+        &mut self,
+        index: &RuntimeArrayValue<'expr>,
+        branch_count: usize,
+        branch_index: usize,
+    ) -> EvaluationResult<ShapeMask> {
+        let mut mask = self.new_shape_mask(index.shape)?;
+        let cells = index
+            .shape
+            .cell_count()
+            .ok_or(EvaluationFailure::ResourceLimit(self.local_limit(
+                Resource::Objects,
+                u64::MAX,
+                self.limits.max_array_cells,
+            )))?;
+        for position in 0..cells {
+            self.charge_cell_work(position)?;
+            let Some(element) = index.cells.get(position) else {
+                continue;
+            };
+            if matches!(
+                self.choose_index_element(element, branch_count)?,
+                Ok(Some(value)) if value == branch_index
+            ) {
+                self.push_shape_mask_index(&mut mask, position)?;
+            }
+        }
+        Ok(mask)
+    }
+
+    fn choose_index_element(
+        &mut self,
+        element: &RuntimeElement<'expr>,
+        branch_count: usize,
+    ) -> EvaluationResult<Result<Option<usize>, ScalarError>> {
+        let value = match element {
+            RuntimeElement::Empty | RuntimeElement::Missing => {
+                return Ok(Err(ScalarError::Value));
+            },
+            RuntimeElement::Present(WorkingValue::Error(error)) => return Ok(Err(*error)),
+            RuntimeElement::Present(WorkingValue::Number(value)) => WorkingValue::Number(*value),
+            RuntimeElement::Present(WorkingValue::Logical(value)) => WorkingValue::Logical(*value),
+            RuntimeElement::Present(WorkingValue::Text(value)) => {
+                WorkingValue::Text(TextValue::borrowed(value.text.as_ref()))
+            },
+            RuntimeElement::Present(WorkingValue::Complex(value)) => WorkingValue::Complex(*value),
+        };
+        let value = match super::to_integer(value, &mut self.scalar)? {
+            Ok(value) => value,
+            Err(error) => return Ok(Err(error)),
+        };
+        if !value.is_finite() || value < 1.0 || value > branch_count as f64 {
+            return Ok(Ok(None));
+        }
+        Ok(Ok(Some(value as usize)))
+    }
+
     fn array_contains_caught_error(
         &mut self,
         value: &RuntimeArrayValue<'expr>,
@@ -3357,6 +3709,9 @@ where
                     || descriptive::is_descriptive_function(name) =>
             {
                 self.cacheable_matrix_branch(node)
+            },
+            super::Kind::Function { name } if lookup::is_lookup_function(name) => {
+                lookup::cacheable_branch(self, node)
             },
             // ROW/COLUMN can depend on the projected output coordinate and
             // SHEET/SHEETS may consult the current workbook position. Keep
@@ -3699,6 +4054,9 @@ where
                         // classified directly.
                         return Ok(false);
                     }
+                    if lookup::is_lookup_function(name) && !lookup::cacheable_branch(self, node)? {
+                        return Ok(false);
+                    }
                     let full_arguments = aggregate::is_aggregate_function(name)
                         || name.eq_ignore_ascii_case("TYPE")
                         || statistical::is_statistical_function(name)
@@ -3730,6 +4088,8 @@ where
                             paired::criterion_full_argument(name, index, child)
                         } else if order::is_order_function(name) {
                             order::criterion_full_argument(name, index, child)
+                        } else if lookup::is_lookup_function(name) {
+                            lookup::criterion_full_argument(name, index, child)
                         } else {
                             full_arguments
                         };
@@ -4103,14 +4463,19 @@ where
     fn matrix_step(&mut self) -> EvaluationResult<()> {
         // Each selected cell starts in value context, independently of the
         // function or metadata argument evaluated for the previous cell.
-        self.reference_kind_only = false;
-        self.reject_source_reference = false;
         let mut matrix = self
             .matrix
             .take()
             .ok_or(EvaluationFailure::InvalidExpression(
                 "matrix continuation is missing",
             ))?;
+        if matches!(matrix.kind, MatrixKind::Choose { .. }) {
+            self.reference_kind_only = matrix.restore_reference_kind_only;
+            self.reject_source_reference = matrix.restore_reject_source_reference;
+        } else {
+            self.reference_kind_only = false;
+            self.reject_source_reference = false;
+        }
         if matrix.pending {
             return Err(EvaluationFailure::InvalidExpression(
                 "matrix continuation has a pending branch",
@@ -4128,6 +4493,8 @@ where
             self.mode = matrix.restore_mode;
             self.position = matrix.restore_position;
             self.projection = matrix.restore_projection;
+            self.reference_kind_only = matrix.restore_reference_kind_only;
+            self.reject_source_reference = matrix.restore_reject_source_reference;
             return self.push_value(RuntimeValue::Array(RuntimeArrayValue {
                 shape: matrix.shape,
                 cells: matrix.output,
@@ -4221,6 +4588,41 @@ where
                     }
                     Some(alternative)
                 },
+                MatrixKind::Choose { node } => {
+                    let condition =
+                        matrix
+                            .condition
+                            .as_ref()
+                            .ok_or(EvaluationFailure::InvalidExpression(
+                                "matrix CHOOSE index is missing",
+                            ))?;
+                    let element = array_element_for(condition, matrix.shape, index)
+                        .map(|element| self.clone_element(element))
+                        .transpose()?
+                        .unwrap_or(RuntimeElement::Missing);
+                    let branch_count = node.child_count().saturating_sub(1);
+                    match self.choose_index_element(&element, branch_count)? {
+                        Ok(Some(branch_index)) => node.child(branch_index),
+                        Ok(None) => {
+                            matrix
+                                .output
+                                .push(RuntimeElement::Present(WorkingValue::Error(
+                                    ScalarError::Value,
+                                )));
+                            matrix.index += 1;
+                            self.matrix = Some(matrix);
+                            return self.push_frame(ValueFrame::MatrixStep);
+                        },
+                        Err(error) => {
+                            matrix
+                                .output
+                                .push(RuntimeElement::Present(WorkingValue::Error(error)));
+                            matrix.index += 1;
+                            self.matrix = Some(matrix);
+                            return self.push_frame(ValueFrame::MatrixStep);
+                        },
+                    }
+                },
             };
 
         let Some(branch) = branch else {
@@ -4246,7 +4648,7 @@ where
         if branch.is_missing() {
             matrix.output.push(match matrix.kind {
                 MatrixKind::IfError { .. } => RuntimeElement::Missing,
-                MatrixKind::If { .. } => RuntimeElement::Empty,
+                MatrixKind::If { .. } | MatrixKind::Choose { .. } => RuntimeElement::Empty,
             });
             matrix.index += 1;
             self.matrix = Some(matrix);
@@ -4301,6 +4703,12 @@ where
         demand: Shape,
         root_mask: Option<&ShapeMask>,
     ) -> EvaluationResult<Option<Shape>> {
+        // A dynamic lookup probe can itself enter a lazy matrix shape
+        // planner.  That nested planner must not discard the outer branch's
+        // retained results while it discovers its own geometry.
+        if self.probe_depth == 0 {
+            self.lookup_probe_prune(demand)?;
+        }
         self.shape_frames.clear();
         self.shape_values.clear();
         // Clearing drops per-mask storage but retains the outer allocation.
@@ -4346,6 +4754,68 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
+                        if let Some(function) = super::lookup::Function::from_name(name) {
+                            if !function.valid_arity(node.child_count()) {
+                                self.push_shape_value(Some(Shape::new(1, 1)?))?;
+                                continue;
+                            }
+                            if matches!(function, super::lookup::Function::Choose) {
+                                let shape = self.choose_static_shape(node, demand)?;
+                                self.push_shape_value(Some(shape))?;
+                                continue;
+                            }
+                            if let Some(shape) = lookup::shape_base(self, node, function)? {
+                                self.push_shape_value(Some(shape))?;
+                                continue;
+                            }
+                            if lookup::is_dynamic_shape_function(name) {
+                                self.push_shape_frame(ShapeFrame::Lookup { node, demand })?;
+                                continue;
+                            }
+                            if matches!(
+                                function,
+                                super::lookup::Function::Address
+                                    | super::lookup::Function::HLookup
+                                    | super::lookup::Function::VLookup
+                                    | super::lookup::Function::Lookup
+                                    | super::lookup::Function::Match
+                            ) {
+                                // Complete data grids determine what is searched,
+                                // not how many keys or selectors are requested.
+                                let children = (0..node.child_count())
+                                    .filter(|&index| !function.reference_argument(index))
+                                    .count();
+                                self.push_shape_frame(ShapeFrame::Exit {
+                                    node,
+                                    children,
+                                    base: None,
+                                })?;
+                                for index in (0..node.child_count()).rev() {
+                                    if function.reference_argument(index) {
+                                        continue;
+                                    }
+                                    let child = node.child(index).ok_or(
+                                        EvaluationFailure::InvalidExpression(
+                                            "lookup shape argument is missing",
+                                        ),
+                                    )?;
+                                    self.push_shape_frame(ShapeFrame::Enter {
+                                        node: child,
+                                        demand,
+                                    })?;
+                                }
+                                continue;
+                            }
+                            // Dynamic descriptor construction and CHOOSE
+                            // branch selection are planned by their runtime
+                            // continuations. Keep unknown geometry out of
+                            // the generic broadcast walk rather than probing
+                            // a provider speculatively here.
+                            // CHOOSE has its own selected-branch shape path
+                            // above. Dynamic descriptor lookups are handled
+                            // by ShapeFrame::Lookup; no unknown lookup shape
+                            // may fall back to a guessed scalar.
+                        }
                         if let Some(function) = super::reference_metadata::Function::from_name(name)
                         {
                             if !function.valid_arity(node.child_count()) {
@@ -4549,6 +5019,10 @@ where
                     let shape = self.matrix_shape_from_children(function, children)?;
                     self.push_shape_value(shape)?;
                 },
+                ShapeFrame::Lookup { node, demand } => {
+                    let shape = self.lookup_shape_demand(node, demand)?;
+                    self.push_shape_value(shape)?;
+                },
                 ShapeFrame::Exit {
                     node,
                     children,
@@ -4571,6 +5045,208 @@ where
         // Keep its reservation until that capacity is released with the VM.
         self.shape_masks.clear();
         Ok(result)
+    }
+
+    /// Plan CHOOSE without walking unselected branches.
+    ///
+    /// The index shape is established first. A computed index gets a nested
+    /// shape-only pass, carrying the caller's selected mask, so its extent is
+    /// retained without evaluating unselected coordinates. The selected
+    /// CHOOSE result is then probed at each demanded coordinate. That probe
+    /// follows the ordinary lazy CHOOSE path, so only the selected branch is
+    /// visited, and its complete value is retained for the runtime matrix
+    /// continuation.
+    fn choose_static_shape(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: ShapeDemand,
+    ) -> EvaluationResult<Shape> {
+        let Some(mut index) = node.child(0) else {
+            return Shape::new(1, 1);
+        };
+        while matches!(index.kind(), super::Kind::Parenthesized) {
+            index = index.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE index parentheses are empty",
+            ))?;
+        }
+        let static_index_shape = self.static_shape(index)?;
+        let computed_index = static_index_shape.is_none();
+        let index_shape = if computed_index {
+            self.nested_shape_hint_demand(index, demand)?.ok_or(
+                EvaluationFailure::InvalidExpression("CHOOSE index shape is unknown"),
+            )?
+        } else {
+            static_index_shape.ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE index shape disappeared",
+            ))?
+        };
+        let mut shape = broadcast_shape(demand.shape, index_shape).ok_or(
+            EvaluationFailure::InvalidExpression("incompatible CHOOSE index shape"),
+        )?;
+        if computed_index {
+            return self.choose_shape_from_computed_index(node, index, demand, shape);
+        }
+        let mask = self
+            .demand_mask_for_shape(demand, shape)?
+            .map(|mask| self.install_shape_mask(mask))
+            .transpose()?
+            .flatten();
+        let selected_shape = self.lookup_shape_demand(node, ShapeDemand { shape, mask })?;
+        if let Some(selected_shape) = selected_shape {
+            shape = broadcast_shape(shape, selected_shape).ok_or(
+                EvaluationFailure::InvalidExpression("incompatible CHOOSE branch shape"),
+            )?;
+        }
+        Ok(shape)
+    }
+
+    /// Probe a computed CHOOSE index under the selected outer mask. The
+    /// scalar selector is evaluated at each demanded coordinate and the
+    /// selected branch is immediately retained in the same bounded probe
+    /// cache used by the final projected VM. This avoids evaluating the
+    /// whole index once for shape and again for branch selection.
+    fn choose_shape_from_computed_index(
+        &mut self,
+        node: super::Node<'expr>,
+        index_node: super::Node<'expr>,
+        demand: ShapeDemand,
+        mut shape: Shape,
+    ) -> EvaluationResult<Shape> {
+        let mask = self
+            .demand_mask_for_shape(demand, shape)?
+            .map(|mask| self.install_shape_mask(mask))
+            .transpose()?
+            .flatten();
+        let effective_demand = ShapeDemand { shape, mask };
+        let cells = self.demand_len(effective_demand)?;
+        let branch_count = node.child_count().saturating_sub(1);
+        let mut selected_shape = None;
+        for ordinal in 0..cells {
+            let index = self.demand_index(effective_demand, ordinal)?;
+            self.charge_cell_work(index)?;
+            let position = self.offset_position(index, shape)?;
+            if let Some(branch_shape) = self.lookup_probe_cached_shape(
+                node,
+                shape,
+                index,
+                Mode::Scalar,
+                position,
+                self.reference_kind_only,
+                self.reject_source_reference,
+            )? {
+                selected_shape = Some(match selected_shape {
+                    None => branch_shape,
+                    Some(previous) => broadcast_shape(previous, branch_shape).ok_or(
+                        EvaluationFailure::InvalidExpression("incompatible CHOOSE branch shapes"),
+                    )?,
+                });
+                continue;
+            }
+            let index_value = self.evaluate_scalar_at(index_node, shape, index)?;
+            let selection =
+                self.choose_index_runtime_value(index_value, shape, index, branch_count)?;
+            let mut value = match selection {
+                Err(error) => RuntimeValue::Scalar(WorkingValue::Error(error)),
+                Ok(None) => RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
+                Ok(Some(branch_index)) => {
+                    let branch =
+                        node.child(branch_index)
+                            .ok_or(EvaluationFailure::InvalidExpression(
+                                "CHOOSE selected branch is missing",
+                            ))?;
+                    if branch.is_missing() {
+                        RuntimeValue::Empty
+                    } else {
+                        self.evaluate_complete_value_at(branch, shape, index)?
+                    }
+                },
+            };
+            value = self.preserve_choose_result(value);
+            let branch_shape = self.runtime_shape(&value)?;
+            let base_position = self.position;
+            self.lookup_probe_put(
+                node,
+                shape,
+                index,
+                Mode::Scalar,
+                position,
+                base_position,
+                self.reference_kind_only,
+                self.reject_source_reference,
+                false,
+                branch_shape,
+                value,
+            )?;
+            selected_shape = Some(match selected_shape {
+                None => branch_shape,
+                Some(previous) => broadcast_shape(previous, branch_shape).ok_or(
+                    EvaluationFailure::InvalidExpression("incompatible CHOOSE branch shapes"),
+                )?,
+            });
+        }
+        if let Some(selected_shape) = selected_shape {
+            shape = broadcast_shape(shape, selected_shape).ok_or(
+                EvaluationFailure::InvalidExpression("incompatible CHOOSE branch shape"),
+            )?;
+        }
+        Ok(shape)
+    }
+
+    fn choose_index_runtime_value(
+        &mut self,
+        value: RuntimeValue<'expr>,
+        shape: Shape,
+        index: usize,
+        branch_count: usize,
+    ) -> EvaluationResult<Result<Option<usize>, ScalarError>> {
+        match value {
+            RuntimeValue::Array(array) => {
+                let Some(element) = array_element_for(&array, shape, index) else {
+                    return Ok(Err(ScalarError::NotAvailable));
+                };
+                self.choose_index_element(element, branch_count)
+            },
+            RuntimeValue::Empty | RuntimeValue::Missing => Ok(Err(ScalarError::Value)),
+            RuntimeValue::Scalar(value) => self.choose_index_scalar_value(value, branch_count),
+            RuntimeValue::ScalarCell(_)
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
+        }
+    }
+
+    fn choose_index_scalar_value(
+        &mut self,
+        value: WorkingValue<'expr>,
+        branch_count: usize,
+    ) -> EvaluationResult<Result<Option<usize>, ScalarError>> {
+        let value = match super::to_integer(value, &mut self.scalar)? {
+            Ok(value) => value,
+            Err(error) => return Ok(Err(error)),
+        };
+        if !value.is_finite() || value < 1.0 || value > branch_count as f64 {
+            return Ok(Ok(None));
+        }
+        Ok(Ok(Some(value as usize)))
+    }
+
+    fn static_shape(&mut self, mut node: super::Node<'expr>) -> EvaluationResult<Option<Shape>> {
+        while matches!(node.kind(), super::Kind::Parenthesized) {
+            node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE shape parentheses are empty",
+            ))?;
+        }
+        match node.kind() {
+            super::Kind::Array(dimensions) => {
+                let columns = dimensions.columns().ok_or(EvaluationFailure::Unsupported(
+                    super::UnsupportedKind::Array,
+                ))?;
+                Ok(Some(Shape::new(dimensions.rows(), columns)?))
+            },
+            super::Kind::Reference(reference) => self.reference_shape_hint(reference),
+            _ => Ok(None),
+        }
     }
 
     fn lazy_condition(
@@ -4772,6 +5448,19 @@ where
                             "formula value reference shape values",
                         )?;
                         scratch.values.push(value);
+                    },
+                    super::Kind::Function { name } if lookup::may_return_reference(name) => {
+                        let mode = if self.projection.is_some() {
+                            Mode::Matrix
+                        } else {
+                            self.mode
+                        };
+                        let value = self.evaluate_complete_value(node, mode)?;
+                        self.push_reference_runtime_value(
+                            value,
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                        )?;
                     },
                     super::Kind::Function { name } if Self::is_reference_value_handler(name) => {
                         match self.schedule_reference_handler(
@@ -5003,6 +5692,21 @@ where
         }
     }
 
+    fn direct_lookup_reference(&mut self, mut node: super::Node<'expr>) -> EvaluationResult<bool> {
+        loop {
+            self.scalar.charge_work(1)?;
+            match node.kind() {
+                super::Kind::Parenthesized => {
+                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "lookup reference parentheses are empty",
+                    ))?;
+                },
+                super::Kind::Function { name } => return Ok(lookup::may_return_reference(name)),
+                _ => return Ok(false),
+            }
+        }
+    }
+
     fn reference_operand_kind_from_runtime(value: &RuntimeValue<'expr>) -> ReferenceOperandKind {
         match value {
             RuntimeValue::Areas(areas) if areas.is_list => ReferenceOperandKind::ReferenceList,
@@ -5176,6 +5880,20 @@ where
                     },
                     super::Kind::Function { name } => {
                         let count = node.child_count();
+                        if lookup::may_return_reference(name) {
+                            let mode = if self.projection.is_some() {
+                                Mode::Matrix
+                            } else {
+                                self.mode
+                            };
+                            let value = self.evaluate_complete_value(node, mode)?;
+                            self.push_reference_kind_runtime(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                value,
+                            )?;
+                            continue;
+                        }
                         if name.eq_ignore_ascii_case("IF") {
                             if !(1..=3).contains(&count) {
                                 self.push_reference_kind_value(
@@ -5372,6 +6090,8 @@ where
                     let mut metadata_argument = None;
                     let order_function = super::order::OrderFunction::from_name(name);
                     let paired_function = super::paired::PairedFunction::from_name(name);
+                    let lookup_function = super::lookup::Function::from_name(name);
+                    let mut lookup_data = None;
                     for index in (0..count).rev() {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
                         if metadata_function.is_some() {
@@ -5384,6 +6104,12 @@ where
                         if order_function.is_some_and(|function| function.data_argument(index))
                             || paired_function.is_some_and(|function| function.data_argument(index))
                         {
+                            continue;
+                        }
+                        if lookup_function
+                            .is_some_and(|function| function.reference_argument(index))
+                        {
+                            lookup_data = Some(Self::reference_kind_value_into_kind(child));
                             continue;
                         }
                         if name.eq_ignore_ascii_case("AND")
@@ -5432,6 +6158,8 @@ where
                     }
                     if let Some(function) = metadata_function {
                         kind = reference_metadata::reference_kind(function, metadata_argument);
+                    } else if let Some(function) = lookup_function {
+                        kind = lookup::reference_kind(function, lookup_data);
                     } else if let Some(function) = Self::matrix_function(name) {
                         kind = match function {
                             MatrixFunction::Determinant => ReferenceOperandKind::Scalar,
@@ -5750,6 +6478,17 @@ where
         if node.is_missing() {
             return self
                 .push_reference_runtime_value(RuntimeValue::Empty, values, value_reservation)
+                .map_err(Into::into);
+        }
+        if self.direct_lookup_reference(node)? {
+            let mode = if self.projection.is_some() {
+                Mode::Matrix
+            } else {
+                self.mode
+            };
+            let value = self.evaluate_complete_value(node, mode)?;
+            return self
+                .push_reference_runtime_value(value, values, value_reservation)
                 .map_err(Into::into);
         }
         // Resolve a selected matrix function once in array mode.  Its
@@ -6557,6 +7296,61 @@ where
         &mut self,
         root: super::Node<'expr>,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
+        self.evaluate_complete_value(root, Mode::Matrix)
+    }
+
+    /// Re-enter the shape planner for a computed selector while preserving
+    /// the suspended planner's stacks and demand mask.  A CHOOSE index is
+    /// evaluated only where its outer lazy branch is selected; evaluating a
+    /// complete computed index here would both lose that laziness and repeat
+    /// provider reads during the selected-branch probe.
+    fn nested_shape_hint_demand(
+        &mut self,
+        root: super::Node<'expr>,
+        demand: ShapeDemand,
+    ) -> EvaluationResult<Option<Shape>> {
+        let root_mask = demand
+            .mask
+            .map(|mask| self.copy_shape_mask_id(mask))
+            .transpose()?;
+        let _probe_depth_reservation = self.enter_value_probe()?;
+        let saved = self.suspend_shape_planner();
+        let result = self.shape_hint_demand(root, demand.shape, root_mask.as_ref());
+        self.restore_shape_planner(saved);
+        self.probe_depth -= 1;
+        result
+    }
+
+    fn evaluate_complete_value(
+        &mut self,
+        root: super::Node<'expr>,
+        mode: Mode,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        self.evaluate_complete_value_with_context(root, mode, None, None)
+    }
+
+    fn evaluate_complete_value_at(
+        &mut self,
+        root: super::Node<'expr>,
+        demand: Shape,
+        index: usize,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let position = self.offset_position(index, demand)?;
+        self.evaluate_complete_value_with_context(
+            root,
+            Mode::Matrix,
+            Some(position),
+            Some((demand, index)),
+        )
+    }
+
+    fn evaluate_complete_value_with_context(
+        &mut self,
+        root: super::Node<'expr>,
+        mode: Mode,
+        position: Option<Position<'position>>,
+        projection: Option<(Shape, usize)>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
         let _probe_depth_reservation = self.enter_value_probe()?;
         let saved_shape_planner = self.suspend_shape_planner();
         let saved_frames = std::mem::take(&mut self.frames);
@@ -6570,8 +7364,13 @@ where
         let saved_position = self.position;
         let saved_projection = self.projection;
 
-        self.mode = Mode::Matrix;
-        self.projection = None;
+        let saved_reference_kind_only = self.reference_kind_only;
+        let saved_reject_source_reference = self.reject_source_reference;
+        self.mode = mode;
+        if let Some(position) = position {
+            self.position = position;
+        }
+        self.projection = projection;
         let result = self.run_from_without_scalar_demand(root);
 
         // A failed probe can leave partial values or a nested matrix
@@ -6603,6 +7402,8 @@ where
         self.mode = saved_mode;
         self.position = saved_position;
         self.projection = saved_projection;
+        self.reference_kind_only = saved_reference_kind_only;
+        self.reject_source_reference = saved_reject_source_reference;
         self.probe_depth -= 1;
         result
     }
@@ -6699,6 +7500,390 @@ where
             .ok_or(EvaluationFailure::InvalidExpression(
                 "shape planner value stack underflow",
             ))
+    }
+
+    /// Resolve the geometry of a dynamic reference constructor at each
+    /// selected projected coordinate.  The generic shape walk deliberately
+    /// does not combine selector shapes with a descriptor result: the
+    /// descriptor is the result, and its shape can depend on the selector's
+    /// coordinate.
+    fn lookup_shape_demand(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: ShapeDemand,
+    ) -> EvaluationResult<Option<Shape>> {
+        let cells = self.demand_len(demand)?;
+        let mut shape = None;
+        for ordinal in 0..cells {
+            let index = self.demand_index(demand, ordinal)?;
+            self.charge_cell_work(index)?;
+            let current = self.lookup_probe_shape_at(node, demand.shape, index)?;
+            shape = Some(match shape {
+                None => current,
+                Some(previous) => broadcast_shape(previous, current).ok_or(
+                    EvaluationFailure::InvalidExpression(
+                        "incompatible dynamic lookup result shapes",
+                    ),
+                )?,
+            });
+        }
+        Ok(shape)
+    }
+
+    /// Probe one dynamic lookup with the projected coordinate in force and
+    /// retain its complete result.  Shape discovery must not turn an area
+    /// descriptor into a scalar intersection, because the matrix
+    /// continuation consumes this exact result later.
+    fn lookup_probe_shape_at(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: Shape,
+        index: usize,
+    ) -> EvaluationResult<Shape> {
+        let position = self.offset_position(index, demand)?;
+        let base_position = self.position;
+        let mode = Mode::Scalar;
+        let reference_kind_only = self.reference_kind_only;
+        let reject_source_reference = self.reject_source_reference;
+        let demand_invariant = lookup::probe_demand_invariant(node);
+        if let Some(shape) = self.lookup_probe_cached_shape(
+            node,
+            demand,
+            index,
+            mode,
+            position,
+            reference_kind_only,
+            reject_source_reference,
+        )? {
+            return Ok(shape);
+        }
+        let value = self.evaluate_complete_value_at(node, demand, index)?;
+        let shape = self.runtime_shape(&value)?;
+        self.lookup_probe_put(
+            node,
+            demand,
+            index,
+            mode,
+            position,
+            base_position,
+            reference_kind_only,
+            reject_source_reference,
+            demand_invariant,
+            shape,
+            value,
+        )?;
+        Ok(shape)
+    }
+
+    fn lookup_probe_cached_shape(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: Shape,
+        index: usize,
+        mode: Mode,
+        position: Position<'position>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    ) -> EvaluationResult<Option<Shape>> {
+        let ast_node = node;
+        let node = node.arena_index();
+        let context_index = self.lookup_probe_context_position(
+            node,
+            demand,
+            mode,
+            reference_kind_only,
+            reject_source_reference,
+        )?;
+        if let Some(context_index) = context_index {
+            self.scalar.charge_work(1)?;
+            if let Some(Some(entry)) = self
+                .lookup_probe_cache
+                .get(context_index)
+                .and_then(|context| context.entries.get(index))
+            {
+                if entry.position == position {
+                    return Ok(Some(entry.shape));
+                }
+            }
+        }
+        self.scalar.charge_work(1)?;
+        if !lookup::probe_demand_invariant(ast_node) {
+            return Ok(None);
+        }
+        // A shape widening changes the projection demand but not the
+        // absolute position of scalar-only lookup selectors. Reuse such a
+        // probe by position; array-valued selectors stay demand-keyed above.
+        for context_index in 0..self.lookup_probe_cache.len() {
+            self.scalar.charge_work(1)?;
+            let context_matches = {
+                let context = &self.lookup_probe_cache[context_index];
+                context.node == node
+                    && context.demand != demand
+                    && context.demand_invariant
+                    && context.mode == mode
+                    && context.reference_kind_only == reference_kind_only
+                    && context.reject_source_reference == reject_source_reference
+            };
+            if !context_matches {
+                continue;
+            }
+            self.scalar.charge_work(1)?;
+            let old_index = Self::lookup_probe_index_for_position(
+                &self.lookup_probe_cache[context_index],
+                position,
+            );
+            let Some(old_index) = old_index else {
+                continue;
+            };
+            let entry = self.lookup_probe_cache[context_index]
+                .entries
+                .get(old_index)
+                .and_then(Option::as_ref);
+            if let Some(entry) = entry {
+                if entry.position == position {
+                    return Ok(Some(entry.shape));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn lookup_probe_take(
+        &mut self,
+        node: super::Node<'expr>,
+    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
+        let Some((demand, index)) = self.projection else {
+            return Ok(None);
+        };
+        let mode = self.mode;
+        let position = self.position;
+        let reference_kind_only = self.reference_kind_only;
+        let reject_source_reference = self.reject_source_reference;
+        let ast_node = node;
+        let node = node.arena_index();
+        let context_index = self.lookup_probe_context_position(
+            node,
+            demand,
+            mode,
+            reference_kind_only,
+            reject_source_reference,
+        )?;
+        if let Some(context_index) = context_index {
+            self.scalar.charge_work(1)?;
+            let entry = self
+                .lookup_probe_cache
+                .get_mut(context_index)
+                .and_then(|context| context.entries.get_mut(index))
+                .and_then(Option::take);
+            if let Some(entry) = entry {
+                if entry.position == position {
+                    return Ok(Some(entry.value));
+                }
+                // The slot is safe to discard when its absolute position no
+                // longer matches. The final continuation cannot consume it.
+            }
+        }
+        self.scalar.charge_work(1)?;
+        if lookup::probe_demand_invariant(ast_node) {
+            for context_index in 0..self.lookup_probe_cache.len() {
+                self.scalar.charge_work(1)?;
+                let matches = {
+                    let context = &self.lookup_probe_cache[context_index];
+                    context.node == node
+                        && context.demand != demand
+                        && context.demand_invariant
+                        && context.mode == mode
+                        && context.reference_kind_only == reference_kind_only
+                        && context.reject_source_reference == reject_source_reference
+                };
+                if !matches {
+                    continue;
+                }
+                let old_index = Self::lookup_probe_index_for_position(
+                    &self.lookup_probe_cache[context_index],
+                    position,
+                );
+                let Some(old_index) = old_index else {
+                    continue;
+                };
+                let entry = self
+                    .lookup_probe_cache
+                    .get_mut(context_index)
+                    .and_then(|context| context.entries.get_mut(old_index))
+                    .and_then(Option::take);
+                if let Some(entry) = entry {
+                    if entry.position == position {
+                        return Ok(Some(entry.value));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn lookup_probe_put(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: Shape,
+        index: usize,
+        mode: Mode,
+        position: Position<'position>,
+        base_position: Position<'position>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+        demand_invariant: bool,
+        shape: Shape,
+        value: RuntimeValue<'expr>,
+    ) -> EvaluationResult<()> {
+        let node = node.arena_index();
+        let context_index = match self.lookup_probe_context_position(
+            node,
+            demand,
+            mode,
+            reference_kind_only,
+            reject_source_reference,
+        )? {
+            Some(index) => index,
+            None => {
+                ensure_capacity(
+                    &mut self.lookup_probe_cache,
+                    &mut self.lookup_probe_cache_reservation,
+                    1,
+                    self.limits.scalar.max_stack_entries,
+                    self.execution,
+                    &self.storage_budget,
+                    "formula value lookup shape probe contexts",
+                )?;
+                self.scalar.charge_work(1)?;
+                let index = self.lookup_probe_cache.len();
+                self.lookup_probe_cache.push(LookupProbeContext {
+                    node,
+                    demand,
+                    demand_invariant,
+                    base_position,
+                    mode,
+                    reference_kind_only,
+                    reject_source_reference,
+                    entries: Vec::new(),
+                    reservation: None,
+                });
+                index
+            },
+        };
+        let required = index
+            .checked_add(1)
+            .ok_or(EvaluationFailure::ResourceLimit(self.local_limit(
+                Resource::Objects,
+                u64::MAX,
+                self.limits.max_array_cells,
+            )))?;
+        let context = self.lookup_probe_cache.get_mut(context_index).ok_or(
+            EvaluationFailure::InvalidExpression("lookup shape probe context disappeared"),
+        )?;
+        if required > self.limits.max_array_cells {
+            return Err(EvaluationFailure::ResourceLimit(self.local_limit(
+                Resource::Objects,
+                u64::try_from(required).unwrap_or(u64::MAX),
+                self.limits.max_array_cells,
+            )));
+        }
+        let additional = required.saturating_sub(context.entries.len());
+        ensure_capacity(
+            &mut context.entries,
+            &mut context.reservation,
+            additional,
+            self.limits.max_array_cells,
+            self.execution,
+            &self.storage_budget,
+            "formula value lookup shape probe entries",
+        )?;
+        if additional != 0 {
+            self.scalar
+                .charge_work(u64::try_from(additional).unwrap_or(u64::MAX))?;
+            context.entries.resize_with(required, || None);
+        }
+        if let Some(slot) = context.entries.get_mut(index) {
+            if let Some(entry) = slot.as_mut() {
+                if entry.position == position {
+                    entry.shape = shape;
+                    entry.value = value;
+                    return Ok(());
+                }
+            }
+            *slot = Some(LookupProbeEntry {
+                position,
+                shape,
+                value,
+            });
+            return Ok(());
+        }
+        Err(EvaluationFailure::InvalidExpression(
+            "lookup shape probe entry is missing",
+        ))
+    }
+
+    fn lookup_probe_context_position(
+        &mut self,
+        node: usize,
+        demand: Shape,
+        mode: Mode,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    ) -> EvaluationResult<Option<usize>> {
+        for index in 0..self.lookup_probe_cache.len() {
+            self.scalar.charge_work(1)?;
+            let context = &self.lookup_probe_cache[index];
+            if context.node == node
+                && context.demand == demand
+                && context.mode == mode
+                && context.reference_kind_only == reference_kind_only
+                && context.reject_source_reference == reject_source_reference
+            {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Discard probes from a previous shape demand while preserving results
+    /// that can be consumed by a sibling branch at the current demand.  The
+    /// vector is bounded by `max_array_cells`; charging this pass keeps cache
+    /// growth visible to the work budget as well.
+    fn lookup_probe_prune(&mut self, demand: Shape) -> EvaluationResult<()> {
+        let mut index = 0;
+        while index < self.lookup_probe_cache.len() {
+            self.scalar.charge_work(1)?;
+            if self.lookup_probe_cache[index].demand == demand
+                || self.lookup_probe_cache[index].demand_invariant
+            {
+                index += 1;
+            } else {
+                self.lookup_probe_cache.swap_remove(index);
+            }
+        }
+        Ok(())
+    }
+
+    /// Map an absolute projected position back to the direct slot used by an
+    /// older demand context.  A shape can widen while the evaluator is
+    /// continuing a projected branch (for example, from a 2x1 result to a
+    /// 2x2 result).  Reusing the new row-major index would then point at the
+    /// wrong old slot; the original demand's origin and width define the
+    /// correct coordinate mapping.
+    fn lookup_probe_index_for_position(
+        context: &LookupProbeContext<'expr, 'position>,
+        position: Position<'position>,
+    ) -> Option<usize> {
+        if context.base_position.sheet != position.sheet {
+            return None;
+        }
+        let row = position.row.checked_sub(context.base_position.row)?;
+        let column = position.column.checked_sub(context.base_position.column)?;
+        if row >= context.demand.rows() || column >= context.demand.columns() {
+            return None;
+        }
+        row.checked_mul(context.demand.columns())?
+            .checked_add(column)
     }
 
     fn runtime_shape(&mut self, value: &RuntimeValue<'expr>) -> EvaluationResult<Shape> {
@@ -6902,6 +8087,20 @@ where
         if reference_metadata::is_reference_metadata_function(name) {
             let value = reference_metadata::apply(self, name, arguments)?;
             if self.projection.is_some() && self.cacheable_scalar_branch(node)? {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if lookup::is_lookup_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = lookup::apply(self, node, name, arguments)?;
+            if cacheable {
                 self.demand_cache_put(node, &value)?;
             }
             return self.push_value(value);
