@@ -20,6 +20,7 @@ import subprocess
 HERE = Path(__file__).resolve().parent
 EVIDENCE = HERE.parent
 ROOT = HERE.parents[4]
+COVERAGE_SCOPE = "docs/report/spec-gap-validation-evidence/ods-formula-lookups/coverage-scope.json"
 
 
 def digest(path: Path) -> str:
@@ -105,6 +106,8 @@ def main() -> int:
     sources = {relative: (HERE / "Cargo.lock" if relative == "Cargo.lock" else ROOT / relative) for relative in sorted(profile_sources(profile))}
     if "Cargo.lock" not in sources:
         raise RuntimeError("performance profile must declare Cargo.lock")
+    if COVERAGE_SCOPE not in sources:
+        raise RuntimeError("performance profile must declare immutable coverage-scope.json")
     lock_hash = config.get("gate_lock_sha256")
     if not isinstance(lock_hash, str) or digest(HERE / "Cargo.lock") != lock_hash:
         raise RuntimeError("retained gate Cargo.lock does not match baseline")

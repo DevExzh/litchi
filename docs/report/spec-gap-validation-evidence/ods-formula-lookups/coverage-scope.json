@@ -1,0 +1,91 @@
+{
+  "schema": "ods-formula-lookups-coverage-scope-v1",
+  "normative": "OpenDocument 1.4 Part 4 section 6.14",
+  "functions": {
+    "ADDRESS": [
+      "all four absolute modes",
+      "A1 and R1C1 text",
+      "optional quoted sheet and apostrophe escaping",
+      "scalar and matrix parameter conversion",
+      "text/storage/work limits"
+    ],
+    "CHOOSE": [
+      "only selected expression evaluated",
+      "scalar and matrix index policy",
+      "selected reference/list/source identity",
+      "shape probing does not evaluate unselected branches",
+      "typed failures not caught"
+    ],
+    "HLOOKUP": [
+      "ForceArray data with complete shape",
+      "exact first match in left-to-right order",
+      "sorted approximate last duplicate",
+      "result row bounds before reads",
+      "only selected result cell read"
+    ],
+    "INDEX": [
+      "Array and ReferenceList data",
+      "logical record area selector including duplicates",
+      "zero/omitted row and column slices",
+      "3D descriptor preservation",
+      "reference identity in metadata/reducers/operators",
+      "derived result owned conversion"
+    ],
+    "INDIRECT": [
+      "A1 cells/ranges/whole axes/3D",
+      "dot and exclamation sheet separators",
+      "R1C1 absolute and relative coordinates",
+      "first-element selector semantics for array inputs",
+      "temporary parse storage charged",
+      "source references inert",
+      "derived result owned conversion"
+    ],
+    "LOOKUP": [
+      "tall/square and wide orientation",
+      "largest less-than-or-equal and last duplicate",
+      "result vector shape validation",
+      "short reference result extension and sheet edge refusal",
+      "short Array result out-of-bounds error",
+      "text/number mismatch barrier"
+    ],
+    "MATCH": [
+      "vector shape validation",
+      "exact first match",
+      "ascending and descending last duplicate",
+      "case-insensitive Unicode text",
+      "type order and mismatch barriers",
+      "bounded sorted search reads"
+    ],
+    "OFFSET": [
+      "checked signed row/column offsets",
+      "omitted dimensions default; actual Empty dimensions are invalid",
+      "strictly positive dimensions",
+      "3D extents validated on every plane",
+      "list admission rule",
+      "zero-read descriptor construction",
+      "derived result owned conversion"
+    ],
+    "VLOOKUP": [
+      "ForceArray data with complete shape",
+      "exact first match in top-to-bottom order",
+      "sorted approximate last duplicate",
+      "result column bounds before reads",
+      "only selected result cell read"
+    ]
+  },
+  "cross_cutting": [
+    "formula errors versus typed provider failures",
+    "cancellation before and after resolver calls",
+    "source-version fence before and after evaluation",
+    "all memory reservations released on failure",
+    "projection-sensitive MUNIT descendants",
+    "reference lists never implicitly materialized as arrays",
+    "no package or formula-cache mutation",
+    "independent oracle and native compatibility record",
+    "frozen seven-gate receipts",
+    "matched performance controls and scaling with retained raw attempts",
+    "invalid lookup selectors precede reference-key reads",
+    "sequential computed CHOOSE probe depth and memory release",
+    "position-sensitive computed CHOOSE selector cache exclusion"
+  ]
+}

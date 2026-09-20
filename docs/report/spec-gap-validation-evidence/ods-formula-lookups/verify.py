@@ -33,6 +33,7 @@ SEMANTIC_REVIEW = HERE / "semantic-review.md"
 RESOURCE_REVIEW = HERE / "resource-review.md"
 REVIEW_RECEIPT = HERE / "review-receipt.json"
 COVERAGE_REQUIREMENTS = HERE / "coverage-requirements.json"
+COVERAGE_SCOPE = HERE / "coverage-scope.json"
 
 
 class VerificationError(RuntimeError):
@@ -171,6 +172,7 @@ def validate_repo_relative(relative: Any, label: str) -> str:
 # in that receipt.  This keeps a planning note or an arbitrary dictionary from
 # becoming an accidental approval.
 COVERAGE_SCHEMA = "ods-formula-lookups-coverage-v1"
+COVERAGE_SCOPE_SCHEMA = "ods-formula-lookups-coverage-scope-v1"
 COVERAGE_KINDS = {
     "focused_test",
     "oracle",
@@ -183,6 +185,7 @@ BINDING_KEYS = {"kind", "root", "path", "sha256", "identifiers", "requirements",
 RECEIPT_KEYS = {"root", "path", "sha256"}
 EVIDENCE_KEYS = {"schema", "status", "contract_sha256", "bindings"}
 CROSS_EVIDENCE_KEYS = {"requirement", "evidence"}
+COVERAGE_SCOPE_KEYS = {"schema", "normative", "functions", "cross_cutting"}
 
 
 def resolve_bound_file(root_name: Any, relative: Any, label: str) -> Path:
@@ -669,6 +672,58 @@ def verify_contract() -> dict[str, Any]:
     return {"sha256": expected_hash, "functions": list(FUNCTIONS)}
 
 
+def coverage_scope_projection(value: dict[str, Any]) -> dict[str, Any]:
+    """Return the immutable requirement projection of the mutable manifest."""
+
+    functions = value.get("functions")
+    if not isinstance(functions, dict):
+        raise VerificationError("coverage manifest functions are absent for scope projection")
+    projected_functions: dict[str, Any] = {}
+    for name in FUNCTIONS:
+        entry = functions.get(name)
+        if not isinstance(entry, dict) or not isinstance(entry.get("requirements"), list):
+            raise VerificationError(f"coverage function {name} has no requirement projection")
+        projected_functions[name] = entry["requirements"]
+    cross_cutting = value.get("cross_cutting")
+    if not isinstance(cross_cutting, list):
+        raise VerificationError("coverage cross-cutting requirements are absent for scope projection")
+    return {
+        "schema": COVERAGE_SCOPE_SCHEMA,
+        "normative": value.get("normative"),
+        "functions": projected_functions,
+        "cross_cutting": cross_cutting,
+    }
+
+
+def validate_coverage_scope(
+    observed: Any,
+    expected: dict[str, Any],
+    label: str = "coverage scope",
+) -> None:
+    """Reject missing fields or any change to the frozen requirement scope."""
+
+    if not isinstance(observed, dict) or set(observed) != COVERAGE_SCOPE_KEYS:
+        raise VerificationError(f"{label} has an unexpected schema or fields")
+    equal(f"{label} schema", observed.get("schema"), COVERAGE_SCOPE_SCHEMA)
+    equal(f"{label} projection", observed, expected)
+
+
+def verify_coverage_scope(value: dict[str, Any], path: Path = COVERAGE_SCOPE) -> dict[str, Any]:
+    """Verify the retained immutable scope before accepting mutable evidence."""
+
+    if not path.is_file():
+        raise PendingReceipt(f"immutable coverage scope is absent: {path.name}")
+    observed = read_json(path)
+    expected = coverage_scope_projection(value)
+    validate_coverage_scope(observed, expected)
+    return {
+        "sha256": digest(path),
+        "schema": COVERAGE_SCOPE_SCHEMA,
+        "functions": len(expected["functions"]),
+        "cross_cutting": len(expected["cross_cutting"]),
+    }
+
+
 def verify_coverage() -> dict[str, Any]:
     """Require hashed, case-bound evidence for every requirement.
 
@@ -745,6 +800,7 @@ def verify_coverage() -> dict[str, Any]:
         raise VerificationError("coverage cross_cutting requirements are malformed")
     if len(cross_cutting) != len(set(cross_cutting)):
         raise VerificationError("coverage cross_cutting requirements contain duplicates")
+    scope_receipt = verify_coverage_scope(value)
 
     # Validate the shape of any cross-cutting entries even while the manifest
     # is pending.  A pending bundle may leave an entry's evidence null, but it
@@ -840,6 +896,7 @@ def verify_coverage() -> dict[str, Any]:
         )
     return {
         "sha256": digest(COVERAGE_REQUIREMENTS),
+        "scope_sha256": scope_receipt["sha256"],
         "functions": len(functions),
         "cross_cutting": len(cross_cutting),
         "function_bindings": sum(item["bindings"] for item in function_receipts.values()),
@@ -1192,9 +1249,9 @@ def verify_source_closure() -> dict[str, Any]:
     selected = freeze.get("selected_files")
     if not isinstance(selected, dict) or not selected or "Cargo.lock" not in selected:
         raise VerificationError("frozen selected source map is incomplete")
-    coverage_relative = str(COVERAGE_REQUIREMENTS.relative_to(REPO))
-    if coverage_relative not in selected:
-        raise VerificationError("frozen selected source map omits coverage-requirements.json")
+    scope_relative = str(COVERAGE_SCOPE.relative_to(REPO))
+    if scope_relative not in selected:
+        raise VerificationError("frozen selected source map omits immutable coverage-scope.json")
     for relative in selected:
         validate_repo_relative(relative, "frozen selected source")
     equal("staged source path set", set(staged), set(selected))

@@ -96,6 +96,7 @@ SOURCE_FILES = (
     "crates/litchi-ods/tests/ods_formula_functions.rs",
     "crates/litchi-ods/docs/FEATURE_MATRIX.md",
     "docs/report/spec-gap-validation-evidence/ods-formula-lookups/baseline.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-lookups/coverage-scope.json",
 )
 SOURCE_FILE_GLOBS = (
     "crates/litchi-ods/src/codec/formula/evaluation/value/*.rs",
