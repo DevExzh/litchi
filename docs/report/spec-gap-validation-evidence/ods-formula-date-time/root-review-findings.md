@@ -49,3 +49,28 @@ checks exist and to add negative cases for forged receipts and identifiers.
 
 Resolution of these findings requires checking the final source and relevant
 tests; this document is not a substitute for that check.
+
+## Integration diagnostics and gate custody
+
+The third isolated `cargo check --locked --offline -p litchi-ods` snapshot
+reduced compilation failures to two value-adapter errors: an unwrapped text
+argument passed to `to_number`, and an unnecessary mutable binding. After
+those fixes, the fourth snapshot reached thirteen unused-helper errors.
+Neither run is a passing package gate. The isolated checkout retains lock
+`58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3`;
+the ambient root lock was not changed.
+
+Gate staging now selects the complete recursive evaluator source closure,
+including the shared projected-argument helper in `value/lookup.rs`. Oracle
+inputs use an explicit allowlist; future execution receipts cannot enter the
+freeze and create a circular dependency. Negative cases also reject arbitrary
+performance harness outputs and mutable coverage bindings. Root reran both
+gate-closure and coverage negative suites successfully.
+
+The independent oracle checker recomputed all 132 vectors across 24 functions
+against contract `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`.
+The native reproducer checked 126 deterministic rows and kept six volatile
+host observations separate, using a fresh profile that it removed afterwards.
+These checks validate expected-value and compatibility artifacts; Rust oracle
+execution, final source review, full package gates, and performance capture
+remain pending.
