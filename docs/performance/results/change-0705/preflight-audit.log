@@ -1,0 +1,9 @@
+Current-head native evidence and phase sums verified: /tmp/litchi-0705-audit-qsh7ie2a/analysis.json
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0705/audit.py", line 43, in <module>
+    if __name__ == '__main__': main()
+                               ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0705/audit.py", line 37, in main
+    assert json.loads(result.read_text()) == json.loads((P / output).read_text()), output
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: analysis.json

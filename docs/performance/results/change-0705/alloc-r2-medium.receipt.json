@@ -1,0 +1,27 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline-alloc",
+    "--warmup",
+    "2",
+    "--samples",
+    "3",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0705/alloc-r2-medium.json"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "90e1692be1c94fe262b1cec629cb5a7e9e85fd302ee46bdbec351f851327e5f9",
+  "artifacts": {
+    "alloc-r2-medium.json": "dea97e4c1b637efd4105a44f4c4501bbe8fcd33110a2b5b556d103a21741a81d",
+    "alloc-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "script_sha256": "dc8c2be93f8366d91188447d14d76de1924ff463724df7116f26270add593c60",
+  "source_manifest_sha256": "8efecea3a3388b92a2ba66f994947b8e54e15b301021a88252c4e824a95a2307"
+}

@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0705 — refreshed XLSX priorities after PPTX retention
+
+[0704](0704-pptx-bounded-slide-mce-retention.md) retains bounded slide MCE
+projections, with scoped real-file commit gains and explicit memory costs.
+[0705](0705-xlsx-edit-save-baseline-refresh.md) returns to XLSX with fresh
+native phase, allocation, producer and RSS evidence. It identifies publication
+and planning ahead of commit on two synthetic one-percent edit/save shapes.
+Production is unchanged in this diagnostic. Neither historical measurements
+nor selector availability establish current broad CRUD coverage. Physical
+cold-cache, general scaling and the broader non-iWork GOAL remain open.
+
 ## 0692 — measured PPTX capture projection reuse
 
 [0692](0692-pptx-capture-name-projection.md) follows the fresh 0691 attribution

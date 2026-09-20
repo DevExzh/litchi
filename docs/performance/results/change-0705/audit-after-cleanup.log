@@ -1,0 +1,5 @@
+Current-head native evidence and phase sums verified: /tmp/litchi-0705-audit-lfvxrk6w/analysis.json
+0705 allocation evidence pass: /tmp/litchi-0705-audit-lfvxrk6w/allocation-analysis.json
+Publication profile edges verified: /tmp/litchi-0705-audit-lfvxrk6w/profile-analysis.json (4 profiles)
+PASS producer repetition and whole-child RSS controls
+PASS source, constraints, six evidence gates and four independent recomputations

@@ -1,0 +1,254 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "exit_code": 2,
+  "raw_diagnostic_sha256": "84f08590b4b508afe2b22ebe50c9ac8d1040592ad1d4bb3762af49a4339de554",
+  "exceptions": [
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.1",
+      "warning": "trailing whitespace.",
+      "occurrences": 195
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.2",
+      "warning": "trailing whitespace.",
+      "occurrences": 95
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.3",
+      "warning": "trailing whitespace.",
+      "occurrences": 968
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.4",
+      "warning": "trailing whitespace.",
+      "occurrences": 97
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.5",
+      "warning": "trailing whitespace.",
+      "occurrences": 968
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.callgrind.6",
+      "warning": "trailing whitespace.",
+      "occurrences": 963
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.inclusive.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.inclusive.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.self.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.self.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-dense-sparse.stderr",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.1",
+      "warning": "trailing whitespace.",
+      "occurrences": 197
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.2",
+      "warning": "trailing whitespace.",
+      "occurrences": 95
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.3",
+      "warning": "trailing whitespace.",
+      "occurrences": 954
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.4",
+      "warning": "trailing whitespace.",
+      "occurrences": 96
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.5",
+      "warning": "trailing whitespace.",
+      "occurrences": 953
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.callgrind.6",
+      "warning": "trailing whitespace.",
+      "occurrences": 959
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.inclusive.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.inclusive.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.self.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.self.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r1-medium.stderr",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.1",
+      "warning": "trailing whitespace.",
+      "occurrences": 196
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.2",
+      "warning": "trailing whitespace.",
+      "occurrences": 95
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.3",
+      "warning": "trailing whitespace.",
+      "occurrences": 970
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.4",
+      "warning": "trailing whitespace.",
+      "occurrences": 97
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.5",
+      "warning": "trailing whitespace.",
+      "occurrences": 970
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.callgrind.6",
+      "warning": "trailing whitespace.",
+      "occurrences": 963
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.inclusive.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.inclusive.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.self.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.self.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-dense-sparse.stderr",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.1",
+      "warning": "trailing whitespace.",
+      "occurrences": 197
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.2",
+      "warning": "trailing whitespace.",
+      "occurrences": 95
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.3",
+      "warning": "trailing whitespace.",
+      "occurrences": 952
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.4",
+      "warning": "trailing whitespace.",
+      "occurrences": 94
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.5",
+      "warning": "trailing whitespace.",
+      "occurrences": 952
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.callgrind.6",
+      "warning": "trailing whitespace.",
+      "occurrences": 958
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.inclusive.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.inclusive.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.self.txt",
+      "warning": "new blank line at EOF.",
+      "occurrences": 1
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.self.txt",
+      "warning": "trailing whitespace.",
+      "occurrences": 6
+    },
+    {
+      "path": "docs/performance/results/change-0705/profile-r2-medium.stderr",
+      "warning": "trailing whitespace.",
+      "occurrences": 3
+    }
+  ],
+  "authored_files_clean": true,
+  "policy": "Only raw Callgrind, profiler stderr and annotation bytes have whitespace exceptions; retain their exact capture hashes."
+}

@@ -1,0 +1,142 @@
+[
+  {
+    "shape": "medium",
+    "phase": "plan",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 67845,
+      "reallocation_calls": 199,
+      "allocated_bytes": 12139796,
+      "deallocated_bytes": 9939732,
+      "failed_allocation_calls": 0,
+      "net_live": 2200064,
+      "peak_above_start": 3191768
+    }
+  },
+  {
+    "shape": "medium",
+    "phase": "staging",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 389,
+      "reallocation_calls": 105,
+      "allocated_bytes": 1899381,
+      "deallocated_bytes": 1887154,
+      "failed_allocation_calls": 0,
+      "net_live": 12227,
+      "peak_above_start": 28521
+    }
+  },
+  {
+    "shape": "medium",
+    "phase": "commit_core",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 42383,
+      "reallocation_calls": 358,
+      "allocated_bytes": 3205114,
+      "deallocated_bytes": 1158860,
+      "failed_allocation_calls": 0,
+      "net_live": 2046254,
+      "peak_above_start": 2058609
+    }
+  },
+  {
+    "shape": "medium",
+    "phase": "commit",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 42772,
+      "reallocation_calls": 463,
+      "allocated_bytes": 5104495,
+      "deallocated_bytes": 3046014,
+      "failed_allocation_calls": 0,
+      "net_live": 2058481,
+      "peak_above_start": 2070836
+    }
+  },
+  {
+    "shape": "medium",
+    "phase": "publication",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 19197,
+      "reallocation_calls": 40,
+      "allocated_bytes": 4126154,
+      "deallocated_bytes": 4141787,
+      "failed_allocation_calls": 0,
+      "net_live": -15633,
+      "peak_above_start": 1095243
+    }
+  },
+  {
+    "shape": "dense-sparse",
+    "phase": "plan",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 129411,
+      "reallocation_calls": 162,
+      "allocated_bytes": 15850404,
+      "deallocated_bytes": 11650189,
+      "failed_allocation_calls": 0,
+      "net_live": 4200215,
+      "peak_above_start": 7602062
+    }
+  },
+  {
+    "shape": "dense-sparse",
+    "phase": "staging",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 725,
+      "reallocation_calls": 186,
+      "allocated_bytes": 2916044,
+      "deallocated_bytes": 2890100,
+      "failed_allocation_calls": 0,
+      "net_live": 25944,
+      "peak_above_start": 35828
+    }
+  },
+  {
+    "shape": "dense-sparse",
+    "phase": "commit_core",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 80110,
+      "reallocation_calls": 510,
+      "allocated_bytes": 5968832,
+      "deallocated_bytes": 2066063,
+      "failed_allocation_calls": 0,
+      "net_live": 3902769,
+      "peak_above_start": 3931745
+    }
+  },
+  {
+    "shape": "dense-sparse",
+    "phase": "commit",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 80835,
+      "reallocation_calls": 696,
+      "allocated_bytes": 8884876,
+      "deallocated_bytes": 4956163,
+      "failed_allocation_calls": 0,
+      "net_live": 3928713,
+      "peak_above_start": 3957689
+    }
+  },
+  {
+    "shape": "dense-sparse",
+    "phase": "publication",
+    "samples": 6,
+    "metrics": {
+      "allocation_calls": 36573,
+      "reallocation_calls": 40,
+      "allocated_bytes": 5747529,
+      "deallocated_bytes": 5763162,
+      "failed_allocation_calls": 0,
+      "net_live": -15633,
+      "peak_above_start": 1604554
+    }
+  }
+]

@@ -1,5 +1,38 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0705 — current XLSX edit/save phases and allocations
+
+[0705](0705-xlsx-edit-save-baseline-refresh.md) refreshes source-backed
+one-percent edits without changing production. Medium total medians are
+16.656 / 16.659 ms; dense-sparse medians are 32.763 / 33.263 ms. Publication
+accounts for 40.81–43.17%, planning 35.73–37.65%, and commit 20.77–21.04%
+of summed measured time. Separate allocator, producer and whole-child RSS
+controls retain their distinct scopes. Historical 0520 timings predate several
+implemented optimizations and are not a matched speedup baseline. Five
+open-phase repeat-variation flags remain visible. No coverage promotion.
+
+## 0704 — bounded slide projection retention across commit
+
+[0704](0704-pptx-bounded-slide-mce-retention.md) retains successful owned
+slide MCE projections under a default 1 MiB logical ceiling. Longer paired
+real-file one-edit medians improve 18.95% / 19.19%, and two-edit medians
+18.98% / 17.96%. Initial commit medians fall from about 5.0 ms to 2.9 ms;
+capture remains about 4.6 ms. The real capture retains 539,340 charged bytes.
+One-edit allocation peak above start rises from 459,170 to 954,239 bytes;
+whole-child profile RSS rises from 5,832 to 6,168 KiB. This trades bounded
+retention for less repeated work. Refusal and phase-tail review triggers,
+controls, exact-source ownership, release semantics and validation evidence
+remain explicit in the report; no universal tail or memory-saving claim.
+
+## 0703 — projection reuse diagnostic
+
+[0703](0703-pptx-capture-projection-reuse-diagnostic.md) records twelve fresh
+process traces across real/generated and no-op/one-edit/two-edit workflows.
+Real capture performs 18 default MCE calls; each changed commit repeats 18.
+The thirteen unique owned slide outputs occupy 538,356 bytes of capacity.
+Generated outputs are borrowed. This diagnostic supplied the reuse and
+retention evidence for 0704; it makes no latency claim.
+
 ## 0702 — retained borrowed inherited namespaces after marker-search isolation
 
 [0702](0702-mce-borrowed-inherited-after-marker-search.md) retries the

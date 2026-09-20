@@ -1,0 +1,3 @@
+{
+  "reason": "Retained analysis preceded the final analyzer checks metadata. Recomputed output adds checks; all prior derived fields and raw measurements are unchanged."
+}

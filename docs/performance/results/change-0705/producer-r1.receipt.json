@@ -1,0 +1,38 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0705/release/litchi-perf-baseline",
+    "--warmup",
+    "20",
+    "--samples",
+    "100",
+    "--case",
+    "xlsx_producer_medium_source_one_edit_save",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0705/producer-r1.producer.json",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0705/producer-r1.json"
+  ],
+  "start_utc": "2026-09-20T04:26:20.686161+00:00",
+  "end_utc": "2026-09-20T04:26:21.394408+00:00",
+  "seconds": 0.7082433110335842,
+  "exit_code": 0,
+  "binary_sha256": "96765510fad9eab59d9928a10cfe8a4260f0c5c1f39d9503b532156952089d61",
+  "script_sha256": "669d8cbc538fccfff80923c415d310e948b43aef425ca0ad343fa256dd39ae56",
+  "source_manifest_sha256": "8efecea3a3388b92a2ba66f994947b8e54e15b301021a88252c4e824a95a2307",
+  "plan_sha256": "5fa388a893e8ceab85c53497cc4dc91c70a605e300b3195e8a530fb61dac89f5",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "producer-r1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "producer-r1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "producer-r1.producer.json": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca",
+    "producer-r1.json": "2612c5bd79286d5d939bb12b3695b34ae7a267238bf21880695c2d69c2220ae2"
+  }
+}

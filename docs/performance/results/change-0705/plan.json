@@ -1,0 +1,22 @@
+{
+  "revision": "eac6f43db52f4092c50ecc3e1058685024b3bfaf",
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "native_repeats": 2,
+  "warmup": 20,
+  "samples": 100,
+  "cpu": 12,
+  "performance_claim": "none; current-head diagnostic, not a historical speed comparison",
+  "timing": "sum of open, plan, staged sets plus commit, publication including returned snapshot drop; excludes sink setup, other handle drops, reopen and oracles",
+  "provider": "instrumented in-memory ReadAt; fresh editor/cache per iteration, warm process",
+  "producer_control": {
+    "case": "xlsx_producer_medium_source_one_edit_save",
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 100,
+    "scope": "separate total timer; numeric edit on planning sheet in producer Edit workbook containing SST; no shared-string-sheet edit or phase attribution"
+  }
+}
