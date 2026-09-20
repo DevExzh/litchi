@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "tools/check_crate_boundaries.py"
+  ],
+  "environment_overrides": {},
+  "exit_code": 0,
+  "seconds": 263.83153087703977,
+  "source_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+  "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+  "runner_sha256": "288f8796733014d4be47227ad62c47becf0a1c8d8a3f1d46548b1ca6ae8e7655"
+}

@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0719",
+    "-j",
+    "2",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "environment_overrides": {},
+  "exit_code": 0,
+  "seconds": 92.86837774701416,
+  "source_sha256": "3764d680e7b9aab5f00ea1ed4dabe3ed87519b3ecf24064f69b5f0396597fc8d",
+  "log_sha256": "509e7a3322c83f0b6930e9088429879c3988746a716fda7d62f84317381906eb",
+  "runner_sha256": "288f8796733014d4be47227ad62c47becf0a1c8d8a3f1d46548b1ca6ae8e7655"
+}

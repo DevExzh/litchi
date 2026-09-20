@@ -238,10 +238,10 @@ impl ArchiveOptions {
         worksheet_relationships: false,
         workbook_root_markers: false,
     };
-    /// The frozen historical edit variant. Its byte identity stays stable
-    /// even as the editor admits more of the complete producer signature.
-    /// Shared strings are retained while the planning worksheet uses numeric
-    /// cells; the selected shared-string worksheet proves its read path separately.
+    /// The largest subset of that signature the value-only editor admits.
+    /// Shared strings are retained even though the planning worksheet uses
+    /// numeric cells; the selected shared-string worksheet proves its read
+    /// path separately.
     const ADMITTED: Self = Self {
         namespace_declarations: true,
         markup_compatibility_attributes: false,
@@ -263,9 +263,10 @@ impl ArchiveOptions {
 
 /// What a worksheet of the producer shape carries beyond the plain grid.
 ///
-/// Separate roles preserve the historical corpus identities and let admission
-/// probes isolate each producer feature. Former allow-list refusals are now
-/// admitted by the dependency rule, as the producer verdict tests record.
+/// The roles are deliberately separated so one corpus can prove each library
+/// gate independently: the value-only editor admits a shared-string worksheet
+/// but refuses a relationship-bearing worksheet before it parses, so a sheet
+/// carrying both can only witness the latter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum SheetRole {
@@ -298,8 +299,8 @@ impl SheetRole {
     }
 }
 
-/// Numeric worksheet selected by the existing planning and edit/save cases.
-/// Other roles have separate read/admission probes.
+/// Worksheet index the planning and edit/save selectors act on: the one role
+/// the value-only editor admits.
 const PLANNING_SHEET: usize = 0;
 /// Worksheet index the selected-cell selector reads: the shared-string role.
 const SELECTED_SHEET: usize = 1;
@@ -2228,7 +2229,7 @@ mod tests {
     fn rewrite_archive_member(
         archive: &[u8],
         target: &str,
-        rewrite: impl FnMut(Vec<u8>) -> Vec<u8>,
+        mut rewrite: impl FnMut(Vec<u8>) -> Vec<u8>,
     ) -> Vec<u8> {
         let reader = ArchiveReader::new(archive).expect("archive reader");
         let mut writer = StreamingArchiveWriter::new();

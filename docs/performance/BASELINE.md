@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0719 — producer XLSX edit/save output oracle
+
+[0719](0719-producer-edit-output-oracle.md) strengthens the existing producer
+benchmark with full-grid semantic readback, an exact edited-worksheet splice,
+calculation-invalidation checks and raw untouched-member preservation. Four
+successful medium/dense correctness children preserve corpus/output identity;
+these short captures support no latency claim. The numeric sheet-0 target and
+timer boundaries stay unchanged; added untimed work requires a fresh baseline
+for future comparisons. The stale XLS queue is corrected through 0690, and a
+reviewed DOCX duplicate-scan qualification preserves both MCE calls rather than
+unioning their budgets. Production is unchanged and the broader goal remains
+active. [Evidence packet](results/change-0719/README.md).
+
 ## 0718 — DOCX allocation and mapping attribution
 
 [0718](0718-docx-serialization-allocation-mapping.md) retains eight fixed

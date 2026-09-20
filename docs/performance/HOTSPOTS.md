@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0719 — producer XLSX edit/save output oracle
+
+[0719](0719-producer-edit-output-oracle.md) strengthens the existing producer
+benchmark with full-grid semantic readback, an exact edited-worksheet splice,
+calculation-invalidation checks and raw untouched-member preservation. Four
+successful medium/dense correctness children preserve corpus/output identity;
+these short captures support no latency claim. The numeric sheet-0 target and
+timer boundaries stay unchanged; added untimed work requires a fresh baseline
+for future comparisons. The stale XLS queue is corrected through 0690, and a
+reviewed DOCX duplicate-scan qualification preserves both MCE calls rather than
+unioning their budgets. Production is unchanged and the broader goal remains
+active. [Evidence packet](results/change-0719/README.md).
+
 ## 0718 — DOCX allocation and mapping attribution
 
 [0718](0718-docx-serialization-allocation-mapping.md) retains eight fixed
@@ -8853,21 +8866,26 @@ pattern elsewhere.
 
 ## Ranked work queue
 
-Change [0675](0675-third-wave-integration.md) records the disposition of all
-20 rows left by [0651](0651-queue-refresh-after-the-second-wave.md), including
-the ten owner decisions accepted in [0652](0652-owner-decisions-for-the-third-wave.md).
-The implementation records retain their own evidence and limitations. The
-remaining queue consists of explicit design and measurement prerequisites;
-the accepted decisions are no longer listed as awaiting an owner.
+Refreshed in [0719](0719-producer-edit-output-oracle.md) against current source
+and the later disposition records. The previous queue ended its XLS evidence
+at 0687 even though 0688–0690 had already removed most of that cited first-cell
+chain and name-construction work. Historical measurements below retain their
+original scopes; this ranking is a prioritization judgment, not a new timing
+comparison between formats.
 
 | Priority | Remaining work | Required proof or design |
 | ---: | --- | --- |
-| 1 | XLS retained sheet indexes and snapshot chain hints | [0684](0684-xls-occurrence-query-index.md) implements and measures the bounded occurrence cache, including candidate/retained admission and target refusal order. [0685](0685-xls-worksheet-chain-checkpoints.md) adds immutable worksheet-start checkpoints; the new warm profile still attributes 53.07% self samples to chain traversal. [0686](0686-xls-oversized-index-admission.md) bounds geometric growth and suppresses intrinsically oversized retries after complete scans. [0687](0687-cfb-ascii-directory-keys.md) reduces shared name-construction work with explicit 45365-2 build/RSS costs; its final chain profile is still 51.52% self. SST/within-sheet traversal, tiny/no-benefit admission and residual refusal/build overhead remain open. |
-| 2 | XLSX selected scanner's retained record vector | [0683](0683-xlsx-selected-record-compaction.md) implements compact records and exact SST staging, with an additional profiled escape-search optimization. Direct owning-result construction and managed semantic-vector admission remain open; [0679](0679-xlsx-scanner-publication-design.md) explains why ordinary two-pass replay does not preserve the callback contract. |
-| 3 | DOCX cache breadth and remaining per-view work | [0682](0682-docx-paragraph-index-reuse.md) implements the 0680 memo with scoped fresh-view gains, pressure reclamation and replacement/rollback tests; its measured hot-query regression was removed by direct index ownership. Extend producer/concurrent/cold measurements and attribute remaining MCE visibility work before broader claims. |
-| 4 | XLS framing fusion and full SST locator scan | Preserve the coverage proof, validation order and malformed-input boundaries; pointer scratch removal does not eliminate the full scan; [0668](0668-xls-query-residues.md). |
-| 5 | Guarded DOCX source reader buffers | Prove equivalent token ceilings, source freshness, cancellation and refusal-before-output before borrowing source events; [0670](0670-docx-parser-residues.md). |
-| 6 | Broader performance evidence | Controlled physical cold-cache, RSS, cross-platform and shared-budget scaling measurements. Per-record counts and warm timings do not establish these results. |
+| 1 | DOCX duplicate structural scans on edit | 0712 attributes two namespace/event walks before body capture. 0713 already improves substring search. Qualify a shared structural walk while retaining both existing MCE selections and their order; preserve deferred error precedence and all independent budgets. The [next experiment](results/change-0719/next-experiment.md) distinguishes this from rejected 0711 borrowing and 0715 section collection. |
+| 2 | XLSX planning and publication | 0707 measures planning at about 36% of the named synthetic edit/save interval; 0705 attributes publication to source audits and preservation writing. 0706 attribute-cardinality and 0708 name-storage pilots remain rejected. Strengthen producer output checks (0719), then price a distinct work-elimination mechanism; neither original nor replacement XML audit may simply be omitted. |
+| 3 | XLS late-target worksheet replay | 0689 eliminates the measured repeated SST-chain prefix; 0690 removes ASCII temporary lookup keys. First-cell chain self share is now 12.05% in that historical profile, not the older 51–59%. The late 54016 target still walks 1,044 worksheet links. Price a bounded target-local checkpoint with explicit memory charge and backward fallback before adding retained state; do not add a checkpoint per cell without evidence. |
+| 4 | XLSX owning selected-result construction | 0683 compacts retained records and SST staging. Direct owning-result construction and managed semantic-vector admission remain open; 0679 explains why ordinary two-pass replay does not preserve the existing callback contract. |
+| 5 | Broader CRUD and provider evidence | DOCX cache breadth, producer-shaped shared-string-sheet edits, XLS framing/SST locator work and guarded source buffers remain bounded follow-ups. Physical cold-cache, cross-platform and shared-budget scaling coverage are still incomplete. |
+
+0718 identifies Deflate allocation and untimed heap shrinkage, not a reason to
+resume compressor pooling or change allocator policy. Future candidate gates
+must retain independent process repeats and state their teardown boundary.
+PPTX 0704's measured transaction-local retention is already implemented; it is
+not an outstanding cache design. The broader non-iWork goal remains active.
 
 ## Evidence still missing
 
