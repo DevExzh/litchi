@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0706 — XML auditor bookkeeping is attributable but not retained
+
+[0706](0706-xml-attribute-cardinality-pilot.md) tests reuse of the existing
+lexical attribute-layout proof in source-compatible XML auditing. The candidate
+cuts publication allocation calls
+(`19,197 → 365` medium; `36,573 → 365` dense-sparse), but the matched native
+XLSX edit/save gate fails in seven of eight primary rows: total p50/mean must
+improve 2% and publication p50 5% in every row. The candidate is rejected and
+production is restored. The separate 60-row auditor microguard retains
+45 metric-level >5% review flags after corrected ABBA labeling, so it supplies
+diagnostic attribution rather than a shipped speedup. 0529's extra unchecked
+probe/replay remains rejected and is a distinct mechanism. [Packet](results/change-0706/README.md).
+
 ## 0705 — XLSX publication and planning now outrank commit
 
 [0705](0705-xlsx-edit-save-baseline-refresh.md) refreshes the existing

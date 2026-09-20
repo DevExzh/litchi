@@ -1,0 +1,15 @@
+docs/performance/results/change-0706/candidate.patch:97: trailing whitespace.
++ 
+docs/performance/results/change-0706/candidate.patch:102: trailing whitespace.
++ 
+docs/performance/results/change-0706/candidate.patch:116: trailing whitespace.
++ 
+docs/performance/results/change-0706/candidate.patch:148: trailing whitespace.
++ 
+docs/performance/results/change-0706/candidate.patch:177: trailing whitespace.
++ 
+docs/performance/results/change-0706/candidate.patch:181: trailing whitespace.
++ 
+docs/performance/results/change-0706/focused-baseline.log:102: new blank line at EOF.
+docs/performance/results/change-0706/focused-candidate.log:105: new blank line at EOF.
+docs/performance/results/change-0706/focused-restored.log:102: new blank line at EOF.

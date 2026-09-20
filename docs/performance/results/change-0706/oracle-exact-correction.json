@@ -1,0 +1,13 @@
+{
+  "reason": "Independent review found whitespace normalization could hide changes to error details",
+  "correction": "Retain exact Debug strings; recapture both builds and baseline microguard before candidate timings",
+  "archived": "normalized-oracle-preflight",
+  "source_restored_exactly": true,
+  "source_manifest_sha256": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+  "baseline_source_verified_exactly": true,
+  "exact_full_json_equal": true,
+  "panics": 0,
+  "casecount": 4148,
+  "callcount": 29036,
+  "script_sha256": "258f139df88102b8ed5c460bfcccce3fef8cfcacc724908b61d10d1394013ee5"
+}

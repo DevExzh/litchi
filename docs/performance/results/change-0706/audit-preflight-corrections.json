@@ -1,0 +1,9 @@
+{
+  "stage": "Final audit implementation before successful verification",
+  "corrections": [
+    "Permit the recorded workspace-wide cargo fmt --all --check while requiring XML-minifier-only compile/Clippy commands for rejected test-only change",
+    "Count guard- and producer- native receipts alongside native- primary/noise receipts; require exact 60 native and eight allocator receipt sets"
+  ],
+  "raw_capture_changed": false,
+  "retention_decision_changed": false
+}

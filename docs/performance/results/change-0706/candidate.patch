@@ -1,0 +1,282 @@
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index b58b73e3fd..581ff49ed7 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -873,7 +873,7 @@ fn verify_reader_with_policy<R: BufRead>(
+             Event::Start(tag) => {
+                 finish_text_run(&mut state, policy.reject_ambiguous_space)
+                     .map_err(StreamError::Audit)?;
+-                check_start(raw, false, start, policy.require_compact)
++                let attribute_cardinality = check_start(raw, false, start, policy.require_compact)
+                     .map_err(StreamError::Audit)?;
+                 let space = inspect_attributes(
+                     &tag,
+@@ -882,6 +882,7 @@ fn verify_reader_with_policy<R: BufRead>(
+                     &mut state,
+                     limits,
+                     start,
++                    attribute_cardinality,
+                 )
+                 .map_err(StreamError::Audit)?;
+                 enter_element(&mut state, limits, start).map_err(StreamError::Audit)?;
+@@ -894,7 +895,7 @@ fn verify_reader_with_policy<R: BufRead>(
+             Event::Empty(tag) => {
+                 finish_text_run(&mut state, policy.reject_ambiguous_space)
+                     .map_err(StreamError::Audit)?;
+-                check_start(raw, true, start, policy.require_compact)
++                let attribute_cardinality = check_start(raw, true, start, policy.require_compact)
+                     .map_err(StreamError::Audit)?;
+                 inspect_attributes(
+                     &tag,
+@@ -903,6 +904,7 @@ fn verify_reader_with_policy<R: BufRead>(
+                     &mut state,
+                     limits,
+                     start,
++                    attribute_cardinality,
+                 )
+                 .map_err(StreamError::Audit)?;
+                 enter_empty(&mut state, limits, start).map_err(StreamError::Audit)?;
+@@ -1356,7 +1358,7 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
+         match event {
+             Event::Start(tag) => {
+                 finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+-                check_start(raw, false, start, policy.require_compact)?;
++                let attribute_cardinality = check_start(raw, false, start, policy.require_compact)?;
+                 let space = inspect_attributes(
+                     &tag,
+                     reader.decoder(),
+@@ -1364,6 +1366,7 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
+                     &mut state,
+                     limits,
+                     start,
++                    attribute_cardinality,
+                 )?;
+                 enter_element(&mut state, limits, start)?;
+                 state
+@@ -1374,7 +1377,7 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
+             },
+             Event::Empty(tag) => {
+                 finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+-                check_start(raw, true, start, policy.require_compact)?;
++                let attribute_cardinality = check_start(raw, true, start, policy.require_compact)?;
+                 inspect_attributes(
+                     &tag,
+                     reader.decoder(),
+@@ -1382,6 +1385,7 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
+                     &mut state,
+                     limits,
+                     start,
++                    attribute_cardinality,
+                 )?;
+                 enter_empty(&mut state, limits, start)?;
+             },
+@@ -1540,9 +1544,14 @@ fn inspect_attributes(
+     state: &mut State,
+     limits: Limits,
+     offset: usize,
++    attribute_cardinality: AttributeCardinality,
+ ) -> Result<Space, Error> {
+     let mut space = inherited;
+-    for attribute_result in tag.attributes() {
++    let mut attributes = tag.attributes();
++    if attribute_cardinality.at_most_one() {
++        attributes.with_checks(false);
++    }
++    for attribute_result in attributes {
+         let attribute =
+             attribute_result.map_err(|error| Error::malformed(offset, error.to_string()))?;
+         state.attributes = checked_add(
+@@ -1578,7 +1587,8 @@ fn check_declaration(raw: &[u8], offset: usize, compact: bool) -> Result<(), Err
+     else {
+         return Err(Error::malformed(offset, "invalid XML declaration boundary"));
+     };
+-    check_attribute_layout(inner, offset + 2, compact)
++    check_attribute_layout(inner, offset + 2, compact)?;
++    Ok(())
+ }
+ 
+ fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
+@@ -1614,7 +1624,12 @@ fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
+     Ok(())
+ }
+ 
+-fn check_start(raw: &[u8], empty: bool, offset: usize, compact: bool) -> Result<(), Error> {
++fn check_start(
++    raw: &[u8],
++    empty: bool,
++    offset: usize,
++    compact: bool,
++) -> Result<AttributeCardinality, Error> {
+     let Some(without_open) = raw.strip_prefix(b"<") else {
+         return Err(Error::malformed(offset, "invalid start-tag boundary"));
+     };
+@@ -1627,10 +1642,35 @@ fn check_start(raw: &[u8], empty: bool, offset: usize, compact: bool) -> Result<
+     check_attribute_layout(inner, offset + 1, compact)
+ }
+ 
+-fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum AttributeCardinality {
++    None,
++    One,
++    Many,
++}
++
++impl AttributeCardinality {
++    fn with_attribute(self) -> Self {
++        match self {
++            Self::None => Self::One,
++            Self::One | Self::Many => Self::Many,
++        }
++    }
++
++    const fn at_most_one(self) -> bool {
++        matches!(self, Self::None | Self::One)
++    }
++}
++
++fn check_attribute_layout(
++    inner: &[u8],
++    offset: usize,
++    compact: bool,
++) -> Result<AttributeCardinality, Error> {
+     let Some(mut cursor) = inner.iter().position(|byte| is_space(*byte)) else {
+-        return Ok(());
++        return Ok(AttributeCardinality::None);
+     };
++    let mut cardinality = AttributeCardinality::None;
+ 
+     loop {
+         let separator = cursor;
+@@ -1640,7 +1680,7 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
+         if cursor == inner.len() {
+             if !compact {
+                 // Whitespace before the tag close is a producer spelling.
+-                return Ok(());
++                return Ok(cardinality);
+             }
+             return Err(Error::NotCompact(Violation {
+                 kind: Kind::WhitespaceBeforeClose,
+@@ -1718,7 +1758,7 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
+         }
+         cursor += 1;
+         if cursor == inner.len() {
+-            return Ok(());
++            return Ok(cardinality.with_attribute());
+         }
+         if !is_space(inner[cursor]) {
+             return Err(Error::malformed(
+@@ -1726,6 +1766,8 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
+                 "missing attribute separator",
+             ));
+         }
++
++        cardinality = cardinality.with_attribute();
+     }
+ }
+ 
+@@ -2132,6 +2174,104 @@ mod stream_tests {
+         assert_eq!(actual.bytes(), xml.len());
+     }
+ 
++    #[test]
++    fn start_layout_proves_saturated_attribute_cardinality() {
++        for (xml, empty, compact, expected) in [
++            (
++                b"<root/>".as_slice(),
++                true,
++                true,
++                AttributeCardinality::None,
++            ),
++            (
++                b"<root a=\"1\">".as_slice(),
++                false,
++                true,
++                AttributeCardinality::One,
++            ),
++            (
++                b"<root a=\"1\" b=\"2\"/>".as_slice(),
++                true,
++                true,
++                AttributeCardinality::Many,
++            ),
++            (
++                b"<root a=\"1\" />".as_slice(),
++                true,
++                false,
++                AttributeCardinality::One,
++            ),
++        ] {
++            assert_eq!(
++                check_start(xml, empty, 0, compact).expect("valid start tag"),
++                expected,
++                "attribute proof for {xml:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn single_attribute_route_matches_the_fully_checked_route() {
++        let xml = b"<root xml:space=\"preserve\"/>";
++        let mut reader = Reader::from_str(std::str::from_utf8(xml).expect("UTF-8 test XML"));
++        let event = reader.read_event().expect("valid empty tag");
++        assert!(matches!(&event, Event::Empty(_)));
++        let Event::Empty(tag) = event else { return };
++        let cardinality = check_start(xml, true, 0, true).expect("valid start tag");
++        assert_eq!(cardinality, AttributeCardinality::One);
++
++        let mut optimized_state = State::new();
++        let optimized_space = inspect_attributes(
++            &tag,
++            reader.decoder(),
++            Space::Default,
++            &mut optimized_state,
++            limits(xml),
++            0,
++            cardinality,
++        )
++        .expect("single attribute must parse");
++        let mut checked_state = State::new();
++        let checked_space = inspect_attributes(
++            &tag,
++            reader.decoder(),
++            Space::Default,
++            &mut checked_state,
++            limits(xml),
++            0,
++            AttributeCardinality::Many,
++        )
++        .expect("fully checked single attribute must parse");
++
++        assert_eq!(optimized_space, checked_space);
++        assert_eq!(optimized_state.attributes, checked_state.attributes);
++    }
++
++    #[test]
++    fn many_attribute_route_retains_duplicate_rejection() {
++        let xml = b"<root a=\"1\" a=\"2\"/>";
++        let mut reader = Reader::from_str(std::str::from_utf8(xml).expect("UTF-8 test XML"));
++        let event = reader.read_event().expect("valid empty tag");
++        assert!(matches!(&event, Event::Empty(_)));
++        let Event::Empty(tag) = event else { return };
++        let cardinality = check_start(xml, true, 0, true).expect("valid start tag");
++        assert_eq!(cardinality, AttributeCardinality::Many);
++        let mut state = State::new();
++        let error = inspect_attributes(
++            &tag,
++            reader.decoder(),
++            Space::Default,
++            &mut state,
++            limits(xml),
++            0,
++            cardinality,
++        )
++        .expect_err("duplicate attributes must remain rejected");
++        assert!(
++            matches!(error, Error::Malformed { ref detail, .. } if detail.contains("duplicated attribute"))
++        );
++    }
++
+     #[test]
+     fn authored_reader_preserves_authored_whitespace_policy() {
+         let xml = b"<root> <child/></root>";

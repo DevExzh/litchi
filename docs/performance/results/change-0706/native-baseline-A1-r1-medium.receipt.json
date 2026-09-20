@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "name": "native-baseline-A1-r1-medium",
+  "phase": "baseline-A1",
+  "role": "baseline",
+  "lane": "native",
+  "kind": "primary",
+  "repeat": 1,
+  "shape": "medium",
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0706-bin/baseline-native",
+    "--warmup",
+    "20",
+    "--samples",
+    "200",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0706/native-baseline-A1-r1-medium.json"
+  ],
+  "start_utc": "2026-09-20T05:02:44.587948+00:00",
+  "end_utc": "2026-09-20T05:02:56.535438+00:00",
+  "seconds": 11.59592272399459,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0706-bin/baseline-native",
+  "binary_sha256": "bda34d12ffe9289d6ef9f722c2880247a2ba27faf160772b5e37e31a82d6dddd",
+  "binary_bytes": 63339376,
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+    "source_census_sha256": "662d1a3951a00733f7493351643e2a3e3dce691bc715cec929bb48a6d29fade3",
+    "source_entry_count": 7281
+  },
+  "current_checkout_source": {
+    "before_artifact": "native-baseline-A1-r1-medium.source-before.json",
+    "after_artifact": "native-baseline-A1-r1-medium.source-after.json",
+    "before_sha256": "662d1a3951a00733f7493351643e2a3e3dce691bc715cec929bb48a6d29fade3",
+    "after_sha256": "662d1a3951a00733f7493351643e2a3e3dce691bc715cec929bb48a6d29fade3",
+    "before_file_sha256": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+    "after_file_sha256": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+    "before_entry_count": 7281,
+    "after_entry_count": 7281,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/xml-minifier/"
+      ],
+      "expected_entry_count": 7281,
+      "current_entry_count": 7281
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/xml-minifier/"
+      ],
+      "expected_entry_count": 7281,
+      "current_entry_count": 7281
+    },
+    "unchanged_during_child": true
+  },
+  "build_record_sha256": "287477756238e52167cf89a624b9b91ee6628980958e24639b91a6f6c04b35b6",
+  "build_source_manifest_sha256": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+  "plan_sha256": "291e2c6f79ec86aeb82a9766583e3c722276bd4591b27929845cdb1eb5468bb2",
+  "script_sha256": "d8e2e3eb090759abd845432075df8f9717585c0449468bd154357bae334ceb50",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-baseline-A1-r1-medium.json": "04f9f2f89d4cdffcb3ba25af3289c82bd965afd89265d25a9998201741c087c7",
+    "native-baseline-A1-r1-medium.source-after.json": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+    "native-baseline-A1-r1-medium.source-before.json": "494ecc8777597686a76e3baba0e060642c2370df88faccdfaca14cc7bafeecef",
+    "native-baseline-A1-r1-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-baseline-A1-r1-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

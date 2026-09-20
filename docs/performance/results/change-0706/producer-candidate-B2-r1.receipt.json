@@ -1,0 +1,91 @@
+{
+  "schema_version": 2,
+  "name": "producer-candidate-B2-r1",
+  "phase": "candidate-B2",
+  "role": "candidate",
+  "lane": "native",
+  "kind": "producer",
+  "repeat": 1,
+  "shape": "medium",
+  "case": "xlsx_producer_medium_source_one_edit_save",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0706-bin/candidate-native",
+    "--warmup",
+    "20",
+    "--samples",
+    "200",
+    "--case",
+    "xlsx_producer_medium_source_one_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0706/producer-candidate-B2-r1.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0706/producer-candidate-B2-r1.producer.json"
+  ],
+  "start_utc": "2026-09-20T05:20:02.141739+00:00",
+  "end_utc": "2026-09-20T05:20:03.230412+00:00",
+  "seconds": 0.7397696179104969,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0706-bin/candidate-native",
+  "binary_sha256": "14d07d6f044e6adfb0305f9ea88f60e1c67a2dabff47bc6d0e2280e04b352c74",
+  "binary_bytes": 63324016,
+  "retained_binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+    "source_census_sha256": "a363127b5682120339700627c113bdf685eacc471a82e26d07db35c2e15cdb63",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "producer-candidate-B2-r1.source-before.json",
+    "after_artifact": "producer-candidate-B2-r1.source-after.json",
+    "before_sha256": "a363127b5682120339700627c113bdf685eacc471a82e26d07db35c2e15cdb63",
+    "after_sha256": "a363127b5682120339700627c113bdf685eacc471a82e26d07db35c2e15cdb63",
+    "before_file_sha256": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+    "after_file_sha256": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/xml-minifier/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/xml-minifier/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "build_record_sha256": "353912dfe82eea61d0a16a5cca296ada1539a3fa2da112f4d164ab0adc279770",
+  "build_source_manifest_sha256": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+  "plan_sha256": "291e2c6f79ec86aeb82a9766583e3c722276bd4591b27929845cdb1eb5468bb2",
+  "script_sha256": "d8e2e3eb090759abd845432075df8f9717585c0449468bd154357bae334ceb50",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "producer-candidate-B2-r1.json": "9ec36932155cfd1a94d00157839cef9d90d557aa141bb8a663e615f8345f0ff1",
+    "producer-candidate-B2-r1.producer.json": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca",
+    "producer-candidate-B2-r1.source-after.json": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+    "producer-candidate-B2-r1.source-before.json": "2389d61370b9847c7429c353f8feb43430264aa861816204510eb79a49029461",
+    "producer-candidate-B2-r1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "producer-candidate-B2-r1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

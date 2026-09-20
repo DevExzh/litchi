@@ -1,0 +1,9 @@
+HEAD cfd2aa4f3fb051f3914503fce597ef70593a26dd
+$ cargo check -p xml-minifier --all-features --all-targets --locked
+   Compiling memchr v2.8.3
+    Checking quick-xml v0.41.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.10s
+
+exit 0

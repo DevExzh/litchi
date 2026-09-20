@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0706/audit.py"
+  ],
+  "exit_code": 0,
+  "log_sha256": "aa99e3a904d8fb92d6f7d3879d1f7ceae13004176d5dc4b73d010812d172e9ca",
+  "analysis_sha256": "09768d94e9822595474ce81a274ba54c20ba009d905e737860b73d34f664bce2"
+}

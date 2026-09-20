@@ -1,0 +1,3515 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-0706-bin/baseline-native",
+    "binary_sha256": "bda34d12ffe9289d6ef9f722c2880247a2ba27faf160772b5e37e31a82d6dddd",
+    "binary_bytes": 63339376,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "cfd2aa4f3fb051f3914503fce597ef70593a26dd",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 10,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_source_backed_cell_values_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false,
+    "xlsx_cell_values_range_accounting": "compressed-member-intersections-v1"
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "corpus_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          4352402,
+          4359242,
+          4360251,
+          4360391,
+          4363402,
+          4366401,
+          4367311,
+          4370422,
+          4374222,
+          4375461,
+          4376072,
+          4376072,
+          4376082,
+          4376712,
+          4377202,
+          4378062,
+          4378252,
+          4379451,
+          4381781,
+          4383882,
+          4384592,
+          4390852,
+          4393672,
+          4398922,
+          4400022,
+          4401181,
+          4411802,
+          4418832,
+          4431882,
+          4434312
+        ],
+        "sample_order": [
+          9,
+          22,
+          8,
+          3,
+          5,
+          18,
+          4,
+          13,
+          2,
+          0,
+          6,
+          21,
+          10,
+          19,
+          29,
+          27,
+          20,
+          1,
+          26,
+          17,
+          11,
+          23,
+          7,
+          15,
+          14,
+          12,
+          28,
+          24,
+          16,
+          25
+        ],
+        "min": 4352402,
+        "p50": 4377632,
+        "p95": 4431882,
+        "p99": 4434312,
+        "max": 4434312,
+        "mean": 4383304.733333332,
+        "standard_deviation": 20503.127300460168,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 4375649.599405597,
+          "upper": 4390959.867261068
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226480,
+        "write_calls": 137,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 69,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 64,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "read_calls": [
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167
+        ],
+        "read_bytes": [
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572,
+          4233572
+        ],
+        "ordinary_payload_read_calls": [
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79
+        ],
+        "ordinary_payload_read_bytes": [
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "xlsx_cell_values": {
+          "implementation": "source-backed",
+          "cache_mode": "unmanaged-control",
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "update_count": 1,
+          "selected_worksheet_count": 1,
+          "open_ns": [
+            86110,
+            84741,
+            88420,
+            85910,
+            87000,
+            97131,
+            94590,
+            86840,
+            86470,
+            84991,
+            85351,
+            92140,
+            85420,
+            93560,
+            88471,
+            85731,
+            86550,
+            90631,
+            84680,
+            86181,
+            88410,
+            85361,
+            88450,
+            95031,
+            85280,
+            92021,
+            93960,
+            86381,
+            85601,
+            86130
+          ],
+          "plan_ns": [
+            1563458,
+            1568707,
+            1568018,
+            1572958,
+            1558388,
+            1558588,
+            1552018,
+            1575868,
+            1568248,
+            1561798,
+            1557897,
+            1556438,
+            1565058,
+            1557198,
+            1574537,
+            1569327,
+            1583038,
+            1564608,
+            1561308,
+            1569538,
+            1563838,
+            1565428,
+            1556098,
+            1576557,
+            1592338,
+            1584458,
+            1560158,
+            1577968,
+            1573888,
+            1583228
+          ],
+          "plan_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_ns": [
+            796824,
+            800834,
+            791454,
+            794184,
+            808204,
+            797694,
+            798214,
+            798924,
+            798634,
+            788954,
+            799424,
+            802584,
+            810794,
+            798174,
+            801074,
+            809144,
+            796634,
+            803834,
+            797434,
+            798514,
+            794634,
+            799284,
+            791244,
+            803264,
+            804424,
+            805764,
+            802214,
+            798384,
+            795474,
+            801954
+          ],
+          "commit_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "publication_ns": [
+            1929069,
+            1925169,
+            1926330,
+            1907339,
+            1913719,
+            1909989,
+            1931250,
+            1932040,
+            1906899,
+            1916659,
+            1933410,
+            1933430,
+            1939909,
+            1921490,
+            1935940,
+            1934720,
+            1965660,
+            1924809,
+            1922979,
+            1922479,
+            1931370,
+            1925999,
+            1923450,
+            1916000,
+            1936790,
+            1952069,
+            1925449,
+            1915329,
+            1956839,
+            1905890
+          ],
+          "publication_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "reopen_ns": [
+            30325811,
+            30342102,
+            30365091,
+            30219530,
+            30367911,
+            30501102,
+            30250081,
+            30367821,
+            30372881,
+            30194771,
+            30362372,
+            30327981,
+            30646262,
+            30294781,
+            30548073,
+            30487422,
+            30700163,
+            30445192,
+            30598962,
+            30487563,
+            30500202,
+            30569033,
+            30807624,
+            30738873,
+            30437152,
+            30635983,
+            30384411,
+            30385941,
+            30274811,
+            30370781
+          ],
+          "source_read_calls": [
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167,
+            167
+          ],
+          "source_read_bytes": [
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572,
+            4233572
+          ],
+          "workbook_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "workbook_read_bytes": [
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226
+          ],
+          "selected_worksheet_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "selected_worksheet_read_bytes": [
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816
+          ],
+          "unselected_worksheet_read_calls": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "unselected_worksheet_read_bytes": [
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330
+          ],
+          "payload_materializations": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_hits": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_cold_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_waiter_joins": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_successful_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_failed_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_evictions": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_oversized_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_allocation_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_in_flight_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_retained_entries": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_retained_bytes": [
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321
+          ],
+          "cache_budget_managed": false,
+          "payload_memory_limit": null,
+          "publication_planning_memory_headroom": null,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reserved_bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reservation_failures": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "pre_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            }
+          ],
+          "post_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            }
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_objects_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "output_sha256": [
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+          ],
+          "semantic_sha256": [
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de"
+          ],
+          "untouched_member_count": 15,
+          "untouched_member_sha256": [
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d"
+          ],
+          "output_budget_refusal": {
+            "successful_output_ceiling": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "accepted_output_bytes": 0,
+            "source_read_calls": 0,
+            "source_read_bytes": 0,
+            "output_bytes_used": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false,
+            "source_identity_preserved": false
+          }
+        }
+      },
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

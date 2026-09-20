@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0706 — XML attribute-cardinality pilot rejected
+
+[0706](0706-xml-attribute-cardinality-pilot.md) evaluates a source-compatible
+XML auditor candidate against the existing XLSX publication path. Reusing the
+successful lexical layout scan cuts publication allocation work, but the native
+admission gate fails seven of eight primary shape/repeat rows; production is
+restored and no performance claim is promoted. The public
+oracle covers 4,148 cases and 29,036 calls with identical baseline/candidate
+outcomes and zero panics. Eight independent public integration tests remain.
+The result supplies scoped auditor attribution and correctness evidence while
+leaving RSS, physical cold behavior, native Office producers, cross-platform
+coverage, and the broader CRUD/performance goal open. [Evidence packet](results/change-0706/README.md).
+
 ## 0705 — refreshed XLSX priorities after PPTX retention
 
 [0704](0704-pptx-bounded-slide-mce-retention.md) retains bounded slide MCE

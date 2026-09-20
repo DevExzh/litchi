@@ -1,0 +1,63 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.47s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0706/debug/deps/xml_minifier-5c7e703feaa1c926)
+
+running 11 tests
+test audit::stream_tests::aggregate_attribute_budget_remains_independent_of_token_scratch ... ok
+test audit::stream_tests::authored_reader_preserves_authored_whitespace_policy ... ok
+test audit::stream_tests::reader_matches_slice_bom_admission ... ok
+test audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks ... ok
+test audit::stream_tests::source_failures_are_distinguished_from_audit_failures ... ok
+test audit::stream_tests::streamed_encoding_offsets_include_markup_prefixes ... ok
+test audit::stream_tests::streaming_memory_bound_accounts_for_depth_and_token_windows ... ok
+test audit::stream_tests::streaming_memory_bound_caps_per_event_attribute_scratch_at_token_window ... ok
+test audit::stream_tests::streaming_memory_bound_reports_checked_arithmetic_overflow ... ok
+test audit::stream_tests::token_window_fails_before_unbounded_parser_growth ... ok
+test audit::stream_tests::total_window_fails_with_audit_limit ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/attribute_cardinality.rs (/home/zhuhe/code/litchi-target-0706/debug/deps/attribute_cardinality-08b82308ba4909fc)
+
+running 8 tests
+test attribute_and_document_resource_boundaries_are_inclusive_and_chunk_stable ... ok
+test attribute_cardinality_reports_zero_one_two_many_and_aggregate_values ... FAILED
+test bom_offsets_and_encoding_errors_remain_physical_source_offsets ... ok
+test duplicate_attributes_are_refused_before_and_after_many_attribute_scans ... ok
+test malformed_duplicate_precedes_later_xml_space_value_error ... ok
+test one_malformed_attribute_remains_structural_under_every_policy_and_chunking ... FAILED
+test source_policy_accepts_producer_spacing_but_authored_policy_keeps_compactness_errors ... ok
+test xml_space_inheritance_and_escaped_values_are_checked_after_cardinality ... ok
+
+failures:
+
+---- attribute_cardinality_reports_zero_one_two_many_and_aggregate_values stdout ----
+
+thread 'attribute_cardinality_reports_zero_one_two_many_and_aggregate_values' (1105698) panicked at crates/xml-minifier/tests/attribute_cardinality.rs:243:9:
+assertion `left == right` failed: source fixture [60, 114, 111, 111, 116, 32, 97, 61, 34, 49, 34, 62, 60, 99, 104, 105, 108, 100, 32, 98, 61, 34, 50, 34, 32, 99, 61, 34, 51, 34, 47, 62, 60, 108, 101, 97, 102, 32, 100, 61, 34, 52, 34, 47, 62, 60, 47, 114, 111, 111, 116, 62]
+  left: 4
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- one_malformed_attribute_remains_structural_under_every_policy_and_chunking stdout ----
+
+thread 'one_malformed_attribute_remains_structural_under_every_policy_and_chunking' (1105702) panicked at crates/xml-minifier/tests/attribute_cardinality.rs:164:14:
+assertion `left == right` failed: chunks [1]
+  left: 23
+ right: 0
+
+
+failures:
+    attribute_cardinality_reports_zero_one_two_many_and_aggregate_values
+    one_malformed_attribute_remains_structural_under_every_policy_and_chunking
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xml-minifier --test attribute_cardinality`

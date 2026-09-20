@@ -1,0 +1,7 @@
+HEAD cfd2aa4f3fb051f3914503fce597ef70593a26dd
+$ cargo clippy -p xml-minifier --all-features --all-targets --no-deps --locked -- -D warnings
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.63s
+
+exit 0

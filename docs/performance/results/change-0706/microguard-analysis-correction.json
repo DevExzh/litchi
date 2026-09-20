@@ -1,0 +1,8 @@
+{
+  "reason": "Initial microguard analyzer reversed baseline/candidate roles in second ABBA pair",
+  "correction": "Compare baseline-A2 against candidate-B2, with baseline as denominator",
+  "raw_data_changed": false,
+  "primary_native_analysis_changed": false,
+  "old_analysis": "microguard-analysis-preflight.json",
+  "corrected_flags": 45
+}

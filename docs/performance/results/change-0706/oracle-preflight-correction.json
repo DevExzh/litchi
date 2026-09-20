@@ -1,0 +1,1 @@
+{"stage":"before any oracle acquisition","issue":"Probe deny(warnings) rejected five ignored black_box Result values","correction":"Explicitly discard black_box return values with let _; semantic probes unchanged","production_changed":false}
