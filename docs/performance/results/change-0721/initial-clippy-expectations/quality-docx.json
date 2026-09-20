@@ -1,0 +1,63 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-docx",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 1.3478899070760235,
+    "log": "quality-docx-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_manifest_sha256": "251fa710f9e3f6830647b5bcd7836276e2c9c81e17352eadbe68a260bc2c8048"
+  },
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0721",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 19.314625193015672,
+    "log": "quality-docx-tests.log",
+    "log_sha256": "ae622bd5ee3933c2cca31f3345922fdc83faf18c9c1b62bc390f51934b836e30",
+    "source_manifest_sha256": "251fa710f9e3f6830647b5bcd7836276e2c9c81e17352eadbe68a260bc2c8048"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0721",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "seconds": 30.57561431603972,
+    "log": "quality-docx-clippy.log",
+    "log_sha256": "6b11ba414894e46c85d00ee3081e05945fb90082af1b83eea44ae2c1b4493c7a",
+    "source_manifest_sha256": "251fa710f9e3f6830647b5bcd7836276e2c9c81e17352eadbe68a260bc2c8048"
+  }
+]

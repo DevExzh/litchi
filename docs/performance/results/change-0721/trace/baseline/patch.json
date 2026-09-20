@@ -1,0 +1,51 @@
+{
+  "fragment_sha256": "d14db28969f4484347e6f70c5734a0ed8c2955497ea002e9b811f50cea80f6a7",
+  "lane": "baseline",
+  "module": "/home/zhuhe/code/litchi-scratch-0721-trace/scan_trace_0721.rs",
+  "repo_root": "/home/zhuhe/code/litchi",
+  "scratch": "/home/zhuhe/code/litchi-scratch-0721-trace",
+  "sources": [
+    {
+      "backup": "originals/crates/litchi-docx/src/lib.rs.orig",
+      "original_bytes": 5879,
+      "original_sha256": "ba9965127f1b6ddfdc2cd5fe5e4684479e2c7b6848d48b945489e30296d87225",
+      "relative": "crates/litchi-docx/src/lib.rs",
+      "transformed_bytes": 5975,
+      "transformed_sha256": "1f68c9a3d6f521deb0e12767229ae5132edc388b13fefc4dca5e0168699da4b0"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/alt/codec.rs.orig",
+      "original_bytes": 14433,
+      "original_sha256": "4c60069945e369657a0fd3bcf968f317bf3c0d42fb7dce3795321c41a1aa9725",
+      "relative": "crates/litchi-docx/src/alt/codec.rs",
+      "transformed_bytes": 15141,
+      "transformed_sha256": "274f026c8299de1972df62934555f7f83f4df3eb9b9a46c65dbcd55443ecf327"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/namespace.rs.orig",
+      "original_bytes": 21199,
+      "original_sha256": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+      "relative": "crates/litchi-docx/src/namespace.rs",
+      "transformed_bytes": 21571,
+      "transformed_sha256": "9e9221faf7c1b0e7fd4d364ab085ce7a57f0dad51fccfdcebd88f3463a064f3a"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/writer/doc/package.rs.orig",
+      "original_bytes": 50691,
+      "original_sha256": "f5670594685a8035952169487777381e39c950515c59fcc9d176ebedf0e42e92",
+      "relative": "crates/litchi-docx/src/writer/doc/package.rs",
+      "transformed_bytes": 50768,
+      "transformed_sha256": "6bd5518bed87fcfe90e892c5504b26c101a513b886547f57ca726d9ed1ab5d26"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/parts/document_part.rs.orig",
+      "original_bytes": 55570,
+      "original_sha256": "847caf3dba89a7bf948d07c3b70a4729b4e6d742dcc48dae2fdcd25ac26f65a9",
+      "relative": "crates/litchi-docx/src/parts/document_part.rs",
+      "transformed_bytes": 55952,
+      "transformed_sha256": "9887e2efc16a915185e44a7a8f0193e7a8ec5cf289cef313cf00173b2f43e6cd"
+    }
+  ],
+  "status": "applied",
+  "version": 1
+}

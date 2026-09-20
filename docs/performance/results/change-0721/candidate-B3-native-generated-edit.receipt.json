@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "packet": "change-0721-docx-structural-scan-fusion-pilot",
+  "name": "candidate-B3-native-generated-edit",
+  "stage": "candidate-B3",
+  "source_label": "candidate",
+  "build_label": "candidate",
+  "pair": "pair-3",
+  "cycle": 2,
+  "lane": "native",
+  "stage_order": "forward",
+  "stage_order_index": 0,
+  "corpus_id": "generated",
+  "corpus_label": "generated-medium",
+  "corpus_origin": "generated-harness-corpus",
+  "phase": "edit",
+  "case": "docx_ordinary_save_edit",
+  "samples": 200,
+  "warmup": 100,
+  "fresh_child_process": true,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0721-bin/candidate-native",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_ordinary_save_edit",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0721/candidate-B3-native-generated-edit.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0721-fs"
+  ],
+  "start_utc": "2026-09-20T14:51:04.362166+00:00",
+  "end_utc": "2026-09-20T14:51:05.119906+00:00",
+  "seconds": 0.4401289629749954,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0721-bin/candidate-native",
+  "binary_sha256": "867a39fae840dc9cf308db595256cb2e9b023222f7275770a36a70fcbdd7cf07",
+  "binary_bytes": 62858368,
+  "build_record": "build-candidate.json",
+  "build_record_sha256": "9932b18a0c29e0cb4670e11a02906720ddc3ad3d5e7955c5a4ac1a269f7d99c1",
+  "build_source_manifest": "source-candidate.json",
+  "build_source_manifest_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+  "binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+    "source_census_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "source_entry_count": 7283
+  },
+  "retained_binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+    "source_census_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "source_entry_count": 7283
+  },
+  "live_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+    "source_census_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "source_entry_count": 7283,
+    "before_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "after_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "recensus_before": true,
+    "recensus_after": true,
+    "unchanged_during_child": true,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7283,
+      "current_entry_count": 7283,
+      "expected_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+      "current_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706"
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7283,
+      "current_entry_count": 7283,
+      "expected_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+      "current_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706"
+    }
+  },
+  "current_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "832065f45d0aca61f2cd683336151658eac00bffc47dd3e77b74ed86b69ceffa",
+    "source_census_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "source_entry_count": 7283,
+    "before_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "after_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+    "recensus_before": true,
+    "recensus_after": true,
+    "unchanged_during_child": true,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7283,
+      "current_entry_count": 7283,
+      "expected_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+      "current_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706"
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7283,
+      "current_entry_count": 7283,
+      "expected_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706",
+      "current_sha256": "8f14a8682d71190f8942135aa4f87b534b9f6cf23824873cf12bac4b61500706"
+    }
+  },
+  "fixture": {
+    "plan_path": null,
+    "plan_sha256": null,
+    "before": null,
+    "after": null
+  },
+  "plan_sha256": "46c07062f7090bda7c41cbdb7189c56bb1e689863e573dcfa23477d2a2a09663",
+  "script_sha256": "43d85ce4f0c9145f6249d1acecdb5316998d2c46edfb7b179b2cc63ce69ba44e",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "candidate-B3-native-generated-edit.json": "f2e200dcd78fe9c5c455880f4d4ef2aa787943a681575bd2e64991283742ef8c",
+    "candidate-B3-native-generated-edit.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-B3-native-generated-edit.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

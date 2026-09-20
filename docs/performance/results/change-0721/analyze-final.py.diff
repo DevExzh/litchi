@@ -1,0 +1,65 @@
+--- analyze.py
++++ analyze-final.py
+@@ -231,6 +231,8 @@
+             "read-control analysis scope or final source changed")
+     require(value.get("plan_sha256") == sha(HERE / "read-controls-plan.json")
+             and value.get("capture_script_sha256") == sha(HERE / "read-controls.py")
++            and value.get("analysis_script_sha256")
++            == sha(HERE / "read-controls-analyze.py")
+             and value.get("constraints_sha256") == sha(HERE / "constraints.json"),
+             "read-control analysis binding changed")
+     decision = value.get("decision")
+@@ -263,6 +265,7 @@
+     return {
+         "path": path.name,
+         "sha256": sha(path),
++        "analysis_script_sha256": sha(HERE / "read-controls-analyze.py"),
+         "accepted": bool(decision["accepted"]),
+         "all_hard_gates_pass": all_gates_pass,
+         "failed_hard_gate_count": sum(not item["pass"] for item in hard_gates),
+@@ -626,8 +629,26 @@
+ def validate_inventory(plan: dict[str, Any]) -> list[dict[str, Any]]:
+     jobs = child_jobs(plan)
+     expected_names = {job["name"] for job in jobs}
+-    actual_receipts = {path.name[:-len(".receipt.json")]
+-                       for path in HERE.glob("*.receipt.json")}
++    receipt_paths = tuple(HERE.glob("*.receipt.json"))
++    actual_receipts = {
++        path.name[:-len(".receipt.json")]
++        for path in receipt_paths
++        if path.is_file() and not path.is_symlink()
++        and path.name[:-len(".receipt.json")] in expected_names
++    }
++    primary_prefixes = tuple(
++        f"{stage}-{lane}-"
++        for stage in STAGES
++        for lane in (("native", "allocator")
++                     if stage in ALLOCATOR_STAGES else ("native",))
++    )
++    unknown_primary_receipts = sorted(
++        path.name for path in receipt_paths
++        if path.name.startswith(primary_prefixes)
++        and path.name[:-len(".receipt.json")] not in expected_names
++    )
++    require(not unknown_primary_receipts,
++            f"unknown primary receipt(s) retained: {unknown_primary_receipts}")
+     require(actual_receipts == expected_names,
+             f"receipt inventory differs; missing={sorted(expected_names - actual_receipts)} "
+             f"extra={sorted(actual_receipts - expected_names)}")
+@@ -860,7 +881,7 @@
+             "pooled_gates_used": False,
+         },
+         "verification": {
+-            "current_source_matches_source_candidate": True,
++            "current_source_matches_source_candidate": (final_source is None or final_source == candidate),
+             "source_delta_allowlist_verified": True,
+             "source_delta_paths": changed,
+             "child_receipts_verified": len(rows),
+@@ -901,6 +922,7 @@
+             "plan_sha256": plan_sha,
+             "capture_script_sha256": script_sha,
+             "analyzer_sha256": sha(Path(__file__).resolve()),
++            "analysis_script_sha256": sha(Path(__file__).resolve()),
+             "constraints_sha256": constraints_sha,
+         },
+         "limits": plan["claims"]["limitations"],

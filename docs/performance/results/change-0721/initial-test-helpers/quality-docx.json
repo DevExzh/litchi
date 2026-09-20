@@ -1,0 +1,39 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-docx",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 1.3401582480873913,
+    "log": "quality-docx-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_manifest_sha256": "75be56d51cc983b84044103c3eee64cfbf8ccf16b4dca8b0473b79b210f00481"
+  },
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0721",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 101,
+    "seconds": 15.633050426957197,
+    "log": "quality-docx-tests.log",
+    "log_sha256": "cc693482fb5a89d0405e2c2ec6fcd5ade954eddd73e2dc7aecc9292ed19f7ab3",
+    "source_manifest_sha256": "75be56d51cc983b84044103c3eee64cfbf8ccf16b4dca8b0473b79b210f00481"
+  }
+]

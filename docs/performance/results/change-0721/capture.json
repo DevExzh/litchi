@@ -1,0 +1,182 @@
+[
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A1",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "baseline-A1"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B1",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "candidate-B1"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B2",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "candidate-B2"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A2",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "baseline-A2"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A3",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "baseline-A3"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B3",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "candidate-B3"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B4",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "candidate-B4"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A4",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/read-controls.py",
+      "capture",
+      "baseline-A4"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A1",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B1",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "candidate-B2",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0721/pilot.py",
+      "baseline-A2",
+      "allocator"
+    ],
+    "exit_code": 0
+  }
+]

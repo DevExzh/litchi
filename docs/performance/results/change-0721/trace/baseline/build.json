@@ -1,0 +1,34 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0721/oracle/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0721",
+    "-j",
+    "2"
+  ],
+  "exit_code": 0,
+  "seconds": 32.960603081970476,
+  "source_sha256": "b2ee6385a9a623f47fa83fad4cd4244a2d4bd855312ac0b84b8d5d949e9bb813",
+  "patch_sha256": "ed6d72c4e80ebc30d41d8299c4a42c5f69e419fa1dc74a2cf22d9d3536d045ae",
+  "log_sha256": "39ffe3ad17a7361b5c37b8d157ad89f844d031a9f78df9774db16db0d2cd0fdd",
+  "scripts": {
+    "trace-run.py": "e6ad677e6e6771d77f8b732890ec184d6122450369b2715c9214ce8d8f9c08de",
+    "trace.py": "f9b544fec1c8bca75a867bf7ad189faf5be201a76ba03dff32a623a56dc31157",
+    "trace.fragment": "d14db28969f4484347e6f70c5734a0ed8c2955497ea002e9b811f50cea80f6a7",
+    "trace-analyze.py": "432f532d8893af9328f91c55cea866967a4574025c57f30e14292ef70e383b16"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0721-bin/baseline-trace",
+    "sha256": "41a174421010b1188bc15e1e98415f3323ff6f218c8ffbc640ceee5660dadf12",
+    "bytes": 118911248
+  },
+  "probe": {
+    "Cargo.toml": "537e3315abaddd358dd23f510256d9991bfce03ac45350f38f18117c96b25127",
+    "Cargo.lock": "31a9ab37bc212fe4cb98e196afbb90a3d90c9886c2f5d23c6babcb11e249f64c",
+    "src/main.rs": "742380d3d02c88ded16ff69d264762cc10c8bf990af4c55567bdf4c360096d0e"
+  }
+}

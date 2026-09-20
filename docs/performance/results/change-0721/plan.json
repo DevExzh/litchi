@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "packet": "change-0721-docx-structural-scan-fusion-pilot",
+  "revision": "cae79bd77277921b60d5bc86fb5245da30397565",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0721-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "phase_order": [
+    "edit",
+    "lifecycle"
+  ],
+  "native": {
+    "samples": 200,
+    "warmup": 100
+  },
+  "allocator": {
+    "samples": 3,
+    "warmup": 0
+  },
+  "stages": [
+    {
+      "label": "baseline-A1",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-1",
+      "cycle": 1,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B1",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-1",
+      "cycle": 1,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B2",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-2",
+      "cycle": 1,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A2",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-2",
+      "cycle": 1,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A3",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-3",
+      "cycle": 2,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B3",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-3",
+      "cycle": 2,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B4",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-4",
+      "cycle": 2,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A4",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-4",
+      "cycle": 2,
+      "order": "reverse"
+    }
+  ],
+  "allocator_stages": [
+    "baseline-A1",
+    "candidate-B1",
+    "candidate-B2",
+    "baseline-A2"
+  ],
+  "order": "A1 forward, B1 forward, B2 reverse, A2 reverse, then A3 forward, B3 forward, B4 reverse, A4 reverse; each stage has one fresh child per corpus and phase",
+  "thresholds": {
+    "edit_improvement_percent": 3,
+    "lifecycle_regression_percent": 3,
+    "allocation_regression_percent": 3,
+    "tail_flag_percent": 5,
+    "repeat_drift_flag_percent": 5
+  },
+  "source_delta_allowlist": [
+    "crates/litchi-docx/src/alt/codec.rs",
+    "crates/litchi-docx/src/alt/mod.rs",
+    "crates/litchi-docx/src/namespace.rs",
+    "crates/litchi-docx/src/parts/document_part.rs",
+    "crates/litchi-docx/src/writer/doc/package.rs",
+    "crates/litchi-docx/src/writer/doc/fusion_tests_0721.rs"
+  ],
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "claims": {
+    "primary": "Every ABBA pair must show at least 3 percent native edit improvement in p50 and mean for both corpora.",
+    "lifecycle": "Every ABBA pair must keep native lifecycle p50 and mean regression at or below 3 percent for both corpora.",
+    "allocation": "In the first ABBA cycle, every pair, corpus, and phase must keep allocator request counts and requested bytes at or below 3 percent regression.",
+    "review_flags": "All native tail regressions over 5 percent and within-variant repeat p50/mean drifts over 5 percent remain visible; no samples or pairs are excluded.",
+    "limitations": [
+      "The allocator lane is instrumentation-bearing and is not latency-comparable to native.",
+      "Each phase is timed independently; edit, lifecycle, publication, and allocation observations are not additive.",
+      "This pilot makes no hardware, RSS, cold-cache, throughput, or scaling claim.",
+      "The two MCE decisions and any new trace evidence remain separate semantic evidence; timing gates never pool them."
+    ]
+  }
+}

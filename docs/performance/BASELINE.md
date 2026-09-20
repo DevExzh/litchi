@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0721 — rejected DOCX structural scan fusion
+
+[0721](0721-docx-structural-scan-fusion-pilot.md) removes one structural walk
+in a frozen candidate but retains no production change. Across two ABBA cycles,
+edit medians improve while read-control p50 regresses 5.59–8.60%; all 16 read
+gates and one generated-edit mean gate fail. NumberedList edit also adds 2,480
+bytes to the measured allocation-region peak. Exact output/MCE parity and
+correctness checks pass. Baseline source is restored; all samples and the
+candidate remain reproducible. A future writer-local experiment must preserve
+the existing read-only path. The performance program remains active.
+[Evidence packet](results/change-0721/README.md).
+
 ## 0720 — DOCX structural scan qualification
 
 [0720](0720-docx-structural-scan-qualification.md) adds an untimed diagnostic

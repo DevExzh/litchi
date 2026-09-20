@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "packet": "change-0721-docx-read-controls",
+  "revision": "cae79bd77277921b60d5bc86fb5245da30397565",
+  "primary_packet": "change-0721-docx-structural-scan-fusion-pilot",
+  "primary_script": "docs/performance/results/change-0721/pilot.py",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0721-fs",
+  "binary_root": "/home/zhuhe/code/litchi-0721-bin",
+  "source_maps": {
+    "baseline": "docs/performance/results/change-0721/source-baseline.json",
+    "candidate": "docs/performance/results/change-0721/source-candidate.json"
+  },
+  "constraints": "docs/performance/results/change-0721/constraints.json",
+  "build_records": {
+    "baseline": "docs/performance/results/change-0721/build-baseline.json",
+    "candidate": "docs/performance/results/change-0721/build-candidate.json",
+    "schema": "same as build.py: one native record with command, exit_code, source_manifest_sha256, binary, binary_sha256, and binary_bytes"
+  },
+  "selector_verification": {
+    "generated-medium-list-paragraphs": {
+      "source": "tools/perf-baseline/src/lib.rs::run_semantic_docx",
+      "timed_query": "DocumentPart::document_paragraphs via document.paragraphs()",
+      "semantic_shape": "medium",
+      "shared_scanner": "crates/litchi-docx/src/parts/document_part.rs::scan_word_element_ranges"
+    },
+    "pinned-media-eager-paragraph-count": {
+      "source": "tools/perf-baseline/src/filesystem.rs::run_selected and run_docx_operation",
+      "timed_query": "PreparedDocx::paragraph_count() via document.paragraph_count()",
+      "shared_scanner": "crates/litchi-docx/src/parts/document_part.rs::scan_word_element_ranges",
+      "currentlib_input": "build_docx_source_edit_corpus() pinned by DOCX_FILE_CORPUS_GENERATOR and DOCX_FILE_SOURCE_SHA256",
+      "currentlib_input_generator": "litchi-docx-source-edit-media-v1",
+      "currentlib_input_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+      "currentlib_input_bytes": 16793036
+    }
+  },
+  "native": {
+    "samples": 200,
+    "warmup": 100
+  },
+  "controls": [
+    {
+      "id": "generated-medium-list-paragraphs",
+      "label": "generated medium semantic paragraph list",
+      "origin": "generated-harness-corpus",
+      "case": "docx_semantic_list_paragraphs",
+      "semantic_shape": "medium",
+      "filesystem_cache": null,
+      "scope": "Package::document() is prepared outside the timer; document.paragraphs() is the timed query and its complete paragraph list is retained for validation. The generated corpus has the fixed medium semantic shape."
+    },
+    {
+      "id": "pinned-media-eager-paragraph-count",
+      "label": "pinned DOCX source-backed media eager paragraph count",
+      "origin": "pinned-filesystem-corpus",
+      "case": "docx_file_eager_paragraph_count",
+      "semantic_shape": null,
+      "filesystem_cache": "warm",
+      "expected_corpus": {
+        "name": "docx-source-backed-media",
+        "generator": "litchi-docx-source-edit-media-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "media-rich",
+        "payload_kind": "deterministic-incompressible-media",
+        "compression": "deflate",
+        "entry_count": 17,
+        "archive_member_count": 20,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 16833643,
+        "archive_bytes": 16793036,
+        "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+        "target_entry": "paragraph:100",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "08ea83c6e3287e74125f5a70c3ce3a4bdb6de13b7930312a5059060e24e56c14",
+        "xlsx": null
+      },
+      "scope": "The filesystem child prepares the pinned docx-source-backed-media Package outside the timer; the timed query is document.paragraph_count(), with one warm isolated child result. The corpus identity is validated against the current filesystem builder manifest."
+    }
+  ],
+  "stages": [
+    {
+      "label": "baseline-A1",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-1",
+      "cycle": 1,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B1",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-1",
+      "cycle": 1,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B2",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-2",
+      "cycle": 1,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A2",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-2",
+      "cycle": 1,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A3",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-3",
+      "cycle": 2,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B3",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-3",
+      "cycle": 2,
+      "order": "forward"
+    },
+    {
+      "label": "candidate-B4",
+      "source": "candidate",
+      "build": "candidate",
+      "pair": "pair-4",
+      "cycle": 2,
+      "order": "reverse"
+    },
+    {
+      "label": "baseline-A4",
+      "source": "baseline",
+      "build": "baseline",
+      "pair": "pair-4",
+      "cycle": 2,
+      "order": "reverse"
+    }
+  ],
+  "interleave": {
+    "primary_script": "pilot.py",
+    "primary_lane": "native",
+    "required_before_read_capture": "all four primary native children for the same stage must have completed successfully; read capture starts after their recorded end_utc",
+    "read_children_per_stage": 2,
+    "top_level_read_invocations": 16,
+    "pinned_filesystem_internal_children_per_invocation": {
+      "warmup": 100,
+      "measured": 200,
+      "reported_total": 300
+    },
+    "pinned_filesystem_internal_children_across_stages": 2400,
+    "read_child_order": "controls list order; one fresh child per control"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "thresholds": {
+    "regression_percent": 3,
+    "tail_flag_percent": 5,
+    "repeat_drift_flag_percent": 5
+  },
+  "statistics": {
+    "source": "result.elapsed_ns.samples from every retained report",
+    "p50": "Rust midpoint of the two middle sorted samples",
+    "tails": ["p95", "p99", "max"],
+    "repeat_groups": [
+      ["baseline-A1", "baseline-A2"],
+      ["candidate-B1", "candidate-B2"],
+      ["baseline-A3", "baseline-A4"],
+      ["candidate-B3", "candidate-B4"]
+    ],
+    "excluded_from_normalized_identity": [
+      "result.elapsed_ns",
+      "result.operation_metrics",
+      "top-level binary_identity",
+      "top-level environment",
+      "top-level parallel_metrics",
+      "configuration sample and timing fields"
+    ]
+  },
+  "claims": {
+    "nonregression": "For every pair and every control, candidate native p50 and mean regress by no more than 3 percent against its paired baseline.",
+    "review_flags": "Every candidate tail delta over 5 percent and every within-variant repeat drift over 5 percent remains visible; no samples, controls, or pairs are excluded.",
+    "limitations": [
+      "This is a read-consumer non-regression control and makes no speedup, hardware, RSS, cold-cache, throughput, or scaling claim.",
+      "The generated semantic query and pinned eager filesystem query are separate controls; their timings are never pooled.",
+      "Allocator, process, and operation-metric fields are excluded from semantic parity and are not compared in this native lane."
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "recorded_utc": "2026-09-20T14:43:21.885027+00:00",
+  "command": [
+    "findmnt",
+    "--target",
+    "/home/zhuhe/code/litchi-0721-fs",
+    "--json",
+    "--output",
+    "FSTYPE,TARGET,SOURCE"
+  ],
+  "exit_code": 0,
+  "stdout": "{\n   \"filesystems\": [\n      {\n         \"fstype\": \"ext4\",\n         \"target\": \"/\",\n         \"source\": \"/dev/nvme0n1p1\"\n      }\n   ]\n}\n",
+  "stderr": "",
+  "cpu12_governor": null,
+  "scope": "Read-only host metadata recorded during capture; no CPU or filesystem configuration changed"
+}

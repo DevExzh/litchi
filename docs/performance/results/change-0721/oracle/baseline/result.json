@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0721-bin/baseline-oracle",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0721/oracle/baseline/report.json"
+  ],
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0721-bin/baseline-oracle",
+    "sha256": "47ac89157fd19e6a8776882b56e04acfb19887821ecdb98e18228fb8499d285a",
+    "bytes": 4466152
+  },
+  "source_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+  "probe_sha256": "463b440c46530610be2f44322105d478a0c8adbf103af8ccf931f3564c8a61b4",
+  "artifacts": {
+    "report.json": "bea0e3f26e446d4de32cb4aa1b2398adf82da76045fb70de49957ba4a9ac24f0",
+    "stdout": "a25af5ba82a5eacdfcbf16d23e8d472cc5062e25ad49f9946da9a9022b1b67bc",
+    "stderr": "20c70688cded49aa81a79d268d656a135d32edd97c3bab1f7506948a58bed379"
+  }
+}

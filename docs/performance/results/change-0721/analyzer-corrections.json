@@ -1,0 +1,22 @@
+{
+  "utc": "2026-09-20T14:57:42.944332+00:00",
+  "reason": "Separate analysis-only corrections for mixed receipt inventory, aggregate disposition and filesystem priming counts; capture scripts/plans/native samples and gate formulas unchanged; current-checkout candidate witness is computed for either final disposition",
+  "corrections": [
+    {
+      "capture_time_script": "analyze.py",
+      "capture_time_sha256": "e21783674d5571e85c6ccc85a7c3c034c4a0f6f3631f3bf8585e98504f8d8e72",
+      "final_analyzer": "analyze-final.py",
+      "final_analyzer_sha256": "47d7fbc337aeb608f4ce37dcec7b471b18be693259f1e05c7faf7747599cc8da",
+      "diff": "analyze-final.py.diff",
+      "diff_sha256": "18c4c239a7e783289f180ac1e11c7986e56c8698a06889c1ba643d7e81286b9c"
+    },
+    {
+      "capture_time_script": "read-controls.py",
+      "capture_time_sha256": "e7cd4ec7336c561899060a6911cf3936a21babb2b20e8cb995db9742fc806375",
+      "final_analyzer": "read-controls-analyze.py",
+      "final_analyzer_sha256": "b06972ca944a6dd71fc989bd832da9e2e7332be7967b50ea6d53d15a0f7181c2",
+      "diff": "read-controls-analyze.py.diff",
+      "diff_sha256": "8c12af013308736b387a2cff47b7858babfe332110af65da050ee9906db2329a"
+    }
+  ]
+}
