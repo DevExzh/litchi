@@ -146,7 +146,7 @@ numeric 0/1 controls, not arbitrary truthiness flags. A Number-declared
 1. A control slot declared `Integer` first uses the repository's
 truncation-toward-zero Integer profile and is then checked for exact 0 or 1;
 only declared Integer slots truncate. In this slice that includes `Type` in
-`CUMIPMT`, `CUMPRINC`, and `PPMT`; the `Type`/`PayType` slots declared Number
+`CUMIPMT` and `CUMPRINC`; `PPMT`'s `Type` and the `Type`/`PayType` slots declared Number
 in the other annuity signatures use exact comparison without truncation. No
 control accepts an arbitrary nonzero Number or Boolean-style coercion.
 
@@ -190,10 +190,14 @@ variant, a host-specific convention, or an uncited approximation.
   their ODF clauses provide no equation. For a nonzero rate, define the
   balance factor `A = (1 + Rate * Type) * ((1 + Rate)^Nper - 1) / Rate` and
   the payment `Payment = -(PV * (1 + Rate)^Nper + FV) / A`. Define the balance
-  immediately before period `Period` as
+  factor `B` for period `Period` as
   `PV * (1 + Rate)^(Period - 1) + Payment * (1 + Rate * Type) *
-  ((1 + Rate)^(Period - 1) - 1) / Rate`. Then `IPMT` is the negative of that
-  balance multiplied by `Rate`, and `PPMT = Payment - IPMT`. The zero-rate
+  ((1 + Rate)^(Period - 1) - 1) / Rate`. For `Type = 0`,
+  `IPMT = -B * Rate`. For `Type = 1`, the first period's interest is zero;
+  in subsequent periods `IPMT = -B * Rate / (1 + Rate)`, which charges
+  interest on the balance after the preceding beginning-of-period payment.
+  Thus `IPMT(0.1;2;2;100;0;1) = -100/21`, not `-110/21`.
+  In either case `PPMT = Payment - IPMT`. The zero-rate
   payment branch is `-(PV + FV) / Nper` and its interest component is zero
   where the function's domain admits zero. This is a documented repository
   profile, not an assertion that the ODF prose prints these equations.
@@ -201,10 +205,12 @@ variant, a host-specific convention, or an uncited approximation.
   `ISPMT = Rate * Pv * (Period / Nper - 1)` because §6.12.25 supplies no
   equation. Its source signature and any source constraints still govern
   argument admission.
-- `MIRR` uses the §6.12.27 equation over positive and negative Values. The
-  source HTML renders the fraction and exponent with MathML; the MathML,
-  rather than flattened text extraction, is authoritative. A contract or
-  implementation must not replace it with a different modified-IRR formula.
+- `MIRR` uses the §6.12.27 MathML equation:
+  `((-NPV(ReinvestRate; PositiveMask) * (1 + ReinvestRate)^n) /
+  (NPV(Investment; NegativeMask) * (1 + Investment)))^(1/(n - 1)) - 1`.
+  The source writes the masks as `Values > 0` and `Values < 0`; their
+  positional interpretation is fixed below. This equation must not be
+  replaced with a different host modified-IRR formula.
   Under this profile, first remove Text and Empty elements, retain Logical
   elements as 0/1, and use the retained count `n`. Build the positive and
   negative NPV masks over the same retained positions, contributing zero for
@@ -235,9 +241,12 @@ The expected pseudotype controls conversion before the function operates:
   ordered ReferenceList, processing each area in occurrence order. This is why
   NPV can receive one or more sequence-list arguments while IRR and FVSCHEDULE
   use a single NumberSequence.
-- `DateSequence` follows the existing date/time profile and §6.3.9: a single
-  Reference or scalar date-number sequence is admitted, with each admitted
-  element a Date serial. The current profile does not invent ReferenceList
+- `DateSequence` follows the existing date/time profile and §6.3.9. Scalar
+  Number, Text, and Logical first use Number conversion and form a one-element
+  Date sequence; scalar Text here uses numeric conversion, not DateParam text
+  parsing. A single Reference admits Number and formula Error cells, skipping
+  Empty, Text, and distinguished Logical cells. Every admitted numeric element
+  must be a profile Date serial. The profile does not invent ReferenceList
   flattening for DateSequence. A known ReferenceList mismatch is rejected
   before resolver reads; a computed expression may need to run until its type
   is known.
