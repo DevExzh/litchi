@@ -1,0 +1,949 @@
+{
+  "status": "development-preflight-pass",
+  "frozen_gate": false,
+  "timing_capture": false,
+  "candidate_cases": 120,
+  "baseline_controls": 34,
+  "validated": [
+    "expected outputs (harness assertions)",
+    "exact formula",
+    "evaluation path",
+    "resolver read count"
+  ],
+  "files": {
+    "performance-plan.md": "d54913dcabdfd4ce78ccb8e071ade7f451cf382c9d09ab2867908322411364e9",
+    "case-matrix.json": "dacebd3dc7b5533c64ac967f8dee5343176f316eda6540b16b8cf100de7e5bbd",
+    "run_profile.py": "4fca24bf24345db9142808caed0822f339dcf4a3ae5e04c0216dfa18e83135f7",
+    "harness/Cargo.toml": "878f74e54b5d3511c37725e64618f6d5f74e7b8b1f91ae544192760fcdd83e15",
+    "harness/Cargo.lock": "5261723f62e5ebbea6875cb51b29dbfbfdfd6dca1a651febf7779a2d65a70319",
+    "harness/src/main.rs": "4e48c3bf78de63d0bb32f35d49c99fda55be9fc29217f244f4a8de386eb9683a"
+  },
+  "candidate_results": [
+    {
+      "case": "scalar-control-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-arithmetic\",\"source\":\"=0.17+1.25\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-sin\",\"source\":\"=SIN(0.17)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-imsum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-imsum\",\"source\":\"=IMREAL(IMSUM(COMPLEX(2;3);COMPLEX(1;4)))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-imsum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dsum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dsum\",\"source\":\"=DSUM([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dsum reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-average",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-average\",\"source\":\"=AVERAGE(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-average reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-counta",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-counta\",\"source\":\"=COUNTA(1.25;\\\"x\\\";TRUE())\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-counta reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-var",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-var\",\"source\":\"=VAR(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-var reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-stdev",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-stdev\",\"source\":\"=STDEV(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-stdev reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dvar",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dvar\",\"source\":\"=DVAR([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dvar reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dstdev",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dstdev\",\"source\":\"=DSTDEV([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dstdev reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-4x4-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-4x4-arithmetic\",\"source\":\"={0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000}+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-4x4-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-4x4-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-4x4-sin\",\"source\":\"=SIN({0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-4x4-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-16x16-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-16x16-arithmetic\",\"source\":\"={0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000}+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-16x16-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-16x16-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-16x16-sin\",\"source\":\"=SIN({0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-16x16-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-array-16x4-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-array-16x4-arithmetic\",\"source\":\"=[.A1:.D16]+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":64}\npreflight case=reference-array-16x4-arithmetic reference_reads=64\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-aggregate-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-aggregate-sum\",\"source\":\"=SUM(1.25)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-aggregate-sum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "literal-aggregate-4x1-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"literal-aggregate-4x1-sum\",\"source\":\"=SUM({1|2|3|4})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=literal-aggregate-4x1-sum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-aggregate-64x4-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-aggregate-64x4-sum\",\"source\":\"=SUM([.A1:.D64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-aggregate-64x4-sum reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-conditional-256x4-sumifs",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-conditional-256x4-sumifs\",\"source\":\"=SUMIFS([.I1:.L256];[.A1:.D256];\\\">=2\\\";[.E1:.H256];1)\",\"evaluation_path\":\"value\",\"reference_reads\":1792}\npreflight case=reference-conditional-256x4-sumifs reference_reads=1792\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-control-average",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-control-average\",\"source\":\"=AVERAGE([.A1:.D64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-control-average reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-control-counta",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-control-counta\",\"source\":\"=COUNTA([.E1:.H64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-control-counta reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-median",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-median\",\"source\":\"=MEDIAN(1;2;4;8)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-median reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-rank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-rank\",\"source\":\"=RANK(8;8;1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-rank reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-percentrank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-percentrank\",\"source\":\"=PERCENTRANK(8;8;3)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-percentrank reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-borrowed-literals",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-borrowed-literals\",\"source\":\"=\\\"left\\\"&\\\"right\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-borrowed-literals reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-owned-left",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-owned-left\",\"source\":\"=(\\\"left\\\"&\\\"mid\\\")&\\\"right\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-owned-left reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-owned-right",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-owned-right\",\"source\":\"\\\"left\\\"&(\\\"mid\\\"&\\\"right\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-owned-right reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-growth-chain",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-growth-chain\",\"source\":\"=\\\"a\\\"&\\\"b\\\"&\\\"c\\\"&\\\"d\\\"&\\\"e\\\"&\\\"f\\\"&\\\"g\\\"&\\\"h\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-growth-chain reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-date",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-date\",\"source\":\"=VALUE(\\\"2024-01-02\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-date reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-time",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-time\",\"source\":\"=VALUE(\\\"12:34:56\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-time reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-mixed-fraction",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-mixed-fraction\",\"source\":\"=VALUE(\\\"3 1/2\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-mixed-fraction reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-isnumber",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-isnumber\",\"source\":\"=IF({TRUE()|TRUE()};ISNUMBER([.A3:.A4]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-isnumber reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-isblank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-isblank\",\"source\":\"=IF({TRUE()|TRUE()};ISBLANK([.A1:.A2]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-isblank reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-istext",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-istext\",\"source\":\"=IF({TRUE()|TRUE()};ISTEXT([.A1:.A2]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-istext reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-date",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-date\",\"source\":\"=DATE(2020;13;1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-date reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-datedif",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-datedif\",\"source\":\"=DATEDIF(DATE(2020;1;31);DATE(2021;3;1);\\\"Y\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-datedif reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-datevalue",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-datevalue\",\"source\":\"=DATEVALUE(\\\"2024-03-31T12:34:56\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-datevalue reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-day",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-day\",\"source\":\"=DAY(DATE(2024;3;31)+0.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-day reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-days",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-days\",\"source\":\"=DAYS(DATE(2024;4;1)+0.5;DATE(2024;3;31)+0.5)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-days reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-days360",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-days360\",\"source\":\"=DAYS360(DATE(2024;1;31);DATE(2024;2;29))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-days360 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-eastersunday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-eastersunday\",\"source\":\"=EASTERSUNDAY(2024)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-eastersunday reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-edate",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-edate\",\"source\":\"=EDATE(DATE(2024;1;31);1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-edate reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-eomonth",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-eomonth\",\"source\":\"=EOMONTH(DATE(2024;2;10);0)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-eomonth reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-hour",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-hour\",\"source\":\"=HOUR(0.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-hour reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-isoweeknum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-isoweeknum\",\"source\":\"=ISOWEEKNUM(DATE(2024;1;1))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-isoweeknum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-minute",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-minute\",\"source\":\"=MINUTE(-1/256)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-minute reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-month",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-month\",\"source\":\"=MONTH(DATE(2024;3;31)+0.5)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-month reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-networkdays",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-networkdays\",\"source\":\"=NETWORKDAYS(DATE(2024;3;29);DATE(2024;4;1))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-networkdays reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-now",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-now\",\"source\":\"=NOW()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-now reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-second",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-second\",\"source\":\"=SECOND(-1/256)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-second reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-time",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-time\",\"source\":\"=TIME(12;30;0)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-time reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-timevalue",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-timevalue\",\"source\":\"=TIMEVALUE(\\\"12:30:00\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-timevalue reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-today",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-today\",\"source\":\"=TODAY()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-today reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-weekday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-weekday\",\"source\":\"=WEEKDAY(DATE(2024;1;1);2)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-weekday reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-weeknum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-weeknum\",\"source\":\"=WEEKNUM(DATE(2024;1;1);21)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-weeknum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-workday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-workday\",\"source\":\"=WORKDAY(DATE(2024;3;29);1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-workday reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-year",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-year\",\"source\":\"=YEAR(DATE(2024;3;31)+0.5)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-year reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-core-yearfrac",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-core-yearfrac\",\"source\":\"=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);3)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-core-yearfrac reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-datevalue-iso",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-datevalue-iso\",\"source\":\"=DATEVALUE(\\\"2024-03-31\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-datevalue-iso reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-datevalue-datetime",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-datevalue-datetime\",\"source\":\"=DATEVALUE(\\\"2024-03-31 12:34:56\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-datevalue-datetime reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-datevalue-enus",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-datevalue-enus\",\"source\":\"=DATEVALUE(\\\"3/31/2024\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-datevalue-enus reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-datevalue-month",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-datevalue-month\",\"source\":\"=DATEVALUE(\\\"Mar 31, 2024\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-datevalue-month reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-timevalue-clock",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-timevalue-clock\",\"source\":\"=TIMEVALUE(\\\"12:30:00\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-timevalue-clock reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-timevalue-datetime",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-timevalue-datetime\",\"source\":\"=TIMEVALUE(\\\"2020-01-02T03:04:05\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-timevalue-datetime reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-timevalue-fraction",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-timevalue-fraction\",\"source\":\"=TIMEVALUE(\\\"12:30:00.5\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-timevalue-fraction reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-datevalue-number",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-datevalue-number\",\"source\":\"=DATEVALUE(\\\"123\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-datevalue-number reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-parser-timevalue-number",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-parser-timevalue-number\",\"source\":\"=TIMEVALUE(\\\"0.5\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-parser-timevalue-number reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-date-rollover",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-date-rollover\",\"source\":\"=DATE(2020;2;30)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-date-rollover reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-date-1900",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-date-1900\",\"source\":\"=DATE(1900;3;1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-date-1900 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-days360-eu",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-days360-eu\",\"source\":\"=DAYS360(DATE(2024;1;31);DATE(2024;2;29);TRUE())\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-days360-eu reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-edate-clamp",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-edate-clamp\",\"source\":\"=EDATE(DATE(2024;1;31);1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-edate-clamp reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-eomonth-clamp",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-eomonth-clamp\",\"source\":\"=EOMONTH(DATE(2024;2;10);0)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-eomonth-clamp reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-yearfrac-basis1",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-yearfrac-basis1\",\"source\":\"=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-yearfrac-basis1 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-weeknum-noninteger",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-weeknum-noninteger\",\"source\":\"=WEEKNUM(44199;21.5)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-weeknum-noninteger reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-boundary-weekday-17",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-boundary-weekday-17\",\"source\":\"=WEEKDAY(DATE(2024;1;7);17)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-boundary-weekday-17 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-holidays-0",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-holidays-0\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31))\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-networkdays-holidays-0 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-holidays-1",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-holidays-1\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A1])\",\"evaluation_path\":\"value\",\"reference_reads\":1}\npreflight case=date-networkdays-holidays-1 reference_reads=1\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-holidays-16",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-holidays-16\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A16])\",\"evaluation_path\":\"value\",\"reference_reads\":16}\npreflight case=date-networkdays-holidays-16 reference_reads=16\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-holidays-64",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-holidays-64\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A64])\",\"evaluation_path\":\"value\",\"reference_reads\":64}\npreflight case=date-networkdays-holidays-64 reference_reads=64\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-holidays-256",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-holidays-256\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A256])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=date-networkdays-holidays-256 reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-holidays-0",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-holidays-0\",\"source\":\"=WORKDAY(DATE(2024;1;1);64)\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-workday-holidays-0 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-holidays-1",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-holidays-1\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;[.A1:.A1])\",\"evaluation_path\":\"value\",\"reference_reads\":1}\npreflight case=date-workday-holidays-1 reference_reads=1\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-holidays-16",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-holidays-16\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])\",\"evaluation_path\":\"value\",\"reference_reads\":16}\npreflight case=date-workday-holidays-16 reference_reads=16\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-holidays-64",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-holidays-64\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;[.A1:.A64])\",\"evaluation_path\":\"value\",\"reference_reads\":64}\npreflight case=date-workday-holidays-64 reference_reads=64\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-holidays-256",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-holidays-256\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;[.A1:.A256])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=date-workday-holidays-256 reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-workweek-default",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-workweek-default\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-networkdays-workweek-default reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-workweek-custom",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-workweek-custom\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-networkdays-workweek-custom reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-workweek-alloff",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-workweek-alloff\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-networkdays-workweek-alloff reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-workweek-malformed",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-workweek-malformed\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-networkdays-workweek-malformed reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-workweek-default",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-workweek-default\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-workday-workweek-default reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-workweek-custom",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-workweek-custom\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-workday-workweek-custom reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-workweek-alloff",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-workweek-alloff\",\"source\":\"=WORKDAY(DATE(2024;1;1);1;;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-workday-workweek-alloff reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-workweek-malformed",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-workweek-malformed\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=date-workday-workweek-malformed reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-interval-7",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-interval-7\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;7))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-networkdays-interval-7 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-interval-31",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-interval-31\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;31))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-networkdays-interval-31 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-interval-365",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-interval-365\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;30))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-networkdays-interval-365 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-networkdays-interval-4096",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-networkdays-interval-4096\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-networkdays-interval-4096 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-offset-0",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-offset-0\",\"source\":\"=WORKDAY(DATE(2024;1;1);0)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-workday-offset-0 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-offset-1",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-offset-1\",\"source\":\"=WORKDAY(DATE(2024;1;1);1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-workday-offset-1 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-offset-64",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-offset-64\",\"source\":\"=WORKDAY(DATE(2024;1;1);64)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-workday-offset-64 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-offset-256",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-offset-256\",\"source\":\"=WORKDAY(DATE(2024;1;1);256)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-workday-offset-256 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-workday-offset-1024",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-workday-offset-1024\",\"source\":\"=WORKDAY(DATE(2024;1;1);1024)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-workday-offset-1024 reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-sequence-networkdays-projection",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-sequence-networkdays-projection\",\"source\":\"=IF({TRUE()|TRUE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16];[.B1:.B7]);0)\",\"evaluation_path\":\"value\",\"reference_reads\":46}\npreflight case=date-sequence-networkdays-projection reference_reads=46\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-sequence-workday-projection",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-sequence-workday-projection\",\"source\":\"=IF({TRUE()|TRUE()};WORKDAY(DATE(2024;1;1);64;[.A1:.A16];[.B1:.B7]);0)\",\"evaluation_path\":\"value\",\"reference_reads\":46}\npreflight case=date-sequence-workday-projection reference_reads=46\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-projected-day",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-projected-day\",\"source\":\"=DAY({43890|43891})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-projected-day reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-lazy-unselected",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-lazy-unselected\",\"source\":\"=IF({FALSE()|FALSE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A256];[.B1:.B7]);0)\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-lazy-unselected reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-timestamp-now",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-timestamp-now\",\"source\":\"=NOW()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-timestamp-now reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-timestamp-today",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-timestamp-today\",\"source\":\"=TODAY()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-timestamp-today reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-timestamp-eastersunday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-timestamp-eastersunday\",\"source\":\"=EASTERSUNDAY()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-timestamp-eastersunday reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-missing-now",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-missing-now\",\"source\":\"=NOW()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-missing-now reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-missing-today",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-missing-today\",\"source\":\"=TODAY()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-missing-today reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-missing-eastersunday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-missing-eastersunday\",\"source\":\"=EASTERSUNDAY()\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-missing-eastersunday reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-list-refusal",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-list-refusal\",\"source\":\"=DAY([.A1:.A2]~[.A3:.A4])\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-list-refusal reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-direct-sequence-refusal",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-direct-sequence-refusal\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A2]~[.A3:.A4])\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-direct-sequence-refusal reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-cancel-networkdays",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-cancel-networkdays\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])\",\"evaluation_path\":\"value\",\"reference_reads\":1}\npreflight case=date-cancel-networkdays reference_reads=1\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-cancel-workday",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-cancel-workday\",\"source\":\"=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])\",\"evaluation_path\":\"value\",\"reference_reads\":1}\npreflight case=date-cancel-workday reference_reads=1\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-resource-networkdays",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-resource-networkdays\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=date-resource-networkdays reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-work-limit-networkdays",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-work-limit-networkdays\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=date-work-limit-networkdays reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-formula-error-sequence",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-formula-error-sequence\",\"source\":\"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.C1:.C16])\",\"evaluation_path\":\"value\",\"reference_reads\":16}\npreflight case=date-formula-error-sequence reference_reads=16\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "date-dateparam-error",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"date-dateparam-error\",\"source\":\"=DAY([.C1])\",\"evaluation_path\":\"value\",\"reference_reads\":1}\npreflight case=date-dateparam-error reference_reads=1\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    }
+  ],
+  "baseline_results": [
+    {
+      "case": "scalar-control-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-arithmetic\",\"source\":\"=0.17+1.25\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-sin\",\"source\":\"=SIN(0.17)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-imsum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-imsum\",\"source\":\"=IMREAL(IMSUM(COMPLEX(2;3);COMPLEX(1;4)))\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-imsum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dsum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dsum\",\"source\":\"=DSUM([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dsum reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-average",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-average\",\"source\":\"=AVERAGE(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-average reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-counta",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-counta\",\"source\":\"=COUNTA(1.25;\\\"x\\\";TRUE())\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-counta reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-var",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-var\",\"source\":\"=VAR(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-var reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-control-stdev",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-control-stdev\",\"source\":\"=STDEV(1.25;2.5;3.75)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-control-stdev reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dvar",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dvar\",\"source\":\"=DVAR([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dvar reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "database-control-dstdev",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"database-control-dstdev\",\"source\":\"=DSTDEV([.A1:.B4];2;[.D1:.D2])\",\"evaluation_path\":\"value\",\"reference_reads\":7}\npreflight case=database-control-dstdev reference_reads=7\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-4x4-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-4x4-arithmetic\",\"source\":\"={0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000}+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-4x4-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-4x4-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-4x4-sin\",\"source\":\"=SIN({0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-4x4-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-16x16-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-16x16-arithmetic\",\"source\":\"={0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000}+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-16x16-arithmetic reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "array-control-16x16-sin",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"array-control-16x16-sin\",\"source\":\"=SIN({0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=array-control-16x16-sin reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-array-16x4-arithmetic",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-array-16x4-arithmetic\",\"source\":\"=[.A1:.D16]+1.25\",\"evaluation_path\":\"value\",\"reference_reads\":64}\npreflight case=reference-array-16x4-arithmetic reference_reads=64\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "scalar-aggregate-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"scalar-aggregate-sum\",\"source\":\"=SUM(1.25)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=scalar-aggregate-sum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "literal-aggregate-4x1-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"literal-aggregate-4x1-sum\",\"source\":\"=SUM({1|2|3|4})\",\"evaluation_path\":\"value\",\"reference_reads\":0}\npreflight case=literal-aggregate-4x1-sum reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-aggregate-64x4-sum",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-aggregate-64x4-sum\",\"source\":\"=SUM([.A1:.D64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-aggregate-64x4-sum reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-conditional-256x4-sumifs",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-conditional-256x4-sumifs\",\"source\":\"=SUMIFS([.I1:.L256];[.A1:.D256];\\\">=2\\\";[.E1:.H256];1)\",\"evaluation_path\":\"value\",\"reference_reads\":1792}\npreflight case=reference-conditional-256x4-sumifs reference_reads=1792\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-control-average",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-control-average\",\"source\":\"=AVERAGE([.A1:.D64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-control-average reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "reference-control-counta",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"reference-control-counta\",\"source\":\"=COUNTA([.E1:.H64])\",\"evaluation_path\":\"value\",\"reference_reads\":256}\npreflight case=reference-control-counta reference_reads=256\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-median",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-median\",\"source\":\"=MEDIAN(1;2;4;8)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-median reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-rank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-rank\",\"source\":\"=RANK(8;8;1)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-rank reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "representative-percentrank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"representative-percentrank\",\"source\":\"=PERCENTRANK(8;8;3)\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=representative-percentrank reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-borrowed-literals",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-borrowed-literals\",\"source\":\"=\\\"left\\\"&\\\"right\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-borrowed-literals reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-owned-left",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-owned-left\",\"source\":\"=(\\\"left\\\"&\\\"mid\\\")&\\\"right\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-owned-left reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-owned-right",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-owned-right\",\"source\":\"\\\"left\\\"&(\\\"mid\\\"&\\\"right\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-owned-right reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "concat-growth-chain",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"concat-growth-chain\",\"source\":\"=\\\"a\\\"&\\\"b\\\"&\\\"c\\\"&\\\"d\\\"&\\\"e\\\"&\\\"f\\\"&\\\"g\\\"&\\\"h\\\"\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=concat-growth-chain reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-date",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-date\",\"source\":\"=VALUE(\\\"2024-01-02\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-date reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-time",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-time\",\"source\":\"=VALUE(\\\"12:34:56\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-time reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "value-date-fraction-value-mixed-fraction",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"value-date-fraction-value-mixed-fraction\",\"source\":\"=VALUE(\\\"3 1/2\\\")\",\"evaluation_path\":\"scalar\",\"reference_reads\":0}\npreflight case=value-date-fraction-value-mixed-fraction reference_reads=0\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-isnumber",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-isnumber\",\"source\":\"=IF({TRUE()|TRUE()};ISNUMBER([.A3:.A4]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-isnumber reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-isblank",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-isblank\",\"source\":\"=IF({TRUE()|TRUE()};ISBLANK([.A1:.A2]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-isblank reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    },
+    {
+      "case": "lazy-if-cache-istext",
+      "ok": true,
+      "stdout": "preflight-json {\"case\":\"lazy-if-cache-istext\",\"source\":\"=IF({TRUE()|TRUE()};ISTEXT([.A1:.A2]);FALSE())\",\"evaluation_path\":\"value\",\"reference_reads\":2}\npreflight case=lazy-if-cache-istext reference_reads=2\npreflight-ok cases=1 phase=evaluate\n",
+      "stderr": ""
+    }
+  ]
+}
