@@ -1,0 +1,158 @@
+{
+  "status": "requirements; evidence pending",
+  "normative": "OpenDocument 1.4 Part 4 section 6.14",
+  "functions": {
+    "ADDRESS": {
+      "requirements": [
+        "all four absolute modes",
+        "A1 and R1C1 text",
+        "optional quoted sheet and apostrophe escaping",
+        "scalar and matrix parameter conversion",
+        "text/storage/work limits"
+      ],
+      "evidence": null
+    },
+    "CHOOSE": {
+      "requirements": [
+        "only selected expression evaluated",
+        "scalar and matrix index policy",
+        "selected reference/list/source identity",
+        "shape probing does not evaluate unselected branches",
+        "typed failures not caught"
+      ],
+      "evidence": null
+    },
+    "HLOOKUP": {
+      "requirements": [
+        "ForceArray data with complete shape",
+        "exact first match in left-to-right order",
+        "sorted approximate last duplicate",
+        "result row bounds before reads",
+        "only selected result cell read"
+      ],
+      "evidence": null
+    },
+    "INDEX": {
+      "requirements": [
+        "Array and ReferenceList data",
+        "logical record area selector including duplicates",
+        "zero/omitted row and column slices",
+        "3D descriptor preservation",
+        "reference identity in metadata/reducers/operators",
+        "derived result owned conversion"
+      ],
+      "evidence": null
+    },
+    "INDIRECT": {
+      "requirements": [
+        "A1 cells/ranges/whole axes/3D",
+        "dot and exclamation sheet separators",
+        "R1C1 absolute and relative coordinates",
+        "first-element selector semantics for array inputs",
+        "temporary parse storage charged",
+        "source references inert",
+        "derived result owned conversion"
+      ],
+      "evidence": null
+    },
+    "LOOKUP": {
+      "requirements": [
+        "tall/square and wide orientation",
+        "largest less-than-or-equal and last duplicate",
+        "result vector shape validation",
+        "short reference result extension and sheet edge refusal",
+        "short Array result out-of-bounds error",
+        "text/number mismatch barrier"
+      ],
+      "evidence": null
+    },
+    "MATCH": {
+      "requirements": [
+        "vector shape validation",
+        "exact first match",
+        "ascending and descending last duplicate",
+        "case-insensitive Unicode text",
+        "type order and mismatch barriers",
+        "bounded sorted search reads"
+      ],
+      "evidence": null
+    },
+    "OFFSET": {
+      "requirements": [
+        "checked signed row/column offsets",
+        "omitted dimensions default; actual Empty dimensions are invalid",
+        "strictly positive dimensions",
+        "3D extents validated on every plane",
+        "list admission rule",
+        "zero-read descriptor construction",
+        "derived result owned conversion"
+      ],
+      "evidence": null
+    },
+    "VLOOKUP": {
+      "requirements": [
+        "ForceArray data with complete shape",
+        "exact first match in top-to-bottom order",
+        "sorted approximate last duplicate",
+        "result column bounds before reads",
+        "only selected result cell read"
+      ],
+      "evidence": null
+    }
+  },
+  "cross_cutting": [
+    "formula errors versus typed provider failures",
+    "cancellation before and after resolver calls",
+    "source-version fence before and after evaluation",
+    "all memory reservations released on failure",
+    "projection-sensitive MUNIT descendants",
+    "reference lists never implicitly materialized as arrays",
+    "no package or formula-cache mutation",
+    "independent oracle and native compatibility record",
+    "frozen seven-gate receipts",
+    "matched performance controls and scaling with retained raw attempts"
+  ],
+  "schema": "ods-formula-lookups-coverage-v1",
+  "cross_cutting_evidence": [
+    {
+      "requirement": "formula errors versus typed provider failures",
+      "evidence": null
+    },
+    {
+      "requirement": "cancellation before and after resolver calls",
+      "evidence": null
+    },
+    {
+      "requirement": "source-version fence before and after evaluation",
+      "evidence": null
+    },
+    {
+      "requirement": "all memory reservations released on failure",
+      "evidence": null
+    },
+    {
+      "requirement": "projection-sensitive MUNIT descendants",
+      "evidence": null
+    },
+    {
+      "requirement": "reference lists never implicitly materialized as arrays",
+      "evidence": null
+    },
+    {
+      "requirement": "no package or formula-cache mutation",
+      "evidence": null
+    },
+    {
+      "requirement": "independent oracle and native compatibility record",
+      "evidence": null
+    },
+    {
+      "requirement": "frozen seven-gate receipts",
+      "evidence": null
+    },
+    {
+      "requirement": "matched performance controls and scaling with retained raw attempts",
+      "evidence": null
+    }
+  ]
+}
