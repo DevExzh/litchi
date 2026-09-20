@@ -19,7 +19,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
             ],
@@ -60,7 +60,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
             ],
@@ -95,7 +95,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
             ],
@@ -131,7 +131,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
             ],
@@ -217,7 +217,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "choose_evaluates_only_the_selected_value"
             ],
@@ -251,9 +251,10 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
-              "choose_lifts_matrix_indices_and_preserves_selected_identity"
+              "choose_lifts_matrix_indices_and_preserves_selected_identity",
+              "sequential_choose_shape_probes_release_depth"
             ],
             "requirements": [
               "scalar and matrix index policy"
@@ -286,7 +287,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "choose_evaluates_only_the_selected_value",
               "choose_lifts_matrix_indices_and_preserves_selected_identity"
@@ -323,9 +324,10 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
-              "choose_lifts_matrix_indices_and_preserves_selected_identity"
+              "choose_lifts_matrix_indices_and_preserves_selected_identity",
+              "sequential_choose_shape_probes_release_depth"
             ],
             "requirements": [
               "shape probing does not evaluate unselected branches"
@@ -407,7 +409,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -442,7 +444,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "horizontal_and_vertical_lookup_exact_and_approximate_modes"
             ],
@@ -477,7 +479,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "horizontal_and_vertical_lookup_exact_and_approximate_modes"
             ],
@@ -512,9 +514,10 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
-              "table_lookup_reads_search_prefix_and_selected_result_only"
+              "table_lookup_reads_search_prefix_and_selected_result_only",
+              "lookup_invalid_selectors_precede_reference_key_reads"
             ],
             "requirements": [
               "result row bounds before reads"
@@ -546,7 +549,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "table_lookup_reads_search_prefix_and_selected_result_only"
             ],
@@ -597,7 +600,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_selects_array_cells_and_missing_row_or_column_returns_vectors",
               "index_selects_one_union_record_and_clears_list_identity"
@@ -633,7 +636,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_selects_one_union_record_and_clears_list_identity"
             ],
@@ -668,7 +671,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_selects_array_cells_and_missing_row_or_column_returns_vectors"
             ],
@@ -704,7 +707,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads"
             ],
@@ -739,7 +742,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads",
               "selected_derived_references_keep_matrix_shape_without_unsliced_branch_probes"
@@ -774,7 +777,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "derived_reference_owned_roundtrip_drops_synthetic_lexical_owner"
             ],
@@ -826,7 +829,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
             ],
@@ -864,7 +867,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
             ],
@@ -899,7 +902,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
             ],
@@ -936,7 +939,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "projected_scalar_selectors_use_first_element_but_munit_stays_position_sensitive"
             ],
@@ -1004,7 +1007,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
             ],
@@ -1039,7 +1042,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "projected_indirect_growth_does_not_replay_its_text_selector"
             ],
@@ -1091,7 +1094,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -1126,7 +1129,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -1161,7 +1164,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -1195,7 +1198,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_extends_short_references_only_after_an_out_of_range_match"
             ],
@@ -1230,7 +1233,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -1264,7 +1267,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "approximate_search_crosses_numeric_and_text_midpoints"
             ],
@@ -1315,9 +1318,10 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
-              "lookup_search_data_rejects_scalars_lists_and_three_dimensional_references"
+              "lookup_search_data_rejects_scalars_lists_and_three_dimensional_references",
+              "lookup_invalid_selectors_precede_reference_key_reads"
             ],
             "requirements": [
               "vector shape validation"
@@ -1351,7 +1355,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "match_exact_returns_first_duplicate_and_approximate_returns_last"
             ],
@@ -1385,7 +1389,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "match_exact_returns_first_duplicate_and_approximate_returns_last"
             ],
@@ -1420,7 +1424,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "search_comparison_is_type_preserving_casefolded_and_not_normalized"
             ],
@@ -1457,7 +1461,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "approximate_search_crosses_numeric_and_text_midpoints"
             ],
@@ -1493,7 +1497,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "table_lookup_reads_search_prefix_and_selected_result_only"
             ],
@@ -1545,7 +1549,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads",
               "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
@@ -1582,7 +1586,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads"
             ],
@@ -1617,7 +1621,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
             ],
@@ -1652,7 +1656,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads"
             ],
@@ -1686,7 +1690,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
             ],
@@ -1737,7 +1741,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "index_and_offset_return_derived_reference_descriptors_without_reads"
             ],
@@ -1771,7 +1775,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "derived_reference_owned_roundtrip_drops_synthetic_lexical_owner"
             ],
@@ -1821,7 +1825,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
             ],
@@ -1856,7 +1860,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "horizontal_and_vertical_lookup_exact_and_approximate_modes"
             ],
@@ -1891,7 +1895,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "horizontal_and_vertical_lookup_exact_and_approximate_modes"
             ],
@@ -1926,9 +1930,10 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
-              "table_lookup_reads_search_prefix_and_selected_result_only"
+              "table_lookup_reads_search_prefix_and_selected_result_only",
+              "lookup_invalid_selectors_precede_reference_key_reads"
             ],
             "requirements": [
               "result column bounds before reads"
@@ -1960,7 +1965,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "table_lookup_reads_search_prefix_and_selected_result_only"
             ],
@@ -2005,7 +2010,10 @@
     "no package or formula-cache mutation",
     "independent oracle and native compatibility record",
     "frozen seven-gate receipts",
-    "matched performance controls and scaling with retained raw attempts"
+    "matched performance controls and scaling with retained raw attempts",
+    "invalid lookup selectors precede reference-key reads",
+    "sequential computed CHOOSE probe depth and memory release",
+    "position-sensitive computed CHOOSE selector cache exclusion"
   ],
   "schema": "ods-formula-lookups-coverage-v1",
   "cross_cutting_evidence": [
@@ -2148,7 +2156,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "projected_scalar_selectors_use_first_element_but_munit_stays_position_sensitive",
               "projected_lookup_cache_reuses_direct_search_but_keeps_munit_position_sensitive"
@@ -2176,7 +2184,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "choose_lifts_matrix_indices_and_preserves_selected_identity",
               "lookup_search_data_rejects_scalars_lists_and_three_dimensional_references",
@@ -2205,7 +2213,7 @@
             "kind": "focused_test",
             "root": "repo",
             "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
-            "sha256": "79b99446c9d5af68152edaa7dc1db3a5f77922343b3d021658aa168fada7a86c",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
             "identifiers": [
               "projected_lookup_cache_reuses_direct_search_but_keeps_munit_position_sensitive"
             ],
@@ -2325,6 +2333,87 @@
             "receipt": {
               "root": "evidence",
               "path": "performance/results/performance-report.json",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "invalid lookup selectors precede reference-key reads",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
+            "identifiers": [
+              "lookup_invalid_selectors_precede_reference_key_reads"
+            ],
+            "requirements": [
+              "invalid lookup selectors precede reference-key reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "sequential computed CHOOSE probe depth and memory release",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
+            "identifiers": [
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "sequential computed CHOOSE probe depth and memory release"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "position-sensitive computed CHOOSE selector cache exclusion",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "pending",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "32dd9b97bdeda505e71102c9e5de166c60b527a8a9a2209c128fde2a81c81837",
+            "identifiers": [
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "position-sensitive computed CHOOSE selector cache exclusion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
               "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
             }
           }
