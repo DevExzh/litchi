@@ -8,7 +8,7 @@
     "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
     "common_conventions_section": "6.12.1"
   },
-  "scope_note": "All 54 financial functions remain in scope. contract.md currently drafts only the 20 cash-flow and annuity functions; other groups require separate contracts. Grouping is for implementation planning, not a normative classification.",
+  "scope_note": "All 54 financial functions remain in scope. contract.md drafts 20 cash-flow and annuity functions; depreciation-contract.md drafts seven depreciation and fractional monetary functions. The 27 security/coupon functions still require their contract. Grouping is for implementation planning, not a normative classification.",
   "functions": [
     {
       "section": "6.12.2",
@@ -80,13 +80,13 @@
       "section": "6.12.13",
       "name": "DB",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.14",
       "name": "DDB",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.15",
@@ -98,13 +98,13 @@
       "section": "6.12.16",
       "name": "DOLLARDE",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.17",
       "name": "DOLLARFR",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.18",
@@ -272,13 +272,13 @@
       "section": "6.12.45",
       "name": "SLN",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.46",
       "name": "SYD",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.47",
@@ -302,7 +302,7 @@
       "section": "6.12.50",
       "name": "VDB",
       "planning_group": "depreciation-and-fractions",
-      "contract_status": "not drafted"
+      "contract_status": "draft"
     },
     {
       "section": "6.12.51",
