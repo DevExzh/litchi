@@ -1,0 +1,21 @@
+{
+  "commit": "3844f235bac545ff0ae1580b97612883c1fd9f89",
+  "scope": [
+    "FINDB",
+    "LEFTB",
+    "LENB",
+    "MIDB",
+    "REPLACEB",
+    "RIGHTB",
+    "SEARCHB"
+  ],
+  "contract_sha256": "88dafc6f0d111672e724b4238289afc0a17d879b856059ac3886ca60bbc99db5",
+  "gate_lock_source": "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/gates/Cargo.lock",
+  "gate_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "ambient_lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "unrelated_tracked_changes": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md"
+  ]
+}

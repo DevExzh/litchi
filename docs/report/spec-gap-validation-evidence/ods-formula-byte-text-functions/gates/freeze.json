@@ -1,0 +1,30 @@
+{
+  "base_commit": "3844f235bac545ff0ae1580b97612883c1fd9f89",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "971f7589f5abd32930e039e7cb07a1b6f20dcab776836ade37327648ebc85847",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "e9e266ad59658d378fb758a436fd7a4a12e66b9924c225e074a03a82c8ceb51f",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "cd882fa914bffa26ede20c51a4483c53fc36f4070e37cfbfef2bfec6e2db69f3",
+    "crates/litchi-ods/src/codec/formula/evaluation/text.rs": "11d7e945eeb00b733941c34026ae670d997d58a76be16808c2d10b0a9221ac41",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/bytes.rs": "3a625110a77697bba2e7414f9c898bedf61a70bed8517cc9d67db6036add3d61",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/core.rs": "17d1a1d1f9bbd4a30eec6a48d1aa1d049e29040b489779c0ca867a6f27f962f0",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/format.rs": "129b4323c1f577f048e6bc3431653d4c2d979cc04f2fa60305d3bcf84d923c06",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/fraction.rs": "a2196dd849e2d85faaacd49f876aba8920f9aff00b50e1fad474ae6c278f276e",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/search.rs": "523b93ce563976bc617c626133e3dd90760d0580b63ef677a7eb73bda0f78d0f",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/unicode.rs": "336584ece56ee00e9e68a0c2165b5396ac1f007d5ad671f1fe8eba30aac877b6",
+    "crates/litchi-ods/src/codec/formula/evaluation/text/width.rs": "69a4fae2bb52744e6fa041e3b5de2ffcb9ffa17f6fa7ed2139e433ffe9136b7c",
+    "crates/litchi-ods/tests/ods_formula_byte_text_evaluation.rs": "57be711b33521d02197552bba33a09e105e4c927e8cc7e1fc5a6451e68ca8007",
+    "crates/litchi-ods/tests/ods_formula_byte_text_limits.rs": "ad4723fe4e3ee6a31a82e59a63e036fcabbff01a25b52ec06778f09f534981d2",
+    "crates/litchi-ods/tests/ods_formula_byte_text_oracle.rs": "be7897323c2dbb937a19acc3546be18da2f4739ec843326c74e7325c5261783b",
+    "crates/litchi-ods/docs/FEATURE_MATRIX.md": "80494d5da9129ac1957fc8206e9b9b780144d1bea95e75d7074941069493d1d8",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/contract.md": "88dafc6f0d111672e724b4238289afc0a17d879b856059ac3886ca60bbc99db5",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/byte_oracle.py": "0b677d1e3b67d2597fdfa292d656abd98debf308f3a7be4387a8e37341888859",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/byte-goldens.json": "9f30f244b3f98d1f6ddbdc481165efbf153c80205ad60a85cab1c7561f47746c",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/README.md": "634d549abc98a9155a157fe30217ec56bff9e6cc8650490b3923064e6fdae24c",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/byte-functions-native.fods": "bfe3de382ea70223509e99b4709b9b25bbb4f7eb73bea77c461f8f07ba6c9011",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/native-results.json": "a9a376ef554ada95ef0d9cb864be4f4d195c46fb3d9a14fd1148e1813e3c8091",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/provenance.json": "ca084d339cbfd49c86cfc75fc015e6eac092bc454c46375fdf340d106f4fb03a",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/recalculated.ods": "25551e366e07853532d4afd958c02645b08d308b0ef5a1cbe4ff61f4d0d0a0b5",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/reproduce.py": "61c025979febe643e10219f876b840dc15d7d4855cd3628c3c00c219cc4d9d7f",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

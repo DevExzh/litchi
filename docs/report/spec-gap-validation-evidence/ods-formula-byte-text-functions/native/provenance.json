@@ -1,0 +1,45 @@
+{
+  "fixture": {
+    "input": "byte-functions-native.fods",
+    "input_sha256": "bfe3de382ea70223509e99b4709b9b25bbb4f7eb73bea77c461f8f07ba6c9011",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "25551e366e07853532d4afd958c02645b08d308b0ef5a1cbe4ff61f4d0d0a0b5",
+    "recalculated_content_xml_sha256": "9af35052efe76d7772c0c1908c414d4dd0f3287ab74ed4c5b55c39c89997ac6d",
+    "formula_rows": 19,
+    "authorship": "Repository-local fixture authored for this evidence receipt; it contains no downloaded or upstream source content."
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "command": "libreoffice --headless -env:UserInstallation=file://<temporary-profile> --convert-to ods --outdir <temporary-output> byte-functions-native.fods",
+    "filter": "calc8",
+    "locale": {
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "LC_CTYPE": "C.UTF-8",
+      "LC_NUMERIC": "C.UTF-8"
+    },
+    "fresh_profile": true,
+    "recalculated": true,
+    "temporary_profile_removed_by_reproduce": true
+  },
+  "selected_profile": {
+    "encoding": "UTF-8 octets of semantic Unicode Text",
+    "functions": ["FINDB", "LEFTB", "LENB", "MIDB", "REPLACEB", "RIGHTB", "SEARCHB"],
+    "source": "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/contract.md",
+    "contract_sha256": "88dafc6f0d111672e724b4238289afc0a17d879b856059ac3886ca60bbc99db5"
+  },
+  "coverage": {
+    "ascii_rows": 7,
+    "ascii_rows_matching_profile": 7,
+    "nonascii_rows": 12,
+    "nonascii_rows_matching_profile": 2,
+    "nonascii_rows_showing_divergence": 10,
+    "results": "native-results.json",
+    "native_observation": "The ASCII rows agree with the selected UTF-8 profile. The non-ASCII rows are retained to show LibreOffice's native byte-position behavior under C.UTF-8; it uses host/native width units rather than the selected UTF-8-octet contract. This receipt does not claim that those units are one particular code page or that native results are portable."
+  },
+  "reproduction": {
+    "script": "reproduce.py",
+    "verification": "The script checks the input SHA-256, runs a fresh headless conversion, checks the extracted formula/result sequence and stable content.xml SHA-256, and verifies the retained native-results.json. Raw ODS ZIP bytes are not required to be stable because container metadata can vary."
+  }
+}

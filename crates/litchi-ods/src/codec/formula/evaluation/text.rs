@@ -6,6 +6,7 @@
 //! the evaluator.  Matrix/reference text evaluation remains in the value VM;
 //! this module only consumes the eagerly evaluated scalar argument tail.
 
+mod bytes;
 mod core;
 mod format;
 mod fraction;
@@ -15,9 +16,10 @@ mod width;
 
 use super::{EvaluationFailure, EvaluationResult, Evaluator, Node, TextValue, WorkingValue};
 
-/// Return whether `name` belongs to the section 6.20 text family.
+/// Return whether `name` belongs to the sections 6.7 or 6.20 text families.
 pub(super) fn is_text_function(name: &str) -> bool {
-    core::is_core_function(name)
+    bytes::is_byte_function(name)
+        || core::is_core_function(name)
         || matches!(name.len(), 3..=10)
             && [
                 "ASC", "CHAR", "CODE", "DOLLAR", "FIXED", "JIS", "TEXT", "UNICHAR", "UNICODE",
@@ -33,7 +35,7 @@ pub(super) fn is_text_function(name: &str) -> bool {
 /// classifier when it has to coerce a matrix Empty to a scalar function's
 /// declared Text parameter.
 pub(super) fn argument_is_text(name: &str, index: usize) -> bool {
-    if core::argument_is_text(name, index) {
+    if bytes::argument_is_text(name, index) || core::argument_is_text(name, index) {
         return true;
     }
     (name.eq_ignore_ascii_case("ASC")
@@ -50,6 +52,9 @@ pub(super) fn apply<'a>(
     node: Node<'a>,
     name: &str,
 ) -> EvaluationResult<()> {
+    if bytes::is_byte_function(name) {
+        return bytes::apply(evaluator, node, name);
+    }
     if core::is_core_function(name) {
         return core::apply(evaluator, node, name);
     }
