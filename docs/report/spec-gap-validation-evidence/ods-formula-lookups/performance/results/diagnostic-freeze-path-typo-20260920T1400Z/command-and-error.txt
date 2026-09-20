@@ -1,0 +1,3 @@
+python3 docs/report/spec-gap-validation-evidence/ods-formula-lookups/performance/run_profile.py --candidate-root .codex-tmp/ods-lookups-gates-hYbIgA/checkout --candidate-freeze docs/report/spec-gap-validation-evidence/ods-formula-lookups/ods-formula-lookups/gates/freeze.json --warmups 3 --samples 15
+
+FileNotFoundError: [Errno 2] No such file or directory: '/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-lookups/ods-formula-lookups/gates/freeze.json'
