@@ -1,0 +1,187 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+
+#
+# Total Lost Samples: 0
+#
+# Samples: 7K of event 'cpu/cycles/P'
+# Event count (approx.): 34897555314
+#
+# Overhead  Command          Shared Object         Symbol                                                                                                                
+# ........  ...............  ....................  ......................................................................................................................
+#
+     7.37%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::start
+     6.86%  candidate-nativ  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     5.25%  candidate-nativ  candidate-native      [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     3.98%  candidate-nativ  candidate-native      [.] quick_xml::events::attributes::IterState::next
+     3.83%  candidate-nativ  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+     3.80%  candidate-nativ  candidate-native      [.] sha2::sha256::x86_sha::compress
+     3.30%  candidate-nativ  candidate-native      [.] core::str::converts::from_utf8
+     2.92%  candidate-nativ  candidate-native      [.] litchi_pptx::notes::codec::scan_processed_xml
+     2.69%  candidate-nativ  libc.so.6             [.] malloc
+            |          
+            |--1.55%--__libc_malloc (inlined)
+            |          
+             --1.14%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __libc_malloc (inlined)
+
+     2.49%  candidate-nativ  candidate-native      [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     2.30%  candidate-nativ  candidate-native      [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     2.21%  candidate-nativ  candidate-native      [.] zlib_rs::inflate::inflate_fast_help
+     2.08%  candidate-nativ  candidate-native      [.] litchi_pptx::notes::codec::inspect_element
+     2.03%  candidate-nativ  candidate-native      [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     2.02%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     2.01%  candidate-nativ  candidate-native      [.] quick_xml::reader::state::ReaderState::emit_start
+     1.96%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::process_markup_compatibility
+     1.92%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::xml_name::validation::is_ncname
+     1.73%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     1.53%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::write_start
+     1.45%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     1.44%  candidate-nativ  libc.so.6             [.] cfree@GLIBC_2.2.5
+            |          
+            |--1.19%--__libc_free (inlined)
+            |          
+             --0.25%--tcache_put_n (inlined)
+                       tcache_put (inlined)
+                       __libc_free (inlined)
+
+     1.44%  candidate-nativ  libc.so.6             [.] _int_malloc
+            |          
+             --1.43%--_int_malloc
+                       |          
+                       |--1.00%--__libc_malloc2
+                       |          
+                        --0.40%--_int_realloc
+                                  __libc_realloc (inlined)
+
+     1.30%  candidate-nativ  candidate-native      [.] zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch
+     1.09%  candidate-nativ  candidate-native      [.] zlib_rs::inflate::inftrees::inflate_table
+     1.07%  candidate-nativ  candidate-native      [.] litchi_pptx::notes::resolved
+     1.06%  candidate-nativ  candidate-native      [.] litchi_pptx::shape::reader::Scene::read_with
+     1.05%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::close
+     1.04%  candidate-nativ  candidate-native      [.] zlib_rs::inflate::inflate
+     0.91%  candidate-nativ  candidate-native      [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.90%  candidate-nativ  candidate-native      [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.87%  candidate-nativ  candidate-native      [.] quick_xml::reader::state::ReaderState::emit_end
+     0.85%  candidate-nativ  candidate-native      [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     0.83%  candidate-nativ  candidate-native      [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.83%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::expand_parts
+     0.73%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+     0.73%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::BoundedOutput::reserve
+     0.72%  candidate-nativ  candidate-native      [.] quick_xml::name::NamespaceResolver::resolve_prefix
+     0.71%  candidate-nativ  candidate-native      [.] quick_xml::name::NamespaceResolver::resolve_event
+     0.70%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.67%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::xml_name::validation::is_qualified_name
+     0.57%  candidate-nativ  candidate-native      [.] quick_xml::name::NamespaceResolver::push
+     0.56%  candidate-nativ  libc.so.6             [.] _int_free_merge_chunk
+            |          
+            |--0.40%--_int_free_create_chunk (inlined)
+            |          _int_free_merge_chunk
+            |          _int_free_chunk
+            |          
+             --0.15%--_int_free_merge_chunk
+                       |          
+                        --0.14%--_int_free_chunk
+
+     0.56%  candidate-nativ  candidate-native      [.] quick_xml::escape::unescape
+     0.53%  candidate-nativ  candidate-native      [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.48%  candidate-nativ  candidate-native      [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.47%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw
+     0.45%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     0.43%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.42%  candidate-nativ  candidate-native      [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+     0.42%  candidate-nativ  [unknown]             [k] 0xffffffff9e800ef0
+            |
+            ---0xffffffff9e800ef0
+               |          
+                --0.10%--syscall
+
+     0.39%  candidate-nativ  candidate-native      [.] quick_xml::name::QName::local_name
+     0.37%  candidate-nativ  candidate-native      [.] quick_xml::escape::normalize_attribute_value
+     0.33%  candidate-nativ  libc.so.6             [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk (inlined)
+               |          
+               |--0.18%--_int_malloc
+               |          |          
+               |           --0.10%--__libc_malloc2
+               |          
+                --0.10%--_int_free_merge_chunk
+
+     0.33%  candidate-nativ  candidate-native      [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+     0.33%  candidate-nativ  candidate-native      [.] __rustc::__rust_alloc
+     0.32%  candidate-nativ  candidate-native      [.] core::slice::memchr::memchr_aligned
+     0.29%  candidate-nativ  candidate-native      [.] core::ops::function::FnOnce::call_once
+     0.29%  candidate-nativ  candidate-native      [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.28%  candidate-nativ  candidate-native      [.] quick_xml::name::QName::decompose
+     0.28%  candidate-nativ  candidate-native      [.] std::thread::local::LocalKey<T>::with
+     0.27%  candidate-nativ  candidate-native      [.] __rustc::__rdl_alloc
+     0.24%  candidate-nativ  libc.so.6             [.] _int_realloc
+            |          
+             --0.21%--_int_realloc
+                       __libc_realloc (inlined)
+
+     0.21%  candidate-nativ  candidate-native      [.] litchi_pptx::tag::shape::codec::selected_raw_span_for_shape
+     0.21%  candidate-nativ  candidate-native      [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.20%  candidate-nativ  libc.so.6             [.] __libc_malloc2
+            |
+            ---__libc_malloc2
+
+     0.20%  candidate-nativ  candidate-native      [.] __rustc::__rust_dealloc
+     0.19%  candidate-nativ  candidate-native      [.] litchi_opc::packuri::PackURI::new
+     0.19%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::mce::codec::active_offsets
+     0.18%  candidate-nativ  candidate-native      [.] alloc::raw_vec::RawVec<T,A>::grow_one
+     0.16%  candidate-nativ  libc.so.6             [.] _int_free_maybe_trim
+            |
+            ---_int_free_maybe_trim
+               _int_free_chunk
+
+     0.16%  candidate-nativ  candidate-native      [.] crc32fast::specialized::pclmulqdq::calculate_avx512
+     0.15%  candidate-nativ  candidate-native      [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.14%  candidate-nativ  libc.so.6             [.] realloc
+            |          
+             --0.10%--__libc_realloc (inlined)
+
+     0.14%  candidate-nativ  libc.so.6             [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.14%  candidate-nativ  candidate-native      [.] litchi_ooxml_common::xml::unqualified_attribute_value
+     0.13%  candidate-nativ  candidate-native      [.] litchi_pptx::shape::reader::Scanner::start_element
+     0.13%  candidate-nativ  candidate-native      [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.13%  candidate-nativ  candidate-native      [.] alloc::raw_vec::RawVecInner<A>::try_allocate_in
+     0.13%  candidate-nativ  candidate-native      [.] __rustc::__rdl_dealloc
+     0.11%  candidate-nativ  candidate-native      [.] litchi_pptx::opened::xml::rewrite_shape_texts
+     0.11%  candidate-nativ  candidate-native      [.] hashbrown::raw::RawTable<T,A>::reserve_rehash
+     0.11%  candidate-nativ  candidate-native      [.] alloc::raw_vec::RawVecInner<A>::finish_grow
+     0.11%  candidate-nativ  candidate-native      [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.11%  candidate-nativ  candidate-native      [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+     0.11%  candidate-nativ  candidate-native      [.] zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch
+     0.11%  candidate-nativ  candidate-native      [.] digest::FixedOutput::finalize_fixed
+     0.10%  candidate-nativ  candidate-native      [.] core::slice::memchr::memrchr
+     0.10%  candidate-nativ  candidate-native      [.] litchi_pptx::opened::xml::write_compact_start
+     0.10%  candidate-nativ  candidate-native      [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+     0.10%  candidate-nativ  candidate-native      [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.10%  candidate-nativ  candidate-native      [.] litchi_opc::packuri::PackURI::validate_percent_encoding
+     0.10%  candidate-nativ  candidate-native      [.] core::hash::BuildHasher::hash_one
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

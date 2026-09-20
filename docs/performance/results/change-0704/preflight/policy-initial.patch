@@ -1,0 +1,98 @@
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -62,4 +62,5 @@ pub struct Limits {
+     max_history_entries: usize,
+     max_history_bytes: usize,
+     max_retained_candidate_bytes: usize,
++    max_retained_mce_bytes: usize,
+ }
+ 
+ impl Limits {
+@@ -73,4 +74,5 @@ impl Limits {
+         max_history_entries: 64,
+         max_history_bytes: 256 * 1024 * 1024,
+         max_retained_candidate_bytes: 64 * 1024 * 1024,
++        max_retained_mce_bytes: 1 * 1024 * 1024,
+     };
+@@ -101,6 +103,7 @@ impl Limits {
+                 max_history_entries,
+                 max_history_bytes,
+                 max_retained_candidate_bytes,
++                max_retained_mce_bytes: Self::DEFAULT.max_retained_mce_bytes,
+             })
+         }
+     }
+ 
++    /// Return a copy with an aggregate retained transformed-XML ceiling.
++    ///
++    /// This setter is deliberately allowed to receive zero: zero disables
++    /// optional MCE retention while leaving all required work and validation
++    /// limits unchanged. The six-argument [`Self::new`] constructor continues
++    /// to use the one-MiB default for this optional optimization budget.
++    #[must_use]
++    pub const fn with_max_retained_mce_bytes(mut self, maximum: usize) -> Self {
++        self.max_retained_mce_bytes = maximum;
++        self
++    }
++
+     /// Maximum number of changed parts in one patch.
+@@ -135,4 +148,13 @@ impl Limits {
+         self.max_history_bytes
+     }
+ 
++    /// Maximum aggregate capacity of transformed XML retained for reuse.
++    ///
++    /// This ceiling is independent of
++    /// [`Self::max_retained_candidate_bytes`], which governs serialized
++    /// cross-presentation candidate archives. A value of zero means that no
++    /// transformed XML may be retained; the operation recomputes it instead.
++    #[must_use]
++    pub const fn max_retained_mce_bytes(self) -> usize {
++        self.max_retained_mce_bytes
++    }
++
+     /// Maximum serialized candidate archive a cross-presentation slide-copy
+diff --git a/crates/litchi-pptx/src/opened/patch.rs b/crates/litchi-pptx/src/opened/patch.rs
+--- a/crates/litchi-pptx/src/opened/patch.rs
++++ b/crates/litchi-pptx/src/opened/patch.rs
+@@ -1060,6 +1060,10 @@ fn merge_root(
+ fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
+-    Limits::new(
++    let max_retained_mce_bytes = left
++        .max_retained_mce_bytes()
++        .min(right.max_retained_mce_bytes());
++    Limits::new(
+         left.max_parts().min(right.max_parts()),
+         left.max_patch_bytes().min(right.max_patch_bytes()),
+         left.max_text_bytes().min(right.max_text_bytes()),
+         left.max_history_entries().min(right.max_history_entries()),
+         left.max_history_bytes().min(right.max_history_bytes()),
+         left.max_retained_candidate_bytes()
+             .min(right.max_retained_candidate_bytes()),
+     )
++    .map(|limits| limits.with_max_retained_mce_bytes(max_retained_mce_bytes))
+     .ok_or_else(|| invalid("opened-presentation patch limits are invalid"))
+ }
+
+diff --git a/crates/litchi-pptx/src/opened/cross_copy_plan.rs b/crates/litchi-pptx/src/opened/cross_copy_plan.rs
+--- a/crates/litchi-pptx/src/opened/cross_copy_plan.rs
++++ b/crates/litchi-pptx/src/opened/cross_copy_plan.rs
+@@ -1873,6 +1873,10 @@ fn reject_slide_name_collisions(
+ fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
+-    Limits::new(
++    let max_retained_mce_bytes = left
++        .max_retained_mce_bytes()
++        .min(right.max_retained_mce_bytes());
++    Limits::new(
+         left.max_parts().min(right.max_parts()),
+         left.max_patch_bytes().min(right.max_patch_bytes()),
+         left.max_text_bytes().min(right.max_text_bytes()),
+         left.max_history_entries().min(right.max_history_entries()),
+         left.max_history_bytes().min(right.max_history_bytes()),
+         left.max_retained_candidate_bytes()
+             .min(right.max_retained_candidate_bytes()),
+     )
++    .map(|limits| limits.with_max_retained_mce_bytes(max_retained_mce_bytes))
+     .ok_or_else(|| invalid("cross-slide copy limits are invalid"))
+ }

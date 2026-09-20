@@ -1,0 +1,7 @@
+error: failed to load manifest for dependency `litchi-pptx`
+
+Caused by:
+  failed to read `/home/zhuhe/code/litchi/docs/crates/litchi-pptx/Cargo.toml`
+
+Caused by:
+  No such file or directory (os error 2)

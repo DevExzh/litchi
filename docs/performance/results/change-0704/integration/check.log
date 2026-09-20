@@ -1,0 +1,6 @@
+HEAD 8705ebc5f26f2eba62f3e866dbcc78e96a5bd1e4
+$ cargo check -p litchi-pptx -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx --all-features --all-targets --locked
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.88s
+
+exit 0

@@ -56,6 +56,21 @@ impl Transaction {
             .is_ok_and(|(revision, _digests)| revision != self.source.revision)
     }
 
+    /// Aggregate charged bytes held by the source snapshot's optional MCE
+    /// projection table. Cloned snapshots may report the same shared charge,
+    /// so per-owner values are not additive physical-memory measurements.
+    #[must_use]
+    pub fn retained_mce_bytes(&self) -> usize {
+        self.source.retained_mce_bytes()
+    }
+
+    /// Release this transaction's source reference to retained transformed
+    /// slide projections. Its staged package and semantic edits are unchanged;
+    /// snapshot clones may keep the shared table alive.
+    pub fn release_retained_mce(&mut self) {
+        self.source.release_retained_mce();
+    }
+
     /// Move one slide between checked zero-based positions.
     ///
     /// # Errors
@@ -1231,12 +1246,13 @@ impl Transaction {
                 patch,
             });
         }
-        let snapshot = super::model::capture_with_revision_and_digests(
+        let snapshot = super::model::capture_with_revision_and_digests_and_mce(
             &working,
             self.source.limits,
             self.source.physical_source_provenance,
             revision,
             digests,
+            self.source.retained_mce.as_deref(),
         )?;
         Ok(Commit { snapshot, patch })
     }
@@ -1904,6 +1920,20 @@ impl Commit {
     #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
+    }
+
+    /// Aggregate charged bytes held by the candidate snapshot's optional MCE
+    /// projection table. Cloned snapshots may report the same shared charge,
+    /// so per-owner values are not additive physical-memory measurements.
+    #[must_use]
+    pub fn retained_mce_bytes(&self) -> usize {
+        self.snapshot.retained_mce_bytes()
+    }
+
+    /// Release this commit's reference to retained transformed slide
+    /// projections without changing its semantic or physical meaning.
+    pub fn release_retained_mce(&mut self) {
+        self.snapshot.release_retained_mce();
     }
 
     /// Durable exact-source patch for this commit.

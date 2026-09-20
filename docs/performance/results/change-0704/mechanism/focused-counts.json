@@ -1,0 +1,158 @@
+[
+  {
+    "case": "real",
+    "workflow": "noop",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "noop.i0.open": 1,
+      "noop.i0.capture": 18,
+      "noop.i0.apply": 1,
+      "noop.i0.verify": 15
+    }
+  },
+  {
+    "case": "real",
+    "workflow": "one",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "one.i0.open": 1,
+      "one.i0.capture": 18,
+      "one.i0.commit": 6,
+      "one.i0.apply": 1,
+      "one.i0.verify": 15
+    }
+  },
+  {
+    "case": "real",
+    "workflow": "two",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "setup.target.second": 19,
+      "two.i0.open": 1,
+      "two.i0.capture": 18,
+      "two.i0.commit": 7,
+      "two.i0.apply": 1,
+      "two.i0.verify": 30
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "noop",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "noop.i0.open": 1,
+      "noop.i0.capture": 19,
+      "noop.i0.apply": 1,
+      "noop.i0.verify": 14
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "one",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "one.i0.open": 1,
+      "one.i0.capture": 19,
+      "one.i0.commit": 19,
+      "one.i0.apply": 1,
+      "one.i0.verify": 14
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "two",
+    "repeat": 0,
+    "counts": {
+      "setup.target.first": 34,
+      "setup.target.second": 20,
+      "two.i0.open": 1,
+      "two.i0.capture": 19,
+      "two.i0.commit": 19,
+      "two.i0.apply": 1,
+      "two.i0.verify": 28
+    }
+  },
+  {
+    "case": "real",
+    "workflow": "noop",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "noop.i0.open": 1,
+      "noop.i0.capture": 18,
+      "noop.i0.apply": 1,
+      "noop.i0.verify": 15
+    }
+  },
+  {
+    "case": "real",
+    "workflow": "one",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "one.i0.open": 1,
+      "one.i0.capture": 18,
+      "one.i0.commit": 6,
+      "one.i0.apply": 1,
+      "one.i0.verify": 15
+    }
+  },
+  {
+    "case": "real",
+    "workflow": "two",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "setup.target.second": 19,
+      "two.i0.open": 1,
+      "two.i0.capture": 18,
+      "two.i0.commit": 7,
+      "two.i0.apply": 1,
+      "two.i0.verify": 30
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "noop",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "noop.i0.open": 1,
+      "noop.i0.capture": 19,
+      "noop.i0.apply": 1,
+      "noop.i0.verify": 14
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "one",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "one.i0.open": 1,
+      "one.i0.capture": 19,
+      "one.i0.commit": 19,
+      "one.i0.apply": 1,
+      "one.i0.verify": 14
+    }
+  },
+  {
+    "case": "generated",
+    "workflow": "two",
+    "repeat": 1,
+    "counts": {
+      "setup.target.first": 34,
+      "setup.target.second": 20,
+      "two.i0.open": 1,
+      "two.i0.capture": 19,
+      "two.i0.commit": 19,
+      "two.i0.apply": 1,
+      "two.i0.verify": 28
+    }
+  }
+]

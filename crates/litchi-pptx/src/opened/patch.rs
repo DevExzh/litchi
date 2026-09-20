@@ -1058,6 +1058,21 @@ fn merge_root(
     }
 }
 
+#[cfg(test)]
+#[test]
+fn mce_retention_intersection_preserves_the_tighter_policy_in_both_orders() -> Result<()> {
+    for maximum in [0, 1, 1024, usize::MAX] {
+        let left = Limits::default().with_max_retained_mce_bytes(maximum);
+        for other in [0, 512, 1024 * 1024, usize::MAX] {
+            let right = Limits::default().with_max_retained_mce_bytes(other);
+            let expected = Limits::default().with_max_retained_mce_bytes(maximum.min(other));
+            assert_eq!(intersect_limits(left, right)?, expected);
+            assert_eq!(intersect_limits(right, left)?, expected);
+        }
+    }
+    Ok(())
+}
+
 fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
     Limits::new(
         left.max_parts().min(right.max_parts()),
@@ -1068,6 +1083,12 @@ fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
         left.max_retained_candidate_bytes()
             .min(right.max_retained_candidate_bytes()),
     )
+    .map(|limits| {
+        limits.with_max_retained_mce_bytes(
+            left.max_retained_mce_bytes()
+                .min(right.max_retained_mce_bytes()),
+        )
+    })
     .ok_or_else(|| invalid("opened-presentation patch limits are invalid"))
 }
 

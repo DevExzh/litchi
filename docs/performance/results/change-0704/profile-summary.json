@@ -1,0 +1,68 @@
+{
+  "baseline": {
+    "stage": "commit",
+    "counters": {
+      "10": {
+        "cycles": 583298107.0,
+        "instructions": 2453816155.0,
+        "branches": 499187901.0,
+        "branch-misses": 2191671.0,
+        "cache-misses": 531986.0,
+        "page-faults": 1037.0,
+        "task-clock": 130.62
+      },
+      "210": {
+        "cycles": 11105345878.0,
+        "instructions": 47338493664.0,
+        "branches": 9626795650.0,
+        "branch-misses": 40761640.0,
+        "cache-misses": 9828368.0,
+        "page-faults": 10125.0,
+        "task-clock": 2474.55
+      }
+    },
+    "per_open_commit": {
+      "cycles": 52610238.855,
+      "instructions": 224423387.545,
+      "branches": 45638038.745,
+      "branch-misses": 192849.845,
+      "cache-misses": 46481.91,
+      "page-faults": 45.44,
+      "task-clock": 11.719650000000001
+    },
+    "whole_child_peak_rss_kib": 5832
+  },
+  "candidate": {
+    "stage": "commit",
+    "counters": {
+      "10": {
+        "cycles": 487753414.0,
+        "instructions": 2006071381.0,
+        "branches": 409834179.0,
+        "branch-misses": 1914947.0,
+        "cache-misses": 497057.0,
+        "page-faults": 770.0,
+        "task-clock": 108.93
+      },
+      "210": {
+        "cycles": 9139674997.0,
+        "instructions": 37913103651.0,
+        "branches": 7746456515.0,
+        "branch-misses": 34885240.0,
+        "cache-misses": 8050110.0,
+        "page-faults": 767.0,
+        "task-clock": 2037.17
+      }
+    },
+    "per_open_commit": {
+      "cycles": 43259607.915,
+      "instructions": 179535161.35,
+      "branches": 36683111.68,
+      "branch-misses": 164851.465,
+      "cache-misses": 37765.265,
+      "page-faults": -0.015,
+      "task-clock": 9.6412
+    },
+    "whole_child_peak_rss_kib": 6168
+  }
+}

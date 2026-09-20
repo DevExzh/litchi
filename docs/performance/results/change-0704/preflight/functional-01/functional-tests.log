@@ -1,0 +1,159 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling stable_deref_trait v1.2.1
+   Compiling cfg-if v1.0.4
+   Compiling serde_core v1.0.229
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling synstructure v0.13.2
+   Compiling zerovec-derive v0.10.4
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerofrom v0.1.4
+   Compiling displaydoc v0.2.6
+   Compiling yoke v0.7.4
+   Compiling zerovec v0.10.4
+   Compiling litemap v0.7.3
+   Compiling libc v0.2.189
+   Compiling writeable v0.5.5
+   Compiling crossbeam-utils v0.8.22
+   Compiling tinystr v0.7.6
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling icu_locid v1.5.0
+   Compiling icu_provider_macros v1.5.0
+   Compiling crossbeam-epoch v0.9.20
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_provider v1.5.0
+   Compiling hybrid-array v0.4.14
+   Compiling crossbeam-deque v0.8.7
+   Compiling memchr v2.8.3
+   Compiling autocfg v1.5.1
+   Compiling icu_normalizer_data v1.5.1
+   Compiling smallvec v1.16.0
+   Compiling num-traits v0.2.19
+   Compiling icu_locid_transform v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling syn v3.0.4
+   Compiling getrandom v0.4.3
+   Compiling cpufeatures v0.3.1
+   Compiling rand_core v0.10.1
+   Compiling zmij v1.0.19
+   Compiling serde v1.0.229
+   Compiling rayon-core v1.13.0
+   Compiling zeroize v1.9.0
+   Compiling block-buffer v0.12.1
+   Compiling icu_properties v1.5.1
+   Compiling serde_derive v1.0.229
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.3.4
+   Compiling write16 v1.0.0
+   Compiling rustversion v1.0.23
+   Compiling thiserror v2.0.18
+   Compiling utf16_iter v1.0.5
+   Compiling const-oid v0.10.2
+   Compiling crc32fast v1.5.1
+   Compiling serde_json v1.0.149
+   Compiling utf8_iter v1.0.4
+   Compiling zerocopy v0.8.56
+   Compiling icu_normalizer v1.5.0
+   Compiling digest v0.11.3
+   Compiling digest v0.10.7
+   Compiling chacha20 v0.10.2
+   Compiling quick-xml v0.41.0
+   Compiling thiserror-impl v2.0.18
+   Compiling bitflags v2.13.1
+   Compiling zlib-rs v0.6.7
+   Compiling once_cell v1.21.4
+   Compiling iana-time-zone v0.1.65
+   Compiling linux-raw-sys v0.12.1
+   Compiling itoa v1.0.18
+   Compiling tinyvec_macros v0.1.1
+   Compiling cpufeatures v0.2.17
+   Compiling either v1.18.0
+   Compiling rayon v1.12.0
+   Compiling sha2 v0.10.9
+   Compiling tinyvec v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling chrono v0.4.45
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rand v0.10.2
+   Compiling idna_adapter v1.2.0
+   Compiling sha2 v0.11.0
+   Compiling base64 v0.22.1
+   Compiling percent-encoding v2.3.2
+   Compiling debug_unsafe v0.1.4
+   Compiling fastrand v2.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling tempfile v3.27.0
+   Compiling atoi_simd v0.18.1
+   Compiling form_urlencoded v1.2.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling idna v1.1.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling unicode-normalization v0.1.25
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling ryu v1.0.22
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.14s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0704/debug/deps/litchi_pptx-2f276d6ead2eba17)
+
+running 24 tests
+test opened::cross_copy_plan::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders ... ok
+test opened::mce_retention_tests::a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route ... FAILED
+test opened::mce_retention_tests::a_clone_shares_outputs_release_is_local_and_drop_does_not_evict_the_original ... ok
+test opened::mce_retention_tests::a_notes_edit_runs_notes_validation_while_unchanged_slide_outputs_hit ... ok
+test opened::mce_retention_tests::a_root_relationship_edit_runs_capture_validation_while_slide_outputs_hit ... ok
+test opened::mce_retention_tests::changed_content_type_on_an_unchanged_raw_slide_remains_a_typed_refusal ... ok
+test opened::mce_retention_tests::changed_notes_root_remains_a_typed_refusal_while_slides_are_cache_hits ... ok
+test opened::mce_retention_tests::changed_root_relationship_metadata_remains_a_typed_refusal_on_slide_cache_hits ... ok
+test opened::mce_retention_tests::checked_retention_charge_rejects_entry_and_output_overflow ... ok
+test opened::mce_retention_tests::disabled_retention_keeps_the_same_snapshot_semantics_without_owned_outputs ... ok
+test opened::mce_retention_tests::foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_payloads ... ok
+test opened::mce_retention_tests::fresh_captures_are_equal_but_snapshot_local_retention_is_not_a_global_cache ... ok
+test opened::mce_retention_tests::malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence ... FAILED
+test opened::mce_retention_tests::marker_free_slides_never_create_a_retained_mce_projection ... ok
+test opened::mce_retention_tests::no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it ... ok
+test opened::mce_retention_tests::one_edit_misses_the_changed_slide_but_shares_the_untouched_slide_through_publication ... ok
+test opened::mce_retention_tests::rebound_projects_only_current_slide_allocations_and_drops_foreign_entries ... ok
+test opened::mce_retention_tests::retained_bytes_are_aggregate_capacity_and_metadata_and_partial_admission_is_a_fallback ... ok
+test opened::mce_retention_tests::the_exact_observed_budget_fits_and_one_byte_below_falls_back_without_refusal ... ok
+test opened::mce_retention_tests::the_retention_policy_defaults_to_one_mib_and_zero_disables_only_mce_retention ... ok
+test opened::mce_retention_tests::tiny_ceilings_and_maximum_usize_are_fallbacks_or_successes_never_refusals ... ok
+test opened::mce_retention_tests::transaction_and_commit_release_hooks_are_value_preserving ... ok
+test opened::mce_retention_tests::two_edits_keep_the_previous_unchanged_output_and_miss_each_newly_changed_slide ... ok
+test opened::patch::mce_retention_intersection_preserves_the_tighter_policy_in_both_orders ... ok
+
+failures:
+
+---- opened::mce_retention_tests::a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route stdout ----
+
+thread 'opened::mce_retention_tests::a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route' (568879) panicked at crates/litchi-pptx/src/opened/mce_retention_tests.rs:478:5:
+assertion `left == right` failed: MCE cache lookup must not add raw blob observations
+  left: 12
+ right: 10
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- opened::mce_retention_tests::malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence stdout ----
+
+thread 'opened::mce_retention_tests::malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence' (568890) panicked at crates/litchi-pptx/src/opened/mce_retention_tests.rs:578:5:
+assertion failed: error.to_string().contains("slide part does not have a p:sld root")
+
+
+failures:
+    opened::mce_retention_tests::a_cache_hit_adds_no_blob_or_blob_arc_observations_over_the_uncached_route
+    opened::mce_retention_tests::malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence
+
+test result: FAILED. 22 passed; 2 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.72s
+
+error: test failed, to rerun pass `-p litchi-pptx --lib`

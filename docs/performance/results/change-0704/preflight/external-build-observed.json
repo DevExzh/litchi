@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-20T03:50:59.497941+00:00",
+  "command": [
+    "ps",
+    "-eo",
+    "pid,ppid,etime,pcpu,args"
+  ],
+  "matching_process_rows": [],
+  "scope": "Observed during integration, after initial timings; no matching process at subsequent census. No inference about earlier measurement overlap.",
+  "earlier_observation": {
+    "pid": 724638,
+    "ppid": 724609,
+    "elapsed": "00:24",
+    "command": "cargo build --locked --offline --manifest-path /tmp/litchi-ods-text-gates-qga93bo_/docs/report/spec-gap-validation-evidence/ods-formula-text-functions/performance/harness/Cargo.toml --release"
+  }
+}

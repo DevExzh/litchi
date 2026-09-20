@@ -11,7 +11,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use std::io::Write;
 
 use crate::notes::SlideRootProof;
-use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference};
+use crate::parts::{MceCapture, PresentationPart, SlideMasterPart, SlidePart, SlideReference};
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
 
@@ -46,7 +46,22 @@ pub(super) fn validate_slide_catalog(
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
+    capture_slides_inner(presentation, None)
+}
+
+pub(crate) fn capture_slides_with_mce<'a, 'parent>(
+    presentation: &Presentation<'a>,
+    capture: &mut MceCapture<'a, 'parent>,
+) -> Result<CaptureSlides<'a>> {
+    capture_slides_inner(presentation, Some(capture))
+}
+
+fn capture_slides_inner<'a, 'parent>(
+    presentation: &Presentation<'a>,
+    mut capture: Option<&mut MceCapture<'a, 'parent>>,
+) -> Result<CaptureSlides<'a>> {
     let package = presentation.package();
     let references = presentation.catalog()?;
     let mut slides = Vec::new();
@@ -73,8 +88,14 @@ pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<Capt
             |part| part.content_type(),
         )?;
         let (slide_part, name) = if first_name_error.is_none() {
-            let (slide_part, name, notes_proof) =
-                SlidePart::from_part_with_name(part, collect_notes_proofs)?;
+            let (slide_part, name, notes_proof) = match capture.as_deref_mut() {
+                Some(capture) => SlidePart::from_part_with_name_with_capture(
+                    part,
+                    collect_notes_proofs,
+                    capture,
+                )?,
+                None => SlidePart::from_part_with_name(part, collect_notes_proofs)?,
+            };
             if let Some(proof) = notes_proof {
                 if let Some(proofs) = slide_root_proofs.as_mut() {
                     proofs.push(proof);
