@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-20T07:27:13.331732165Z",
+  "revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+  "corpora": [
+    "generated",
+    "numbered-list"
+  ],
+  "phases": [
+    "edit",
+    "counting_publish"
+  ],
+  "repeats": 2,
+  "samples": 1,
+  "warmup": 0,
+  "owners": {
+    "edit": "litchi_perf_baseline::ordinary_save::Owner::edit",
+    "counting_publish": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+  },
+  "owner_match": {
+    "edit": "exact",
+    "counting_publish": "exact"
+  },
+  "nested_diagnostics": {
+    "edit": [
+      "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+    ],
+    "counting_publish": []
+  },
+  "measured_parent": "litchi_perf_baseline::ordinary_save::run_case",
+  "setup_parents": {
+    "edit": {
+      "litchi_perf_baseline::ordinary_save::build_corpus": 1,
+      "litchi_perf_baseline::ordinary_save::publish_reference": 3
+    },
+    "counting_publish": {
+      "generated": {
+        "litchi_perf_baseline::semantic_docx_bytes": 1,
+        "litchi_opc::atomic::replace_with_impl": 4
+      },
+      "numbered-list": {
+        "litchi_opc::atomic::replace_with_impl": 4
+      }
+    }
+  },
+  "expected_numbered_dumps": {
+    "edit": {
+      "generated": 5,
+      "numbered-list": 5
+    },
+    "counting_publish": {
+      "generated": 6,
+      "numbered-list": 5
+    }
+  },
+  "options": {
+    "edit": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "--zero-before=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit"
+    ],
+    "counting_publish": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+      "--zero-before=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+      "--dump-after=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+    ]
+  },
+  "selection_policy": "Retain every numbered raw Callgrind dump and the zero-Ir Program termination part. Select the measured part only from a positive raw incoming edge whose caller is ordinary_save::run_case; generated counting publication has one additional semantic_docx_bytes setup serialization, while the admitted real fixture has four atomic reference saves. Preserve unexpected callers as warnings.",
+  "scope": "Callgrind Ir guest-instruction attribution for the direct ordinary-save edit owner and the DOCX write_plain serializer. The edit owner includes document_mut admission and mutation; the publication owner includes one package serialization call. Setup probes and reference publications are retained for edge proof and excluded from the measured row.",
+  "claim": "Attribution only; Callgrind Ir is a guest-instruction mechanism diagnostic and is not native latency, hardware-cycle, allocation-count, RSS, cache-counter, or production-change evidence."
+}
