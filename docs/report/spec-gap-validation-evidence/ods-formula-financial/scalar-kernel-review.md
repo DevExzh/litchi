@@ -31,3 +31,20 @@ needs to align the misspelled `ispmnt` identifier with `ispmt` and the selected
 zero-divisor error mapping with the scalar adapter. No universal accuracy or
 numerical-domain claim follows from these eight probes. The temporary harness
 and executable were removed after recording the results.
+
+## First correction follow-up
+
+Root repeated the isolated `rustc` probe against kernel SHA-256
+`1271770ec5522c34bcf15c05fc8da463a4b4ee5c371548942d7fe3a7af3b7cc1`.
+All four original probes now pass, together with the four kernel tests.
+Two additional RRI probes still return `#NUM!` and need correction:
+
+* `RRI(0.5;100;-100)` has exponent 2 and should return 0. Requiring an odd
+  integer NPER excludes this real integer-exponent case.
+* `RRI(2;1e-300;1e300)` has a finite result approximately `1e300`, but the
+  intermediate ratio overflows. Log-magnitude arithmetic can avoid forming
+  that ratio.
+
+The follow-up result is 8 passed and 2 failed; disposition remains changes
+required. Its temporary harness and executable were also removed. These are
+arithmetic probes, not integrated evaluator or Cargo evidence.
