@@ -172,7 +172,12 @@ variant, a host-specific convention, or an uncited approximation.
   across several sequence-list arguments.
 - `PDURATION` is
   `(log(SpecifiedValue) - log(CurrentValue)) / log(Rate + 1)`.
-- `RRI` is `(Fv / Pv)^(1 / Nper) - 1`.
+- `RRI` is `(Fv / Pv)^(1 / Nper) - 1`. For a negative ratio, this
+  repository selects the real `POWER` profile permitted by §6.16.46: the
+  binary64 reciprocal `1 / Nper` must be exactly integral; otherwise return
+  `#NUM!`. Evaluate an admitted negative base with checked signed integer
+  power. Thus `RRI(0.5;100;-100)` is zero, while `RRI(3;100;-800)` is
+  `#NUM!`; there is no additional odd-root extension.
 - `XNPV` is
   `sum(Values[i] / (1 + Rate)^((Dates[i] - Dates[1]) / 365))`.
 - `FV`, `NPER`, `PMT`, and `PV` use the equations printed in §§6.12.20,
