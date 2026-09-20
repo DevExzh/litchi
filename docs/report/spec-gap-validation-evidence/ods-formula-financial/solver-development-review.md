@@ -50,3 +50,24 @@ python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/probe_
 It snapshots the selected source and removes its temporary files on exit.
 This follow-up confirms numerical probes still pass after work-accounting
 changes; independent resource review and adapter reservations remain pending.
+
+## Boundary regressions found by semantic review
+
+Two further independent probes against the same `6624fce0...` snapshot
+compiled successfully and failed at runtime:
+
+| Invocation | Contract result | Observed result |
+| --- | --- | --- |
+| `IRR([-100, 110], guess=-1)` | `#NUM!` | `0.10000000000000044` |
+| `RATE(1.5, -110, 100, 0, 0, guess=-1)` | `#NUM!` | `0.5030684048044026` |
+
+The expanded run had **11 passed, 2 failed**, exit status 101. The contract
+explicitly refuses IRR's exact `-1` guess and nonintegral RATE periods at that
+boundary. These are implementation failures, not proposed profile changes.
+Temporary harness files were removed. The solver owner received both cases
+for permanent regression coverage and correction.
+
+Source review additionally identified bracket tie/probe-order, adjacent RATE
+branch search, unchanged Newton step, and cross-bin compensation concerns.
+Those require targeted fixes and evidence before numerical acceptance; the
+earlier passing scale probes do not establish correctness for these cases.
