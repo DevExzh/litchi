@@ -1,0 +1,254 @@
+//! Bounded 0703 transaction trace driver.
+//!
+//! The binary has no timers and makes no production edits.  The temporary
+//! codec instrumentation reads the phase file before each MCE call, while this
+//! driver opens a fresh package and runs one no-op, one-edit, or two-edit
+//! transaction per requested iteration.
+
+use litchi_pptx::Package;
+use std::env;
+use std::error::Error;
+use std::fs;
+use std::path::Path;
+
+const EDIT_MARKER: &str = "litchi-perf-0703-trace-edit";
+const MAX_ITERATIONS: usize = 8;
+const MAX_GENERATED_SLIDES: usize = 16;
+const MAX_GENERATED_SHAPES: usize = 16;
+
+type Fallible<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+#[derive(Clone, Copy, Debug)]
+struct Target {
+    slide: usize,
+    shape: usize,
+}
+
+fn parse_bounded(value: &str, label: &str, maximum: usize) -> Fallible<usize> {
+    let parsed = value.parse::<usize>()?;
+    if parsed == 0 || parsed > maximum {
+        return Err(format!("{label} must be between 1 and {maximum}, got {parsed}").into());
+    }
+    Ok(parsed)
+}
+
+fn source_bytes(source: &str) -> Fallible<Vec<u8>> {
+    if let Some(shape) = source.strip_prefix("generated:") {
+        let (slides, shapes) = shape
+            .split_once('x')
+            .ok_or("generated source must be generated:<slides>x<text-boxes>")?;
+        let slides = parse_bounded(slides, "generated slide count", MAX_GENERATED_SLIDES)?;
+        let shapes = parse_bounded(shapes, "generated text-box count", MAX_GENERATED_SHAPES)?;
+        let mut package = Package::new()?;
+        {
+            let presentation = package.presentation_mut()?;
+            for slide_index in 0..slides {
+                let slide = presentation.add_slide()?;
+                for shape_index in 0..shapes {
+                    slide.add_text_box(
+                        &format!("litchi-perf-0703-source-{slide_index:04}-{shape_index:04}"),
+                        36 + i64::try_from(shape_index % 4)? * 180,
+                        36 + i64::try_from(shape_index / 4)? * 90,
+                        144,
+                        54,
+                    );
+                }
+            }
+        }
+        return Ok(package.to_bytes()?);
+    }
+    Ok(fs::read(source)?)
+}
+
+fn phase(path: &Path, label: &str) -> Fallible<()> {
+    if label.is_empty() || label.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        return Err(format!("phase label is not machine-safe: {label:?}").into());
+    }
+    fs::write(path, label.as_bytes())?;
+    eprintln!("LITCHI0703_BOUNDARY event=begin phase={label}");
+    Ok(())
+}
+
+fn shape_text(package: &Package, target: Target) -> Fallible<String> {
+    let presentation = package.presentation()?;
+    let slides = presentation.slides()?;
+    let slide = slides
+        .get(target.slide)
+        .ok_or_else(|| format!("slide {} is out of range", target.slide))?;
+    let scene = slide.shapes()?;
+    let shape = scene
+        .at(target.shape)
+        .map_err(|error| format!("target shape lookup failed: {error:?}"))?;
+    Ok(shape.common().text().unwrap_or("").to_owned())
+}
+
+fn derive_target(archive: &[u8], phase_file: &Path, label: &str) -> Fallible<(Target, String)> {
+    phase(phase_file, label)?;
+    let package = Package::from_bytes(archive)?;
+    let snapshot = package.opened_presentation()?;
+    for slide in 0..snapshot.slides().len().min(MAX_GENERATED_SLIDES) {
+        for shape in 0..MAX_GENERATED_SHAPES {
+            let target = Target { slide, shape };
+            let mut edit = snapshot.edit();
+            if let Ok(true) = edit.set_shape_text(slide, shape, EDIT_MARKER) {
+                return Ok((target, shape_text(&package, target)?));
+            }
+        }
+    }
+    Err("no editable text shape found in the bounded target search".into())
+}
+
+fn derive_second_target(
+    archive: &[u8],
+    first: Target,
+    phase_file: &Path,
+    label: &str,
+) -> Fallible<Target> {
+    phase(phase_file, label)?;
+    let package = Package::from_bytes(archive)?;
+    let snapshot = package.opened_presentation()?;
+    for slide in 0..snapshot.slides().len().min(MAX_GENERATED_SLIDES) {
+        if slide == first.slide {
+            continue;
+        }
+        for shape in 0..MAX_GENERATED_SHAPES {
+            let mut edit = snapshot.edit();
+            if let Ok(true) = edit.set_shape_text(slide, shape, EDIT_MARKER) {
+                return Ok(Target { slide, shape });
+            }
+        }
+    }
+    Err("no editable text shape found on a second bounded slide".into())
+}
+
+fn revision(snapshot: &litchi_pptx::opened::Snapshot) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(64);
+    for byte in snapshot.revision() {
+        text.push(char::from(DIGITS[(byte >> 4) as usize]));
+        text.push(char::from(DIGITS[(byte & 0x0f) as usize]));
+    }
+    text
+}
+
+fn run_iteration(
+    archive: &[u8],
+    workflow: &str,
+    iteration: usize,
+    first: Target,
+    second: Option<Target>,
+    original: &str,
+    phase_file: &Path,
+) -> Fallible<()> {
+    let prefix = format!("{workflow}.i{iteration}");
+    phase(phase_file, &format!("{prefix}.open"))?;
+    let mut package = Package::from_bytes(archive)?;
+
+    phase(phase_file, &format!("{prefix}.capture"))?;
+    let snapshot = package.opened_presentation()?;
+    let before_revision = revision(&snapshot);
+
+    phase(phase_file, &format!("{prefix}.clone"))?;
+    let mut edit = snapshot.edit();
+
+    phase(phase_file, &format!("{prefix}.edit"))?;
+    let changed = match workflow {
+        "noop" => edit.set_shape_text(first.slide, first.shape, original)?,
+        "one" => edit.set_shape_text(first.slide, first.shape, EDIT_MARKER)?,
+        "two" => {
+            let second = second.ok_or("two-edit workflow has no second target")?;
+            let first_changed = edit.set_shape_text(first.slide, first.shape, EDIT_MARKER)?;
+            let second_changed = edit.set_shape_text(second.slide, second.shape, EDIT_MARKER)?;
+            if !first_changed || !second_changed {
+                return Err("two-edit workflow did not change both selected shapes".into());
+            }
+            true
+        },
+        _ => return Err(format!("unknown workflow {workflow:?}").into()),
+    };
+
+    phase(phase_file, &format!("{prefix}.commit"))?;
+    let commit = edit.commit()?;
+    let committed_changed = commit.is_changed();
+
+    phase(phase_file, &format!("{prefix}.apply"))?;
+    let published = package.apply_opened_presentation_commit(commit)?;
+    phase(phase_file, &format!("{prefix}.verify"))?;
+    let first_text = shape_text(&package, first)?;
+    if workflow == "noop" && first_text != original {
+        return Err("no-op workflow changed the selected text".into());
+    }
+    if workflow != "noop" && first_text != EDIT_MARKER {
+        return Err("changed workflow did not publish the first text edit".into());
+    }
+    if workflow == "two" {
+        let second = second.ok_or("two-edit workflow has no second target")?;
+        if shape_text(&package, second)? != EDIT_MARKER {
+            return Err("two-edit workflow did not publish the second text edit".into());
+        }
+    }
+    if workflow == "noop" && (changed || committed_changed) {
+        return Err("no-op workflow changed semantic or commit state".into());
+    }
+    if workflow == "noop" && before_revision != revision(&published) {
+        return Err("no-op workflow changed the complete-package revision".into());
+    }
+    if workflow != "noop" && (!changed || !committed_changed) {
+        return Err("changed workflow did not publish a changed commit".into());
+    }
+    println!(
+        "result\tworkflow={workflow}\titeration={iteration}\tchanged={changed}\tcommit_changed={committed_changed}\trevision={}",
+        revision(&published)
+    );
+    Ok(())
+}
+
+fn run(source: &str, workflow: &str, iterations: usize, phase_file: &Path) -> Fallible<()> {
+    if !matches!(workflow, "noop" | "one" | "two") {
+        return Err(format!("workflow must be noop, one, or two, got {workflow:?}").into());
+    }
+    let archive = source_bytes(source)?;
+    let (first, original) = derive_target(&archive, phase_file, "setup.target.first")?;
+    let second = if workflow == "two" {
+        Some(derive_second_target(
+            &archive,
+            first,
+            phase_file,
+            "setup.target.second",
+        )?)
+    } else {
+        None
+    };
+    println!("probe\t0703");
+    println!("source\t{source}");
+    println!("archive_bytes\t{}", archive.len());
+    println!("workflow\t{workflow}");
+    println!("iterations\t{iterations}");
+    println!("first_target\tslide={}\tshape={}", first.slide, first.shape);
+    if let Some(second) = second {
+        println!(
+            "second_target\tslide={}\tshape={}",
+            second.slide, second.shape
+        );
+    }
+    for iteration in 0..iterations {
+        run_iteration(
+            &archive, workflow, iteration, first, second, &original, phase_file,
+        )?;
+    }
+    phase(phase_file, "done")?;
+    Ok(())
+}
+
+fn usage() -> &'static str {
+    "usage: probe0703 <source|generated:SxB> <noop|one|two> <iterations> <phase-file>"
+}
+
+fn main() -> Fallible<()> {
+    let arguments: Vec<String> = env::args().skip(1).collect();
+    let [source, workflow, iterations, phase_file] = arguments.as_slice() else {
+        return Err(usage().into());
+    };
+    let iterations = parse_bounded(iterations, "iterations", MAX_ITERATIONS)?;
+    run(source, workflow, iterations, Path::new(phase_file))
+}

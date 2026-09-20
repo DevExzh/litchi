@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "docs/performance/results/change-0703/probe/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0703",
+    "-j",
+    "2",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 0,
+  "seconds": 9.568290138035081,
+  "log_sha256": "0a46826d204109b01402d8cb3152accccd70de58ae42e9e1a096963c135dc40d"
+}

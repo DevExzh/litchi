@@ -1,0 +1,254 @@
+[
+  {
+    "name": "real-noop-r0",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "noop",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "noop",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-noop-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-noop-r0.stdout",
+    "stderr": "trace-runs/real-noop-r0.stderr",
+    "stdout_sha256": "af0d7dc7269e429cdb04ea6df3cec574f5b90dd322c7f9435c99030c7fdad336",
+    "stderr_sha256": "a0a6817562228ecdfdf4dd3c93c40081b56d08e765d1d5cb4cee38a6bca35608"
+  },
+  {
+    "name": "real-one-r0",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "one",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "one",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-one-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-one-r0.stdout",
+    "stderr": "trace-runs/real-one-r0.stderr",
+    "stdout_sha256": "44960c2b6bd922a762bc401d10e98cb3741710ff4790cb533938564306adb636",
+    "stderr_sha256": "28e19bc162a7d518d25bd8f3dda8a3b163b8a10c044ede2f08aaf6c01a8673fe"
+  },
+  {
+    "name": "real-two-r0",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "two",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "two",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-two-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-two-r0.stdout",
+    "stderr": "trace-runs/real-two-r0.stderr",
+    "stdout_sha256": "39689591fb60033f27e1c25ecd83ce21486db21531eae1f6217bb4eef199ddcf",
+    "stderr_sha256": "6acdd1bfcebbd62e252f2ecfc08e1c36095e80edf6a87d5ad0a47ac58a6b24e4"
+  },
+  {
+    "name": "generated-noop-r0",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "noop",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "noop",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-noop-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-noop-r0.stdout",
+    "stderr": "trace-runs/generated-noop-r0.stderr",
+    "stdout_sha256": "42f53460863ce50c683934ce9af47fb579542bfa4a8491e0c7b77a47f7b831bf",
+    "stderr_sha256": "a2b7d0c17143a388d47da34db9a35e48b6cbc4d040083d876a37301f86f0f67e"
+  },
+  {
+    "name": "generated-one-r0",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "one",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "one",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-one-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-one-r0.stdout",
+    "stderr": "trace-runs/generated-one-r0.stderr",
+    "stdout_sha256": "103a06de03da315ed65c51699640717f847041621795c18ea4a112de3516a020",
+    "stderr_sha256": "7a9b132dd145d612eab7c618161a8490d3bc2be3ab1b121da6bcfd0ed1b153ad"
+  },
+  {
+    "name": "generated-two-r0",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "two",
+    "repeat": 0,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "two",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-two-r0.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-two-r0.stdout",
+    "stderr": "trace-runs/generated-two-r0.stderr",
+    "stdout_sha256": "461c900c7e0d083f609be0a922d4b3993f5c8d438147da58fb1b4c2fd23884a4",
+    "stderr_sha256": "c95173f141adc383b42d94fae267fa6c99f3f4c2be3376e29e610006cc2444d8"
+  },
+  {
+    "name": "real-noop-r1",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "noop",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "noop",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-noop-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-noop-r1.stdout",
+    "stderr": "trace-runs/real-noop-r1.stderr",
+    "stdout_sha256": "af0d7dc7269e429cdb04ea6df3cec574f5b90dd322c7f9435c99030c7fdad336",
+    "stderr_sha256": "c2680f718053a83b1fb78ec7c33c7123ecb78703a866a08d403470af8540af84"
+  },
+  {
+    "name": "real-one-r1",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "one",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "one",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-one-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-one-r1.stdout",
+    "stderr": "trace-runs/real-one-r1.stderr",
+    "stdout_sha256": "44960c2b6bd922a762bc401d10e98cb3741710ff4790cb533938564306adb636",
+    "stderr_sha256": "0c473d9442b49dde715fa5a819e509a6bf8283c17fa4eb55bb3d9c8207f7c1ae"
+  },
+  {
+    "name": "real-two-r1",
+    "case": "real",
+    "source": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "two",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "two",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/real-two-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+    "stdout": "trace-runs/real-two-r1.stdout",
+    "stderr": "trace-runs/real-two-r1.stderr",
+    "stdout_sha256": "39689591fb60033f27e1c25ecd83ce21486db21531eae1f6217bb4eef199ddcf",
+    "stderr_sha256": "015f98d24c7fdd537c2effcf6b66254f8de7a28e0dd97305ad81135c5c6c27d6"
+  },
+  {
+    "name": "generated-noop-r1",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "noop",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "noop",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-noop-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-noop-r1.stdout",
+    "stderr": "trace-runs/generated-noop-r1.stderr",
+    "stdout_sha256": "42f53460863ce50c683934ce9af47fb579542bfa4a8491e0c7b77a47f7b831bf",
+    "stderr_sha256": "f736f9e5c35cd3c1a791cfdd81acc50000e22b812c736ec32e133efcb7ba38b2"
+  },
+  {
+    "name": "generated-one-r1",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "one",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "one",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-one-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-one-r1.stdout",
+    "stderr": "trace-runs/generated-one-r1.stderr",
+    "stdout_sha256": "103a06de03da315ed65c51699640717f847041621795c18ea4a112de3516a020",
+    "stderr_sha256": "6711913a205c6f195d4f04f22698f69cff2b1ce13c82943cc16af727aef025e5"
+  },
+  {
+    "name": "generated-two-r1",
+    "case": "generated",
+    "source": "generated:12x8",
+    "workflow": "two",
+    "repeat": 1,
+    "command": [
+      "/home/zhuhe/code/litchi-0703-bin/probe0703",
+      "generated:12x8",
+      "two",
+      "1",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0703/trace-runs/generated-two-r1.phase"
+    ],
+    "exit_code": 0,
+    "binary_sha256": "e45c7e84e96d0965b4c3798dcd299d726c18466f1b30a707ede5f9f835bbfee1",
+    "source_archive_sha256": null,
+    "stdout": "trace-runs/generated-two-r1.stdout",
+    "stderr": "trace-runs/generated-two-r1.stderr",
+    "stdout_sha256": "461c900c7e0d083f609be0a922d4b3993f5c8d438147da58fb1b4c2fd23884a4",
+    "stderr_sha256": "7ddf05cfc3e2c18bc98146a8f84a6efd9687517211c6219792c55eaecb966141"
+  }
+]

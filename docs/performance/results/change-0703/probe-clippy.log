@@ -1,0 +1,5 @@
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking probe0703 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0703/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 9.53s

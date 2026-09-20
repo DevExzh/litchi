@@ -1,0 +1,8 @@
+probe	0703
+source	generated:12x8
+archive_bytes	40632
+workflow	two
+iterations	1
+first_target	slide=0	shape=0
+second_target	slide=1	shape=0
+result	workflow=two	iteration=0	changed=true	commit_changed=true	revision=683dbfde41e064131ddd95d0d46488ea5881425451c38ec40a2254c9bb807425
