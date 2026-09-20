@@ -1,0 +1,18 @@
+{
+  "schema": "financial-reducer-oracle-root-check-v1",
+  "scope": "Independent six-function oracle corpus only; Rust replay/resource/native/performance pending.",
+  "files": {
+    "contract.md": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+    "oracle_reducers.py": "059f0357e4249c6c2091bb2936580de0e06b76e60db5bff4302516750d4a98b6",
+    "oracle-reducer-vectors.json": "9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26"
+  },
+  "command": "python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/oracle_reducers.py --check",
+  "exit_code": 0,
+  "vectors": 41,
+  "corruption_checks": {
+    "duplicate": "rejected",
+    "expected": "rejected",
+    "contract": "rejected",
+    "missing": "rejected"
+  }
+}
