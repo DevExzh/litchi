@@ -18,6 +18,9 @@
 //! `DOLLAR` and `FIXED` use the same decimal rounding kernel and a fixed
 //! en-US presentation (`$`, `,`, and `.`).
 
+use super::super::calendar::{
+    MONTH_LONG, MONTH_SHORT, SECONDS_PER_DAY, SERIAL_EPOCH_TO_UNIX_DAYS, civil_from_days,
+};
 use super::super::rounding::round_nearest;
 use super::super::{
     EvaluationFailure, EvaluationResult, Evaluator, Node, NumberText, ScalarError, TextValue,
@@ -30,8 +33,6 @@ use std::fmt::Write as FmtWrite;
 const MAX_FORMAT_SECTIONS: usize = 4;
 const DECIMAL_DIGIT_CAPACITY: usize = 1024;
 const MAX_FRACTION_DENOMINATOR_DIGITS: usize = 6;
-const SECONDS_PER_DAY: f64 = 86_400.0;
-const SERIAL_EPOCH_TO_UNIX_DAYS: i64 = 25_569;
 
 #[derive(Clone, Copy)]
 enum Function {
@@ -2040,26 +2041,6 @@ fn date_parts(value: f64) -> Result<DateParts, ScalarError> {
     })
 }
 
-// Howard Hinnant's proleptic-Gregorian civil-date conversion, expressed in
-// terms of days since 1970-01-01 and kept integer-only for deterministic TEXT.
-fn civil_from_days(days: i64) -> (i32, u32, u32) {
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = mp + if mp < 10 { 3 } else { -9 };
-    let year = y + if month <= 2 { 1 } else { 0 };
-    (
-        i32::try_from(year).unwrap_or(i32::MAX),
-        u32::try_from(month).unwrap_or(u32::MAX),
-        u32::try_from(day).unwrap_or(u32::MAX),
-    )
-}
-
 fn render_date(sink: &mut dyn Sink, source: &str, date: &DateParts) -> Result<(), ScalarError> {
     let bytes = source.as_bytes();
     let mut cursor = 0usize;
@@ -2324,23 +2305,6 @@ fn write_padded(sink: &mut dyn Sink, value: u64, width: usize) -> Result<(), Sca
     Ok(())
 }
 
-const MONTH_SHORT: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-const MONTH_LONG: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
 const WEEKDAY_SHORT: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAY_LONG: [&str; 7] = [
     "Sunday",
