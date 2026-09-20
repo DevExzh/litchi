@@ -38,3 +38,16 @@ Separately, `cargo check --locked --offline -p litchi-ods` in the isolated
 development checkout failed with 86 dead-code diagnostics while financial
 value-dispatch hooks were absent. Integration and focused Cargo tests remain
 pending. These findings were handed to the respective implementation owners.
+
+## Numerical follow-up
+
+The same two independent probes plus seven reducer unit tests pass against
+reducer snapshot
+`b7a949e9ec3cc6ad7b33f68879c0a6904532c3f69d3026bebd2deb26e8580ec1`,
+with the unchanged numeric helper snapshot above: **9 passed, 0 failed**.
+The discounted cash-flow underflow and the two fixture errors are resolved
+in that snapshot. The temporary standalone harness was removed.
+
+This does not clear the resource hold: fixed accumulator work accounting and
+the distinction between numerical-domain refusal and typed accumulator-span
+failure still require adapter review and public-evaluator tests.
