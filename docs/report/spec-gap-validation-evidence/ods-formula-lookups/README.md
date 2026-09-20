@@ -26,3 +26,10 @@ The retained isolated gate lockfile is distinct from the ambient root lockfile;
 its exact source and hash are recorded in `baseline.json`. No gate should replace
 the root lockfile. Performance captures require a frozen source handoff and must
 retain all failed attempts, superseded captures, and measured review flags.
+
+Computed CHOOSE probes retain the projection demand as part of their cache key.
+If a selected dynamic reference widens that demand, the evaluator may revisit
+selector inputs while preserving position-sensitive computation. The direct
+INDIRECT width-growth test fixes its own read count; it does not establish a
+single-read guarantee for every computed CHOOSE/reference composition. Final
+performance claims must retain this distinction.
