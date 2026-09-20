@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0726 — empty-slot-only XLS candidate rejected
+
+[0726](0726-xls-empty-slot-setup-pilot.md) isolates unused missing-query setup
+without changing index layout or scanner code. Owned missing loops improve
+32–33% and exactly one 16-byte allocation/deallocation disappears. All p50 and
+repeat gates pass, but four native mean checks reject retention. All source and
+budget metrics remain exact. Baseline is restored. Next investigate the failed
+warm distributions and specify independent replication before another retention
+attempt; do not reinterpret this rejection. [Evidence](results/change-0726/README.md).
+The non-iWork goal remains active.
+
 ## 0725 — revised XLS checkpoint rejected
 
 [0725](0725-xls-revised-checkpoint-pilot.md) removes the duplicate construction

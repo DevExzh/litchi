@@ -1,0 +1,14 @@
+{
+  "facade.log": {
+    "binaries": 28,
+    "passed": 61,
+    "failed": 0,
+    "ignored": 0
+  },
+  "tests.log": {
+    "binaries": 80,
+    "passed": 1900,
+    "failed": 0,
+    "ignored": 2
+  }
+}
