@@ -1,0 +1,17 @@
+{
+  "reviewer": "/root/stationarity_design_0716",
+  "result": "No substantive inaccuracies found",
+  "verified": [
+    "32 children and 6400 measured samples",
+    "12 between-process metric flags;12 within-child block flags and6half flags",
+    "B6sustainedshift exactstats",
+    "Whole-processfault association, no causalclaim",
+    "Historicalqualityreuse;0715rejection unchanged"
+  ],
+  "files": {
+    "docs/performance/0716-docx-baseline-process-variation.md": "0c7f4bbbedad72f0e33c8b337eb7de4119c9ab9a257968acb3896e201346f3b0",
+    "docs/performance/results/change-0716/README.md": "f114af16490a8cb1316ba21ef2794afcb9d210da506a68e685dc77aed87cb552",
+    "docs/performance/results/change-0716/analysis.json": "99f9ebf15bd8b052b4239e6c838db707bf853539a5ed7689a986f33caffb3c7d"
+  },
+  "cleanup_note": "Removed owned packet Python cache before sealing"
+}

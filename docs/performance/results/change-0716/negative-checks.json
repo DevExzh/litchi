@@ -1,0 +1,34 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "elapsed-mean",
+      "rejected": true,
+      "error": "native-b1-generated-w10.elapsed_ns.mean: 351921.49500000005 != 351920.495"
+    },
+    {
+      "name": "sample-permutation",
+      "rejected": true,
+      "error": "native-b1-generated-w10.elapsed_ns.sample_order is not a permutation"
+    },
+    {
+      "name": "command-cpu",
+      "rejected": true,
+      "error": "native-b1-generated-w10 argv changed"
+    },
+    {
+      "name": "decoded-target-size",
+      "rejected": true,
+      "error": "native-b1-numbered-list-w10 decoded target manifest identity changed"
+    },
+    {
+      "name": "negative-process-counter",
+      "rejected": true,
+      "error": "native-b1-generated-w10.wait4.ru_nivcsw is negative"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "positive_exact_replay": true,
+  "analysis_sha256": "99f9ebf15bd8b052b4239e6c838db707bf853539a5ed7689a986f33caffb3c7d",
+  "analyzer_sha256": "ddab732bec41d7e4c5b361e14b9dcf097d80640976f76ef6a20ae4ca049afff0"
+}

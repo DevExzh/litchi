@@ -1,0 +1,2 @@
+PASS deterministic 0716 analysis check (32 rows)
+PASS unchanged source, exact diagnostic replay, negative checks, reused quality and cleanup

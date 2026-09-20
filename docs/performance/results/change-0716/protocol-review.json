@@ -1,0 +1,19 @@
+{
+  "reviewer": "/root/stationarity_design_0716",
+  "result": "go; no capture correctness blocker",
+  "verified": [
+    "32 fresh processes; all four treatments occur twice at each position",
+    "wait4 child ownership and process-level context scope",
+    "Unavailable sysfs/proc files recorded explicitly"
+  ],
+  "caveats": [
+    "In-process samples, not one process per sample",
+    "Warmup also changes prior work and process state",
+    "System and child counters do not measure timed owner",
+    "Rust hash seeds and allocator/ASLR layout uncontrolled; partial environment capture"
+  ],
+  "resolution": "Caveats are included in the frozen plan and required in final report. Root also added direct helper identity verification before capture.",
+  "plan_sha256": "3f102333c67e711bba23caee50285dd1b284d42af0e318dd34c9729c3998b8db",
+  "capture_sha256": "73f698890bfe5c10bbb8f84b6e69733870e0a1d95b46a5d2d62895270a89b94b",
+  "created_utc": "2026-09-20T11:10:27.384122+00:00"
+}

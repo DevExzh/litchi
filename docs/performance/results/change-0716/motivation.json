@@ -1,0 +1,11 @@
+{
+  "packet": "docs/performance/results/change-0715",
+  "files": {
+    "pilot-analysis.json": "a9cee8658af008553c7054df95b63ae1ffcedbbbda2915a8e953fe329c19776a",
+    "child-shift.json": "d8e1a0d005ca0b9bce4457759cd27452f0a299f87dc1ef4841e65e14374e2fa9",
+    "disposition.json": "8a4f5dbfde5c8845369a48854b7b33f6c2ab30a8cc9a3ef8c28defd55dd1daf1",
+    "artifact-manifest.json": "b13f7525cabbb54ea854b0fe5afe8febb1f186cf36efb9d3a8d193515746ac33"
+  },
+  "decision": "0715 remains rejected. New baseline-only diagnostic cannot accept its candidate.",
+  "question": "Does the unchanged baseline show between-child or within-child elapsed variation, and does longer warmup consistently reduce it?"
+}
