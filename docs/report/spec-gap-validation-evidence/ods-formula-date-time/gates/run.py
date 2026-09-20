@@ -155,16 +155,28 @@ def frozen_inputs(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any
     stage = load("stage-manifest.json")
     if not isinstance(freeze, dict) or not isinstance(stage, dict):
         raise RuntimeError("freeze or stage manifest is malformed")
+    selected = validate_freeze_identity(config, freeze, stage)
+    return freeze, stage, selected
+
+
+def validate_freeze_identity(config: dict[str, Any], freeze: dict[str, Any], stage: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(freeze, dict) or not isinstance(stage, dict):
+        raise RuntimeError("freeze or stage manifest is malformed")
+    if freeze.get("schema") != "ods-formula-date-time-freeze-v1":
+        raise RuntimeError("freeze schema is not the date/time freeze schema")
     preparation = config.get("preparation_commit")
     if freeze.get("base_commit") != preparation or stage.get("base_commit") != preparation:
         raise RuntimeError("freeze/stage base commit does not match preparation_commit")
+    production = config.get("production_commit")
+    if freeze.get("production_commit") != production or stage.get("production_commit") != production:
+        raise RuntimeError("freeze/stage production commit does not match production_commit")
     selected = freeze.get("selected_files")
     if selected != stage.get("selected_files"):
         raise RuntimeError("freeze selected_files differ from the reviewed stage manifest")
     lock = config.get("isolated_lock")
     if not isinstance(lock, dict) or freeze.get("isolated_lock_sha256") != lock.get("sha256"):
         raise RuntimeError("freeze isolated lock hash does not match the date/time baseline")
-    return freeze, stage, selected
+    return selected
 
 
 def expected_commands(batch: list[str]) -> dict[str, list[str]]:
@@ -222,8 +234,6 @@ def main() -> int:
         raise RuntimeError("freeze/stage lock identity does not match the baseline")
     if not isinstance(selected, dict):
         raise RuntimeError("frozen selected_files is malformed")
-    if freeze.get("schema") != "ods-formula-date-time-freeze-v1":
-        raise RuntimeError("freeze schema is not the date/time freeze schema")
     batch = stage.get("batch_files")
     if not isinstance(batch, list) or not all(isinstance(path, str) for path in batch) or len(batch) != len(set(batch)):
         raise RuntimeError("stage batch-files declaration is malformed")

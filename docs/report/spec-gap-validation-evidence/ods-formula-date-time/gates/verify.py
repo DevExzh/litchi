@@ -155,8 +155,10 @@ def verify_sources(config: dict[str, Any], freeze: dict[str, Any], stage: dict[s
     lock_hash = config["isolated_lock"]["sha256"]
     equal("freeze schema", freeze.get("schema"), "ods-formula-date-time-freeze-v1")
     equal("freeze base commit", freeze.get("base_commit"), preparation)
+    equal("freeze production commit", freeze.get("production_commit"), config.get("production_commit"))
     equal("stage schema", stage.get("schema"), STAGE_SCHEMA)
     equal("stage base commit", stage.get("base_commit"), preparation)
+    equal("stage production commit", stage.get("production_commit"), config.get("production_commit"))
     equal("freeze isolated lock", freeze.get("isolated_lock_sha256"), lock_hash)
     selected = validate_map(freeze.get("selected_files"), "freeze selected_files")
     staged = validate_map(stage.get("selected_files"), "stage selected_files")

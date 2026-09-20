@@ -74,6 +74,22 @@ def main() -> int:
         raise AssertionError("source closure warnings are not a list")
     rejects(verifier.validate_map, {"../escape": "0" * 64}, "negative selected map")
     rejects(verifier.validate_map, {"Cargo.lock": "not-a-sha"}, "negative selected map")
+    lock_hash = config["isolated_lock"]["sha256"]
+    staged_identity = {
+        "schema": stage.STAGE_SCHEMA,
+        "base_commit": config["preparation_commit"],
+        "production_commit": config["production_commit"],
+        "selected_files": {"Cargo.lock": lock_hash},
+        "isolated_lock": {"sha256": lock_hash},
+    }
+    mismatched_freeze = {
+        "schema": "ods-formula-date-time-freeze-v1",
+        "base_commit": config["preparation_commit"],
+        "production_commit": "0" * 40,
+        "isolated_lock_sha256": lock_hash,
+        "selected_files": {"Cargo.lock": lock_hash},
+    }
+    rejects(runner.validate_freeze_identity, config, mismatched_freeze, staged_identity)
 
     with tempfile.TemporaryDirectory() as directory:
         mirror = Path(directory) / "repo"
