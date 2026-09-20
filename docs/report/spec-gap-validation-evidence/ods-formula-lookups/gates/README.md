@@ -1,7 +1,17 @@
-# Lookup integration gates
+# Frozen lookup integration gates
 
-All seven isolated gates pass against `freeze.json`: 1,699 tests, zero failures and zero ignores. `verify.py` verifies the source closure, commands, logs and test summaries. Performance and independent review acceptance are separate requirements.
+All seven gates passed for the 62 selected inputs in `freeze.json`: ODS tests,
+strict all-target Clippy, strict rustdoc, package formatting, selected-source
+formatting, crate boundaries, and diff checks. The standalone verifier confirms
+1,700 passed tests, zero failures, and zero ignored tests across 127 summaries.
+Source manifests before and after execution match the staged checkout.
 
-`selected-source.tar.gz` contains the exact 61 selected inputs, with each member verified against the freeze. Extract it into the baseline commit recorded by the manifest to reconstruct this candidate. Archive SHA-256: `6e15caf59814b5124dd720f87be26eb706ca33edaf71c92f8119c021f4d8867a`. The retained `Cargo.lock` is the isolated dependency input; do not replace the ambient root lockfile.
+`selected-source.tar.gz` retains every selected input from the isolated checkout,
+with each member verified against the freeze. SHA-256: `219db7325dbd7b216e43e867fcd314b826afa88e6c4c5691106dc8a71a6f0b39`.
+Reconstruct the candidate by overlaying these files on baseline commit
+`635fd2e1348b621426b50909cbd5765c91837306`. The retained `Cargo.lock` is the gate dependency input;
+the ambient workspace lockfile is not part of this receipt.
 
-The `diagnostic-attempt-*` directories retain earlier passing snapshots and explain why they were superseded. They are historical evidence, not additional final-candidate gate runs.
+Attempts 1 through 6 are retained in diagnostic directories because subsequent
+review or source changes superseded their successful runs. They do not certify
+the current candidate. Performance acceptance is recorded separately.
