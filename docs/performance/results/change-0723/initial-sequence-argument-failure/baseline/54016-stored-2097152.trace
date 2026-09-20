@@ -1,0 +1,40 @@
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-replay line=3557
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=478 to=478 links=0
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-replay line=3557
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=478 to=478 links=0
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-scan line=2265
+TRACE chain table=FAT from=0 to=599 links=599
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=0 to=478 links=478
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-replay line=3557
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=478 to=478 links=0
+TRACE query sheet=0 row=0 column=0
+TRACE call route=worksheet-replay line=3557
+TRACE chain table=FAT from=599 to=613 links=14
+TRACE call route=sst-entry line=4272
+TRACE chain table=FAT from=478 to=478 links=0

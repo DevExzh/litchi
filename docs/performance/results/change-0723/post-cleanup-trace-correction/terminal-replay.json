@@ -1,0 +1,41 @@
+{
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0723/analyze.py",
+        "--offline"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "seconds": 12.766473405994475,
+      "log": "analysis-final.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0723/audit.py",
+        "--allow-rejected"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "seconds": 5.2958311040420085,
+      "log": "audit-final.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0723/trace-analyze.py"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 0,
+      "seconds": 0.07289491302799433,
+      "log": "trace-final.log"
+    }
+  ],
+  "analysis_bytes_preserved": "b30459c18a79f69d56b6e70d66367635bf81247718f899fa4667e7f707aa4234",
+  "expected_disposition": "rejected"
+}

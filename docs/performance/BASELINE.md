@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0723 — rejected XLS checkpoint pilot
+
+[0723](0723-xls-target-frame-chain-checkpoint.md) records A/A and ABBA native
+measurements against `45cb480eaa`, with 24 fresh-owner groups, 16 repeated-loop
+groups, 96 allocator groups and separate counted-source/diagnostic captures.
+Rust 1.95.0 release binaries ran on CPU 12, AMD EPYC 9R45 with warm OS caches.
+The candidate fails 14 native and four repeat groups despite a 79–80% late-target
+q8 benefit. No production change or baseline promotion is retained. All samples,
+source archives, hashes and drift/tail comparisons remain in the
+[evidence packet](results/change-0723/README.md). The broader goal stays active.
+
 ## 0722 — retained writer-local DOCX fusion
 
 [0722](0722-docx-writer-local-fusion-pilot.md) retains one structural reader

@@ -1,0 +1,5 @@
+{
+  "reason": "sha2 0.11 hybrid-array digest has no LowerHex implementation; encode individual bytes instead. Corrected before any sequence probe compilation or capture.",
+  "original_sha256": "13e792e432cf44238983784dae30ec6ac9d68f3f587e5dcef0379fc0d8a9d59e",
+  "corrected_sha256": "b94e27f456d8d71a72ff5b1644e6c3e47b6aa090395e34233809ee40b1f0f43c"
+}

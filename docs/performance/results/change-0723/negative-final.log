@@ -1,0 +1,54 @@
+{
+  "scope": "synthetic verifier checks, not performance evidence",
+  "analysis_sha256": "788402eaed7b35a803436d741c20d49aa049353de394ec27a0ccdadaa60f3607",
+  "checks": [
+    {
+      "name": "warm absolute allowance",
+      "pass": true
+    },
+    {
+      "name": "warm regression rejected",
+      "pass": true
+    },
+    {
+      "name": "build has no warm allowance",
+      "pass": true
+    },
+    {
+      "name": "workflow regression rejected",
+      "pass": true
+    },
+    {
+      "name": "native positive control",
+      "pass": true
+    },
+    {
+      "name": "actual outcome mutation rejected",
+      "pass": true
+    },
+    {
+      "name": "actual timing mutation rejected",
+      "pass": true
+    },
+    {
+      "name": "allocator positive control",
+      "pass": true
+    },
+    {
+      "name": "strict allocation delta 1 rejected",
+      "pass": true
+    },
+    {
+      "name": "strict allocation delta -1 rejected",
+      "pass": true
+    },
+    {
+      "name": "build allowance boundary 64",
+      "pass": true
+    },
+    {
+      "name": "build allowance boundary 65",
+      "pass": true
+    }
+  ]
+}

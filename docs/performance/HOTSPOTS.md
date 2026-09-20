@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0723 — rejected XLS target-frame checkpoint
+
+[0723](0723-xls-target-frame-chain-checkpoint.md) removes repeated target-prefix
+FAT traversal, improving owned 54016-late q8 p50 by 79.31–79.86%, but fails
+14/24 native groups and 4/16 repeated-query groups. Early and missing owned
+queries regress about 6–10% in repeated-loop p50; q2 construction also regresses.
+Semantic, allocation and source-I/O checks pass. The candidate is archived and
+baseline source restored. Future work must isolate early/missing-target and
+construction costs before a fresh pilot; the late-target gain alone is
+insufficient. The non-iWork program remains active.
+[Evidence packet](results/change-0723/README.md).
+
 ## 0722 — retained writer-local DOCX fusion
 
 [0722](0722-docx-writer-local-fusion-pilot.md) retains one structural reader

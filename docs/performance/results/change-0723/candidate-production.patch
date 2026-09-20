@@ -1,0 +1,287 @@
+diff --git a/crates/litchi-xls/src/workbook/query_cache.rs b/crates/litchi-xls/src/workbook/query_cache.rs
+index 77745e55a7..4ceeccc619 100644
+--- a/crates/litchi-xls/src/workbook/query_cache.rs
++++ b/crates/litchi-xls/src/workbook/query_cache.rs
+@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
+ /// Logical charge for one retained worksheet occurrence slot.
+ pub(crate) const SLOT_WEIGHT: u64 = 24;
+ /// Logical charge for one worksheet index entry and its LRU metadata.
+-pub(crate) const INDEX_OVERHEAD: u64 = 224;
++pub(crate) const INDEX_OVERHEAD: u64 = 264;
+ const CACHE_OVERHEAD: u64 = 128;
+ const INITIAL_SLOT_CAPACITY: usize = 8;
+ const HOTNESS_ADMISSION_REFUSED: u8 = u8::MAX;
+@@ -40,6 +40,12 @@ pub(crate) struct CellSlot {
+ pub(crate) struct WorksheetCellIndex {
+     pub(crate) expected_version: SourceVersion,
+     pub(crate) chain_checkpoint: Option<StreamChainCheckpoint>,
++    /// The first retained target-frame position and the worksheet-chain
++    /// checkpoint restored immediately before that frame.  This is optional
++    /// because a missing target, a refused candidate, or a metadata-only
++    /// checkpoint probe must leave replay on the original worksheet-start
++    /// checkpoint.
++    pub(crate) target_chain_checkpoint: Option<(u64, StreamChainCheckpoint)>,
+     /// The SST-chain position after the first successfully resolved selected
+     /// `LabelSst`; the checkpoint is immutable and owns no source bytes.
+     /// A typed error value that read no SST bytes can leave it without a position.
+@@ -213,6 +219,7 @@ impl QueryIndexCache {
+             slots: Vec::new(),
+             reservations: Vec::new(),
+             chain_checkpoint: None,
++            target_chain_checkpoint: None,
+             sst_chain_checkpoint: None,
+             observed_count: 0,
+             reserved_weight: 0,
+@@ -322,6 +329,7 @@ impl QueryIndexCache {
+         let index = Arc::new(WorksheetCellIndex {
+             expected_version,
+             chain_checkpoint: candidate.chain_checkpoint.take(),
++            target_chain_checkpoint: candidate.target_chain_checkpoint.take(),
+             sst_chain_checkpoint: candidate.sst_chain_checkpoint.take(),
+             slots,
+             _reservations: reservations,
+@@ -414,6 +422,7 @@ pub(crate) struct IndexCandidate<'a> {
+     slots: Vec<CellSlot>,
+     reservations: Vec<Reservation>,
+     chain_checkpoint: Option<StreamChainCheckpoint>,
++    target_chain_checkpoint: Option<(u64, StreamChainCheckpoint)>,
+     sst_chain_checkpoint: Option<StreamChainCheckpoint>,
+     observed_count: u64,
+     reserved_weight: u64,
+@@ -427,6 +436,38 @@ impl IndexCandidate<'_> {
+         }
+     }
+ 
++    /// Returns the first retained slot for `row`/`column` together with the
++    /// original worksheet-start checkpoint.  A candidate that has abandoned
++    /// its optional state must never expose a checkpoint for publication.
++    pub(crate) fn target_slot_and_chain_checkpoint(
++        &self,
++        row: u16,
++        column: u16,
++    ) -> Option<(u64, &StreamChainCheckpoint)> {
++        if !self.active || self.reserved_weight == 0 {
++            return None;
++        }
++        let slot = self
++            .slots
++            .iter()
++            .find(|slot| slot.row == row && slot.column == column)?;
++        Some((slot.stream_offset, self.chain_checkpoint.as_ref()?))
++    }
++
++    /// Retains a target-local worksheet checkpoint after the caller has
++    /// successfully probed the exact frame offset.  The probe is optional:
++    /// any CFB refusal leaves this field empty and replay uses the original
++    /// worksheet-start checkpoint.
++    pub(crate) fn set_target_chain_checkpoint(
++        &mut self,
++        frame_offset: u64,
++        chain: &StreamChainHint<'_>,
++    ) {
++        if self.active && self.reserved_weight != 0 {
++            self.target_chain_checkpoint = Some((frame_offset, chain.checkpoint()));
++        }
++    }
++
+     /// Retains only the first successful selected-`LabelSst` resolver position.
+     /// The CFB checkpoint is weak and is discarded with an abandoned candidate.
+     pub(crate) fn set_sst_chain_checkpoint(&mut self, chain: &StreamChainHint<'_>) {
+@@ -605,6 +646,7 @@ impl IndexCandidate<'_> {
+     fn abandon(&mut self) {
+         if self.active {
+             self.chain_checkpoint = None;
++            self.target_chain_checkpoint = None;
+             self.sst_chain_checkpoint = None;
+             let slots = std::mem::take(&mut self.slots);
+             let reservations = std::mem::take(&mut self.reservations);
+@@ -621,6 +663,7 @@ impl Drop for IndexCandidate<'_> {
+     fn drop(&mut self) {
+         if self.active {
+             self.chain_checkpoint = None;
++            self.target_chain_checkpoint = None;
+             self.sst_chain_checkpoint = None;
+             let slots = std::mem::take(&mut self.slots);
+             let reservations = std::mem::take(&mut self.reservations);
+@@ -687,6 +730,7 @@ mod tests {
+         Arc::new(WorksheetCellIndex {
+             expected_version: SourceVersion::new(version, 0),
+             chain_checkpoint: None,
++            target_chain_checkpoint: None,
+             sst_chain_checkpoint: None,
+             slots: Vec::new(),
+             _reservations: reservations,
+@@ -744,6 +788,24 @@ mod tests {
+         }
+     }
+ 
++    fn add_target_checkpoint(candidate: &mut IndexCandidate<'_>, file: &litchi_cfb::SharedOleFile) {
++        let mut worksheet_hint = file.chain_hint();
++        let _cursor = file
++            .stream_cursor_at_hinted(&["Workbook"], 0, &mut worksheet_hint)
++            .unwrap();
++        candidate.set_chain_checkpoint(worksheet_hint.checkpoint());
++        candidate.push(slot());
++
++        let (offset, worksheet_checkpoint) =
++            candidate.target_slot_and_chain_checkpoint(0, 0).unwrap();
++        let worksheet_checkpoint = worksheet_checkpoint.clone();
++        let mut target_hint = file.chain_hint_from_checkpoint(&worksheet_checkpoint);
++        let _cursor = file
++            .stream_cursor_at_hinted(&["Workbook"], offset, &mut target_hint)
++            .unwrap();
++        candidate.set_target_chain_checkpoint(offset, &target_hint);
++    }
++
+     fn cache_with_index_budget(index_budget: u64, worksheet_count: usize) -> Arc<QueryIndexCache> {
+         let metadata = cache_metadata_weight(worksheet_count).unwrap();
+         Arc::new(QueryIndexCache::new(
+@@ -1266,6 +1328,61 @@ mod tests {
+         assert_eq!(parent.used(Resource::Memory), 0);
+     }
+ 
++    #[test]
++    fn abandoning_or_retaining_a_target_chain_checkpoint_keeps_budget_lifetime_exact() {
++        let cache = cache_with_index_budget(4096, 1);
++        let (budget, parent, execution) = hierarchical_execution(4096);
++        let bytes = std::fs::read(concat!(
++            env!("CARGO_MANIFEST_DIR"),
++            "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
++        ))
++        .unwrap();
++        let file = litchi_cfb::SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap();
++
++        let mut abandoned = cache.begin_candidate(0, Some(&execution)).unwrap();
++        add_target_checkpoint(&mut abandoned, &file);
++        assert_eq!(
++            abandoned
++                .target_chain_checkpoint
++                .as_ref()
++                .map(|(offset, _)| *offset),
++            Some(4)
++        );
++        assert!(budget.used(Resource::Memory) > 0);
++        abandoned.abandon();
++        assert!(abandoned.target_chain_checkpoint.is_none());
++        assert_eq!(cache.lock().reserved_weight, 0);
++        assert_eq!(budget.used(Resource::Memory), 0);
++        assert_eq!(parent.used(Resource::Memory), 0);
++        drop(abandoned);
++
++        let mut dropped = cache.begin_candidate(0, Some(&execution)).unwrap();
++        add_target_checkpoint(&mut dropped, &file);
++        assert!(dropped.target_chain_checkpoint.is_some());
++        drop(dropped);
++        assert_eq!(cache.lock().reserved_weight, 0);
++        assert_eq!(budget.used(Resource::Memory), 0);
++        assert_eq!(parent.used(Resource::Memory), 0);
++
++        let mut retained = cache.begin_candidate(0, Some(&execution)).unwrap();
++        add_target_checkpoint(&mut retained, &file);
++        let retained = retained.publish(SourceVersion::new(1, 0)).unwrap();
++        assert_eq!(
++            retained
++                .target_chain_checkpoint
++                .as_ref()
++                .map(|(offset, _)| *offset),
++            Some(4)
++        );
++        let weight = cache.lock().entries[0].as_ref().unwrap().weight;
++        assert_eq!(budget.used(Resource::Memory), weight);
++        assert_eq!(budget.used(Resource::Memory), parent.used(Resource::Memory));
++        drop(retained);
++        drop(cache);
++        assert_eq!(budget.used(Resource::Memory), 0);
++        assert_eq!(parent.used(Resource::Memory), 0);
++    }
++
+     #[test]
+     fn concurrent_reservations_share_one_owner_ceiling() {
+         let cache = cache_with_index_budget(96, 1);
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index afec1c787c..e43c26c5f7 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -3506,12 +3506,49 @@ fn scan_target_cell<'a, const COLLECT_INDEX: bool>(
+         index,
+     };
+     scan_worksheet(owner, sheet_index, execution, &mut sink)?;
+-    if let Some(candidate) = sink.index.take() {
++    if let Some(mut candidate) = sink.index.take() {
++        if COLLECT_INDEX && sink.found.is_some() {
++            retain_target_chain_checkpoint(owner, &mut candidate, row, column);
++        }
+         let _ = candidate.publish(owner.expected_version);
+     }
+     Ok(sink.found)
+ }
+ 
++/// Probes one retained target frame with the worksheet-start checkpoint and
++/// keeps the resulting chain position as optional replay metadata.  The CFB
++/// cursor constructor only walks already validated allocation metadata; it
++/// does not read the source or observe freshness.  Any refusal is therefore a
++/// cache-only miss and leaves the original worksheet checkpoint in force.
++fn retain_target_chain_checkpoint(
++    owner: &SourceInner,
++    candidate: &mut IndexCandidate<'_>,
++    row: u16,
++    column: u16,
++) {
++    let Some((frame_offset, original)) = candidate.target_slot_and_chain_checkpoint(row, column)
++    else {
++        return;
++    };
++    // The normal worksheet scan already owns its borrowed path view. Rebuild
++    // it only for this optional probe, and make that scratch allocation
++    // fallible so a metadata-only optimization cannot change query results.
++    let mut refs = Vec::new();
++    if refs.try_reserve_exact(owner.workbook_path.len()).is_err() {
++        return;
++    }
++    refs.extend(owner.workbook_path.iter().map(String::as_str));
++    let mut chain = owner.cfb.chain_hint_from_checkpoint(original);
++    if owner
++        .cfb
++        .stream_cursor_at_hinted(&refs, frame_offset, &mut chain)
++        .is_err()
++    {
++        return;
++    }
++    candidate.set_target_chain_checkpoint(frame_offset, &chain);
++}
++
+ /// Replays every occurrence for one coordinate from a previously published
+ /// worksheet index.  The index proves that the complete worksheet already
+ /// validated, but each selected frame is still parsed and decoded here so
+@@ -3543,12 +3580,26 @@ fn replay_indexed_cell(
+         // falls back cold for a foreign or backward position.
+         strings.chain = owner.cfb.chain_hint_from_checkpoint(checkpoint);
+     }
+-    let mut chain = index.chain_checkpoint.as_ref().map_or_else(
+-        || owner.cfb.chain_hint(),
+-        |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),
+-    );
++    let slots = index.slots_for(row, column);
++    let mut chain = index
++        .target_chain_checkpoint
++        .as_ref()
++        .filter(|(saved_offset, _)| {
++            slots
++                .first()
++                .is_some_and(|slot| slot.stream_offset >= *saved_offset)
++        })
++        .map_or_else(
++            || {
++                index.chain_checkpoint.as_ref().map_or_else(
++                    || owner.cfb.chain_hint(),
++                    |checkpoint| owner.cfb.chain_hint_from_checkpoint(checkpoint),
++                )
++            },
++            |(_, checkpoint)| owner.cfb.chain_hint_from_checkpoint(checkpoint),
++        );
+     let mut found = None;
+-    for slot in index.slots_for(row, column) {
++    for slot in slots {
+         if let Some(context) = execution {
+             context.check().map_err(SourceBackedError::from)?;
+         }
