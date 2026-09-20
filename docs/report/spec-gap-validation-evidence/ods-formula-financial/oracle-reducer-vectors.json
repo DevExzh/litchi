@@ -27,8 +27,9 @@
     "decimal_digits": 100,
     "rounding": "ROUND_HALF_EVEN during independent arithmetic",
     "input_model": "formula literals are converted with IEEE-754 binary64 float() and Decimal.from_float before Decimal arithmetic",
-    "comparison": "per-vector absolute tolerance is zero; finite evaluator outputs use a 1e-12 relative tolerance without a unit-scale floor",
-    "cancellation": "rate-zero NPV/XNPV and MIRR mask sums use exact rational accumulation of the converted binary64 Decimal inputs before Decimal serialization"
+    "comparison": "all rows use a 1e-12 relative tolerance without a unit-scale floor; absolute tolerance is zero by default, with only the three named cancellation rows using their recorded conditioned forward-error bound",
+    "cancellation": "rate-zero NPV/XNPV and MIRR mask sums use exact rational accumulation of the converted binary64 Decimal inputs before Decimal serialization",
+    "conditioned_forward_error": "Only npv.basic, npv.split_argument_order, and xnpv.basic add 16 * f64_epsilon * sum(abs(discounted_terms)) as a row-specific absolute bound for finite rounded reducer evaluation; this does not alter the solver residual rule"
   },
   "profile": {
     "integer_conversion": "CUM Start/End/Type truncate toward zero; Type then requires exact 0 or 1",
@@ -363,7 +364,7 @@
         "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
         "subtype": "Number",
         "tolerance": {
-          "absolute": "0",
+          "absolute": "0.0000000000006459479416000910731750247152",
           "relative": "1e-12"
         }
       },
@@ -371,7 +372,14 @@
         "baseline",
         "one-based"
       ],
-      "oracle_basis": "sum(Value[i] / (1 + Rate)^i), with i beginning at one"
+      "oracle_basis": "sum(Value[i] / (1 + Rate)^i), with i beginning at one",
+      "tolerance_basis": {
+        "model": "16 * f64_epsilon * sum(abs(discounted_terms))",
+        "f64_epsilon": "0.0000000000000002220446049250313080847263336",
+        "term_scale": "181.8181818181818168055086472",
+        "absolute_bound": "0.0000000000006459479416000910731750247152",
+        "scope": "finite reducer forward evaluation only; solver residual tolerances do not govern this row"
+      }
     },
     {
       "id": "npv.split_argument_order",
@@ -393,7 +401,7 @@
         "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
         "subtype": "Number",
         "tolerance": {
-          "absolute": "0",
+          "absolute": "0.0000000000006459479416000910731750247152",
           "relative": "1e-12"
         }
       },
@@ -401,7 +409,14 @@
         "argument-order",
         "exact"
       ],
-      "oracle_basis": "separate NumberSequenceList arguments continue one-based exponents"
+      "oracle_basis": "separate NumberSequenceList arguments continue one-based exponents",
+      "tolerance_basis": {
+        "model": "16 * f64_epsilon * sum(abs(discounted_terms))",
+        "f64_epsilon": "0.0000000000000002220446049250313080847263336",
+        "term_scale": "181.8181818181818168055086472",
+        "absolute_bound": "0.0000000000006459479416000910731750247152",
+        "scope": "finite reducer forward evaluation only; solver residual tolerances do not govern this row"
+      }
     },
     {
       "id": "npv.one_based_with_middle_zero",
@@ -872,7 +887,7 @@
         "value": "-0.00000000000000050464682937507115219133017060361472936864986148803904458980566915064127131538654019",
         "subtype": "Number",
         "tolerance": {
-          "absolute": "0",
+          "absolute": "0.0000000000007105427357601001840782585738",
           "relative": "1e-12"
         }
       },
@@ -880,7 +895,14 @@
         "baseline",
         "date-weighted"
       ],
-      "oracle_basis": "sum(Value / (1 + Rate)^((Date - first_date) / 365))"
+      "oracle_basis": "sum(Value / (1 + Rate)^((Date - first_date) / 365))",
+      "tolerance_basis": {
+        "model": "16 * f64_epsilon * sum(abs(discounted_terms))",
+        "f64_epsilon": "0.0000000000000002220446049250313080847263336",
+        "term_scale": "199.9999999999999994953531706",
+        "absolute_bound": "0.0000000000007105427357601001840782585738",
+        "scope": "finite reducer forward evaluation only; solver residual tolerances do not govern this row"
+      }
     },
     {
       "id": "xnpv.nonannual_interval",
