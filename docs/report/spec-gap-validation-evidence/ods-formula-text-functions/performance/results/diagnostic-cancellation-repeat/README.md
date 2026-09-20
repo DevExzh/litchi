@@ -1,0 +1,1 @@
+Complete diagnostic capture rejected by protocol verification: cancellation fixtures inherited the 16x4 default repeat80 instead of the specified repeat4. All original measurements and harness are retained; these are not final accepted evidence.

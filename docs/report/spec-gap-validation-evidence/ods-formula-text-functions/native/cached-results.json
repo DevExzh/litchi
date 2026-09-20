@@ -1,0 +1,3740 @@
+[
+  {
+    "function": "ASC",
+    "source": "sc/qa/unit/data/functions/text/fods/asc.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=ASC(\"Libre Office\")",
+    "cached": {
+      "type": "text",
+      "value": "Libre Office"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Libre Office",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Libre Office"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "CHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/char.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=CHAR([.K35])",
+    "cached": {
+      "type": "text",
+      "value": "!"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "!",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "!"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 11,
+        "type": "number",
+        "value": "33"
+      }
+    ]
+  },
+  {
+    "function": "CHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/char.fods",
+    "sheet": "Sheet2",
+    "row": 34,
+    "column": 1,
+    "formula": "of:=CHAR([.K67])",
+    "cached": {
+      "type": "text",
+      "value": "A"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "A",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "A"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 11,
+        "type": "number",
+        "value": "65"
+      }
+    ]
+  },
+  {
+    "function": "CHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/char.fods",
+    "sheet": "Sheet2",
+    "row": 96,
+    "column": 1,
+    "formula": "of:=CHAR([.K129])",
+    "cached": {
+      "type": "text",
+      "value": ""
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": ""
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 129,
+        "column": 11,
+        "type": "number",
+        "value": "127"
+      }
+    ]
+  },
+  {
+    "function": "CLEAN",
+    "source": "sc/qa/unit/data/functions/text/fods/clean.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=CLEAN([.J2])",
+    "cached": {
+      "type": "text",
+      "value": "Test text"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Test text",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Test text"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "text",
+        "value": "Test text"
+      }
+    ]
+  },
+  {
+    "function": "CODE",
+    "source": "sc/qa/unit/data/functions/text/fods/code.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=CODE([.I2])",
+    "cached": {
+      "type": "number",
+      "value": "33"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "33",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "33"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "!"
+      }
+    ]
+  },
+  {
+    "function": "CODE",
+    "source": "sc/qa/unit/data/functions/text/fods/code.fods",
+    "sheet": "Sheet2",
+    "row": 99,
+    "column": 1,
+    "formula": "of:=CODE(\"Hello\")",
+    "cached": {
+      "type": "number",
+      "value": "72"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "72",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "72"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "CONCATENATE",
+    "source": "sc/qa/unit/data/functions/text/fods/concatenate.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=CONCATENATE(\"Good \";\"Morning \";\"Mrs. \";\"Doe\")",
+    "cached": {
+      "type": "text",
+      "value": "Good Morning Mrs. Doe"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Good Morning Mrs. Doe",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Good Morning Mrs. Doe"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "CONCATENATE",
+    "source": "sc/qa/unit/data/functions/text/fods/concatenate.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=CONCATENATE(\"Stream population for \"; [.I2]; \" \"; [.I3]; \" is \"; [.I4]; \"/mile.\")",
+    "cached": {
+      "type": "text",
+      "value": "Stream population for brook trout species is 32/mile."
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Stream population for brook trout species is 32/mile.",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Stream population for brook trout species is 32/mile."
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "brook trout"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "text",
+        "value": "species"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "32"
+      }
+    ]
+  },
+  {
+    "function": "CONCATENATE",
+    "source": "sc/qa/unit/data/functions/text/fods/concatenate.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=CONCATENATE([.I2]; \" \"; [.J2])",
+    "cached": {
+      "type": "text",
+      "value": "brook trout Andreas"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "brook trout Andreas",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "brook trout Andreas"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "brook trout"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "text",
+        "value": "Andreas"
+      }
+    ]
+  },
+  {
+    "function": "DOLLAR",
+    "source": "sc/qa/unit/data/functions/text/fods/dollar.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=DOLLAR(255)",
+    "cached": {
+      "type": "text",
+      "value": "$255.00"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "$255.00",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "$255.00"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "DOLLAR",
+    "source": "sc/qa/unit/data/functions/text/fods/dollar.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=DOLLAR(367.456;2)",
+    "cached": {
+      "type": "text",
+      "value": "$367.46"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "$367.46",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "$367.46"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "DOLLAR",
+    "source": "sc/qa/unit/data/functions/text/fods/dollar.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=DOLLAR([.I2]; 2)",
+    "cached": {
+      "type": "text",
+      "value": "$1,234.57"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "$1,234.57",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "$1,234.57"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "1234.567"
+      }
+    ]
+  },
+  {
+    "function": "EXACT",
+    "source": "sc/qa/unit/data/functions/text/fods/exact.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=EXACT(\"Text1\"; \"Text2\")",
+    "cached": {
+      "type": "logical",
+      "value": "false"
+    },
+    "cached_attributes": {
+      "office_value_type": "boolean",
+      "office_value": null,
+      "office_string_value": null,
+      "office_boolean_value": "false",
+      "calcext_value_type": "boolean",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "FALSE"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "EXACT",
+    "source": "sc/qa/unit/data/functions/text/fods/exact.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=EXACT([.I2];[.J2])",
+    "cached": {
+      "type": "logical",
+      "value": "true"
+    },
+    "cached_attributes": {
+      "office_value_type": "boolean",
+      "office_value": null,
+      "office_string_value": null,
+      "office_boolean_value": "true",
+      "calcext_value_type": "boolean",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "TRUE"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "word"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "text",
+        "value": "word"
+      }
+    ]
+  },
+  {
+    "function": "EXACT",
+    "source": "sc/qa/unit/data/functions/text/fods/exact.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=EXACT([.I2];\"word\")",
+    "cached": {
+      "type": "logical",
+      "value": "true"
+    },
+    "cached_attributes": {
+      "office_value_type": "boolean",
+      "office_value": null,
+      "office_string_value": null,
+      "office_boolean_value": "true",
+      "calcext_value_type": "boolean",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "TRUE"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "word"
+      }
+    ]
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=FIND(76;998877665544)",
+    "cached": {
+      "type": "number",
+      "value": "6"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "6",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "6"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=FIND(\"M\";[.I2])",
+    "cached": {
+      "type": "number",
+      "value": "1"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "1",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Miriam McGovern"
+      }
+    ]
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=FIND(\"m\";[.I2])",
+    "cached": {
+      "type": "number",
+      "value": "6"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "6",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "6"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Miriam McGovern"
+      }
+    ]
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=FIND(\"M\";[.I2];3)",
+    "cached": {
+      "type": "number",
+      "value": "8"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "8",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "8"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Miriam McGovern"
+      }
+    ]
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 16,
+    "column": 1,
+    "formula": "of:=FIND([.I16];[.J16])",
+    "cached": {
+      "type": "error",
+      "value": "#VALUE!"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "",
+      "office_boolean_value": null,
+      "calcext_value_type": "error",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "#VALUE!"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 9,
+        "type": "text",
+        "value": "B😂"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "text",
+        "value": "ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+      }
+    ]
+  },
+  {
+    "function": "FIND",
+    "source": "sc/qa/unit/data/functions/text/fods/find.fods",
+    "sheet": "Sheet2",
+    "row": 17,
+    "column": 1,
+    "formula": "of:=FIND([.I17];[.J16])",
+    "cached": {
+      "type": "number",
+      "value": "3"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "3",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "3"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "text",
+        "value": "ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 9,
+        "type": "text",
+        "value": "😂d"
+      }
+    ]
+  },
+  {
+    "function": "FIXED",
+    "source": "sc/qa/unit/data/functions/text/fods/fixed.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=FIXED(1234567.89;3)",
+    "cached": {
+      "type": "text",
+      "value": "1,234,567.890"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1,234,567.890",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1,234,567.890"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "FIXED",
+    "source": "sc/qa/unit/data/functions/text/fods/fixed.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=FIXED(1234567.89;3;1)",
+    "cached": {
+      "type": "text",
+      "value": "1234567.890"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1234567.890",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1234567.890"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "FIXED",
+    "source": "sc/qa/unit/data/functions/text/fods/fixed.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=FIXED(52.1254)",
+    "cached": {
+      "type": "text",
+      "value": "52.13"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "52.13",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "52.13"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "JIS",
+    "source": "sc/qa/unit/data/functions/text/fods/jis.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=JIS([.I2])",
+    "cached": {
+      "type": "text",
+      "value": "！”＃＄％＆’（）＊＋，－．／"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "！”＃＄％＆’（）＊＋，－．／",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "！”＃＄％＆’（）＊＋，－．／"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "!\"#$%&'()*+,-./"
+      }
+    ]
+  },
+  {
+    "function": "JIS",
+    "source": "sc/qa/unit/data/functions/text/fods/jis.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=JIS([.I3])",
+    "cached": {
+      "type": "text",
+      "value": "０１２３４５６７８９"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "０１２３４５６７８９",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "０１２３４５６７８９"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "text",
+        "value": "0123456789"
+      }
+    ]
+  },
+  {
+    "function": "JIS",
+    "source": "sc/qa/unit/data/functions/text/fods/jis.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=JIS([.I7])",
+    "cached": {
+      "type": "text",
+      "value": "［￥］＾＿‘"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "［￥］＾＿‘",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "［￥］＾＿‘"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "text",
+        "value": "[\\]^_`"
+      }
+    ]
+  },
+  {
+    "function": "LEFT",
+    "source": "sc/qa/unit/data/functions/text/fods/left.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LEFT([.I1];4)",
+    "cached": {
+      "type": "text",
+      "value": "Sale"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Sale",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Sale"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "Sale Price"
+      }
+    ]
+  },
+  {
+    "function": "LEFT",
+    "source": "sc/qa/unit/data/functions/text/fods/left.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=LEFT([.I2])",
+    "cached": {
+      "type": "text",
+      "value": "S"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "S",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "S"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Sweden"
+      }
+    ]
+  },
+  {
+    "function": "LEFT",
+    "source": "sc/qa/unit/data/functions/text/fods/left.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LEFT(\"output\";3)",
+    "cached": {
+      "type": "text",
+      "value": "out"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "out",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "out"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "LEN",
+    "source": "sc/qa/unit/data/functions/text/fods/len.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LEN([.I1])",
+    "cached": {
+      "type": "number",
+      "value": "10"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "10",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "10"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "Sale Price"
+      }
+    ]
+  },
+  {
+    "function": "LEN",
+    "source": "sc/qa/unit/data/functions/text/fods/len.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 11,
+    "formula": "of:=LEN([.J2])",
+    "cached": {
+      "type": "number",
+      "value": "0"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "0",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "0"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "LEN",
+    "source": "sc/qa/unit/data/functions/text/fods/len.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LEN(\"output\")",
+    "cached": {
+      "type": "number",
+      "value": "6"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "6",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "6"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "LEN",
+    "source": "sc/qa/unit/data/functions/text/fods/len.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=LEN([.I1:.I2])",
+    "cached": {
+      "type": "number",
+      "value": "10"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "10",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "2",
+      "rendered_text": "10"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "Sale Price"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Sweden"
+      }
+    ]
+  },
+  {
+    "function": "LOWER",
+    "source": "sc/qa/unit/data/functions/text/fods/lower.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LOWER([.I1])",
+    "cached": {
+      "type": "text",
+      "value": "sale price"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "sale price",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "sale price"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "Sale Price"
+      }
+    ]
+  },
+  {
+    "function": "LOWER",
+    "source": "sc/qa/unit/data/functions/text/fods/lower.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LOWER(\"OUTPUT\")",
+    "cached": {
+      "type": "text",
+      "value": "output"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "output",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "output"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "LOWER",
+    "source": "sc/qa/unit/data/functions/text/fods/lower.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=LOWER(1)",
+    "cached": {
+      "type": "text",
+      "value": "1"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MID",
+    "source": "sc/qa/unit/data/functions/text/fods/mid.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MID(\"office\";2;2)",
+    "cached": {
+      "type": "text",
+      "value": "ff"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "ff",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "ff"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MID",
+    "source": "sc/qa/unit/data/functions/text/fods/mid.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MID([.I2];2;2)",
+    "cached": {
+      "type": "text",
+      "value": "ho"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "ho",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "ho"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "ahoj"
+      }
+    ]
+  },
+  {
+    "function": "MID",
+    "source": "sc/qa/unit/data/functions/text/fods/mid.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MID([.I4];1;2)",
+    "cached": {
+      "type": "text",
+      "value": "11"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "11",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "11"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1111"
+      }
+    ]
+  },
+  {
+    "function": "MID",
+    "source": "sc/qa/unit/data/functions/text/fods/mid.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=MID([.I8];[.J8];[.K8])",
+    "cached": {
+      "type": "text",
+      "value": "b😂"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "b😂",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "b😂"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "text",
+        "value": "ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!",
+        "nested_markup": [
+          "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}span"
+        ]
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 11,
+        "type": "number",
+        "value": "2"
+      }
+    ]
+  },
+  {
+    "function": "PROPER",
+    "source": "sc/qa/unit/data/functions/text/fods/proper.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=PROPER([.I1])",
+    "cached": {
+      "type": "text",
+      "value": "This Is A Title"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "This Is A Title",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "This Is A Title"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "this is a TITLE"
+      }
+    ]
+  },
+  {
+    "function": "PROPER",
+    "source": "sc/qa/unit/data/functions/text/fods/proper.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=PROPER(\"libre office\")",
+    "cached": {
+      "type": "text",
+      "value": "Libre Office"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Libre Office",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Libre Office"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "PROPER",
+    "source": "sc/qa/unit/data/functions/text/fods/proper.fods",
+    "sheet": "Sheet2",
+    "row": 17,
+    "column": 1,
+    "formula": "of:=PROPER(\"'don't'\")",
+    "cached": {
+      "type": "text",
+      "value": "'Don'T'"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "'Don'T'",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "'Don'T'"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "REPLACE",
+    "source": "sc/qa/unit/data/functions/text/fods/replace.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=REPLACE(\"1234567\";1;1;\"444\")",
+    "cached": {
+      "type": "text",
+      "value": "444234567"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "444234567",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "444234567"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "REPLACE",
+    "source": "sc/qa/unit/data/functions/text/fods/replace.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=REPLACE([.I2];6;5;\"*\")",
+    "cached": {
+      "type": "text",
+      "value": "abcde*k"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "abcde*k",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "abcde*k"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "abcdefghijk"
+      }
+    ]
+  },
+  {
+    "function": "REPLACE",
+    "source": "sc/qa/unit/data/functions/text/fods/replace.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=REPLACE([.I3];3;2;\"10\")",
+    "cached": {
+      "type": "text",
+      "value": "2010"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "2010",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "2010"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "2009"
+      }
+    ]
+  },
+  {
+    "function": "REPLACE",
+    "source": "sc/qa/unit/data/functions/text/fods/replace.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=REPLACE(\"123456789\";5;0;\"Q\")",
+    "cached": {
+      "type": "text",
+      "value": "1234Q56789"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1234Q56789",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1234Q56789"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "REPLACE",
+    "source": "sc/qa/unit/data/functions/text/fods/replace.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=REPLACE([.I11];4;3;[.I10])",
+    "cached": {
+      "type": "text",
+      "value": "ab😂B😂gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "ab😂B😂gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "ab😂B😂gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 9,
+        "type": "text",
+        "value": "B😂"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 9,
+        "type": "text",
+        "value": "ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+      }
+    ]
+  },
+  {
+    "function": "REPT",
+    "source": "sc/qa/unit/data/functions/text/fods/rept.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=REPT(\"Good morning\";2)",
+    "cached": {
+      "type": "text",
+      "value": "Good morningGood morning"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Good morningGood morning",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Good morningGood morning"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "REPT",
+    "source": "sc/qa/unit/data/functions/text/fods/rept.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=REPT(\"*-\"; 3)",
+    "cached": {
+      "type": "text",
+      "value": "*-*-*-"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "*-*-*-",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "*-*-*-"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "REPT",
+    "source": "sc/qa/unit/data/functions/text/fods/rept.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=REPT(\"-\";10)",
+    "cached": {
+      "type": "text",
+      "value": "----------"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "----------",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "----------"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "RIGHT",
+    "source": "sc/qa/unit/data/functions/text/fods/right.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=RIGHT(\"Sun\";2)",
+    "cached": {
+      "type": "text",
+      "value": "un"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "un",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "un"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "RIGHT",
+    "source": "sc/qa/unit/data/functions/text/fods/right.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=RIGHT([.I6:.I7])",
+    "cached": {
+      "type": "text",
+      "value": "b"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "b",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "2",
+      "rendered_text": "b"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "ab"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "text",
+        "value": "ab"
+      }
+    ]
+  },
+  {
+    "function": "RIGHT",
+    "source": "sc/qa/unit/data/functions/text/fods/right.fods",
+    "sheet": "Sheet2",
+    "row": 12,
+    "column": 1,
+    "formula": "of:=RIGHT(\"ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!\";11)",
+    "cached": {
+      "type": "text",
+      "value": "𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "RIGHT",
+    "source": "sc/qa/unit/data/functions/text/fods/right.fods",
+    "sheet": "Sheet2",
+    "row": 23,
+    "column": 10,
+    "formula": "of:=RIGHT([.K21])=\"O\"",
+    "cached": {
+      "type": "logical",
+      "value": "true"
+    },
+    "cached_attributes": {
+      "office_value_type": "boolean",
+      "office_value": null,
+      "office_string_value": null,
+      "office_boolean_value": "true",
+      "calcext_value_type": "boolean",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "TRUE"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 11,
+        "type": "text",
+        "value": "O"
+      }
+    ]
+  },
+  {
+    "function": "SEARCH",
+    "source": "sc/qa/unit/data/functions/text/fods/search.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SEARCH(54;998877665544)",
+    "cached": {
+      "type": "number",
+      "value": "10"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "10",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "10"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "SEARCH",
+    "source": "sc/qa/unit/data/functions/text/fods/search.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SEARCH(\"off\";[.I1])",
+    "cached": {
+      "type": "number",
+      "value": "6"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "6",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "6"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "LibreOffice"
+      }
+    ]
+  },
+  {
+    "function": "SEARCH",
+    "source": "sc/qa/unit/data/functions/text/fods/search.fods",
+    "sheet": "Sheet2",
+    "row": 21,
+    "column": 1,
+    "formula": "of:=SEARCH([.I21];[.J21])",
+    "cached": {
+      "type": "number",
+      "value": "2"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "2",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "2"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 9,
+        "type": "text",
+        "value": "B😂"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "text",
+        "value": "ab😂de𝔖gh𝕬𝖈𝖍𝖙𝖚𝖓𝖌!"
+      }
+    ]
+  },
+  {
+    "function": "SEARCH",
+    "source": "sc/qa/unit/data/functions/text/fods/search.fods",
+    "sheet": "Sheet2",
+    "row": 25,
+    "column": 1,
+    "formula": "of:=SEARCH([.I25];[.J25])",
+    "cached": {
+      "type": "number",
+      "value": "4"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "4",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "4"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 9,
+        "type": "text",
+        "value": "e"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 10,
+        "type": "text",
+        "value": "\"üë\""
+      }
+    ]
+  },
+  {
+    "function": "SUBSTITUTE",
+    "source": "sc/qa/unit/data/functions/text/fods/substitute.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\")",
+    "cached": {
+      "type": "text",
+      "value": "12abc12abc12abc"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "12abc12abc12abc",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "12abc12abc12abc"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "SUBSTITUTE",
+    "source": "sc/qa/unit/data/functions/text/fods/substitute.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUBSTITUTE(\"123123123\";\"3\";\"abc\";2)",
+    "cached": {
+      "type": "text",
+      "value": "12312abc123"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "12312abc123",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "12312abc123"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "SUBSTITUTE",
+    "source": "sc/qa/unit/data/functions/text/fods/substitute.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUBSTITUTE([.I2]; \"Sales\"; \"Cost\")",
+    "cached": {
+      "type": "text",
+      "value": "Cost Data"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Cost Data",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Cost Data"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "text",
+        "value": "Sales Data"
+      }
+    ]
+  },
+  {
+    "function": "SUBSTITUTE",
+    "source": "sc/qa/unit/data/functions/text/fods/substitute.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUBSTITUTE([.I3]; \"1\"; \"2\"; 1)",
+    "cached": {
+      "type": "text",
+      "value": "Quarter 2, 2008"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "Quarter 2, 2008",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "Quarter 2, 2008"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "text",
+        "value": "Quarter 1, 2008"
+      }
+    ]
+  },
+  {
+    "function": "SUBSTITUTE",
+    "source": "sc/qa/unit/data/functions/text/fods/substitute.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SUBSTITUTE([.K1:.K4];[.L1:.L4];[.M1:.M4])",
+    "cached": {
+      "type": "text",
+      "value": "fbfbfbfbf"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "fbfbfbfbf",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "4",
+      "rendered_text": "fbfbfbfbf"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 11,
+        "type": "text",
+        "value": "ababababa"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "text",
+        "value": "f"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "text",
+        "value": "ababababa"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "text",
+        "value": "f"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "text",
+        "value": "ababababa"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "text",
+        "value": "f"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "text",
+        "value": "ababababa"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "text",
+        "value": "f"
+      }
+    ]
+  },
+  {
+    "function": "T",
+    "source": "sc/qa/unit/data/functions/text/fods/t.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=T(\"x\")",
+    "cached": {
+      "type": "text",
+      "value": "x"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "x",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "x"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "T",
+    "source": "sc/qa/unit/data/functions/text/fods/t.fods",
+    "sheet": "Sheet2",
+    "row": 21,
+    "column": 1,
+    "formula": "of:=T([.J10])",
+    "cached": {
+      "type": "text",
+      "value": "x"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "x",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "x"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "text",
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=TEXT(12.34567;\"###.##\")",
+    "cached": {
+      "type": "text",
+      "value": "12.35"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "12.35",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "12.35"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=TEXT(12.34567;\"000.00\")",
+    "cached": {
+      "type": "text",
+      "value": "012.35"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "012.35",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "012.35"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=TEXT([.J1:.J5];[.K1:.K5])",
+    "cached": {
+      "type": "text",
+      "value": "11.2"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "11.2",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "5",
+      "rendered_text": "11.2"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "11.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 11,
+        "type": "text",
+        "value": "###.##"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "12.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "text",
+        "value": "###.##"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "13.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "text",
+        "value": "###.##"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "14.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "text",
+        "value": "###.##"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "15.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 11,
+        "type": "text",
+        "value": "###.##"
+      }
+    ]
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=TEXT(1234.567;\"$#,##0.00\")",
+    "cached": {
+      "type": "text",
+      "value": "$1,234.57"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "$1,234.57",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "$1,234.57"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=TEXT(0.285;\"0.0%\")",
+    "cached": {
+      "type": "text",
+      "value": "28.5%"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "28.5%",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "28.5%"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 18,
+    "column": 1,
+    "formula": "of:=TEXT(12200000;\"0.00E+00\")",
+    "cached": {
+      "type": "text",
+      "value": "1.22E+07"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1.22E+07",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1.22E+07"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 23,
+    "column": 1,
+    "formula": "of:=TEXT([.J1];\"0\")",
+    "cached": {
+      "type": "text",
+      "value": "11"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "11",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "11"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "11.2"
+      }
+    ]
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 24,
+    "column": 1,
+    "formula": "of:=TEXT([.J2];\"0.0\")",
+    "cached": {
+      "type": "text",
+      "value": "12.2"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "12.2",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "12.2"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "12.2"
+      }
+    ]
+  },
+  {
+    "function": "TEXT",
+    "source": "sc/qa/unit/data/functions/text/fods/text.fods",
+    "sheet": "Sheet2",
+    "row": 25,
+    "column": 1,
+    "formula": "of:=TEXT([.J3];0)",
+    "cached": {
+      "type": "text",
+      "value": "13"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "13",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "13"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "13.2"
+      }
+    ]
+  },
+  {
+    "function": "TRIM",
+    "source": "sc/qa/unit/data/functions/text/fods/trim.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=TRIM(\"  apples \")",
+    "cached": {
+      "type": "text",
+      "value": "apples"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "apples",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "apples"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "TRIM",
+    "source": "sc/qa/unit/data/functions/text/fods/trim.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=TRIM([.I1])",
+    "cached": {
+      "type": "text",
+      "value": "LO Office"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "LO Office",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "LO Office"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "      LO        Office    ",
+        "nested_markup": [
+          "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}s"
+        ]
+      }
+    ]
+  },
+  {
+    "function": "TRIM",
+    "source": "sc/qa/unit/data/functions/text/fods/trim.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=TRIM([.I2])",
+    "cached": {
+      "type": "text",
+      "value": "1"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      }
+    ]
+  },
+  {
+    "function": "TRIM",
+    "source": "sc/qa/unit/data/functions/text/fods/trim.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=TRIM([.I5:.I6])",
+    "cached": {
+      "type": "text",
+      "value": "aa"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "aa",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "2",
+      "rendered_text": "aa"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "text",
+        "value": "   aa",
+        "nested_markup": [
+          "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}s"
+        ]
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "     aa",
+        "nested_markup": [
+          "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}s"
+        ]
+      }
+    ]
+  },
+  {
+    "function": "UNICHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/unichar.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=UNICHAR(68)",
+    "cached": {
+      "type": "text",
+      "value": "D"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "D",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "D"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "UNICHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/unichar.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=UNICHAR([.I1:.I31])",
+    "cached": {
+      "type": "text",
+      "value": "D"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "D",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "31",
+      "rendered_text": "D"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "68"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "69"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "70"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "71"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "72"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "73"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "number",
+        "value": "74"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "number",
+        "value": "75"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 9,
+        "type": "number",
+        "value": "76"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 9,
+        "type": "number",
+        "value": "77"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 9,
+        "type": "number",
+        "value": "78"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "number",
+        "value": "79"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "80"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "81"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "82"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 9,
+        "type": "number",
+        "value": "83"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 9,
+        "type": "number",
+        "value": "84"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 9,
+        "type": "number",
+        "value": "85"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 9,
+        "type": "number",
+        "value": "86"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 9,
+        "type": "number",
+        "value": "87"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 9,
+        "type": "number",
+        "value": "88"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 9,
+        "type": "number",
+        "value": "89"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 9,
+        "type": "number",
+        "value": "90"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 9,
+        "type": "number",
+        "value": "91"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 9,
+        "type": "number",
+        "value": "92"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 9,
+        "type": "number",
+        "value": "93"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 9,
+        "type": "number",
+        "value": "94"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 9,
+        "type": "number",
+        "value": "95"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 9,
+        "type": "number",
+        "value": "96"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 9,
+        "type": "number",
+        "value": "97"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 9,
+        "type": "number",
+        "value": "98"
+      }
+    ]
+  },
+  {
+    "function": "UNICHAR",
+    "source": "sc/qa/unit/data/functions/text/fods/unichar.fods",
+    "sheet": "Sheet2",
+    "row": 38,
+    "column": 1,
+    "formula": "of:=UNICHAR([.I32])",
+    "cached": {
+      "type": "text",
+      "value": "c"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "c",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "c"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 9,
+        "type": "number",
+        "value": "99"
+      }
+    ]
+  },
+  {
+    "function": "UNICODE",
+    "source": "sc/qa/unit/data/functions/text/fods/unicode.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=UNICODE(0)",
+    "cached": {
+      "type": "number",
+      "value": "48"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "48",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "48"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "UNICODE",
+    "source": "sc/qa/unit/data/functions/text/fods/unicode.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=UNICODE(\"F\")",
+    "cached": {
+      "type": "number",
+      "value": "70"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "70",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "70"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "UNICODE",
+    "source": "sc/qa/unit/data/functions/text/fods/unicode.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=UNICODE([.J1:.J60])",
+    "cached": {
+      "type": "number",
+      "value": "68"
+    },
+    "cached_attributes": {
+      "office_value_type": "float",
+      "office_value": "68",
+      "office_string_value": null,
+      "office_boolean_value": null,
+      "calcext_value_type": "float",
+      "matrix_columns_spanned": "1",
+      "matrix_rows_spanned": "60",
+      "rendered_text": "68"
+    },
+    "valid_modes": [
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "text",
+        "value": "D"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "text",
+        "value": "E"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "text",
+        "value": "F"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "text",
+        "value": "G"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "text",
+        "value": "H"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "text",
+        "value": "I"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "text",
+        "value": "J"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "text",
+        "value": "K"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "text",
+        "value": "L"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "text",
+        "value": "M"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "text",
+        "value": "N"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 10,
+        "type": "text",
+        "value": "O"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 10,
+        "type": "text",
+        "value": "P"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 10,
+        "type": "text",
+        "value": "Q"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 10,
+        "type": "text",
+        "value": "R"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "text",
+        "value": "S"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "text",
+        "value": "T"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "text",
+        "value": "U"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 10,
+        "type": "text",
+        "value": "V"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 10,
+        "type": "text",
+        "value": "W"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "text",
+        "value": "X"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 10,
+        "type": "text",
+        "value": "Y"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 10,
+        "type": "text",
+        "value": "Z"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 10,
+        "type": "text",
+        "value": "["
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 10,
+        "type": "text",
+        "value": "\\"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 10,
+        "type": "text",
+        "value": "]"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 10,
+        "type": "text",
+        "value": "^"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 10,
+        "type": "text",
+        "value": "_"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 10,
+        "type": "text",
+        "value": "`"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 10,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 10,
+        "type": "text",
+        "value": "b"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 10,
+        "type": "text",
+        "value": "c"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 10,
+        "type": "text",
+        "value": "d"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 10,
+        "type": "text",
+        "value": "e"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 10,
+        "type": "text",
+        "value": "f"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 10,
+        "type": "text",
+        "value": "g"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 10,
+        "type": "text",
+        "value": "h"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 10,
+        "type": "text",
+        "value": "i"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 10,
+        "type": "text",
+        "value": "j"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 10,
+        "type": "text",
+        "value": "k"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 10,
+        "type": "text",
+        "value": "l"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 10,
+        "type": "text",
+        "value": "m"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 10,
+        "type": "text",
+        "value": "n"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 10,
+        "type": "text",
+        "value": "o"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 10,
+        "type": "text",
+        "value": "p"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 10,
+        "type": "text",
+        "value": "q"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 10,
+        "type": "text",
+        "value": "r"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 10,
+        "type": "text",
+        "value": "s"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 10,
+        "type": "text",
+        "value": "t"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 10,
+        "type": "text",
+        "value": "u"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 10,
+        "type": "text",
+        "value": "v"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 10,
+        "type": "text",
+        "value": "w"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 10,
+        "type": "text",
+        "value": "x"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 10,
+        "type": "text",
+        "value": "y"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 10,
+        "type": "text",
+        "value": "z"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 10,
+        "type": "text",
+        "value": "{"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 10,
+        "type": "text",
+        "value": "|"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 10,
+        "type": "text",
+        "value": "}"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 10,
+        "type": "text",
+        "value": "~"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 10,
+        "type": "text",
+        "value": ""
+      }
+    ]
+  },
+  {
+    "function": "UPPER",
+    "source": "sc/qa/unit/data/functions/text/fods/upper.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=UPPER(\"Good Morning\")",
+    "cached": {
+      "type": "text",
+      "value": "GOOD MORNING"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "GOOD MORNING",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "GOOD MORNING"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "UPPER",
+    "source": "sc/qa/unit/data/functions/text/fods/upper.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=UPPER([.I1])",
+    "cached": {
+      "type": "text",
+      "value": "TEST"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "TEST",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "TEST"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "test"
+      }
+    ]
+  },
+  {
+    "function": "UPPER",
+    "source": "sc/qa/unit/data/functions/text/fods/upper.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=UPPER(\"123abc\")",
+    "cached": {
+      "type": "text",
+      "value": "123ABC"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "123ABC",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "123ABC"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "UPPER",
+    "source": "sc/qa/unit/data/functions/text/fods/upper.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=UPPER([.I2])",
+    "cached": {
+      "type": "text",
+      "value": "1"
+    },
+    "cached_attributes": {
+      "office_value_type": "string",
+      "office_value": null,
+      "office_string_value": "1",
+      "office_boolean_value": null,
+      "calcext_value_type": "string",
+      "matrix_columns_spanned": null,
+      "matrix_rows_spanned": null,
+      "rendered_text": "1"
+    },
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      }
+    ]
+  }
+]

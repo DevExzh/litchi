@@ -1,0 +1,37 @@
+{
+  "corpus": "Unicode Character Database 17.0.0",
+  "retrieval_policy": "official Unicode URLs pinned by version and verified by SHA-256 before parsing",
+  "files": [
+    {
+      "name": "UnicodeData.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt",
+      "bytes": 2198209,
+      "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+    },
+    {
+      "name": "DerivedCoreProperties.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt",
+      "bytes": 1134783,
+      "sha256": "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"
+    },
+    {
+      "name": "CaseFolding.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/CaseFolding.txt",
+      "bytes": 87539,
+      "sha256": "ff8d8fefbf123574205085d6714c36149eb946d717a0c585c27f0f4ef58c4183"
+    },
+    {
+      "name": "SpecialCasing.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt",
+      "bytes": 17049,
+      "sha256": "efc25faf19de21b92c1194c111c932e03d2a5eaf18194e33f1156e96de4c9588"
+    },
+    {
+      "name": "license.txt",
+      "url": "https://www.unicode.org/license.txt",
+      "bytes": 1995,
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+    }
+  ],
+  "vendored_ucd_files": false
+}

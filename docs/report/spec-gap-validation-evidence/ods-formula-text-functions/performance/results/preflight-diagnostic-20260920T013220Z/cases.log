@@ -1,0 +1,483 @@
+===== 1/161 scalar-control-arithmetic returncode=0 =====
+preflight case=scalar-control-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 2/161 scalar-control-sin returncode=0 =====
+preflight case=scalar-control-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 3/161 scalar-control-imsum returncode=0 =====
+preflight case=scalar-control-imsum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 4/161 database-control-dsum returncode=0 =====
+preflight case=database-control-dsum reference_reads=7
+preflight-ok cases=1 phase=evaluate
+===== 5/161 scalar-control-average returncode=0 =====
+preflight case=scalar-control-average reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 6/161 scalar-control-counta returncode=0 =====
+preflight case=scalar-control-counta reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 7/161 scalar-control-var returncode=0 =====
+preflight case=scalar-control-var reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 8/161 scalar-control-stdev returncode=0 =====
+preflight case=scalar-control-stdev reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 9/161 database-control-dvar returncode=0 =====
+preflight case=database-control-dvar reference_reads=7
+preflight-ok cases=1 phase=evaluate
+===== 10/161 database-control-dstdev returncode=0 =====
+preflight case=database-control-dstdev reference_reads=7
+preflight-ok cases=1 phase=evaluate
+===== 11/161 array-control-4x4-arithmetic returncode=0 =====
+preflight case=array-control-4x4-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 12/161 array-control-4x4-sin returncode=0 =====
+preflight case=array-control-4x4-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 13/161 array-control-16x16-arithmetic returncode=0 =====
+preflight case=array-control-16x16-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 14/161 array-control-16x16-sin returncode=0 =====
+preflight case=array-control-16x16-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 15/161 reference-array-16x4-arithmetic returncode=0 =====
+preflight case=reference-array-16x4-arithmetic reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 16/161 scalar-aggregate-sum returncode=0 =====
+preflight case=scalar-aggregate-sum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 17/161 literal-aggregate-4x1-sum returncode=0 =====
+preflight case=literal-aggregate-4x1-sum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 18/161 reference-aggregate-64x4-sum returncode=0 =====
+preflight case=reference-aggregate-64x4-sum reference_reads=256
+preflight-ok cases=1 phase=evaluate
+===== 19/161 reference-conditional-256x4-sumifs returncode=0 =====
+preflight case=reference-conditional-256x4-sumifs reference_reads=1792
+preflight-ok cases=1 phase=evaluate
+===== 20/161 reference-control-average returncode=0 =====
+preflight case=reference-control-average reference_reads=256
+preflight-ok cases=1 phase=evaluate
+===== 21/161 reference-control-counta returncode=0 =====
+preflight case=reference-control-counta reference_reads=256
+preflight-ok cases=1 phase=evaluate
+===== 22/161 representative-median returncode=0 =====
+preflight case=representative-median reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 23/161 representative-rank returncode=0 =====
+preflight case=representative-rank reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 24/161 representative-percentrank returncode=0 =====
+preflight case=representative-percentrank reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 25/161 concat-borrowed-literals returncode=0 =====
+preflight case=concat-borrowed-literals reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 26/161 concat-owned-left returncode=0 =====
+preflight case=concat-owned-left reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 27/161 concat-owned-right returncode=0 =====
+preflight case=concat-owned-right reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 28/161 concat-growth-chain returncode=0 =====
+preflight case=concat-growth-chain reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 29/161 tiny-text-asc returncode=0 =====
+preflight case=tiny-text-asc reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 30/161 tiny-text-char returncode=0 =====
+preflight case=tiny-text-char reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 31/161 tiny-text-clean returncode=0 =====
+preflight case=tiny-text-clean reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 32/161 tiny-text-code returncode=0 =====
+preflight case=tiny-text-code reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 33/161 tiny-text-concatenate returncode=0 =====
+preflight case=tiny-text-concatenate reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 34/161 tiny-text-dollar returncode=0 =====
+preflight case=tiny-text-dollar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 35/161 tiny-text-exact returncode=0 =====
+preflight case=tiny-text-exact reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 36/161 tiny-text-find returncode=0 =====
+preflight case=tiny-text-find reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 37/161 tiny-text-fixed returncode=0 =====
+preflight case=tiny-text-fixed reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 38/161 tiny-text-jis returncode=0 =====
+preflight case=tiny-text-jis reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 39/161 tiny-text-left returncode=0 =====
+preflight case=tiny-text-left reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 40/161 tiny-text-len returncode=0 =====
+preflight case=tiny-text-len reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 41/161 tiny-text-lower returncode=0 =====
+preflight case=tiny-text-lower reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 42/161 tiny-text-mid returncode=0 =====
+preflight case=tiny-text-mid reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 43/161 tiny-text-proper returncode=0 =====
+preflight case=tiny-text-proper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 44/161 tiny-text-replace returncode=0 =====
+preflight case=tiny-text-replace reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 45/161 tiny-text-rept returncode=0 =====
+preflight case=tiny-text-rept reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 46/161 tiny-text-right returncode=0 =====
+preflight case=tiny-text-right reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 47/161 tiny-text-search returncode=0 =====
+preflight case=tiny-text-search reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 48/161 tiny-text-substitute returncode=0 =====
+preflight case=tiny-text-substitute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 49/161 tiny-text-t returncode=0 =====
+preflight case=tiny-text-t reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 50/161 tiny-text-text returncode=0 =====
+preflight case=tiny-text-text reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 51/161 tiny-text-trim returncode=0 =====
+preflight case=tiny-text-trim reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 52/161 tiny-text-unichar returncode=0 =====
+preflight case=tiny-text-unichar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 53/161 tiny-text-unicode returncode=0 =====
+preflight case=tiny-text-unicode reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 54/161 tiny-text-upper returncode=0 =====
+preflight case=tiny-text-upper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 55/161 large-unicode-text-asc returncode=0 =====
+preflight case=large-unicode-text-asc reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 56/161 large-unicode-text-char returncode=0 =====
+preflight case=large-unicode-text-char reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 57/161 large-unicode-text-clean returncode=0 =====
+preflight case=large-unicode-text-clean reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 58/161 large-unicode-text-code returncode=0 =====
+preflight case=large-unicode-text-code reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 59/161 large-unicode-text-concatenate returncode=0 =====
+preflight case=large-unicode-text-concatenate reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 60/161 large-unicode-text-dollar returncode=0 =====
+preflight case=large-unicode-text-dollar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 61/161 large-unicode-text-exact returncode=0 =====
+preflight case=large-unicode-text-exact reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 62/161 large-unicode-text-find returncode=0 =====
+preflight case=large-unicode-text-find reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 63/161 large-unicode-text-fixed returncode=0 =====
+preflight case=large-unicode-text-fixed reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 64/161 large-unicode-text-jis returncode=0 =====
+preflight case=large-unicode-text-jis reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 65/161 large-unicode-text-left returncode=0 =====
+preflight case=large-unicode-text-left reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 66/161 large-unicode-text-len returncode=0 =====
+preflight case=large-unicode-text-len reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 67/161 large-unicode-text-lower returncode=0 =====
+preflight case=large-unicode-text-lower reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 68/161 large-unicode-text-mid returncode=0 =====
+preflight case=large-unicode-text-mid reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 69/161 large-unicode-text-proper returncode=0 =====
+preflight case=large-unicode-text-proper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 70/161 large-unicode-text-replace returncode=0 =====
+preflight case=large-unicode-text-replace reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 71/161 large-unicode-text-rept returncode=0 =====
+preflight case=large-unicode-text-rept reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 72/161 large-unicode-text-right returncode=0 =====
+preflight case=large-unicode-text-right reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 73/161 large-unicode-text-search returncode=0 =====
+preflight case=large-unicode-text-search reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 74/161 large-unicode-text-substitute returncode=0 =====
+preflight case=large-unicode-text-substitute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 75/161 large-unicode-text-t returncode=0 =====
+preflight case=large-unicode-text-t reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 76/161 large-unicode-text-text returncode=0 =====
+preflight case=large-unicode-text-text reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 77/161 large-unicode-text-trim returncode=0 =====
+preflight case=large-unicode-text-trim reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 78/161 large-unicode-text-unichar returncode=0 =====
+preflight case=large-unicode-text-unichar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 79/161 large-unicode-text-unicode returncode=0 =====
+preflight case=large-unicode-text-unicode reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 80/161 large-unicode-text-upper returncode=0 =====
+preflight case=large-unicode-text-upper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 81/161 reference-64-text-asc returncode=0 =====
+preflight case=reference-64-text-asc reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 82/161 reference-64-text-char returncode=0 =====
+preflight case=reference-64-text-char reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 83/161 reference-64-text-clean returncode=0 =====
+preflight case=reference-64-text-clean reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 84/161 reference-64-text-code returncode=0 =====
+preflight case=reference-64-text-code reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 85/161 reference-64-text-concatenate returncode=0 =====
+preflight case=reference-64-text-concatenate reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 86/161 reference-64-text-dollar returncode=0 =====
+preflight case=reference-64-text-dollar reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 87/161 reference-64-text-exact returncode=0 =====
+preflight case=reference-64-text-exact reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 88/161 reference-64-text-find returncode=0 =====
+preflight case=reference-64-text-find reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 89/161 reference-64-text-fixed returncode=0 =====
+preflight case=reference-64-text-fixed reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 90/161 reference-64-text-jis returncode=0 =====
+preflight case=reference-64-text-jis reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 91/161 reference-64-text-left returncode=0 =====
+preflight case=reference-64-text-left reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 92/161 reference-64-text-len returncode=0 =====
+preflight case=reference-64-text-len reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 93/161 reference-64-text-lower returncode=0 =====
+preflight case=reference-64-text-lower reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 94/161 reference-64-text-mid returncode=0 =====
+preflight case=reference-64-text-mid reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 95/161 reference-64-text-proper returncode=0 =====
+preflight case=reference-64-text-proper reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 96/161 reference-64-text-replace returncode=0 =====
+preflight case=reference-64-text-replace reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 97/161 reference-64-text-rept returncode=0 =====
+preflight case=reference-64-text-rept reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 98/161 reference-64-text-right returncode=0 =====
+preflight case=reference-64-text-right reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 99/161 reference-64-text-search returncode=0 =====
+preflight case=reference-64-text-search reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 100/161 reference-64-text-substitute returncode=0 =====
+preflight case=reference-64-text-substitute reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 101/161 reference-64-text-t returncode=0 =====
+preflight case=reference-64-text-t reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 102/161 reference-64-text-text returncode=0 =====
+preflight case=reference-64-text-text reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 103/161 reference-64-text-trim returncode=0 =====
+preflight case=reference-64-text-trim reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 104/161 reference-64-text-unichar returncode=0 =====
+preflight case=reference-64-text-unichar reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 105/161 reference-64-text-unicode returncode=0 =====
+preflight case=reference-64-text-unicode reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 106/161 reference-64-text-upper returncode=0 =====
+preflight case=reference-64-text-upper reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 107/161 refusal-text-asc returncode=0 =====
+preflight case=refusal-text-asc reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 108/161 refusal-text-char returncode=0 =====
+preflight case=refusal-text-char reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 109/161 refusal-text-clean returncode=0 =====
+preflight case=refusal-text-clean reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 110/161 refusal-text-code returncode=0 =====
+preflight case=refusal-text-code reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 111/161 refusal-text-concatenate returncode=0 =====
+preflight case=refusal-text-concatenate reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 112/161 refusal-text-dollar returncode=0 =====
+preflight case=refusal-text-dollar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 113/161 refusal-text-exact returncode=0 =====
+preflight case=refusal-text-exact reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 114/161 refusal-text-find returncode=0 =====
+preflight case=refusal-text-find reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 115/161 refusal-text-fixed returncode=0 =====
+preflight case=refusal-text-fixed reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 116/161 refusal-text-jis returncode=0 =====
+preflight case=refusal-text-jis reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 117/161 refusal-text-left returncode=0 =====
+preflight case=refusal-text-left reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 118/161 refusal-text-len returncode=0 =====
+preflight case=refusal-text-len reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 119/161 refusal-text-lower returncode=0 =====
+preflight case=refusal-text-lower reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 120/161 refusal-text-mid returncode=0 =====
+preflight case=refusal-text-mid reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 121/161 refusal-text-proper returncode=0 =====
+preflight case=refusal-text-proper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 122/161 refusal-text-replace returncode=0 =====
+preflight case=refusal-text-replace reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 123/161 refusal-text-rept returncode=0 =====
+preflight case=refusal-text-rept reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 124/161 refusal-text-right returncode=0 =====
+preflight case=refusal-text-right reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 125/161 refusal-text-search returncode=0 =====
+preflight case=refusal-text-search reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 126/161 refusal-text-substitute returncode=0 =====
+preflight case=refusal-text-substitute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 127/161 refusal-text-t returncode=0 =====
+preflight case=refusal-text-t reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 128/161 refusal-text-text returncode=0 =====
+preflight case=refusal-text-text reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 129/161 refusal-text-trim returncode=0 =====
+preflight case=refusal-text-trim reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 130/161 refusal-text-unichar returncode=0 =====
+preflight case=refusal-text-unichar reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 131/161 refusal-text-unicode returncode=0 =====
+preflight case=refusal-text-unicode reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 132/161 refusal-text-upper returncode=0 =====
+preflight case=refusal-text-upper reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 133/161 matrix-broadcast-text-concatenate returncode=0 =====
+preflight case=matrix-broadcast-text-concatenate reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 134/161 matrix-broadcast-text-exact returncode=0 =====
+preflight case=matrix-broadcast-text-exact reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 135/161 matrix-broadcast-text-find returncode=0 =====
+preflight case=matrix-broadcast-text-find reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 136/161 matrix-broadcast-text-left returncode=0 =====
+preflight case=matrix-broadcast-text-left reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 137/161 matrix-broadcast-text-len returncode=0 =====
+preflight case=matrix-broadcast-text-len reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 138/161 matrix-broadcast-text-lower returncode=0 =====
+preflight case=matrix-broadcast-text-lower reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 139/161 matrix-broadcast-text-mid returncode=0 =====
+preflight case=matrix-broadcast-text-mid reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 140/161 matrix-broadcast-text-proper returncode=0 =====
+preflight case=matrix-broadcast-text-proper reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 141/161 matrix-broadcast-text-replace returncode=0 =====
+preflight case=matrix-broadcast-text-replace reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 142/161 matrix-broadcast-text-right returncode=0 =====
+preflight case=matrix-broadcast-text-right reference_reads=128
+preflight-ok cases=1 phase=evaluate
+===== 143/161 matrix-broadcast-text-search returncode=0 =====
+preflight case=matrix-broadcast-text-search reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 144/161 matrix-broadcast-text-substitute returncode=0 =====
+preflight case=matrix-broadcast-text-substitute reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 145/161 matrix-broadcast-text-trim returncode=0 =====
+preflight case=matrix-broadcast-text-trim reference_reads=64
+preflight-ok cases=1 phase=evaluate
+===== 146/161 cancellation-text-concatenate returncode=0 =====
+preflight case=cancellation-text-concatenate reference_reads=1
+preflight-ok cases=1 phase=evaluate
+===== 147/161 cancellation-text-len returncode=0 =====
+preflight case=cancellation-text-len reference_reads=1
+preflight-ok cases=1 phase=evaluate
+===== 148/161 cancellation-text-substitute returncode=0 =====
+preflight case=cancellation-text-substitute reference_reads=1
+preflight-ok cases=1 phase=evaluate
+===== 149/161 cancellation-text-search returncode=0 =====
+preflight case=cancellation-text-search reference_reads=1
+preflight-ok cases=1 phase=evaluate
+===== 150/161 resource-text-concatenate returncode=0 =====
+preflight case=resource-text-concatenate reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 151/161 resource-text-len returncode=0 =====
+preflight case=resource-text-len reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 152/161 resource-text-substitute returncode=0 =====
+preflight case=resource-text-substitute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 153/161 resource-text-search returncode=0 =====
+preflight case=resource-text-search reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 154/161 search-worstcase-find returncode=0 =====
+preflight case=search-worstcase-find reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 155/161 search-worstcase-search returncode=0 =====
+preflight case=search-worstcase-search reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 156/161 search-worstcase-substitute returncode=0 =====
+preflight case=search-worstcase-substitute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 157/161 search-worstcase-exact returncode=0 =====
+preflight case=search-worstcase-exact reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 158/161 rept-growth returncode=0 =====
+preflight case=rept-growth reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 159/161 text-format-fraction-six returncode=0 =====
+preflight case=text-format-fraction-six reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 160/161 asc-jis-expansion-asc returncode=0 =====
+preflight case=asc-jis-expansion-asc reference_reads=0
+preflight-ok cases=1 phase=evaluate
+===== 161/161 asc-jis-expansion-jis returncode=0 =====
+preflight case=asc-jis-expansion-jis reference_reads=0
+preflight-ok cases=1 phase=evaluate
