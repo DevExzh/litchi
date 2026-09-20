@@ -163,6 +163,43 @@ solver iterations, and 256 total residual/derivative evaluations, with the
 caller work budget still able to fail earlier. No hidden clock, random source,
 filesystem, network, or external rate provider is permitted.
 
+### Coverage reconciliation
+
+The matrix has eleven matched controls: scalar arithmetic, scalar
+trigonometry, scalar `SUM`, rectangular arithmetic and trigonometry, reference
+`SUM`, reference `AVERAGE`, conditional reference `SUMIF`, lazy `IF`,
+`IFERROR`, and `IFNA`. The conditional row uses a 64-cell criterion and
+selected range and records the selected-cell read count separately from the
+criterion scan. This keeps the aggregate, conditional, and error-path
+controls promised above in the same fixture and comparison boundary.
+
+The candidate side has a literal core row for each of the twenty contracted
+functions, period-size rows for `CUMIPMT`/`CUMPRINC` at 4, 64, 512, and 2048,
+zero-rate scalar branches, negative-input `RRI`, zero and formula-error
+`FVSCHEDULE`, split and ordered-list `NPV`, a projected `NPV` branch, the
+negative-base `IRR` branch, a non-annual `XIRR`/`XNPV` pair, three
+sequence-list refusals, domain-error rows, and a late date-side provider
+failure. The existing 4/64/1024/4096 streaming rows and 4/64/1024 root/array
+rows remain unchanged. Matrix and harness case names, formulas, outcomes,
+shapes, and read bounds are kept in lockstep.
+
+The 1024/4096 `NPV`, 1024 `XNPV`, and 1024 `MIRR` rows carry an explicit
+`max_steps = 8,000,000` evaluator budget in both the harness and matrix. Their
+larger admitted sequences legitimately exceed the default one-million-step
+profile; the per-row budget makes that workload choice visible and keeps it
+separate from the intentionally small work-limit refusal row.
+
+Some semantic requirements are intentionally outside this process-level
+profile. Source-version mutation, allocation-failure injection,
+fallible-scratch reservation/drop-order receipts, and native recalculation
+provenance need the focused evaluator/resource/native gates because the public
+profile resolver has no source mutator or allocator-fault hook. The capture
+still retains cancellation, reference/work limits, formula-error retention,
+typed provider failure, zero-read shape refusals, and exact read accounting;
+the focused gates own the remaining failure injections. These exclusions are
+documented here so the timing matrix does not imply that a process fixture
+proved a semantic gate it cannot exercise.
+
 ## Independent preflight
 
 The independent financial oracle is prepared outside the timer. It derives
