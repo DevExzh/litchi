@@ -1,0 +1,15 @@
+[package]
+name = "ods-formula-date-time-performance"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+default = []
+date-time-candidate = []
+
+[dependencies]
+litchi-core = { path = "../../../../../../crates/litchi-core" }
+litchi-ods = { path = "../../../../../../crates/litchi-ods" }
