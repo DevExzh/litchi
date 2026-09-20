@@ -1,0 +1,234 @@
+{
+  "status": "pass",
+  "changed_source": [
+    "tools/perf-baseline/src/producer_shape.rs"
+  ],
+  "children": 4,
+  "retained_samples": 12,
+  "warmups": 4,
+  "performance_claim": "none",
+  "results": [
+    {
+      "name": "correctness-r1-medium",
+      "result_sha256": "1e20269dd4947b879b06fc22b8e768becb70158f4eaf99ca2b731daafcafc1f2",
+      "corpus_evidence_sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca",
+      "identity": {
+        "case": "xlsx_producer_medium_source_one_edit_save",
+        "corpus": {
+          "name": "xlsx-producer-medium-edit",
+          "generator": "litchi-xlsx-producer-shape-v1",
+          "package_format": "XLSX/OPC/ZIP",
+          "shape": "producer-medium-edit",
+          "payload_kind": "producer-shape-markup-compatibility-grid",
+          "compression": "deflate",
+          "entry_count": 4096,
+          "archive_member_count": 10,
+          "entry_bytes": 4,
+          "uncompressed_payload_bytes": 123724,
+          "archive_bytes": 21131,
+          "archive_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+          "target_entry": "Bench01!D17",
+          "target_payload_bytes": 37,
+          "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+          "xlsx": {
+            "sheet_count": 4,
+            "rows_per_sheet": 32,
+            "columns_per_sheet": 32,
+            "one_percent_update_count": 0,
+            "source_members": {
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ],
+              "shared_strings": "xl/sharedStrings.xml",
+              "styles": "xl/styles.xml"
+            }
+          }
+        },
+        "sink": {
+          "accepted_bytes": 21131,
+          "write_calls": 43,
+          "largest_write": 4712,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 39,
+            "bytes_513_to_4096": 0,
+            "bytes_4097_to_16384": 4,
+            "bytes_16385_to_65536": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "output_sha256": "2ca9afacd9acdd47a9eac043b6e913154f5ea9095122fc9c51fcd3651bfd58d9"
+      }
+    },
+    {
+      "name": "correctness-r2-medium",
+      "result_sha256": "f62e0b85aa342e67c2661bd56a078bb1afd81082c10b9549478cebe2a476af1d",
+      "corpus_evidence_sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca",
+      "identity": {
+        "case": "xlsx_producer_medium_source_one_edit_save",
+        "corpus": {
+          "name": "xlsx-producer-medium-edit",
+          "generator": "litchi-xlsx-producer-shape-v1",
+          "package_format": "XLSX/OPC/ZIP",
+          "shape": "producer-medium-edit",
+          "payload_kind": "producer-shape-markup-compatibility-grid",
+          "compression": "deflate",
+          "entry_count": 4096,
+          "archive_member_count": 10,
+          "entry_bytes": 4,
+          "uncompressed_payload_bytes": 123724,
+          "archive_bytes": 21131,
+          "archive_sha256": "c2e67bc0e7421c3adfdae0da71a475080358aacb836d15341f84488b42a72d49",
+          "target_entry": "Bench01!D17",
+          "target_payload_bytes": 37,
+          "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+          "xlsx": {
+            "sheet_count": 4,
+            "rows_per_sheet": 32,
+            "columns_per_sheet": 32,
+            "one_percent_update_count": 0,
+            "source_members": {
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ],
+              "shared_strings": "xl/sharedStrings.xml",
+              "styles": "xl/styles.xml"
+            }
+          }
+        },
+        "sink": {
+          "accepted_bytes": 21131,
+          "write_calls": 43,
+          "largest_write": 4712,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 39,
+            "bytes_513_to_4096": 0,
+            "bytes_4097_to_16384": 4,
+            "bytes_16385_to_65536": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "output_sha256": "2ca9afacd9acdd47a9eac043b6e913154f5ea9095122fc9c51fcd3651bfd58d9"
+      }
+    },
+    {
+      "name": "correctness-r1-dense",
+      "result_sha256": "d546ab81f22cc520af6da53de52f7dfe0458a4acd05abf05c8becb4028c6d274",
+      "corpus_evidence_sha256": "5b06602dffa323e60d595ea9aee62ab0e6ddc5593cbddcb025e5c93334c3e801",
+      "identity": {
+        "case": "xlsx_producer_dense_source_one_edit_save",
+        "corpus": {
+          "name": "xlsx-producer-dense-edit",
+          "generator": "litchi-xlsx-producer-shape-v1",
+          "package_format": "XLSX/OPC/ZIP",
+          "shape": "producer-dense-edit",
+          "payload_kind": "producer-shape-markup-compatibility-grid",
+          "compression": "deflate",
+          "entry_count": 49152,
+          "archive_member_count": 9,
+          "entry_bytes": 4,
+          "uncompressed_payload_bytes": 1462073,
+          "archive_bytes": 203072,
+          "archive_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+          "target_entry": "Bench01!D65",
+          "target_payload_bytes": 37,
+          "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+          "xlsx": {
+            "sheet_count": 3,
+            "rows_per_sheet": 128,
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 0,
+            "source_members": {
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml"
+              ],
+              "shared_strings": "xl/sharedStrings.xml",
+              "styles": "xl/styles.xml"
+            }
+          }
+        },
+        "sink": {
+          "accepted_bytes": 203075,
+          "write_calls": 40,
+          "largest_write": 65536,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 36,
+            "bytes_513_to_4096": 0,
+            "bytes_4097_to_16384": 1,
+            "bytes_16385_to_65536": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "output_sha256": "2db2f36d4e27c215510ccfa8cc5f8f52242b177050c352b417a64d05c764d8e6"
+      }
+    },
+    {
+      "name": "correctness-r2-dense",
+      "result_sha256": "b65b3e8c79242e303b7fb07b30fb4fb44fa6b07342c4bc83142bc3c9a886977b",
+      "corpus_evidence_sha256": "5b06602dffa323e60d595ea9aee62ab0e6ddc5593cbddcb025e5c93334c3e801",
+      "identity": {
+        "case": "xlsx_producer_dense_source_one_edit_save",
+        "corpus": {
+          "name": "xlsx-producer-dense-edit",
+          "generator": "litchi-xlsx-producer-shape-v1",
+          "package_format": "XLSX/OPC/ZIP",
+          "shape": "producer-dense-edit",
+          "payload_kind": "producer-shape-markup-compatibility-grid",
+          "compression": "deflate",
+          "entry_count": 49152,
+          "archive_member_count": 9,
+          "entry_bytes": 4,
+          "uncompressed_payload_bytes": 1462073,
+          "archive_bytes": 203072,
+          "archive_sha256": "d0ffd774e6149c282cd43d146c7477477014c11af1c8d6efd35af3c8eb2731aa",
+          "target_entry": "Bench01!D65",
+          "target_payload_bytes": 37,
+          "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+          "xlsx": {
+            "sheet_count": 3,
+            "rows_per_sheet": 128,
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 0,
+            "source_members": {
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml"
+              ],
+              "shared_strings": "xl/sharedStrings.xml",
+              "styles": "xl/styles.xml"
+            }
+          }
+        },
+        "sink": {
+          "accepted_bytes": 203075,
+          "write_calls": 40,
+          "largest_write": 65536,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 36,
+            "bytes_513_to_4096": 0,
+            "bytes_4097_to_16384": 1,
+            "bytes_16385_to_65536": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "output_sha256": "2db2f36d4e27c215510ccfa8cc5f8f52242b177050c352b417a64d05c764d8e6"
+      }
+    }
+  ]
+}

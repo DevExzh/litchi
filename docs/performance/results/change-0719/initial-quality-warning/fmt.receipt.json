@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--",
+    "--check"
+  ],
+  "environment_overrides": {},
+  "exit_code": 0,
+  "seconds": 1.1297027359250933,
+  "source_sha256": "a9aa724777459391a0f7b59cf0f878c596df2e34b970ba3429bfc585455c6884",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "runner_sha256": "288f8796733014d4be47227ad62c47becf0a1c8d8a3f1d46548b1ca6ae8e7655"
+}

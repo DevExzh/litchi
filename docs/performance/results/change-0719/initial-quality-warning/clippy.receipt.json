@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0719",
+    "-j",
+    "2",
+    "--all-targets",
+    "--features",
+    "ordinary-save-process-metrics,allocator-metrics",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "environment_overrides": {},
+  "exit_code": 101,
+  "seconds": 60.97015937801916,
+  "source_sha256": "a9aa724777459391a0f7b59cf0f878c596df2e34b970ba3429bfc585455c6884",
+  "log_sha256": "fb57bffb7911da50dfb8945586b8f438a9f1d87b9fa4a96f60d64d0d33a8532c",
+  "runner_sha256": "288f8796733014d4be47227ad62c47becf0a1c8d8a3f1d46548b1ca6ae8e7655"
+}

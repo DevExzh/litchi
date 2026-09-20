@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-target-0719/release/litchi-perf-baseline",
+    "--warmup",
+    "1",
+    "--samples",
+    "3",
+    "--case",
+    "xlsx_producer_dense_source_one_edit_save",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0719/correctness-r1-dense.corpus.json",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0719/correctness-r1-dense.json"
+  ],
+  "environment_overrides": {},
+  "exit_code": 0,
+  "seconds": 0.8009870869573206,
+  "source_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "runner_sha256": "288f8796733014d4be47227ad62c47becf0a1c8d8a3f1d46548b1ca6ae8e7655"
+}

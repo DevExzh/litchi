@@ -2724,11 +2724,10 @@ The *shared-strings* role stores 40% of its cells as `t="s"` references into
 writes them), and the value-only editor resolves those references while
 retaining the part byte-for-byte. The *worksheet-relationship* role carries
 `xl/worksheets/_rels/sheetN.xml.rels` pointing at a fixed 1,024-byte
-`xl/printerSettings/printerSettings1.bin`. The roles are deliberately on
-separate worksheets because the value-only editor refuses a
-relationship-bearing worksheet *before* it parses while admitting the
-shared-string worksheet; a worksheet carrying both can only witness the first
-gate.
+`xl/printerSettings/printerSettings1.bin`. The roles remain on separate worksheets to preserve corpus identities and
+isolate feature admission. The dependency-rule changes in 0657/0667 admit the
+formerly refused producer features; the corpus verdict tests record their
+current behavior.
 
 The DOCX shape rewrites `word/document.xml` to the Word 2013 root namespace set
 (17 declarations) with `mc:Ignorable="w14 w15 wp14"` and gives every `<w:p>` the
@@ -2753,9 +2752,17 @@ existing corpus identity):
   markup worksheet, with opening, the exact no-op commit and the
   source-unchanged check outside the clock.
 - `xlsx_producer_medium_source_one_edit_save` /
-  `xlsx_producer_dense_source_one_edit_save`: plan one worksheet, set one cell,
-  commit, and publish to a bounded counting sink. Output digests must agree
-  across every retained sample and the source bytes must not change.
+  `xlsx_producer_dense_source_one_edit_save`: plan the numeric worksheet,
+  set one cell, commit, and publish to a bounded counting sink. Editor opening
+  and sink reservation are outside the timer, as are output verification and
+  remaining handle destruction. This is not an open-through-teardown lifecycle
+  measurement. Output digests must agree across retained samples and source
+  bytes must not change. Untimed readback checks the requested edit and untouched
+  content; see [0719](../../docs/performance/0719-producer-edit-output-oracle.md)
+  for its exact preservation scope. The shared-string worksheet is preserved,
+  not edited, by these selectors. Additional oracle work can alter subsequent
+  allocator state, so captures across this harness revision require a fresh
+  baseline even though the timer boundaries and corpus are unchanged.
 - `docx_producer_source_selected_paragraph`: one middle paragraph through
   `document().paragraph(index)`, with the package and the document outside
   timing.

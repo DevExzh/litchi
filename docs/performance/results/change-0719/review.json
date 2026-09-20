@@ -1,0 +1,21 @@
+{
+  "initial_scope_review": {
+    "semantic_full_grid": "Rect::ALL required to catch added cells outside corpus rectangle",
+    "timing": "editor open excluded; consumed editor and returned temporary snapshot destruction included in publication; remaining commit/sink excluded",
+    "raw_member_check": "local record plus central record except offset; no archive ordering claim",
+    "remaining_strengthening": "exact non-target bytes in edited worksheet"
+  },
+  "prior_xls_disposition": {
+    "0688": "checked link inlining retained",
+    "0689": "SST chain checkpoint retained",
+    "0690": "borrowed ASCII lookup retained",
+    "first_cell_chain_self_percent_0690": 12.05,
+    "late_54016_worksheet_links_0689": 1044,
+    "fresh_measurements": false
+  },
+  "final_review": {
+    "path": "final-review.md",
+    "source_sha256": "9870fa7ab77bad422183fe5d365bbb8aa0b2e106049aae6fd15d7806298610f7",
+    "disposition": "accepted for generated producer corpus; workbook may remain unchanged with valid invalidation flags; final root cleanup removes unused test mut and corrects historical comments"
+  }
+}

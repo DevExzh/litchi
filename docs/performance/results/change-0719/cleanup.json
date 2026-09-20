@@ -1,0 +1,11 @@
+{
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-target-0719/release/litchi-perf-baseline",
+    "sha256": "d13f6ef21e9c6188551d9f80dc66292c9ced3d249dcc2b7182a6c7391f7086e2",
+    "bytes": 62885536
+  },
+  "removed_paths": [
+    "/home/zhuhe/code/litchi-target-0719"
+  ],
+  "absent": true
+}

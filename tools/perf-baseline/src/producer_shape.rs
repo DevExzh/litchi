@@ -238,10 +238,10 @@ impl ArchiveOptions {
         worksheet_relationships: false,
         workbook_root_markers: false,
     };
-    /// The largest subset of that signature the value-only editor admits.
-    /// Shared strings are retained even though the planning worksheet uses
-    /// numeric cells; the selected shared-string worksheet proves its read
-    /// path separately.
+    /// The frozen historical edit variant. Its byte identity stays stable
+    /// even as the editor admits more of the complete producer signature.
+    /// Shared strings are retained while the planning worksheet uses numeric
+    /// cells; the selected shared-string worksheet proves its read path separately.
     const ADMITTED: Self = Self {
         namespace_declarations: true,
         markup_compatibility_attributes: false,
@@ -263,10 +263,9 @@ impl ArchiveOptions {
 
 /// What a worksheet of the producer shape carries beyond the plain grid.
 ///
-/// The roles are deliberately separated so one corpus can prove each library
-/// gate independently: the value-only editor admits a shared-string worksheet
-/// but refuses a relationship-bearing worksheet before it parses, so a sheet
-/// carrying both can only witness the latter.
+/// Separate roles preserve the historical corpus identities and let admission
+/// probes isolate each producer feature. Former allow-list refusals are now
+/// admitted by the dependency rule, as the producer verdict tests record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum SheetRole {
@@ -299,8 +298,8 @@ impl SheetRole {
     }
 }
 
-/// Worksheet index the planning and edit/save selectors act on: the one role
-/// the value-only editor admits.
+/// Numeric worksheet selected by the existing planning and edit/save cases.
+/// Other roles have separate read/admission probes.
 const PLANNING_SHEET: usize = 0;
 /// Worksheet index the selected-cell selector reads: the shared-string role.
 const SELECTED_SHEET: usize = 1;
@@ -1275,6 +1274,228 @@ fn describe_cell(cell: Option<&litchi_xlsx::Cell>) -> String {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ProducerWorksheetSemantics {
+    name: String,
+    cells: Vec<litchi_xlsx::SourceCell>,
+}
+
+fn producer_numeric_edit_target(
+    spec: &XlsxCorpus,
+) -> Result<(litchi_xlsx::Address, usize), Box<dyn Error>> {
+    if spec.row_count == 0 || spec.column_count == 0 {
+        return Err("producer XLSX edit corpus has an empty worksheet shape".into());
+    }
+    let row = u32::try_from(spec.row_count / 2)?;
+    let column = u32::try_from(spec.column_count / 2)?;
+    let address = litchi_xlsx::Address::at(row, column)?;
+    let replacement = numeric_value(PLANNING_SHEET, spec.row_count / 2, spec.column_count / 2)
+        .checked_add(1)
+        .ok_or("producer XLSX edit replacement overflows usize")?;
+    Ok((address, replacement))
+}
+
+/// Read every stored cell in the bounded worksheet grid into owning semantic
+/// cells. This deliberately uses the full checked Excel grid, so a candidate
+/// cannot hide an added cell outside the generated shape. It is used only by
+/// the publication correctness oracle and stays outside the phase clock.
+fn producer_xlsx_semantics(
+    bytes: &[u8],
+    spec: &XlsxCorpus,
+) -> Result<Vec<ProducerWorksheetSemantics>, Box<dyn Error>> {
+    let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
+        bytes.to_vec(),
+    )))?;
+    if workbook.len() != spec.sheet_count {
+        return Err("producer XLSX semantic oracle observed an unexpected sheet count".into());
+    }
+    workbook
+        .sheets()
+        .map(|sheet| {
+            Ok(ProducerWorksheetSemantics {
+                name: sheet.name().to_owned(),
+                cells: sheet.cells(litchi_xlsx::Rect::ALL)?,
+            })
+        })
+        .collect()
+}
+
+fn verify_producer_xlsx_semantic_edit(
+    source_semantics: &[ProducerWorksheetSemantics],
+    output: &[u8],
+    spec: &XlsxCorpus,
+    address: litchi_xlsx::Address,
+    replacement: usize,
+) -> Result<(), Box<dyn Error>> {
+    let output_semantics = producer_xlsx_semantics(output, spec)?;
+    if output_semantics.len() != source_semantics.len() {
+        return Err("producer XLSX edit output changed the worksheet count".into());
+    }
+    for (sheet_index, (source, candidate)) in source_semantics
+        .iter()
+        .zip(output_semantics.iter())
+        .enumerate()
+    {
+        if source.name != candidate.name {
+            return Err(
+                format!("producer XLSX edit output changed worksheet {sheet_index} name").into(),
+            );
+        }
+        if sheet_index != PLANNING_SHEET {
+            if source.cells != candidate.cells {
+                return Err(format!(
+                    "producer XLSX edit output changed cells on untouched worksheet {sheet_index}"
+                )
+                .into());
+            }
+            continue;
+        }
+
+        let source_target_count = source
+            .cells
+            .iter()
+            .filter(|cell| cell.address == address)
+            .count();
+        if source_target_count != 1 {
+            return Err("producer XLSX edit source target cell is not unique".into());
+        }
+        let candidate_target = candidate
+            .cells
+            .iter()
+            .filter(|cell| cell.address == address)
+            .collect::<Vec<_>>();
+        if candidate_target.len() != 1 {
+            return Err("producer XLSX edit output target cell is not unique".into());
+        }
+        let expected = format!("number:{replacement}");
+        if describe_cell(Some(&candidate_target[0].cell)) != expected {
+            return Err(
+                format!("producer XLSX edit output target value differs from {expected}").into(),
+            );
+        }
+
+        let source_others = source
+            .cells
+            .iter()
+            .filter(|cell| cell.address != address)
+            .collect::<Vec<_>>();
+        let candidate_others = candidate
+            .cells
+            .iter()
+            .filter(|cell| cell.address != address)
+            .collect::<Vec<_>>();
+        if source_others != candidate_others {
+            return Err("producer XLSX edit output changed another cell's semantics".into());
+        }
+    }
+    Ok(())
+}
+
+/// Exact byte oracle for this deterministic generated numeric-cell corpus.
+/// The target already lies within the declared dimension; only its known
+/// cell fragment may change. This is not a generic XLSX rewrite oracle.
+fn verify_producer_xlsx_worksheet_splice(
+    source: &[u8],
+    output: &[u8],
+    spec: &XlsxCorpus,
+    address: litchi_xlsx::Address,
+    replacement: usize,
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(source)?;
+    let output_archive = ArchiveReader::new(output)?;
+    let source_xml = String::from_utf8(source_archive.read("xl/worksheets/sheet1.xml")?)?;
+    let output_xml = output_archive.read("xl/worksheets/sheet1.xml")?;
+    let original = numeric_value(PLANNING_SHEET, spec.row_count / 2, spec.column_count / 2);
+    let before = format!(r#"<c r="{}"><v>{original}</v></c>"#, address.a1());
+    let after = format!(r#"<c r="{}"><v>{replacement}</v></c>"#, address.a1());
+    if source_xml.matches(&before).count() != 1 {
+        return Err("producer XLSX source target fragment is not unique".into());
+    }
+    if output_xml != source_xml.replacen(&before, &after, 1).as_bytes() {
+        return Err("producer XLSX worksheet differs from the exact target splice".into());
+    }
+    Ok(())
+}
+
+fn verify_producer_xlsx_workbook_calculation_closure(
+    source: &[u8],
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(source)?;
+    let output_archive = ArchiveReader::new(output)?;
+    let source_workbook = source_archive.read("xl/workbook.xml")?;
+    let output_workbook = output_archive.read("xl/workbook.xml")?;
+    let (source_without_calc_pr, source_count) =
+        crate::xlsx_xml_strip_direct_element(&source_workbook, b"calcPr", None)?;
+    let (output_without_calc_pr, output_count) =
+        crate::xlsx_xml_strip_direct_element(&output_workbook, b"calcPr", None)?;
+    if source_count > 1 || output_count != 1 {
+        return Err("producer XLSX edit calculation metadata has an invalid calcPr count".into());
+    }
+    if source_without_calc_pr != output_without_calc_pr {
+        return Err("producer XLSX edit changed workbook content outside calcPr".into());
+    }
+
+    let source_package = litchi_xlsx::Package::from_slice(source)?;
+    let output_package = litchi_xlsx::Package::from_slice(output)?;
+    let mut expected = source_package
+        .calculation_metadata()?
+        .properties()
+        .cloned()
+        .unwrap_or_default();
+    expected.set_calculation_id(Some(0));
+    expected.set_full_calculation_on_load(Some(true));
+    expected.set_force_full_calculation(Some(true));
+    expected.set_calculation_completed(Some(false));
+    expected.set_calculate_on_save(Some(true));
+    let output_calculation = output_package.calculation_metadata()?;
+    let actual = output_calculation
+        .properties()
+        .ok_or("producer XLSX edit output is missing calcPr")?;
+    if !expected.same_specification(actual) {
+        return Err(
+            "producer XLSX edit calculation metadata differs from the required invalidation".into(),
+        );
+    }
+    Ok(())
+}
+
+/// A numeric value-only edit has exactly this source topology: the selected
+/// worksheet and the workbook's calculation metadata. Every other ZIP record
+/// must retain its source local record and central record except for the
+/// relocatable local offset. The existing helper does not compare ZIP order.
+fn verify_producer_xlsx_package_preservation(
+    source: &[u8],
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let source_members = crate::raw_zip_members(source)?;
+    let output_members = crate::raw_zip_members(output)?;
+    if source_members.keys().ne(output_members.keys()) {
+        return Err("producer XLSX edit changed the ZIP member set".into());
+    }
+    let expected_changed = ["xl/workbook.xml", "xl/worksheets/sheet1.xml"];
+    for name in expected_changed {
+        let source_member = source_members
+            .get(name)
+            .ok_or_else(|| format!("producer XLSX source is missing expected member {name}"))?;
+        let output_member = output_members
+            .get(name)
+            .ok_or_else(|| format!("producer XLSX output is missing expected member {name}"))?;
+        if name == "xl/worksheets/sheet1.xml" && source_member == output_member {
+            return Err(format!("producer XLSX edit did not change expected member {name}").into());
+        }
+    }
+    for (name, source_member) in &source_members {
+        if expected_changed.contains(&name.as_str()) {
+            continue;
+        }
+        if output_members.get(name) != Some(source_member) {
+            return Err(format!("producer XLSX edit changed untouched ZIP member {name}").into());
+        }
+    }
+    verify_producer_xlsx_workbook_calculation_closure(source, output)
+}
+
 // ---------------------------------------------------------------------------
 // DOCX generation
 // ---------------------------------------------------------------------------
@@ -1813,12 +2034,13 @@ fn run_xlsx_one_edit_save(
         .xlsx
         .as_ref()
         .ok_or("producer XLSX corpus has no specification")?;
-    let row = u32::try_from(spec.row_count / 2)?;
-    let column = u32::try_from(spec.column_count / 2)?;
-    let address = litchi_xlsx::Address::at(row, column)?;
-    let replacement = numeric_value(PLANNING_SHEET, spec.row_count / 2, spec.column_count / 2) + 1;
+    let (address, replacement) = producer_numeric_edit_target(spec)?;
     let maximum = u64::try_from(corpus.corpus.archive.len().saturating_mul(4).max(64 * 1024))?;
     let before = sha256_hex(&corpus.corpus.archive);
+    // This semantic snapshot is setup for the untimed publication oracle. It
+    // is captured before any measured iteration and is never part of the
+    // planning/set/commit/publication phase clock.
+    let source_semantics = producer_xlsx_semantics(&corpus.corpus.archive, spec)?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut digests = Vec::with_capacity(samples);
@@ -1827,6 +2049,12 @@ fn run_xlsx_one_edit_save(
         sink.reserve_budget()?;
         let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))?;
         let mut duration = Duration::ZERO;
+        // The editor is opened before the clock. The timed interval includes
+        // planning, set, commit and publication. Publication consumes the
+        // editor; its returned snapshot is a temporary dropped at the end of
+        // this statement before elapsed is sampled. The remaining commit and
+        // sink drops, plus every semantic/preservation oracle below, are
+        // outside the reported phase.
         let started = Instant::now();
         let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
         edit.set(PLANNING_SHEET, address, i32::try_from(replacement)?)?;
@@ -1839,6 +2067,21 @@ fn run_xlsx_one_edit_save(
         if sha256_hex(&corpus.corpus.archive) != before {
             return Err("producer XLSX edit/save changed source bytes".into());
         }
+        verify_producer_xlsx_semantic_edit(
+            &source_semantics,
+            &sink.bytes,
+            spec,
+            address,
+            replacement,
+        )?;
+        verify_producer_xlsx_worksheet_splice(
+            &corpus.corpus.archive,
+            &sink.bytes,
+            spec,
+            address,
+            replacement,
+        )?;
+        verify_producer_xlsx_package_preservation(&corpus.corpus.archive, &sink.bytes)?;
         let digest = sha256_hex(&sink.bytes);
         std::hint::black_box(&sink.bytes);
         if iteration >= warmup_iterations {
@@ -1953,6 +2196,150 @@ mod tests {
     fn xlsx_medium(variant: XlsxProducerVariant) -> ProducerCorpus {
         build_xlsx_producer_corpus(XlsxProducerShape::Medium, variant)
             .expect("producer XLSX medium corpus builds")
+    }
+
+    fn producer_edit_output(corpus: &ProducerCorpus) -> (Vec<u8>, litchi_xlsx::Address, usize) {
+        let spec = corpus
+            .corpus
+            .xlsx
+            .as_ref()
+            .expect("producer XLSX corpus has a specification");
+        let (address, replacement) =
+            producer_numeric_edit_target(spec).expect("producer edit target");
+        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))
+            .expect("producer editor opens");
+        let mut edit = editor
+            .edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])
+            .expect("producer edit plans");
+        edit.set(
+            PLANNING_SHEET,
+            address,
+            i32::try_from(replacement).expect("replacement fits i32"),
+        )
+        .expect("producer edit stages");
+        let commit = edit.commit().expect("producer edit commits");
+        let mut output = Vec::new();
+        editor
+            .publish_multi_commit_to_stream(&mut output, &commit)
+            .expect("producer edit publishes");
+        (output, address, replacement)
+    }
+
+    fn rewrite_archive_member(
+        archive: &[u8],
+        target: &str,
+        rewrite: impl FnMut(Vec<u8>) -> Vec<u8>,
+    ) -> Vec<u8> {
+        let reader = ArchiveReader::new(archive).expect("archive reader");
+        let mut writer = StreamingArchiveWriter::new();
+        let mut rewrite = Some(rewrite);
+        for name in reader.file_names() {
+            let payload = reader.read(name).expect("archive member");
+            let payload = if name == target {
+                rewrite
+                    .take()
+                    .expect("archive member rewrite was used once")(payload)
+            } else {
+                payload
+            };
+            writer
+                .write_deflated(name, &payload)
+                .expect("rewritten archive member");
+        }
+        assert!(rewrite.is_none(), "target archive member was not found");
+        writer.finish_to_bytes().expect("rewritten archive")
+    }
+
+    #[test]
+    fn producer_edit_oracle_accepts_the_expected_semantic_and_package_change() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Edit);
+        let spec = corpus.corpus.xlsx.as_ref().expect("XLSX specification");
+        let (output, address, replacement) = producer_edit_output(&corpus);
+        let source_semantics = producer_xlsx_semantics(&corpus.corpus.archive, spec)
+            .expect("source semantic snapshot");
+        verify_producer_xlsx_semantic_edit(&source_semantics, &output, spec, address, replacement)
+            .expect("semantic edit oracle");
+        verify_producer_xlsx_worksheet_splice(
+            &corpus.corpus.archive,
+            &output,
+            spec,
+            address,
+            replacement,
+        )
+        .expect("exact worksheet splice oracle");
+        verify_producer_xlsx_package_preservation(&corpus.corpus.archive, &output)
+            .expect("package preservation oracle");
+    }
+
+    #[test]
+    fn producer_edit_oracle_rejects_a_wrong_target_value() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Edit);
+        let spec = corpus.corpus.xlsx.as_ref().expect("XLSX specification");
+        let (output, address, replacement) = producer_edit_output(&corpus);
+        let corrupted = rewrite_archive_member(&output, "xl/worksheets/sheet1.xml", |payload| {
+            let xml = String::from_utf8(payload).expect("worksheet XML");
+            let expected = format!(r#"<c r="{}"><v>{replacement}</v></c>"#, address.a1());
+            let wrong = format!(r#"<c r="{}"><v>{}</v></c>"#, address.a1(), replacement + 1);
+            let mutated = xml.replacen(&expected, &wrong, 1);
+            assert_ne!(mutated, xml, "target cell was not found in worksheet XML");
+            mutated.into_bytes()
+        });
+        let source_semantics = producer_xlsx_semantics(&corpus.corpus.archive, spec)
+            .expect("source semantic snapshot");
+        let error = verify_producer_xlsx_semantic_edit(
+            &source_semantics,
+            &corrupted,
+            spec,
+            address,
+            replacement,
+        )
+        .expect_err("wrong target value passed the semantic oracle");
+        assert!(
+            error.to_string().contains("target value"),
+            "wrong target failed for an unrelated reason: {error}"
+        );
+    }
+
+    #[test]
+    fn producer_edit_oracle_rejects_lexical_damage_outside_the_target() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Edit);
+        let spec = corpus.corpus.xlsx.as_ref().expect("XLSX specification");
+        let (output, address, replacement) = producer_edit_output(&corpus);
+        let corrupted = rewrite_archive_member(&output, "xl/worksheets/sheet1.xml", |payload| {
+            let xml = String::from_utf8(payload).expect("worksheet XML");
+            let changed = xml.replacen("</row>", " </row>", 1);
+            assert_ne!(xml, changed);
+            changed.into_bytes()
+        });
+        let source = producer_xlsx_semantics(&corpus.corpus.archive, spec).unwrap();
+        verify_producer_xlsx_semantic_edit(&source, &corrupted, spec, address, replacement)
+            .expect("whitespace keeps the semantic edit valid");
+        let error = verify_producer_xlsx_worksheet_splice(
+            &corpus.corpus.archive,
+            &corrupted,
+            spec,
+            address,
+            replacement,
+        )
+        .expect_err("lexical change escaped the exact worksheet oracle");
+        assert!(error.to_string().contains("exact target splice"));
+    }
+
+    #[test]
+    fn producer_edit_oracle_rejects_an_untouched_member_change() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Edit);
+        let (output, _address, _replacement) = producer_edit_output(&corpus);
+        let corrupted = rewrite_archive_member(&output, "[Content_Types].xml", |payload| {
+            let mut payload = payload;
+            payload.push(b' ');
+            payload
+        });
+        let error = verify_producer_xlsx_package_preservation(&corpus.corpus.archive, &corrupted)
+            .expect_err("untouched member mutation passed the preservation oracle");
+        assert!(
+            error.to_string().contains("untouched ZIP member"),
+            "untouched member failed for an unrelated reason: {error}"
+        );
     }
 
     #[test]

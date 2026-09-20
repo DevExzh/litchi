@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "documentation_sha256": "f20094350256b8a054281665a79c24dbd71b5a863dfb49166288de4960b151bc"
+}

@@ -1,0 +1,11 @@
+{
+  "docs/performance/0719-producer-edit-output-oracle.md": "592ec66f08057836727de7d36b0c7075175e969c59c6e13c98a2e6e63cbdfa9e",
+  "docs/performance/BASELINE.md": "f3738823c8dfee24250d00696bcd49dbd992a08ca400a4a5314e9560c1ea884d",
+  "docs/performance/HOTSPOTS.md": "002554ebfb63b9b69343c8b6b4a3f42a46547df1b5d67028bec21f77532f679d",
+  "docs/performance/GOAL_AUDIT.md": "9c5958df637a8aeaeaad3e97776ece2c1f97dadd9d19af4a07011c8affe5e452",
+  "docs/performance/REPORT.md": "0e45e090b5e6a54d3b7398c52eee36e9f4a615d5fb2888118a48007d717ab442",
+  "tools/perf-baseline/README.md": "99c95fa9d58954793d848136189f59f4b1403b6834b009ddc4a3c574e6ee05f5",
+  "docs/performance/results/change-0719/README.md": "b3efaed8f41800d2646f39799ad9f1845f43a7585c1be5ff3eaa72393da6c247",
+  "docs/performance/results/change-0719/final-review.md": "67a79c5c402d19230af57555db3e96ae097531fa75c170553746716861603767",
+  "docs/performance/results/change-0719/next-experiment.md": "9d315ee2a5719c23376aeffc0db72859438cb8f2edb16c26a6bb75aaa97ac29f"
+}
