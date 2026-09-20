@@ -38,9 +38,9 @@
   },
   "independent_oracle": {
     "script": "lookup_oracle.py",
-    "script_sha256": "2d9541fb319944e1d5bb24f3a79197fec2d9580bf8ba51d16ff9be9e624cbc24",
+    "script_sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
     "goldens": "lookup-goldens.json",
-    "goldens_sha256": "42083ceca906fe5842b2f1b30695310b3d23de3a9034e55fd17ff49d71bf4faa",
+    "goldens_sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758",
     "functions": 9,
     "observations": 127,
     "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf"
