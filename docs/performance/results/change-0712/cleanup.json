@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-20T09:04:59.201457+00:00",
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0712-bin/current-oracle",
+      "sha256": "d19cd5f1f84ffd09f6fc229fc2772afb60fb83af9fb97ace4c1ee9f45a474305",
+      "bytes": 2613648
+    }
+  ],
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-target-0712",
+    "/home/zhuhe/code/litchi-0712-bin"
+  ],
+  "owned_paths_absent": true
+}

@@ -1,0 +1,11 @@
+{
+  "revision": "cd8e6167ce85f2a5f9664e8a1830ecebbbcfada8",
+  "utc": "2026-09-20T08:52:30.851201+00:00",
+  "previous_turn": "progress:0711 measured rejection committed; frozen gate unchanged",
+  "scope": "DOCX active block/MCE attribution and no-anchor validation proof",
+  "performance_claim": "none; historical profiles and current-source correctness diagnostic",
+  "owned_scratch": [
+    "/home/zhuhe/code/litchi-target-0712",
+    "/home/zhuhe/code/litchi-0712-bin"
+  ]
+}

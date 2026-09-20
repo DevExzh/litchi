@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0712-bin/current-oracle",
+    "--output",
+    "/tmp/litchi-0712-replay-sqqe9u9u/report.json"
+  ],
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0712-bin/current-oracle",
+    "sha256": "d19cd5f1f84ffd09f6fc229fc2772afb60fb83af9fb97ace4c1ee9f45a474305",
+    "bytes": 2613648
+  },
+  "report_sha256": "4f60011ccb763fe11c6e2a74fe0aa8fb4cfb11ef9e299d9fbf6d0bcdc78ce249",
+  "byte_identical": true,
+  "temporary_output_removed": true
+}

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0712 — active-offset shortcut counterexamples and search attribution
+
+[0712](0712-docx-active-offset-validation.md) records an 11-case current-source
+probe: two no-anchor documents still require MCE refusal at `document_mut`, and
+nested anchors do not become independent outer writer ranges. Four historical
+edit profiles separate namespace scanning, MCE processing and substring-search
+work; generated input has inlined search despite no separate `find_bytes` edge.
+Production is unchanged. A bounded exact substring-search substitution is the
+next measured candidate; skipping MCE or merging offset vectors is not justified.
+[Evidence packet](results/change-0712/README.md). No performance claim is made.
+
 ## 0711 — DOCX `alt::scan` ownership pilot rejected
 
 [0711](change-0711.md) measures borrowing slice-backed XML events and the

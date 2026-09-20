@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "case_count": 11,
+  "reachable_no_anchor_refusals": [
+    {
+      "case": "malformed-alternate-content-no-choice-no-alt",
+      "scan_chunks": 0,
+      "debug": "Mce(NonConformant(\"non-ignorable AlternateContent child\"))",
+      "public_stage": "document_mut"
+    },
+    {
+      "case": "unknown-must-understand-no-alt",
+      "scan_chunks": 0,
+      "debug": "Mce(MustUnderstand(\"urn:unsupported\"))",
+      "public_stage": "document_mut"
+    }
+  ],
+  "nested_anchor_suppression_cases": 2,
+  "offset_limit_scope": "public active only; facade receives small XML and succeeds",
+  "report_sha256": "4f60011ccb763fe11c6e2a74fe0aa8fb4cfb11ef9e299d9fbf6d0bcdc78ce249",
+  "decision": "Do not bypass active block selection from an empty alt scan; do not replace outer block ranges with all anchor offsets.",
+  "limitations": [
+    "Synthetic diagnostic; no native timing or production optimization.",
+    "active_full uses lexical starts in these fixed fixtures, not an independent implementation of the production range scanner."
+  ]
+}

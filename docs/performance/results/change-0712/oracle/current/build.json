@@ -1,0 +1,19 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0712/oracle/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0712",
+    "-j",
+    "2"
+  ],
+  "exit_code": 0,
+  "seconds": 80.44589894695673,
+  "source_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+  "probe_sha256": "1fe855eef80bd57e117a219b823bde9c620aff3ef157416edc284016d14beb4a",
+  "log_sha256": "8f86e397ce328572d77093b3897879af893e20166c59af53614efda68cd9b1e4"
+}
