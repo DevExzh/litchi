@@ -1,0 +1,145 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling cfg-if v1.0.4
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_core v1.0.229
+   Compiling synstructure v0.13.2
+   Compiling zerovec-derive v0.10.4
+   Compiling zerofrom-derive v0.1.6
+   Compiling zerofrom v0.1.4
+   Compiling yoke-derive v0.7.5
+   Compiling displaydoc v0.2.6
+   Compiling yoke v0.7.4
+   Compiling libc v0.2.189
+   Compiling zerovec v0.10.4
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling writeable v0.5.5
+   Compiling litemap v0.7.3
+   Compiling tinystr v0.7.6
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling crossbeam-utils v0.8.22
+   Compiling icu_locid v1.5.0
+   Compiling icu_provider_macros v1.5.0
+   Compiling hybrid-array v0.4.14
+   Compiling memchr v2.8.3
+   Compiling icu_properties_data v1.5.1
+   Compiling crossbeam-epoch v0.9.20
+   Compiling smallvec v1.16.0
+   Compiling autocfg v1.5.1
+   Compiling icu_provider v1.5.0
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.4
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling crossbeam-deque v0.8.7
+   Compiling zmij v1.0.19
+   Compiling rand_core v0.10.1
+   Compiling icu_normalizer_data v1.5.1
+   Compiling cpufeatures v0.3.1
+   Compiling icu_locid_transform v1.5.0
+   Compiling serde_derive v1.0.229
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling icu_collections v1.5.0
+   Compiling rayon-core v1.13.0
+   Compiling thiserror v2.0.18
+   Compiling const-oid v0.10.2
+   Compiling zerocopy v0.8.56
+   Compiling serde_json v1.0.149
+   Compiling digest v0.11.3
+   Compiling icu_properties v1.5.1
+   Compiling chacha20 v0.10.2
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling thiserror-impl v2.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling rustversion v1.0.23
+   Compiling once_cell v1.21.4
+   Compiling write16 v1.0.0
+   Compiling crc32fast v1.5.1
+   Compiling itoa v1.0.18
+   Compiling utf8_iter v1.0.4
+   Compiling utf16_iter v1.0.5
+   Compiling getrandom v0.3.4
+   Compiling rustix v1.1.4
+   Compiling icu_normalizer v1.5.0
+   Compiling chrono v0.4.45
+   Compiling digest v0.10.7
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling quick-xml v0.41.0
+   Compiling bitflags v2.13.1
+   Compiling zlib-rs v0.6.7
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling tinyvec_macros v0.1.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling either v1.18.0
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling rayon v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling tinyvec v1.12.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling idna_adapter v1.2.0
+   Compiling percent-encoding v2.3.2
+   Compiling debug_unsafe v0.1.4
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+   Compiling atoi_simd v0.18.1
+   Compiling form_urlencoded v1.2.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling idna v1.1.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling unicode-normalization v0.1.25
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling ryu v1.0.22
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 48.12s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0708/debug/deps/litchi_xlsx-33e2e7d76bc7978d)
+
+running 30 tests
+test cell_values::validation::borrow_tests::document_type_declarations_are_refused_with_exact_errors ... ok
+test cell_values::validation::borrow_tests::copied_subtree_close_mismatches_match_without_fixing_the_error_owner ... ok
+test cell_values::validation::borrow_tests::malformed_and_composed_span_errors_keep_first_error_precedence ... ok
+test cell_values::validation::borrow_tests::malformed_and_duplicate_attributes_match_parser_errors ... ok
+test cell_values::validation::borrow_tests::copied_subtrees_keep_modeled_looking_names_opaque_across_namespace_rebinding ... ok
+test cell_values::validation::borrow_tests::aliases_and_default_namespace_scopes_are_resolved_identically ... ok
+test cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags ... ok
+test cell_values::validation::borrow_tests::mismatched_and_unbalanced_closing_tags_have_exact_errors ... ok
+test cell_values::validation::borrow_tests::malformed_and_truncated_inputs_keep_parser_errors_identical ... ok
+test cell_values::validation::borrow_tests::namespace_failures_have_the_frozen_exact_errors ... ok
+test cell_values::validation::borrow_tests::workbook_invalid_inputs_are_checked_against_the_same_owned_loop ... ok
+test cell_values::validation::borrow_tests::modeled_names_in_the_wrong_composed_context_keep_exact_refusals ... ok
+test cell_values::validation::borrow_tests::text_cdata_and_general_references_are_checked_in_context ... ok
+test cell_values::validation::borrow_tests::transitional_and_strict_worksheet_and_workbook_inputs_are_accepted ... ok
+test cell_values::validation::borrow_tests::every_modeled_name_and_event_form_matches_the_owned_reference ... ok
+test cell_values::validation::shared_traversal_tests::shared_fallback_preserves_reader_and_validator_first_error_order ... ok
+test cell_values::validation::shared_traversal_tests::copied_modeled_names_and_namespace_rebinding_match_authoritative_fallback ... ok
+test cell_values::validation::shared_traversal_tests::eligible_small_source_uses_successful_value_edit_control ... ok
+test cell_values::validation::shared_traversal_tests::declaration_only_markers_reach_the_shared_traversal ... ok
+test cell_values::validation::shared_traversal_tests::ignorable_directive_proof_is_narrow_and_transparent ... ok
+test cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission ... ok
+test cell_values::validation::borrow_tests::every_truncation_of_namespace_rich_valid_fixture_is_differentially_checked ... ok
+test cell_values::validation::shared_traversal_tests::event_bound_admits_main_numeric_grids ... ok
+test cell_values::validation::shared_traversal_tests::rewrite_declaration_budget_is_per_start_tag ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_false_positive_still_uses_authoritative_fallback ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_matches_direct_ns_reader_edge_oracle ... ok
+test cell_values::validation::shared_traversal_tests::provisional_event_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::marker_admission_matches_the_authoritative_path_on_every_real_worksheet ... ok
+test cell_values::validation::shared_traversal_tests::source_size_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::exact_text_cap_and_chunk_boundaries ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 4.81s
+

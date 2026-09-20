@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0708 — rejected XLSX validator name-storage candidate
+
+[0708](0708-xlsx-validator-name-storage.md) tests static modeled XML names,
+borrowed empty-event names, and owned unknown-name fallback in the XLSX
+validator. The source-bound native ABBA pilot fails all eight joint primary
+rows: total p50 reductions are 0.452–2.147%, while planning p50 reductions
+range from −0.262% to 1.406% against 2% / 2% / 5% thresholds. The separate
+allocator gate passes, reducing planning calls 27.477% / 27.746% on medium /
+dense-sparse, but it cannot override the native failure. Planning peak above
+region start grows 64 bytes per shape; the logical stack representation adds
+2,048 bytes at depth 256. The packet retains 142 paired flags (84 adverse, 58
+favorable), 38 A/A flags, 21 repeat-drift flags, and 24 allocator flags. All
+39 identity rows match. Production is restored, seven focused guard tests are
+retained, and conditional profile/RSS work is deferred. No speedup claim is
+admitted. [Evidence packet](results/change-0708/README.md).
+
 ## 0707 — current XLSX source-backed planning attribution
 
 [0707](0707-xlsx-planning-attribution.md) measures the unchanged source-backed

@@ -1,0 +1,41 @@
+{
+  "status": "pass",
+  "analyzer_sha256": "1ab775cb1384ac6aa13dce51f48b38e4c488b7b9679745c300360bb4a4795ae8",
+  "checks": [
+    {
+      "name": "corpus-shape",
+      "rejected": true,
+      "message": "negative corpus shape changed"
+    },
+    {
+      "name": "corpus-generator",
+      "rejected": true,
+      "message": "negative corpus generator changed"
+    },
+    {
+      "name": "corpus-name",
+      "rejected": true,
+      "message": "negative corpus name changed"
+    },
+    {
+      "name": "source-timing_scope",
+      "rejected": true,
+      "message": "native-baseline-A1-r1-medium source timing scope changed"
+    },
+    {
+      "name": "source-update_count",
+      "rejected": true,
+      "message": "native-baseline-A1-r1-medium.source.update_count is not a non-negative integer"
+    },
+    {
+      "name": "source-selected_worksheet_count",
+      "rejected": true,
+      "message": "native-baseline-A1-r1-medium selected worksheet count disagrees with corpus/case"
+    },
+    {
+      "name": "missing-build-binding",
+      "rejected": true,
+      "message": "native-baseline-A1-r1-medium build receipt binding differs"
+    }
+  ]
+}

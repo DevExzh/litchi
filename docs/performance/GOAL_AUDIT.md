@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0708 — rejected XLSX validator name-storage pilot
+
+[0708](0708-xlsx-validator-name-storage.md) evaluates a private validator
+name-storage candidate selected from the 0707 planning profile. The candidate
+uses static modeled names, borrowed Empty-event names, and owned fallback for
+unknown names, with exact validation and fallback behavior covered by the
+focused differential tests. The independent native/allocator analysis passes
+custody, statistics, and parity checks but rejects the pilot: all eight joint
+primary rows miss the 2% total p50, 2% total mean, and 5% planning p50 gates.
+Planning allocation calls fall 27.477–27.746%, but planning peak above start
+grows 64 bytes per shape and the logical stack layout adds 2,048 bytes at the
+256-depth bound. Production is restored and seven guard tests are retained;
+profile/RSS work is deferred after native-gate failure. No performance claim
+or coverage promotion follows this candidate. The 39 native identity rows
+match, and the broader non-iWork goal remains active. [Evidence packet](results/change-0708/README.md).
+
 ## 0707 — current-source XLSX planning diagnostic
 
 [0707](0707-xlsx-planning-attribution.md) measures the unchanged XLSX

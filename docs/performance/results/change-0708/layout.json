@@ -1,0 +1,23 @@
+{
+  "command": [
+    "rustc",
+    "--edition=2024",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0708/layout-probe.rs",
+    "-o",
+    "/home/zhuhe/code/litchi-0708-bin/layout-probe"
+  ],
+  "exit_code": 0,
+  "output": "24 16\n",
+  "candidate_slot_bytes": 24,
+  "baseline_box_slot_bytes": 16,
+  "max_xml_depth": 256,
+  "logical_extra_at_max_depth": 2048,
+  "scope": "Logical slot size only, not allocation capacity, live peak or RSS",
+  "source_sha256": "a96f3f1afdb871e9a33280c2019f1219421096e9132b76e73a2d69f77e04f9d0",
+  "snippet_sha256": "03510687e49a980c9cd6ad13e15757730b77fa6ac545f2f135387ce3d753fa0f",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0708-bin/layout-probe",
+    "sha256": "2a911d37059b41aeba49ca48224bbc10f4b8a024693964e2fe14b7a695b77116",
+    "bytes": 4337296
+  }
+}

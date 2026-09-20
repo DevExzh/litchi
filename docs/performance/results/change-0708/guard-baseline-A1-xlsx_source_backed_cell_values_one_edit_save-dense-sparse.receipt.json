@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "name": "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse",
+  "phase": "baseline-A1",
+  "role": "baseline",
+  "lane": "native",
+  "kind": "guard",
+  "repeat": null,
+  "shape": "dense-sparse",
+  "case": "xlsx_source_backed_cell_values_one_edit_save",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0708-bin/baseline-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0708/guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-20T06:41:10.838233+00:00",
+  "end_utc": "2026-09-20T06:41:15.058458+00:00",
+  "seconds": 3.860581676941365,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0708-bin/baseline-native",
+  "binary_sha256": "19b4723c6f08089b38783350baef6b4a55e44a6a00d95a39e87073acdacc38ca",
+  "binary_bytes": 63339376,
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+    "source_census_sha256": "e4a604bd7e28fe43122fb334925b190e22692515cb55f197022bbd2c4b190e3d",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json",
+    "after_artifact": "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json",
+    "before_sha256": "7bef61199a0ebe347d262b4fb91fd55fde09bf740392e4ce13d2a745f52c2337",
+    "after_sha256": "7bef61199a0ebe347d262b4fb91fd55fde09bf740392e4ce13d2a745f52c2337",
+    "before_file_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "after_file_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "baseline-retained-under-allowed-candidate-delta",
+      "changed_paths": [
+        "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+      ],
+      "allowed_roots": [
+        "crates/litchi-xlsx/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "baseline-retained-under-allowed-candidate-delta",
+      "changed_paths": [
+        "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+      ],
+      "allowed_roots": [
+        "crates/litchi-xlsx/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "build_record_sha256": "f53fde8b7a8449cf4d974dd25aa3d7edb94372b40c15944ed098d46be28e0070",
+  "build_source_manifest_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+  "plan_sha256": "1791e8e0af11817e7200bf108aff0382b0aad7a0283ccc4f20b6e94a18c9c218",
+  "script_sha256": "a3bb16bfed2ad717be9b9821c8ef72ff3b6c8d082d39da7f0cdd1c364ad929bc",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json": "8e88b67dc619280b2092e9932dfe9a545ef2cc4fac090900e7221019f45b34b7",
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

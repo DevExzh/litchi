@@ -1,0 +1,30 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: useless use of `format!`
+   --> crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs:726:10
+    |
+726 |           &format!(
+    |  __________^
+727 | |             "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>"
+728 | |         ),
+    | |_________^ help: consider using `.to_string()`: `"<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#useless_format
+    = note: `-D clippy::useless-format` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::useless_format)]`
+
+error: could not compile `litchi-xlsx` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

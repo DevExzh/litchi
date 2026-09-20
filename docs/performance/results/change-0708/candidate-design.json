@@ -1,0 +1,27 @@
+{
+  "production_paths": [
+    "crates/litchi-xlsx/src/cell_values/validation.rs"
+  ],
+  "patch_sha256": "aa4d2929b9539c4164497ad71a3dd2c464547f56427e3b94203f3137e809c2ee",
+  "representation": "Static(&static [u8]) or Owned(Box<[u8]>); AsRef returns exact local bytes",
+  "known_names": [
+    "worksheet",
+    "dimension",
+    "sheetData",
+    "row",
+    "c",
+    "f",
+    "v",
+    "is",
+    "t",
+    "r",
+    "workbook",
+    "sheets",
+    "sheet"
+  ],
+  "start": "Borrow for unchanged validation; retain after admission/depth/reserve",
+  "empty": "Borrow only; no retained name",
+  "namespace_and_error_policy_changed": false,
+  "review": "Independent name_review_0708 found no remaining concrete defect after correcting expected.as_ref()",
+  "memory": "Standalone layout observation24B vs16B; maximum XML depth256; operation/RSS measurements pending"
+}

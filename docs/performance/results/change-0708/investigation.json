@@ -1,0 +1,20 @@
+{
+  "previous_turn": "progress: committed0707 verified attribution",
+  "basis": "0707 Validator18.38\u201318.75% planning guest Ir; planning35.75\u201336.88% native time. Raw Callgrind allocation-call fields expressly not used.",
+  "constraints": "33 previously read GOAL/ADR input hashes unchanged",
+  "production_changed": false,
+  "candidate_applied_utc": "2026-09-20T06:34:02.087858+00:00",
+  "focused_validation": {
+    "baseline": {
+      "validation": 30,
+      "facts_oracle": 5,
+      "public_planning_errors": 6
+    },
+    "candidate": {
+      "validation": 30,
+      "facts_oracle": 5,
+      "public_planning_errors": 6
+    }
+  },
+  "final_disposition": "Candidate rejected and production restored; retain seven differential guards"
+}

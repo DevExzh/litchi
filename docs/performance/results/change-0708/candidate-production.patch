@@ -1,0 +1,113 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/validation.rs b/crates/litchi-xlsx/src/cell_values/validation.rs
+index 19c7549cf0..cd41ce0e1f 100644
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -77,7 +77,7 @@ enum XmlOwner {
+ struct Validator {
+     owner: XmlOwner,
+     depth: usize,
+-    elements: Vec<Box<[u8]>>,
++    elements: Vec<ElementName>,
+     dialect: Option<Box<[u8]>>,
+     /// Depth of the outermost element the rewrite copies verbatim, while one
+     /// is open. Inside such a subtree nothing is modelled, so every element,
+@@ -87,6 +87,48 @@ struct Validator {
+     first_error: Option<Error>,
+ }
+ 
++/// The validator needs an element's local name after the reader advances, so
++/// every open element keeps a representation of it until its closing event.
++/// Names in the modeled vocabulary are immutable constants; an unfamiliar
++/// copied element retains the event's bytes in the same owned form as before.
++/// Keeping that distinction here avoids allocating for the names that make up
++/// the ordinary worksheet and workbook paths while preserving arbitrary
++/// copied names exactly.
++enum ElementName {
++    Static(&'static [u8]),
++    Owned(Box<[u8]>),
++}
++
++impl ElementName {
++    fn from_local(local: &[u8]) -> Self {
++        match local {
++            b"worksheet" => Self::Static(b"worksheet"),
++            b"dimension" => Self::Static(b"dimension"),
++            b"sheetData" => Self::Static(b"sheetData"),
++            b"row" => Self::Static(b"row"),
++            b"c" => Self::Static(b"c"),
++            b"f" => Self::Static(b"f"),
++            b"v" => Self::Static(b"v"),
++            b"is" => Self::Static(b"is"),
++            b"t" => Self::Static(b"t"),
++            b"r" => Self::Static(b"r"),
++            b"workbook" => Self::Static(b"workbook"),
++            b"sheets" => Self::Static(b"sheets"),
++            b"sheet" => Self::Static(b"sheet"),
++            _ => Self::Owned(local.to_vec().into_boxed_slice()),
++        }
++    }
++}
++
++impl AsRef<[u8]> for ElementName {
++    fn as_ref(&self) -> &[u8] {
++        match self {
++            Self::Static(local) => local,
++            Self::Owned(local) => local,
++        }
++    }
++}
++
+ impl Validator {
+     fn new(owner: XmlOwner) -> Self {
+         Self {
+@@ -125,17 +167,13 @@ impl Validator {
+         match event {
+             Event::Start(element) => {
+                 let inside_copied = self.inside_copied();
+-                let local = element
+-                    .name()
+-                    .local_name()
+-                    .as_ref()
+-                    .to_vec()
+-                    .into_boxed_slice();
++                let local = element.name().local_name();
++                let local = local.as_ref();
+                 let admission = validate_element(
+                     self.owner,
+                     namespace,
+                     element,
+-                    &local,
++                    local,
+                     self.elements.last().map(AsRef::as_ref),
+                     self.depth,
+                     &mut self.dialect,
+@@ -160,16 +198,17 @@ impl Validator {
+                 self.elements
+                     .try_reserve(1)
+                     .map_err(|source| allocation("value-only XML element stack", source))?;
+-                self.elements.push(local);
++                self.elements.push(ElementName::from_local(local));
+             },
+             Event::Empty(element) => {
+                 let inside_copied = self.inside_copied();
+-                let local = element.name().local_name().as_ref().to_vec();
++                let local = element.name().local_name();
++                let local = local.as_ref();
+                 validate_element(
+                     self.owner,
+                     namespace,
+                     element,
+-                    &local,
++                    local,
+                     self.elements.last().map(AsRef::as_ref),
+                     self.depth,
+                     &mut self.dialect,
+@@ -194,7 +233,7 @@ impl Validator {
+                 validate_close(
+                     namespace,
+                     element,
+-                    &expected,
++                    expected.as_ref(),
+                     self.dialect.as_deref(),
+                     modeled,
+                 )?;

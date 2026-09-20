@@ -1,0 +1,10 @@
+{
+  "reviewer": "/root/name_review_0708",
+  "production": "No remaining concrete correctness defect after expected.as_ref() correction",
+  "tests": "Frozen owned reference unchanged; modeled-name/dialect/event-form/unknown-subtree/refusal fixtures reviewed",
+  "scope_limits": [
+    "Copied close mismatch is rejected by NsReader before Validator End callback; guards reader/fallback transparency only.",
+    "New differential reference lacks production depth/try_reserve; existing admission_tests 300-level exact refusal remains unchanged. Conditional full candidate test lane was not executed after native rejection."
+  ],
+  "frame_layout": "24-byte static/owned enum versus16-byte Box; layout and allocator/RSS checks separate"
+}

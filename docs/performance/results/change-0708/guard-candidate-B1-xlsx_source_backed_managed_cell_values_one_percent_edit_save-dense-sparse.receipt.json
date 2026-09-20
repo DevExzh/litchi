@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "name": "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse",
+  "phase": "candidate-B1",
+  "role": "candidate",
+  "lane": "native",
+  "kind": "guard",
+  "repeat": null,
+  "shape": "dense-sparse",
+  "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0708-bin/candidate-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0708/guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-20T06:42:48.968043+00:00",
+  "end_utc": "2026-09-20T06:42:53.416032+00:00",
+  "seconds": 4.098439836059697,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0708-bin/candidate-native",
+  "binary_sha256": "0b711c97515aa05b8e8274eda575b6bf4765c53194e9410217711512f681f0db",
+  "binary_bytes": 63343480,
+  "retained_binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "source_census_sha256": "7bef61199a0ebe347d262b4fb91fd55fde09bf740392e4ce13d2a745f52c2337",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json",
+    "after_artifact": "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json",
+    "before_sha256": "7bef61199a0ebe347d262b4fb91fd55fde09bf740392e4ce13d2a745f52c2337",
+    "after_sha256": "7bef61199a0ebe347d262b4fb91fd55fde09bf740392e4ce13d2a745f52c2337",
+    "before_file_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "after_file_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/litchi-xlsx/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "allowed_roots": [
+        "crates/litchi-xlsx/"
+      ],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "build_record_sha256": "680a2239e9743cfc97b12f51667671dc2667860bb55275a70b101058deec7a28",
+  "build_source_manifest_sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+  "plan_sha256": "1791e8e0af11817e7200bf108aff0382b0aad7a0283ccc4f20b6e94a18c9c218",
+  "script_sha256": "a3bb16bfed2ad717be9b9821c8ef72ff3b6c8d082d39da7f0cdd1c364ad929bc",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json": "e2f75763d47292f622ce945364f2384afeba9891792df6de53b586d935cf661b",
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a",
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

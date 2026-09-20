@@ -1,0 +1,18 @@
+{
+  "reviewer": "/root/name_evidence_review_0708",
+  "verdict": "Custody and analyzer logic pass; reject candidate",
+  "native_rows_failed": 8,
+  "native_rows_total": 8,
+  "allocator_pass": true,
+  "flags": 225,
+  "parity_rows": 39,
+  "raw_children": 68,
+  "negative_checks": 7,
+  "restored_quality": "pass",
+  "repository_gates": "6 pass",
+  "final_report_gate": "pass",
+  "final_analysis_sha256": "0920119f0f73c2d5001b18e3c34c349f19b794f6d22acf345efe0fd1dd5a8c03",
+  "historical_pilot_analysis_sha256": "5741af73edce86bffed7bf6aee986cd4221c6f6b4daf957ccc65f0193e62d7ab",
+  "archive_clarification": "Reviewer suggested replacing pilot-analysis with final analysis. Root declined because pilot-analysis intentionally preserves the candidate-state historical decision; final analysis includes restoration and later test correction. Disposition binds the historical pilot separately; pre/post-cleanup audits passed. No historical evidence overwritten.",
+  "profiles_rss_full_candidate_quality": "not run after native rejection"
+}

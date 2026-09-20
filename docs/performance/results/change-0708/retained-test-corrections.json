@@ -1,0 +1,11 @@
+{
+  "reason": "Pre-existing useless format! corrected after rejected pilot; identical literal and test behavior",
+  "changes": {
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs": {
+      "before_sha256": "ee479b3b0716d0f3728d0f4a37684140f309896a81160d78fd0adca5dd43928d",
+      "after_sha256": "e96e52838171fe645000a1d43101d46a6ed3121ea575501f8081ea54ffbf81ff"
+    }
+  },
+  "patch": "retained-test-correction.patch",
+  "patch_sha256": "29ef8001c2fde035b453bd9be052d7743b784a037143342147df0b3908642b61"
+}

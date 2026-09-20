@@ -1,0 +1,13 @@
+--- crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
++++ crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+@@ -723,9 +723,7 @@
+         &format!(
+             " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" xmlns:other=\"urn:litchi:other\" mc:Ignorable=\"future\""
+         ),
+-        &format!(
+-            "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>"
+-        ),
++        "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+     );
+     assert_eq!(
+         crate::raw::worksheet::source_stream_admission(&valid),

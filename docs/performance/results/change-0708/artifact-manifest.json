@@ -1,0 +1,2024 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 9651,
+      "sha256": "acfe3e6d440ca4d2159be81bb5782239db90a6ce0c2edca3e62b38be69f37b51"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.json": {
+      "bytes": 44160,
+      "sha256": "b3e2766efc9326f2e16a0a2eafbb8c03a35909ca1cf336c45eed53b3e5dad495"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.receipt.json": {
+      "bytes": 4182,
+      "sha256": "c6d93675fdb5b163484c39ceea0fb71f0eb758896866be42f92bdf5f2b8d4a17"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r1-medium.json": {
+      "bytes": 44114,
+      "sha256": "e848d39edef2964b07a1704dec92f8edf3bd2cb0ba68962c3588e6927f36313b"
+    },
+    "alloc-allocator-baseline-r1-medium.receipt.json": {
+      "bytes": 4116,
+      "sha256": "895cfb6af64fed022cc28c876fb707440d3d5d43a388da916c6fccecdcff341f"
+    },
+    "alloc-allocator-baseline-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.json": {
+      "bytes": 44162,
+      "sha256": "ff45a1855218b05064a1e7827fe97548f44a6cda4ec83a085d9f96e4e3e303a8"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.receipt.json": {
+      "bytes": 4181,
+      "sha256": "a6e980d371439cfc32e12e81dcfa1ab0fbf433bbb053ef993a961b282b6df1e9"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r2-medium.json": {
+      "bytes": 44114,
+      "sha256": "e7c3a828b42d168fe91045217cc2085a95b812df02fcf4349f93c38b4470075f"
+    },
+    "alloc-allocator-baseline-r2-medium.receipt.json": {
+      "bytes": 4116,
+      "sha256": "5358a536cc8530153b5b51fd7be307749b39c0db428fb22346408b341fbbc148"
+    },
+    "alloc-allocator-baseline-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-baseline-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-baseline-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.json": {
+      "bytes": 44153,
+      "sha256": "9f3c8399bc894a7ace4eec7730305faf34b0ec33e37bb98d619e7f1413728a45"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.receipt.json": {
+      "bytes": 3690,
+      "sha256": "b8ad0f43371e7f7c8b254c6167cb9a32cf872c7a763cfe316783c52b4e170091"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r1-medium.json": {
+      "bytes": 44114,
+      "sha256": "3fd25cd75c23780b88c57fa2d8ee131ff7d2fe8df1909ed4a99f857a6e8a789c"
+    },
+    "alloc-allocator-candidate-r1-medium.receipt.json": {
+      "bytes": 3624,
+      "sha256": "235889f36e5c7ce4e56d68bae5dd41472b9d0f371eb0fe82368a7da7b562f93b"
+    },
+    "alloc-allocator-candidate-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.json": {
+      "bytes": 44152,
+      "sha256": "9de7b2bff32ec41fc53a9d1f4bc00567cc2ab61b636b49c29f4235a6d1bdf04c"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.receipt.json": {
+      "bytes": 3690,
+      "sha256": "afd97b7735039ad39d2469c0d3f3930a14ee6e0ca1d07e3fac390fadaf6897bf"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r2-medium.json": {
+      "bytes": 44116,
+      "sha256": "672bf780d170789dd3efb57b5ac050fa43debbfabb650952f55b254a98dd2cba"
+    },
+    "alloc-allocator-candidate-r2-medium.receipt.json": {
+      "bytes": 3623,
+      "sha256": "f709f57c05f8fc654012aeaa7948887183909e23977899a952251c502cebac4e"
+    },
+    "alloc-allocator-candidate-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "alloc-allocator-candidate-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alloc-allocator-candidate-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "analysis.json": {
+      "bytes": 1451621,
+      "sha256": "0920119f0f73c2d5001b18e3c34c349f19b794f6d22acf345efe0fd1dd5a8c03"
+    },
+    "analyze.py": {
+      "bytes": 80149,
+      "sha256": "1ab775cb1384ac6aa13dce51f48b38e4c488b7b9679745c300360bb4a4795ae8"
+    },
+    "analyze_mechanism.py": {
+      "bytes": 41720,
+      "sha256": "96e52ee792b9f761f2c7d3d15073f4b586c2c6f3ad361c07b1c86057b56026f0"
+    },
+    "artifact-seal.py": {
+      "bytes": 2424,
+      "sha256": "06159bb6e2fde3046391ec9efbfd6a5f04fd1632cf6194d00e2d6b2a5de8b1da"
+    },
+    "audit-post-cleanup.log": {
+      "bytes": 176,
+      "sha256": "50dafc58488829a4bf59e0f5542b4c9db79b6785970b8bda2e166f53854195f3"
+    },
+    "audit-result.json": {
+      "bytes": 312,
+      "sha256": "2ca0b040988b6c2fc4d069ec14c19c95ed2008b98e5f6615880c2b0d5ca0e9ef"
+    },
+    "audit.py": {
+      "bytes": 4134,
+      "sha256": "f9f20f95f4b06828b2db64eddceb40da1875a591d7c308fa7667bc2f027bad6f"
+    },
+    "baseline-focused-facts.log": {
+      "bytes": 793,
+      "sha256": "885e6a28e34e231cda3a34071b8dc4b8db0ce22dccdbf6158d461862c6ce9cb9"
+    },
+    "baseline-focused-planning-errors.log": {
+      "bytes": 999,
+      "sha256": "94e6c406ade519c53e16dada39284a0d8df8579efc34bf765030301cf3fed909"
+    },
+    "baseline-focused-validation.log": {
+      "bytes": 7720,
+      "sha256": "99e8ebb62783e5d005835e8d4a180a3fa6aa95f98b3cfe6aeef0d625474fd98d"
+    },
+    "build-baseline-alloc.log": {
+      "bytes": 150,
+      "sha256": "15522c325aa3a4902749d88681f7f2f67db10668a9e85107edd0391166ac25c5"
+    },
+    "build-baseline-native.log": {
+      "bytes": 7825,
+      "sha256": "1064f7a7ec2ab690d8eacb12ba9ee9cdfb4df34f93014389b2e923762e728b6c"
+    },
+    "build-baseline.json": {
+      "bytes": 1596,
+      "sha256": "f53fde8b7a8449cf4d974dd25aa3d7edb94372b40c15944ed098d46be28e0070"
+    },
+    "build-candidate-alloc.log": {
+      "bytes": 150,
+      "sha256": "15522c325aa3a4902749d88681f7f2f67db10668a9e85107edd0391166ac25c5"
+    },
+    "build-candidate-native.log": {
+      "bytes": 294,
+      "sha256": "4f172f9171f34fc5525bd7e32c89471f50251d1df35d3e16d4418b61b1341ade"
+    },
+    "build-candidate.json": {
+      "bytes": 1598,
+      "sha256": "680a2239e9743cfc97b12f51667671dc2667860bb55275a70b101058deec7a28"
+    },
+    "build.py": {
+      "bytes": 2723,
+      "sha256": "39c0ebd7208ad33ace730124c92061fcf270d93ea5172a85def31036f77d9b7c"
+    },
+    "candidate-design.json": {
+      "bytes": 854,
+      "sha256": "7952004c340f7509451e4cec39bcc1f191a3aacea99ff5e905ac6587a235ed01"
+    },
+    "candidate-focused-facts.log": {
+      "bytes": 793,
+      "sha256": "51a65bbc204e5b55486f240155653a744e87c8250f6d45eb6fcfd8ef399f90a9"
+    },
+    "candidate-focused-planning-errors.log": {
+      "bytes": 921,
+      "sha256": "a78c4c4ae0220f9d9746f438c6c6b9c0bb3f51ab8f0dd1a58cf69424d9015ecd"
+    },
+    "candidate-focused-validation.log": {
+      "bytes": 3784,
+      "sha256": "563d6c1e6d543be1a3889402cbe0bec4fcb6a0fcd21e309300a7c373c7ae382e"
+    },
+    "candidate-production.patch": {
+      "bytes": 4358,
+      "sha256": "aa4d2929b9539c4164497ad71a3dd2c464547f56427e3b94203f3137e809c2ee"
+    },
+    "candidate-tests.patch": {
+      "bytes": 14317,
+      "sha256": "f05dbe262cea8ec90473ce809baccb7a1ccd95da87dab2e0159748196dc6d14e"
+    },
+    "capture-freeze.json": {
+      "bytes": 497,
+      "sha256": "8a6eb3a1d2f3be9809305f05c9599208e5eeed10add600f3ebe3bb4d18b3b089"
+    },
+    "capture.py": {
+      "bytes": 17555,
+      "sha256": "a3bb16bfed2ad717be9b9821c8ef72ff3b6c8d082d39da7f0cdd1c364ad929bc"
+    },
+    "cleanup.json": {
+      "bytes": 1397,
+      "sha256": "e5ff504d0ccb80829e72a9139f7a856c8acaa75c5041749bbec52adb350e23a1"
+    },
+    "constraints.json": {
+      "bytes": 3785,
+      "sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65"
+    },
+    "disposition.json": {
+      "bytes": 616,
+      "sha256": "a675ea7582e283b3e082403027c146a52c229928fb8cfb80fda167efa935804d"
+    },
+    "evidence/claims-structural.log": {
+      "bytes": 49,
+      "sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+    },
+    "evidence/claims.log": {
+      "bytes": 45,
+      "sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    },
+    "evidence/coverage.log": {
+      "bytes": 123,
+      "sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d"
+    },
+    "evidence/crate-boundaries.log": {
+      "bytes": 565,
+      "sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    },
+    "evidence/non-iwork.log": {
+      "bytes": 1748,
+      "sha256": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2"
+    },
+    "evidence/report.log": {
+      "bytes": 108,
+      "sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "evidence/results.json": {
+      "bytes": 2876,
+      "sha256": "b86ae607dcb424e5002091b02104d1906e59e1a854b582d5e7e72b7f05f1371a"
+    },
+    "evidence-preflight/crate-boundaries.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "evidence.py": {
+      "bytes": 1537,
+      "sha256": "c6b0a8a5c57cb720c8491a38d7a2043eb9e022897ffc403387eaa1364853ed9a"
+    },
+    "final-report-gate.json": {
+      "bytes": 909,
+      "sha256": "b9f963fc07b9c7f697434a78eed19231158bfabaf40cbd668ea6e819e4d8490e"
+    },
+    "final-report-gate.log": {
+      "bytes": 108,
+      "sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "final-review.json": {
+      "bytes": 1028,
+      "sha256": "06b89d4e284443fc9ca4e99126881248a1648f9a85475633125f13869eb9ae63"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json": {
+      "bytes": 95537,
+      "sha256": "8e88b67dc619280b2092e9932dfe9a545ef2cc4fac090900e7221019f45b34b7"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4476,
+      "sha256": "ccad0ca30deadd66ee88214136642c85c5d4408af90749781c00e6b7749d2514"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.json": {
+      "bytes": 95359,
+      "sha256": "e26779f2d48d44b26fae83c60bee365d23ce9b0a955357d714e386e198f9b8c9"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.receipt.json": {
+      "bytes": 4410,
+      "sha256": "9f71449d62a3c5217d3556f1938d641b953b2f87cb38aa826ce4553516499a03"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 95428,
+      "sha256": "4766a4ab275349d3361f7d70ecfc52f170dc6fa6e266208d9432439d2097fdd5"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4542,
+      "sha256": "d569bd52a76df47aed8916731636281f63a577ecbcec7bfecadc0f3ba0867d9c"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.json": {
+      "bytes": 95494,
+      "sha256": "2717f1001182af0218b3234a7f6ec65b11f81d3509996cdd862b9d5e42a30ec6"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.receipt.json": {
+      "bytes": 4608,
+      "sha256": "dd521b5dd803433f82971ba250c1500641970774392d3ac29cff1dc26b14e18a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json": {
+      "bytes": 99153,
+      "sha256": "f573985d700a291d08087448d44400b953da45bba13c426e6b80de1a56aaeffc"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4653,
+      "sha256": "b5d2b2cac519db33b20eb1c281848f8283162d4b5021c23f0305088f94d22d37"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.json": {
+      "bytes": 99071,
+      "sha256": "6e5a0decc089870b9def4b49904c419bcdd0a3698b0af13159ba20f36c90f872"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.receipt.json": {
+      "bytes": 4586,
+      "sha256": "b8a2106c5629f92a030d27b0daecdd8433d258e960089a8c90832c01e6b6afbf"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 99107,
+      "sha256": "822bcafbb06ace0118be2eb006cb1d2a630bbf36c54e012fc9174b24b4328ac5"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4631,
+      "sha256": "3455b95529acdc6a467f9303630b973c78e60e36d3522777f649c8ed4ae08c1d"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json": {
+      "bytes": 95537,
+      "sha256": "825148724bc1d0b54a3612c31b158fef005b74a174f135e049aa546f21e4353d"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4476,
+      "sha256": "fe94f8148436779819890331fae38b50c68f062288df8216e14e61d7c4e188ed"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.json": {
+      "bytes": 95358,
+      "sha256": "1fc7ae9a4e02424cab740113da73ac0258e44db79afa6f8df95e2880ffc41f29"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.receipt.json": {
+      "bytes": 4411,
+      "sha256": "e73a5cfd3eb2f6d62b0d798573d87b59c75e46dc591c3948375ae673d441661a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 95427,
+      "sha256": "8abeb2579fa2d84368b099e31fcb195c5c1698f61c211e01d9b761a81a0b34ad"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4543,
+      "sha256": "53ede9dda0c3da71377cbb71c18e901d9dc1cfe97c905f6e272e73335b04f8be"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.json": {
+      "bytes": 95492,
+      "sha256": "3cce64407f9b3ecbac58d260ac513d731d486d437a007440488f95d109e809da"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.receipt.json": {
+      "bytes": 4608,
+      "sha256": "ac8b7f27a3c2ea717dcb67398ae3bf6d1a7550480412a0b45ba8cdb7e9cf9d39"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json": {
+      "bytes": 99156,
+      "sha256": "8b673377375cd72e3b3de41722123b2d3ce98c2389d4dec0b06ffe9d65b8d790"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4652,
+      "sha256": "1a9550f23f3c6efa281e29d16d5a8d58ddda009458995a84fa20801ba04dc7a2"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.json": {
+      "bytes": 99069,
+      "sha256": "5081d280a12349415e496f5d8279115d84b9b6b5c73e5001cca0dd696cb744ac"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.receipt.json": {
+      "bytes": 4587,
+      "sha256": "7e0d23b20e3c62aaece188b749b9b551aa1b29c3b26ea6a4d542225fefd09d3a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 99107,
+      "sha256": "c10f0597a58c25b6c5bc6ac7c0c7e3ecdb31345948bf45e2a5e9a2e8eaabe36e"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4631,
+      "sha256": "8c6e64850e09938170c6b4704f4c864a6be09b5a6ac1c8608fdf513ae7b79b5d"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-baseline-A2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json": {
+      "bytes": 95539,
+      "sha256": "8c1f29f55ef98ccafca3e35be30d400ae4efc9364b3f6f9a7277daca592e4fdd"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.receipt.json": {
+      "bytes": 3984,
+      "sha256": "a2db72ba3c48aee2d87087f190a6150e22a9a95be7bc7336fcedd3a0b0e653b7"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.json": {
+      "bytes": 95359,
+      "sha256": "3506fce072dbd7c5ac9f64d28cd6bd5b6770ee7f0a53f390632c493aaf9ff740"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.receipt.json": {
+      "bytes": 3918,
+      "sha256": "6c38a78329729db1af1a6054ef27505b6e53140dc807571ec30f2a78e2736df0"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 95428,
+      "sha256": "bddcad8a139cb90f5daaefb4f2919ebf5923509c2d349420b262a5fa8914553d"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4051,
+      "sha256": "acb96a731085f2e9faad997dc80094930639f623b7698bda2af77753dcf89f3a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.json": {
+      "bytes": 95499,
+      "sha256": "fa2e363eea89490806a4840482bffc2ad59d05ecd92b35f10cfef3ce5a774f22"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.receipt.json": {
+      "bytes": 4116,
+      "sha256": "3dc2dc089876f637ec1c6b982f3224f0a4cc0b1bac4bc9ccbd8e86e93ffe35ed"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json": {
+      "bytes": 99147,
+      "sha256": "e2f75763d47292f622ce945364f2384afeba9891792df6de53b586d935cf661b"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4160,
+      "sha256": "b17b058b0ae86ed250cff5264f79b3b3f44942a69dc6d37edf8979e77f3f476a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.json": {
+      "bytes": 99070,
+      "sha256": "c167c591269eae5c07fd41906591138c278f2c2f53f069a7015db962c1eff46d"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.receipt.json": {
+      "bytes": 4094,
+      "sha256": "b677fd598f51fb99f9e6f334fe673be04b41609558461160b799c28b8793c067"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 99107,
+      "sha256": "42086077e6f6ab6260097df655965fbee86e7604458f101db057f1e152c2a2d5"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4139,
+      "sha256": "742768de5688465abcb7ed6f8b31f5eda06ef44317fd487c5adb5d2a22cad1aa"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B1-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.json": {
+      "bytes": 95531,
+      "sha256": "5714523ad8df09daf9c264a5e99f194708b13e43a7be98b92d1e28f1882149d4"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.receipt.json": {
+      "bytes": 3984,
+      "sha256": "28e407d5fc6ad7d89cdb0aeb61fa2ba2125ad1d141fe80ed82c1f65db32d82d2"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.json": {
+      "bytes": 95360,
+      "sha256": "9c779acd388eb8bb78dffee8bc2eda0ff7174fba9032d5639a31497253671606"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.receipt.json": {
+      "bytes": 3919,
+      "sha256": "5ba771c1fb13a9f167ddbcc83ff5a130904710618d856106604032ebbac8941f"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 95422,
+      "sha256": "8e4dae8d4945ee516c22e40f96a031264e8fd5454a9a89319909a38a866edebb"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4051,
+      "sha256": "a6d59f7abb5df5c6d9f783b0d8664e99558835ffebc2febb9a409ec32d97f61e"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.json": {
+      "bytes": 95492,
+      "sha256": "0fc27316b4e130e7a9cfcb47464264dacce695d371673c238faf567e06177839"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.receipt.json": {
+      "bytes": 4116,
+      "sha256": "d116e2096664cffe362e8871dc9c1dee125bb584aea128bea326869220500314"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_cell_values_one_percent_edit_save-vendor-extension.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.json": {
+      "bytes": 99153,
+      "sha256": "594a7e115629039feaeb79e768dd20bbc9940605941e0a91e5a9b5b5d1ab87d5"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.receipt.json": {
+      "bytes": 4160,
+      "sha256": "7712f4ec3041b043a1a06879b56a1626841acaf35a66eb4178487352172755cd"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.json": {
+      "bytes": 99070,
+      "sha256": "51aeba81c1c916e6e3f1d343b8fc28d2012d212dde2f82e76690cd7948e3060f"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.receipt.json": {
+      "bytes": 4094,
+      "sha256": "5f461d06c73a5cd1f2417d0a7e78f0f5bdba59723d32ea3a6e68acdd6d7f6924"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.json": {
+      "bytes": 99108,
+      "sha256": "9effbeadeaf02d6cf6a08f46da01046ab683569501d0e09dea7bca84b5eb28ba"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.receipt.json": {
+      "bytes": 4139,
+      "sha256": "4b34781770561a6bdcf102bd88043b5a7392d21e258f59cfcd31a5d13bb3a65b"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard-candidate-B2-xlsx_source_backed_managed_cell_values_one_percent_edit_save-noncompact.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "helper-identities.json": {
+      "bytes": 790,
+      "sha256": "e3c337c80a13d61ab7cd43c5f9c350b96a47f7e768c29c2d1c8feb59e0e9a90c"
+    },
+    "host.json": {
+      "bytes": 24309,
+      "sha256": "8ac006ae53f3040bb4cd693aef9427da58f89353125d23ce3fe9f017a5d1c7e4"
+    },
+    "investigation.json": {
+      "bytes": 746,
+      "sha256": "88d51d59bc6f846269b504eb1fa0d9fa4015d7a1d98729fecdd4c617edcddf03"
+    },
+    "layout-build.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "layout-build.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "layout-probe.rs": {
+      "bytes": 193,
+      "sha256": "03510687e49a980c9cd6ad13e15757730b77fa6ac545f2f135387ce3d753fa0f"
+    },
+    "layout.json": {
+      "bytes": 808,
+      "sha256": "294f16ff45613702dc53690828fdbb8bf77d57dc31cdf8741982e6020e901bef"
+    },
+    "layout.py": {
+      "bytes": 1520,
+      "sha256": "ac62c3e40e0d87c00f5e8d44e669da277c96af1562112b6227081d9bc3a11706"
+    },
+    "mechanism-plan.json": {
+      "bytes": 4827,
+      "sha256": "3a7754c4a083289393b764fbc552a72d44b594c918939ce7c087d0a5e130fbd9"
+    },
+    "mechanism.py": {
+      "bytes": 18248,
+      "sha256": "d4fae53f027a8db618b178d3ebe9c9279f8bf1546627b00c1530237b6544d089"
+    },
+    "native-baseline-A1-r1-dense-sparse.json": {
+      "bytes": 528667,
+      "sha256": "78ae1dc0cf2a1a393726162d71cdf9043d06248fbf4adb0f5464e8845cfdc9a7"
+    },
+    "native-baseline-A1-r1-dense-sparse.receipt.json": {
+      "bytes": 4123,
+      "sha256": "408f0bedcff1855f5bd6f3f8379a5fa0388e13ad19bc29d98521006709434d10"
+    },
+    "native-baseline-A1-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r1-medium.json": {
+      "bytes": 528244,
+      "sha256": "e6e77c6888ceec9ab0fb124e779089a1085ee3ba53a27caffc8e1186f7281f6d"
+    },
+    "native-baseline-A1-r1-medium.receipt.json": {
+      "bytes": 4058,
+      "sha256": "65db1539f92efef08cde34399803efbbc5bc8bc046babfa17bfe518edf850984"
+    },
+    "native-baseline-A1-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r2-dense-sparse.json": {
+      "bytes": 528668,
+      "sha256": "90ff247df65c772bbca1a8cc8955d1b53163c6c79bbcaf440c07367b62fd9505"
+    },
+    "native-baseline-A1-r2-dense-sparse.receipt.json": {
+      "bytes": 4124,
+      "sha256": "c80025207d999aa7622cd163d3236f7bff9f752154ed38f64b4a8165d235a349"
+    },
+    "native-baseline-A1-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r2-medium.json": {
+      "bytes": 528238,
+      "sha256": "6210958c7b80b42072dac3d575dfdad1b7475caba312c98cbab3078c75a5adbf"
+    },
+    "native-baseline-A1-r2-medium.receipt.json": {
+      "bytes": 4058,
+      "sha256": "3b5b5d379ad1cb36b562407efb677f6f824c9f969052543c236dfba926fad699"
+    },
+    "native-baseline-A1-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A1-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A1-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r1-dense-sparse.json": {
+      "bytes": 528675,
+      "sha256": "6a91cfc5cbae14a990b35e8ccc014502c0dcec9e406bd529e2aa479b8ab075c5"
+    },
+    "native-baseline-A2-r1-dense-sparse.receipt.json": {
+      "bytes": 4123,
+      "sha256": "a28eb4faa44b61685a5d3cbf836ecf7d1ea39911352c02fb9dc1042d7b4258d6"
+    },
+    "native-baseline-A2-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r1-medium.json": {
+      "bytes": 528244,
+      "sha256": "58d3ee8c08887e6b3691e5628b0a7de07c00c0d6fc96d3933449360a5d24cbe6"
+    },
+    "native-baseline-A2-r1-medium.receipt.json": {
+      "bytes": 4058,
+      "sha256": "d0e5a50de001c927db2546450cf8473cc90380d3a90c73f9554ec266b233ae59"
+    },
+    "native-baseline-A2-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r2-dense-sparse.json": {
+      "bytes": 528659,
+      "sha256": "d48a43fa6501d02e7e008337b22efcc5429506fed4db2e35c5bed63be0e6b5a6"
+    },
+    "native-baseline-A2-r2-dense-sparse.receipt.json": {
+      "bytes": 4123,
+      "sha256": "23ecdfa16ec1c54554c610399889d6dda1249f84468b8e1e8309eb0624322721"
+    },
+    "native-baseline-A2-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r2-medium.json": {
+      "bytes": 528245,
+      "sha256": "58952c35cf7bb9f9e7feb8f6de48b1ab9d16d52d289810a8bc9c5ed95f15e8f5"
+    },
+    "native-baseline-A2-r2-medium.receipt.json": {
+      "bytes": 4058,
+      "sha256": "36ac997fb27eb3b666b5538ba4660cdfede59d98323644df835ce562fe57cf7e"
+    },
+    "native-baseline-A2-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-A2-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-A2-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r1-dense-sparse.json": {
+      "bytes": 528720,
+      "sha256": "7708714002ab6f8c2a413c34950804b1d08c3c701e3c082c55c15a9a4182c02d"
+    },
+    "native-baseline-noise1-r1-dense-sparse.receipt.json": {
+      "bytes": 4164,
+      "sha256": "28a1b8babbc57dc54887e629c92b501b9f117a849259f3e99d3bee13e0968b89"
+    },
+    "native-baseline-noise1-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r1-medium.json": {
+      "bytes": 528313,
+      "sha256": "b13120941ae895257b165c102997359dd67719b9389263fb06ad938a2c9b4406"
+    },
+    "native-baseline-noise1-r1-medium.receipt.json": {
+      "bytes": 4098,
+      "sha256": "42a9d1c78dfde245ff35f36096f15aa74c65fcc9e31c1b7f6fff4610a68ddac0"
+    },
+    "native-baseline-noise1-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r2-dense-sparse.json": {
+      "bytes": 528674,
+      "sha256": "2e94af02f0b70acf33b0a2e7c724928e5f0c4f40b73814d272fc032696c6b033"
+    },
+    "native-baseline-noise1-r2-dense-sparse.receipt.json": {
+      "bytes": 4164,
+      "sha256": "77554e85b07ec28eebefd2f7fc4137a9c6a2eb0e388215a17fe41b857136a22f"
+    },
+    "native-baseline-noise1-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r2-medium.json": {
+      "bytes": 528237,
+      "sha256": "dfe0e3aa7546f131637ee68e1c4c114bf436735a01fdcdfd8136fabee7147b3e"
+    },
+    "native-baseline-noise1-r2-medium.receipt.json": {
+      "bytes": 4098,
+      "sha256": "efdf37303a4ef14fe517c2621dd99319498bec82eba0a77ee0b09527efae7043"
+    },
+    "native-baseline-noise1-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise1-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise1-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r1-dense-sparse.json": {
+      "bytes": 528684,
+      "sha256": "60e82a7c2acec5330a20602f6560fba2473342539aacef8fceea730327622d27"
+    },
+    "native-baseline-noise2-r1-dense-sparse.receipt.json": {
+      "bytes": 4164,
+      "sha256": "98633924034227810f2ade101ea287bce7eec4b5f960160f925202a41ad0b85b"
+    },
+    "native-baseline-noise2-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r1-medium.json": {
+      "bytes": 528246,
+      "sha256": "1c6cf8464a7215f65f4ef080312f441bb209ec55c63a2d96d4b0d1e7548176e6"
+    },
+    "native-baseline-noise2-r1-medium.receipt.json": {
+      "bytes": 4098,
+      "sha256": "0126d0585fa304f3a350450819296b3c88e9271801c0ec045d3a6f6fb8dc5c5c"
+    },
+    "native-baseline-noise2-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r2-dense-sparse.json": {
+      "bytes": 528669,
+      "sha256": "e7be3ae6b20f48807b352f3a3d7c2adf8e2023de80d46f378d1d6db5f39c740e"
+    },
+    "native-baseline-noise2-r2-dense-sparse.receipt.json": {
+      "bytes": 4163,
+      "sha256": "23c751d706c2407ea14d6ed28a10253080d24f98108d5fd1038db1be697bd29e"
+    },
+    "native-baseline-noise2-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r2-medium.json": {
+      "bytes": 528246,
+      "sha256": "56424062a797829c20f935846ef588aff531495484a3441517bb43ed0006e9c4"
+    },
+    "native-baseline-noise2-r2-medium.receipt.json": {
+      "bytes": 4098,
+      "sha256": "15debab8ea14cc444857fc70db241bf471e774fb9e1065901217abb569abb292"
+    },
+    "native-baseline-noise2-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-baseline-noise2-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-baseline-noise2-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r1-dense-sparse.json": {
+      "bytes": 528680,
+      "sha256": "2d2dbfecb3ff37e5c6b8c235ee25dfd972c2589d3cd92b3ed783b2c53fa7f19f"
+    },
+    "native-candidate-B1-r1-dense-sparse.receipt.json": {
+      "bytes": 3632,
+      "sha256": "1d1ec5424b84fe22025138fa2bcc4e6737f2fed06dbd868dd6d1ae50a7b908c5"
+    },
+    "native-candidate-B1-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r1-medium.json": {
+      "bytes": 528245,
+      "sha256": "e3601c7f836d9c7f832d89c0de4b41c505d2137e7e540e31e4930defabb22a95"
+    },
+    "native-candidate-B1-r1-medium.receipt.json": {
+      "bytes": 3566,
+      "sha256": "1f1b466e104462a0d1d6b0bce602706230fafee7f5acf6fb6f3232bd5698802a"
+    },
+    "native-candidate-B1-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r2-dense-sparse.json": {
+      "bytes": 528686,
+      "sha256": "daa892ec7fd25f229197383c62ea1b382f71b9e3fe774dcc3c3e91732f14633e"
+    },
+    "native-candidate-B1-r2-dense-sparse.receipt.json": {
+      "bytes": 3632,
+      "sha256": "2667484e628ad4c10372bf09b4e80ed67fe01019eb59dfbfeda3814ca3d53fa9"
+    },
+    "native-candidate-B1-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r2-medium.json": {
+      "bytes": 528238,
+      "sha256": "cd14ff89d1328e8c06e407af1902fe99ce1cf2326f39636679dbd4630493dd88"
+    },
+    "native-candidate-B1-r2-medium.receipt.json": {
+      "bytes": 3566,
+      "sha256": "79654c4af3c3044d629fb42b85ab44addd6d4ccff4371c7f63f2e2697c7684f1"
+    },
+    "native-candidate-B1-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B1-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B1-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r1-dense-sparse.json": {
+      "bytes": 528671,
+      "sha256": "9985f97576a66f7e99f56ddd2633ab7c9802e0dd609a1aef71a51406bcc608a6"
+    },
+    "native-candidate-B2-r1-dense-sparse.receipt.json": {
+      "bytes": 3632,
+      "sha256": "6d00cd23d61b1fd8447bf1c0aca9dd223068f15111bbee088bbc71c64898e904"
+    },
+    "native-candidate-B2-r1-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r1-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r1-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r1-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r1-medium.json": {
+      "bytes": 528234,
+      "sha256": "3157972c0416a540195b9ea32a1ff109f88bac4d923f58077e061ae4f18934b2"
+    },
+    "native-candidate-B2-r1-medium.receipt.json": {
+      "bytes": 3566,
+      "sha256": "423823e5b42e9fc636fc8a5e47b7240110752fc6e55e3e9e9bacb085f23b841d"
+    },
+    "native-candidate-B2-r1-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r1-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r1-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r1-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r2-dense-sparse.json": {
+      "bytes": 528694,
+      "sha256": "6a5814a98c17e4b31e930e74bc7816fdb1329852f9279ac762eac4a846083517"
+    },
+    "native-candidate-B2-r2-dense-sparse.receipt.json": {
+      "bytes": 3632,
+      "sha256": "5caef5bc0e990e11ce42e08621e05120eca295dd5dd210072c4317ea8468b6b6"
+    },
+    "native-candidate-B2-r2-dense-sparse.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r2-dense-sparse.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r2-dense-sparse.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r2-dense-sparse.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r2-medium.json": {
+      "bytes": 528244,
+      "sha256": "fea15354c6302d67b8b54e5bdc0f9feff0f97643e8a6fdb57c42c0a6ae948862"
+    },
+    "native-candidate-B2-r2-medium.receipt.json": {
+      "bytes": 3566,
+      "sha256": "cdce85bcc4f91b045ded45bf1450feab1c639e3f7d1e0aca04fdf2d9166c04c5"
+    },
+    "native-candidate-B2-r2-medium.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r2-medium.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "native-candidate-B2-r2-medium.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-candidate-B2-r2-medium.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "negative-checks.json": {
+      "bytes": 1146,
+      "sha256": "be544a946c1df51cfbe6461584e3c9cafca64f26cebfa78e2b245ddd67b84086"
+    },
+    "negative-checks.py": {
+      "bytes": 2007,
+      "sha256": "8f571b3f3239458c45e9a03e6914133043e0ba7bd3e5f103530478702fa7bcda"
+    },
+    "pilot-analysis.json": {
+      "bytes": 1416863,
+      "sha256": "5741af73edce86bffed7bf6aee986cd4221c6f6b4daf957ccc65f0193e62d7ab"
+    },
+    "plan.json": {
+      "bytes": 2538,
+      "sha256": "1791e8e0af11817e7200bf108aff0382b0aad7a0283ccc4f20b6e94a18c9c218"
+    },
+    "producer-baseline-A1-r1.json": {
+      "bytes": 59918,
+      "sha256": "816d25207cebcf2c9758d778844a3d0e9a588a5a71e15fa99d252e880f8b8bd5"
+    },
+    "producer-baseline-A1-r1.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-baseline-A1-r1.receipt.json": {
+      "bytes": 4238,
+      "sha256": "fc253c8e5395b646e56a702d3996babc09da7e3857cb7b594f39ce1ea23c0a73"
+    },
+    "producer-baseline-A1-r1.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A1-r1.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A1-r1.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A1-r1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A1-r2.json": {
+      "bytes": 59923,
+      "sha256": "0b8e014e592144b4728e49f9db76daa8f9c0905c1f7c865bd609e9e13983c1a9"
+    },
+    "producer-baseline-A1-r2.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-baseline-A1-r2.receipt.json": {
+      "bytes": 4238,
+      "sha256": "f7fbb20026e259885e7e804857f10df097073d3dc7ecc88196188f65497c9076"
+    },
+    "producer-baseline-A1-r2.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A1-r2.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A1-r2.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A1-r2.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A2-r1.json": {
+      "bytes": 59923,
+      "sha256": "ce1b85e265a5d18c3baa2d1d60cd667869cbc1b56f68413702e59721c1c525a4"
+    },
+    "producer-baseline-A2-r1.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-baseline-A2-r1.receipt.json": {
+      "bytes": 4238,
+      "sha256": "151634ba48711ac3a62bd734c9846101c14e694dfbdc95df95130827ef0231ba"
+    },
+    "producer-baseline-A2-r1.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A2-r1.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A2-r1.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A2-r1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A2-r2.json": {
+      "bytes": 59922,
+      "sha256": "d690f8c233b94eff3a7957bdb82237bafae71638e7d2e839ec9b0594cd00cfdd"
+    },
+    "producer-baseline-A2-r2.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-baseline-A2-r2.receipt.json": {
+      "bytes": 4238,
+      "sha256": "f62c80ea373d4b90432a5932882b60d6f231e0b8174896b8c8785294022ff817"
+    },
+    "producer-baseline-A2-r2.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A2-r2.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-baseline-A2-r2.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-baseline-A2-r2.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B1-r1.json": {
+      "bytes": 59924,
+      "sha256": "8de82097213459da38005bb5f2dfd79efa48c944874c8d7fea061b1fd5722104"
+    },
+    "producer-candidate-B1-r1.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-candidate-B1-r1.receipt.json": {
+      "bytes": 3748,
+      "sha256": "d3205acb18a0c757ee22a3f7d952af61c4cff193cae76fac77d04e1a0f08d0aa"
+    },
+    "producer-candidate-B1-r1.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B1-r1.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B1-r1.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B1-r1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B1-r2.json": {
+      "bytes": 59925,
+      "sha256": "9d4faf9c254d6eabd224b596727ee6c224216dc87ed2914ae107c09f3eba9153"
+    },
+    "producer-candidate-B1-r2.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-candidate-B1-r2.receipt.json": {
+      "bytes": 3748,
+      "sha256": "d8683a8116468665b666002213a0ef0d3ee0b2d7761b84329f805fa472bdec21"
+    },
+    "producer-candidate-B1-r2.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B1-r2.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B1-r2.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B1-r2.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B2-r1.json": {
+      "bytes": 59922,
+      "sha256": "320844db5332b98bffc9ea2344d0dfc84e6ca775fc6feef4fbd8e695e12e1a03"
+    },
+    "producer-candidate-B2-r1.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-candidate-B2-r1.receipt.json": {
+      "bytes": 3747,
+      "sha256": "6839198783ac74fb33906e9c651edee671652517e0ff263c71b23d6d2ef7a49c"
+    },
+    "producer-candidate-B2-r1.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B2-r1.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B2-r1.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B2-r1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B2-r2.json": {
+      "bytes": 59916,
+      "sha256": "92c88bba44a388714d3e727c010b717060d08f90762d1fb76e7e7ea54abeba62"
+    },
+    "producer-candidate-B2-r2.producer.json": {
+      "bytes": 5694,
+      "sha256": "59142259242ad8846e36cbf2ab8f3c5d3ffceaa2501cd7d60814603341238fca"
+    },
+    "producer-candidate-B2-r2.receipt.json": {
+      "bytes": 3748,
+      "sha256": "3ad7c171d695cae5804183b248c52b3c5aa3898a4729f99accdb353a48270e63"
+    },
+    "producer-candidate-B2-r2.source-after.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B2-r2.source-before.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "producer-candidate-B2-r2.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "producer-candidate-B2-r2.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "quality-baseline-focused.json": {
+      "bytes": 1911,
+      "sha256": "00d6fb71163e48c148c3db23f6da916b3982784d64944c1b4ec3b84c19c5ba5e"
+    },
+    "quality-baseline-focused.source.json": {
+      "bytes": 887523,
+      "sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+    },
+    "quality-candidate-focused.json": {
+      "bytes": 1918,
+      "sha256": "5b9890a89033937dbb0106c10dcf1ba19d3c751f7c63dd335fcb0ab4d0ca8631"
+    },
+    "quality-candidate-focused.source.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "quality-correction.json": {
+      "bytes": 425,
+      "sha256": "39dfa34b5dd6178a2831eff3fd6244086ab916a0cfa837503e909b35d4be6fff"
+    },
+    "quality-preflight/quality-restored-focused.json": {
+      "bytes": 1910,
+      "sha256": "b9752c21fbdb5358053b5486fc1ff778fd38fba81b3a0b9817b13fceb1093a47"
+    },
+    "quality-preflight/quality-restored-focused.source.json": {
+      "bytes": 887523,
+      "sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+    },
+    "quality-preflight/quality-restored-quality.json": {
+      "bytes": 1746,
+      "sha256": "85c7f046eb85cc6ebeacc1d1a0c882544a4fa2acd03811914fb717e6e4dfbbb4"
+    },
+    "quality-preflight/quality-restored-quality.source.json": {
+      "bytes": 887523,
+      "sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+    },
+    "quality-preflight/restored-focused-facts.log": {
+      "bytes": 793,
+      "sha256": "9a75faf90bb57fd9ddcf461cd414876107f496e1a83b52d93b0c2a5ff03c7c6a"
+    },
+    "quality-preflight/restored-focused-planning-errors.log": {
+      "bytes": 998,
+      "sha256": "e4fc0c15d6d5cd3f74d8472d121acea7aadd14e070a3cd1bcef1056e2af0e5c5"
+    },
+    "quality-preflight/restored-focused-validation.log": {
+      "bytes": 3861,
+      "sha256": "910536fdb4cf759d325e77333ebf65733ee05c23f515653efb089fa417409f99"
+    },
+    "quality-preflight/restored-quality-fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "quality-preflight/restored-quality-xlsx-check.log": {
+      "bytes": 4612,
+      "sha256": "09fc9ef6e00e237865951cec5652e7d6ac4c7b52e8bde8029afc0cbfa31e60fa"
+    },
+    "quality-preflight/restored-quality-xlsx-clippy.log": {
+      "bytes": 2161,
+      "sha256": "70f81b1cf29bd94194b5aaa3b61208aa97edfe480b519e5a8bb8baab1d159dbf"
+    },
+    "quality-preflight/source-final.json": {
+      "bytes": 887523,
+      "sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+    },
+    "quality-restored-focused.json": {
+      "bytes": 1912,
+      "sha256": "4cee38aa6bf0c10ed3ed709924b2d313c08e2989a2a309c3b84fa0a78a9b21ad"
+    },
+    "quality-restored-focused.source.json": {
+      "bytes": 887523,
+      "sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+    },
+    "quality-restored-quality.json": {
+      "bytes": 1745,
+      "sha256": "7810defc020b628caf969e32a14a8b274933b1748d31fe613fd512a49567ac3d"
+    },
+    "quality-restored-quality.source.json": {
+      "bytes": 887523,
+      "sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+    },
+    "quality.py": {
+      "bytes": 2473,
+      "sha256": "f5e01684d0cdfcd26db1050070783859b498726ef10b9b75b15df9f5ee065583"
+    },
+    "restored-focused-facts.log": {
+      "bytes": 793,
+      "sha256": "6ff6d814855757079dcfab49bd1cd4a0eef2c9ebbb41e04fbb1193db2de75028"
+    },
+    "restored-focused-planning-errors.log": {
+      "bytes": 921,
+      "sha256": "16a827d6b537dcffc3888f9040b3e2928d316f43b89e59c6a9c1a3b4069ca424"
+    },
+    "restored-focused-validation.log": {
+      "bytes": 3861,
+      "sha256": "1776a35101ea6f3ce0c87d5336bc884b20779541e15833aea531ac7f0af22f42"
+    },
+    "restored-quality-fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "restored-quality-xlsx-check.log": {
+      "bytes": 149,
+      "sha256": "5563783da67f81cf789552493d4c76a54d93b2f7af89770519749e7df7feeb1d"
+    },
+    "restored-quality-xlsx-clippy.log": {
+      "bytes": 150,
+      "sha256": "f8fb9035157d1d343148734f3caf396177f94c63daade1f89fefdb3066e4d33b"
+    },
+    "retained-test-correction.patch": {
+      "bytes": 686,
+      "sha256": "29ef8001c2fde035b453bd9be052d7743b784a037143342147df0b3908642b61"
+    },
+    "retained-test-corrections.json": {
+      "bytes": 522,
+      "sha256": "b1d61168ec3b1b46f564ee4f6389da2a3532ba41c8cf7209ff47d266768dac06"
+    },
+    "review.json": {
+      "bytes": 733,
+      "sha256": "7f3f82a1a9a0dc066d7d1f125898d4f1e70e8efe1d1296bf73a300e26bfcd8d0"
+    },
+    "source-baseline.json": {
+      "bytes": 887523,
+      "sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998"
+    },
+    "source-candidate.json": {
+      "bytes": 887523,
+      "sha256": "b83375b7908750cb7d685e2e72c1115b09e642feda4119ed3ecb4a881987205a"
+    },
+    "source-final.json": {
+      "bytes": 887523,
+      "sha256": "9735745cfe67d139263ef56fddaa8767856478df3999b3a4fc550956394d1577"
+    },
+    "whitespace-exceptions.json": {
+      "bytes": 2090,
+      "sha256": "087b7abd1a19346a037acf76c2e3e9d2287b12020c95c2eb8b70540ac7ae2c5b"
+    }
+  }
+}
