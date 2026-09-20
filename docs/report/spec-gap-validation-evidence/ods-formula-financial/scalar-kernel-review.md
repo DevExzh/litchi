@@ -48,3 +48,14 @@ Two additional RRI probes still return `#NUM!` and need correction:
 The follow-up result is 8 passed and 2 failed; disposition remains changes
 required. Its temporary harness and executable were also removed. These are
 arithmetic probes, not integrated evaluator or Cargo evidence.
+
+## Second correction follow-up
+
+Kernel SHA-256
+`bf48b77f683e36e42d75798d24dffa35bc870d7485035f89328bacfb1024983c`
+passes all six independent probes and the four kernel tests: 10 passed,
+0 failed. Root checked that the source hash was unchanged across compilation
+and execution, then removed the temporary harness and executable. The six
+reported defects are resolved in this isolated version. Broader oracle,
+coercion, solver, resolver, and integration validation remain outstanding;
+this result does not promote the financial batch to supported.
