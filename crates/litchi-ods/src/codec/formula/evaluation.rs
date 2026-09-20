@@ -163,6 +163,7 @@
 //! ```
 
 mod aggregate;
+mod calendar;
 pub mod complex;
 mod descriptive;
 mod discrete;
