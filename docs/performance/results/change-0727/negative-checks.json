@@ -1,0 +1,56 @@
+{
+  "analyzer_sha256": "a4d0e2ac6389daba5ed159fac8d3a2f2eaa8ff8557d7dfd7272f9b94ae1d1719",
+  "script_sha256": "e91944cde7e2a119767689b8e1007e743c20f48e3eb15ca8417d3649fedea95e",
+  "checks": [
+    {
+      "name": "complete capture accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "raw hash mismatch rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "outcome corruption with matching hash rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "duplicate process rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "command sample count corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "phase relabel rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "end binding removed rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "warm exception",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "warm failure",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "workflow no exception",
+      "accepted": false,
+      "expected": false
+    }
+  ]
+}

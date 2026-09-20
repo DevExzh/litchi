@@ -1,0 +1,19 @@
+{
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0727",
+    "/home/zhuhe/code/litchi-0727-bin"
+  ],
+  "identities": [
+    {
+      "path": "/home/zhuhe/code/litchi-0727-bin/baseline/xls-index-retry-probe-0686",
+      "sha256": "cf7c6d4df5989f8457173a4f60530f42eea8007ddb7585f11d97934b44508a72",
+      "bytes": 136764800
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0727-bin/candidate/xls-index-retry-probe-0686",
+      "sha256": "614dbcdf9fdf55661435ccbd8517d7c9560d30391b313e68dc843d0ccf68dc36",
+      "bytes": 136706672
+    }
+  ],
+  "removed": true
+}
