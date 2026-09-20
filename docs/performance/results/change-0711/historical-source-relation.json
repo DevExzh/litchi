@@ -1,0 +1,15 @@
+{
+  "historical_packet": "change-0709",
+  "current_revision": "9862aeb599ca623d75e5a10e4f297b472442e7d3",
+  "changes": {
+    "crates/litchi-docx/src/package/codec.rs": {
+      "historical": "d64815bf87ab50a3bee88af9a8296dbda6a693aff1f458a309fd82cac93f0bcb",
+      "current": "6931ca94dfbe5a0f3daf11d759f716e7d783cbab7099d9f5ce775aeb113bf3b0"
+    },
+    "crates/litchi-docx/tests/custom_properties.rs": {
+      "historical": "458acf028166f5d0fe7e11a30bddd61ac744b015abda7df3eae11e590a62ee51",
+      "current": "0950de5ff88c593eef0f1adfc805997b2694c353cfc9f02e15a3aa323e7e5ad3"
+    }
+  },
+  "interpretation": "0710 changes publication custom-properties write only; alt scanner, document_mut and mutable-body acquisition source files are unchanged. Historical instruction attribution selects candidate but is not current native timing."
+}

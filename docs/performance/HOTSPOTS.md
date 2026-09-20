@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0711 — DOCX `alt::scan` remains a deferred ownership experiment
+
+[0711](change-0711.md) tests a private event/resolver borrowing seam selected
+from historical edit attribution. The generated corpus's historical
+`alt::scan` child accounts for 37.325609% of its `DocumentBody::from_xml`
+guest instructions, while the admitted `NumberedList` contrast is 18.179624%
+and has a larger `active_block_ranges` child. The fresh paired pilot reduces
+native edit p50 by 8.151–8.861% on generated and 2.888–4.392% on the real
+fixture, but one real-fixture pair misses the 3% p50 floor. Allocator request
+and byte reductions are retained as instrumentation evidence only. Production
+is restored; the seam remains a bounded follow-up that must preserve ranges,
+namespace/markup-compatibility choices, relationships, refusals, limits, and
+unknown markup. No candidate `cfg(test)` or full-quality suite, RSS capture, or
+Callgrind run was executed at any point in this pilot. `performance_claim: none`.
+[Packet](results/change-0711/README.md).
+
 ## 0710 — remove unintended custom-properties normalization
 
 [0710](0710-docx-clean-custom-properties.md) fixes the clean custom-properties

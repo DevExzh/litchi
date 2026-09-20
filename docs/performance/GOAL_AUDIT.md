@@ -1,5 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0711 — measured DOCX `alt::scan` pilot rejected at the native gate
+
+[0711](change-0711.md) evaluates a source-compatible DOCX event/resolver
+ownership candidate with a generated medium corpus and an admitted real
+`NumberedList` fixture. The strict 49-case scanner oracle is byte-identical
+between baseline and candidate, with 28 successes and 21 typed errors per
+report, and the existing DOCTYPE event acceptance remains an acceptance. The
+paired measurement has 32 isolated children and deterministic output parity;
+47 of 48 hard gates pass. Pair 2's `NumberedList` edit p50 improves
+2.888465327% rather than the required 3%, so the candidate is rejected and
+the production source is restored byte-for-byte. Native rejection stopped
+conditional follow-ups: no candidate `cfg(test)` or full-quality suite, RSS
+capture, or Callgrind run was executed at any point in this pilot.
+`performance_claim: none`. This is scoped evidence for a future
+source-preserving experiment, not a DOCX-wide speedup,
+compatibility, RSS, or coverage claim. [Evidence packet](results/change-0711/README.md).
+
 ## 0710 — DOCX clean custom-properties correction
 
 [0710](0710-docx-clean-custom-properties.md) follows the preservation failure

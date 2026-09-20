@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0711 — DOCX `alt::scan` ownership pilot rejected
+
+[0711](change-0711.md) measures borrowing slice-backed XML events and the
+namespace resolver inside the existing DOCX `alt::scan` loop. The paired
+matrix has 16 native and 16 allocator children across generated-medium and
+admitted `NumberedList` corpora, with exact source/binary/fixture custody and
+deterministic output parity. Native edit p50/mean improves by at least 3% in
+three of four corpus/pair combinations; pair 2 `NumberedList` edit p50
+improves 2.888465327%, below the frozen 3% floor, so the candidate is rejected
+and production is restored byte-for-byte. Lifecycle and allocator hard gates
+pass, but the allocation reductions remain diagnostic. One native p99 tail and
+18 repeat-drift flags remain explicit. No RSS, Callgrind, hardware, cold-cache,
+or broader performance claim follows. Native rejection stopped conditional
+follow-ups: no candidate `cfg(test)` or full-quality suite, RSS capture, or
+Callgrind run was executed at any point in this pilot. `performance_claim: none`.
+[Evidence packet](results/change-0711/README.md).
+
 ## 0710 — DOCX untouched custom-properties preservation
 
 [0710](0710-docx-clean-custom-properties.md) addresses the exact-byte defect

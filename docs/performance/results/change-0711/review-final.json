@@ -1,0 +1,24 @@
+{
+  "author": "root coordinator",
+  "status": "pass",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0711/audit.py"
+  ],
+  "exit_code": 0,
+  "audit_log_sha256": "1c0a6cc0edf25c0ba65145c4e8c6d0c39800c2b2ec9565d0ae3a2cddb6c6c59d",
+  "analyzer_review": {
+    "reviewer": "alt_scan_review_0711",
+    "findings": [
+      "ordered_jobs tuple mismatch",
+      "reference witness lane overwritten by allocator"
+    ],
+    "corrections": "local triple-yield helper and lane-keyed normalized reference; unchanged frozen capture/plan",
+    "acceptance": "single frozen threshold failure retained"
+  },
+  "limitations": [
+    "Independent reviewer supplied analyzer findings; coordinator completed terminal audit.",
+    "No candidate cfg(test), full quality, RSS or Callgrind execution."
+  ]
+}

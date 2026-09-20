@@ -1,0 +1,15 @@
+{
+  "verdict": "No static ownership/lifetime blocker",
+  "proof": [
+    "NsReader<&[u8]> yields input-slice events, not scratch-buffer borrows",
+    "Resolver scope pushes before Start/Empty and defers pop until next read",
+    "No borrowed event/namespace survives iteration; PendingChunk keeps owned Rel plus scalar state",
+    "Only remove event ownership and resolver clone; attribute values still owned when retained"
+  ],
+  "required_oracle_cases": [
+    "temporary prefix/default rebinding",
+    "End and Empty scope pop followed by foreign-prefixed sibling",
+    "identical errors and source offsets"
+  ],
+  "precedent": "0635 XLSX styles parser borrowing; no assumption of same performance benefit"
+}

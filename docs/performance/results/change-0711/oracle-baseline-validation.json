@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "case_count": 49,
+  "successes": 28,
+  "errors": 21,
+  "report_sha256": "f222dcf20328c9ae05750cdcca2d3755a067f323503ac86ac819f420ba83b946",
+  "expected_namespace_and_event_routes_verified": true,
+  "scope": "Scanner parity only: observed baseline accepts the outside-anchor DOCTYPE event; validate_xml here checks byte budget, not generic XML publication security. Both event variants succeed."
+}

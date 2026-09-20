@@ -1,0 +1,9 @@
+{
+  "revision": "9862aeb599ca623d75e5a10e4f297b472442e7d3",
+  "previous_turn": "progress:0710 committed preservation fix with1453tests and strictoraclepass",
+  "scope": "DOCX mutable acquisition altChunk scan ownership pilot",
+  "production_candidate": "Borrow slice-backed XML events and namespace resolver within each existing scan iteration; retain every scan and validation call",
+  "performance_claim": "pending measurement; none yet",
+  "hypothesis": "Removing per-event copies and resolver clones reduces document acquisition time and allocation requests while preserving all public scan outcomes.",
+  "acceptance": "Both pairs and corpora must meet frozen edit improvement and lifecycle/allocation nonregression gates; correctness oracle equality required, then conditional RSS/profile and full quality review."
+}

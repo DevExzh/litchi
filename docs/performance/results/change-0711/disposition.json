@@ -1,0 +1,19 @@
+{
+  "decision": "rejected",
+  "failed_gates": [
+    {
+      "name": "pair-2/numbered-list/edit/p50/improvement",
+      "pass": false,
+      "threshold_percent": 3,
+      "observed_improvement_percent": 2.8884653269031557
+    }
+  ],
+  "production": "baseline restored byte-for-byte; 0710 custom-properties fix retained",
+  "unexecuted": [
+    "conditional RSS capture",
+    "conditional Callgrind profiles",
+    "candidate cfg(test) tests",
+    "candidate full quality suite"
+  ],
+  "reason": "Frozen acceptance threshold not met. No retiming or lowered threshold."
+}

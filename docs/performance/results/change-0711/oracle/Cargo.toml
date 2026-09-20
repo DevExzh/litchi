@@ -1,0 +1,18 @@
+[package]
+name = "docx-alt-scan-oracle-0711"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "docx-alt-scan-oracle-0711"
+path = "src/main.rs"
+
+[dependencies]
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../../../../crates/soapberry-zip" }
+
+[workspace]
