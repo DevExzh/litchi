@@ -1,0 +1,29 @@
+{
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "freeze_sha256": "461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561",
+  "proofs": [
+    {
+      "id": "workday.offset_conversion",
+      "requirements": [
+        "DateParam and toward-zero finite Offset conversion"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/date_time.rs",
+        "root": "repo",
+        "sha256": "29f1495a55aac7effee9f6509deef38e5d5f747ba2b87c65a188d8759c1265e3"
+      }
+    }
+  ],
+  "report": {
+    "path": "workday-conversion-review.md",
+    "root": "evidence",
+    "sha256": "ecffc59b7c4de9c092b7f4aac76e6e64492ae2fdf59ee5b5c7835ac816e8f4cd"
+  },
+  "review_receipt": {
+    "path": "review-receipt.json",
+    "root": "evidence",
+    "sha256": "af38cc90788e881cc36032c1bd7462f395441e698f02d064d0c7e4e04adbf4e5"
+  },
+  "reviewer": "independent_date_time_resource_review",
+  "schema": "ods-formula-date-time-source-review-v1"
+}
