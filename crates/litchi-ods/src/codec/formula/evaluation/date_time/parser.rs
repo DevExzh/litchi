@@ -32,12 +32,12 @@ pub(super) fn parse<'a>(
         let bytes = text.len();
         let reservation = evaluator.reserve_storage(bytes, "formula date/time parser scratch")?;
         let mut scratch = Vec::new();
-        scratch.try_reserve_exact(bytes).map_err(|source| {
-            EvaluationFailure::Allocation {
+        scratch
+            .try_reserve_exact(bytes)
+            .map_err(|source| EvaluationFailure::Allocation {
                 resource: "formula date/time parser scratch",
                 source,
-            }
-        })?;
+            })?;
         scratch.resize(bytes, 0);
         evaluator
             .context
