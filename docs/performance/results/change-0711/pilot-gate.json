@@ -1,0 +1,16 @@
+{
+  "status": "rejected",
+  "native_children": 16,
+  "allocator_children": 16,
+  "output_parity": true,
+  "analysis_sha256": "6c9e4d0ce1c69da185d54fe1bdce699a8b4cb03e45f174cabc459d7c05fbd790",
+  "failed_gates": [
+    {
+      "name": "pair-2/numbered-list/edit/p50/improvement",
+      "pass": false,
+      "threshold_percent": 3,
+      "observed_improvement_percent": 2.8884653269031557
+    }
+  ],
+  "mechanism_capture": "deferred; no RSS or Callgrind runs"
+}

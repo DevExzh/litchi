@@ -1,5 +1,20 @@
 # Performance program phase report
 
+## 0711 — DOCX `alt::scan` ownership pilot rejected
+
+[0711](change-0711.md) records a source-bound paired DOCX pilot for borrowing
+XML events and the namespace resolver inside `alt::scan`. The exact 32-child
+matrix preserves source, binary, fixture, argv, and output custody, and the
+49-case public scanner oracle is byte-identical with 28 successful and 21
+error outcomes per report. The candidate passes 47 of 48 hard metric gates,
+but pair 2's admitted `NumberedList` edit p50 improves 2.888465327%, below the
+frozen 3% native floor. Production is restored byte-for-byte; allocator
+reductions and historical instruction attribution remain diagnostic. No
+candidate `cfg(test)` or full-quality suite, RSS capture, or Callgrind run was
+executed at any point in this pilot; native rejection stopped conditional
+follow-ups. `performance_claim: none`; no broader performance claim is
+registered. [Report](change-0711.md); [packet](results/change-0711/README.md).
+
 ## 0675 — merged validation and cleanup, without an aggregate speedup claim
 
 Record: [0675](0675-third-wave-integration.md). The packet retains the

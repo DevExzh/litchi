@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "packet": "change-0711-docx-ordinary-save-paired-pilot",
+  "name": "baseline-A2-allocator-generated-lifecycle",
+  "stage": "baseline-A2",
+  "source_label": "baseline",
+  "build_label": "baseline",
+  "pair": "pair-2",
+  "lane": "allocator",
+  "stage_order": "reverse",
+  "stage_order_index": 1,
+  "corpus_id": "generated",
+  "corpus_label": "generated-medium",
+  "corpus_origin": "generated-harness-corpus",
+  "phase": "lifecycle",
+  "case": "docx_ordinary_save_lifecycle",
+  "samples": 3,
+  "warmup": 0,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0711-bin/baseline-alloc",
+    "--warmup",
+    "0",
+    "--samples",
+    "3",
+    "--case",
+    "docx_ordinary_save_lifecycle",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0711/baseline-A2-allocator-generated-lifecycle.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0711-fs"
+  ],
+  "start_utc": "2026-09-20T08:33:42.581811+00:00",
+  "end_utc": "2026-09-20T08:33:43.229171+00:00",
+  "seconds": 0.34430492599494755,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0711-bin/baseline-alloc",
+  "binary_sha256": "7fd057c5dcca7a2bba24e7a6ec2841b5d79e3f3a420a87d2849235d5eac786cd",
+  "binary_bytes": 62989600,
+  "build_record": "build-baseline.json",
+  "build_record_sha256": "a3a60ee3cfb49c51b1fbe2c21ac89feab6fd3d185074999dab77fc68d17162a4",
+  "build_source_manifest": "source-baseline.json",
+  "build_source_manifest_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+    "source_census_sha256": "fa75d32d3f3997ce5804f673c08349f0e841e55f2a338e0745b71da98a727266",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "baseline-A2-allocator-generated-lifecycle.source-before.json",
+    "after_artifact": "baseline-A2-allocator-generated-lifecycle.source-after.json",
+    "before_sha256": "fa75d32d3f3997ce5804f673c08349f0e841e55f2a338e0745b71da98a727266",
+    "after_sha256": "fa75d32d3f3997ce5804f673c08349f0e841e55f2a338e0745b71da98a727266",
+    "before_file_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+    "after_file_sha256": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "fixture": {
+    "plan_path": null,
+    "plan_sha256": null,
+    "before": null,
+    "after": null
+  },
+  "plan_sha256": "450c35112d9a4697d94cf466e432e5c9cb492cdba50ec4144857461b23cd1cb4",
+  "script_sha256": "6e465641e3053410d507aa048ab4331ba870aa18faaaad06a95622c8438e1034",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "baseline-A2-allocator-generated-lifecycle.json": "e4ee47ccc73459ce05312e8972813e0106e753b77f847a3517a8fb59b7d3fc87",
+    "baseline-A2-allocator-generated-lifecycle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-A2-allocator-generated-lifecycle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-A2-allocator-generated-lifecycle.source-before.json": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a",
+    "baseline-A2-allocator-generated-lifecycle.source-after.json": "fc34adefe13085d0287e96185987c81f88a8da269d5d84fe61a98b2ee7125a0a"
+  }
+}

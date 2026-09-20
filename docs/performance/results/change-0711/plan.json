@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "packet": "change-0711-docx-ordinary-save-paired-pilot",
+  "created_utc": "2026-09-20T08:23:52+00:00",
+  "revision": "9862aeb599ca623d75e5a10e4f297b472442e7d3",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0711-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "phase_order": ["edit", "lifecycle"],
+  "native": {"samples": 100, "warmup": 10},
+  "allocator": {"samples": 3, "warmup": 0},
+  "stages": [
+    {"label": "baseline-A1", "source": "baseline", "build": "baseline", "pair": "pair-1", "order": "forward"},
+    {"label": "candidate-B1", "source": "candidate", "build": "candidate", "pair": "pair-1", "order": "forward"},
+    {"label": "candidate-B2", "source": "candidate", "build": "candidate", "pair": "pair-2", "order": "reverse"},
+    {"label": "baseline-A2", "source": "baseline", "build": "baseline", "pair": "pair-2", "order": "reverse"}
+  ],
+  "order": "A1 forward, B1 forward, B2 reverse, A2 reverse; each stage has one child per corpus and phase",
+  "thresholds": {
+    "edit_improvement_percent": 3,
+    "lifecycle_regression_percent": 3,
+    "allocation_regression_percent": 3,
+    "tail_flag_percent": 5,
+    "repeat_drift_flag_percent": 5
+  },
+  "claims": {
+    "primary": "paired native edit p50 and mean improve by at least 3 percent for both corpora in both pairs",
+    "lifecycle": "paired native lifecycle p50 and mean regress by no more than 3 percent",
+    "allocation": "allocator allocation request counts and requested bytes regress by no more than 3 percent",
+    "limitations": [
+      "This pilot makes no hardware, RSS, cold-cache, throughput, or scaling claim.",
+      "Lifecycle is a non-regression gate; it is not a speedup claim.",
+      "Allocator net-live and peak-above-start values remain per-operation diagnostics and are never summed across phases."
+    ]
+  }
+}

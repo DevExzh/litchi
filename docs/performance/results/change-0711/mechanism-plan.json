@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "packet": "change-0711-docx-alt-scan-mechanism",
+  "created_utc": "2026-09-20T08:33:08+00:00",
+  "revision": "9862aeb599ca623d75e5a10e4f297b472442e7d3",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0711-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "pilot_gate": {
+    "capture_script": "capture.py",
+    "analysis_candidates": ["pilot-gate.json", "analysis.json"],
+    "required_status": "pass",
+    "required_native_children": 16,
+    "require_output_parity": true,
+    "defer_on_rejection": true,
+    "description": "The mechanism packet is admissible only after the native paired pilot has an explicit passing gate. A missing or rejected gate defers the mechanism and makes no performance claim."
+  },
+  "source_custody": {
+    "baseline_manifest": "source-baseline.json",
+    "candidate_manifest": "source-candidate.json",
+    "current_checkout": "candidate",
+    "allowed_delta_paths": ["crates/litchi-docx/src/alt/codec.rs"],
+    "require_target_changed": true,
+    "baseline_binary_may_use_frozen_custody": true
+  },
+  "stages": [
+    {"label": "baseline-A1", "source": "baseline", "build": "baseline", "pair": "pair-1", "repeat": 1, "order": "forward"},
+    {"label": "candidate-B1", "source": "candidate", "build": "candidate", "pair": "pair-1", "repeat": 1, "order": "forward"},
+    {"label": "candidate-B2", "source": "candidate", "build": "candidate", "pair": "pair-2", "repeat": 2, "order": "reverse"},
+    {"label": "baseline-A2", "source": "baseline", "build": "baseline", "pair": "pair-2", "repeat": 2, "order": "reverse"}
+  ],
+  "callgrind": {
+    "tool": "/usr/bin/valgrind",
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0,
+    "phase": "edit",
+    "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+    "owner_match": "exact",
+    "measured_parent": "litchi_perf_baseline::ordinary_save::run_case",
+    "setup_parents": {
+      "litchi_perf_baseline::ordinary_save::build_corpus": 1,
+      "litchi_perf_baseline::ordinary_save::publish_reference": 3
+    },
+    "expected_numbered_parts": 5,
+    "retain_program_termination": true,
+    "retain_all_numbered_parts": true,
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "--zero-before=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit"
+    ],
+    "selection": "Select exactly one positive raw incoming edge whose caller is ordinary_save::run_case; retain setup edges and every raw part for audit."
+  },
+  "rss": {
+    "tool": "/usr/bin/time",
+    "verbose": true,
+    "repeats": 2,
+    "samples": 10,
+    "warmup": 2,
+    "phases": ["edit", "lifecycle"],
+    "peak_metric": "Maximum resident set size (kbytes)",
+    "peak_flag_percent": 5,
+    "repeat_flag_percent": 5,
+    "no_peak_summation": true,
+    "children": 16
+  },
+  "native_parity": {
+    "pilot_name_template": "{stage}-native-{corpus}-{phase}",
+    "compare_fields": ["case", "corpus", "source", "output_sha256", "published_sha256"],
+    "when_pilot_available": "Require every mechanism result identity to match its same-stage native pilot identity after timing and allocation fields are removed.",
+    "between_stages": "Require baseline and candidate identities to match for each corpus and phase."
+  },
+  "thresholds": {
+    "rss_peak_percent": 5,
+    "repeat_percent": 5
+  },
+  "retained_helpers": [
+    "docs/performance/results/change-0707/analyze_profiles.py",
+    "docs/performance/results/change-0709/analyze_profiles.py",
+    "docs/performance/results/change-0705/analyze_profiles.py",
+    "docs/performance/results/change-0521/analyze_profiles.py"
+  ],
+  "retained_helper_sha256": {
+    "docs/performance/results/change-0707/analyze_profiles.py": "bc1434e1d47bde62a384c00d6125110ffd8b68ec3db6825b91b43c823c7bdd37",
+    "docs/performance/results/change-0709/analyze_profiles.py": "7f4ea583cff8414879b23050353555b08e7839dc6ed1554ecece61918162303b",
+    "docs/performance/results/change-0705/analyze_profiles.py": "1cd145fdeaadddea013747dc7fcd418214237cfca1f57002f95d374933f74819",
+    "docs/performance/results/change-0521/analyze_profiles.py": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7"
+  },
+  "claims": {
+    "callgrind": "Callgrind Ir is a guest-instruction attribution mechanism diagnostic for the exact edit owner; it is not native latency, hardware instructions, allocation count, RSS, or cache-counter evidence.",
+    "rss": "Maximum RSS is a process-level /usr/bin/time -v observation for the named corpus and phase. Peaks are per child and are never summed across phases or repeats.",
+    "gate": "If the native pilot has no explicit passing gate, or if native output parity fails, this packet is deferred and makes no optimization claim."
+  }
+}

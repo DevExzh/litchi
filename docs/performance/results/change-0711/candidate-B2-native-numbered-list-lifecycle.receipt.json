@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "packet": "change-0711-docx-ordinary-save-paired-pilot",
+  "name": "candidate-B2-native-numbered-list-lifecycle",
+  "stage": "candidate-B2",
+  "source_label": "candidate",
+  "build_label": "candidate",
+  "pair": "pair-2",
+  "lane": "native",
+  "stage_order": "reverse",
+  "stage_order_index": 0,
+  "corpus_id": "numbered-list",
+  "corpus_label": "NumberedList.docx",
+  "corpus_origin": "caller-named-real-file",
+  "phase": "lifecycle",
+  "case": "docx_real_file_ordinary_save_lifecycle",
+  "samples": 100,
+  "warmup": 10,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0711-bin/candidate-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--case",
+    "docx_real_file_ordinary_save_lifecycle",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0711/candidate-B2-native-numbered-list-lifecycle.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0711-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "start_utc": "2026-09-20T08:33:13.071821+00:00",
+  "end_utc": "2026-09-20T08:33:14.347026+00:00",
+  "seconds": 0.968754002940841,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0711-bin/candidate-native",
+  "binary_sha256": "7c9c8e0e3779b1afc74008bd19a0070290109fd63845645b84828a25a71d949b",
+  "binary_bytes": 62889104,
+  "build_record": "build-candidate.json",
+  "build_record_sha256": "04c6ae4395bd927c18d4f17d765699460d5e6c6721adf50a4f2e6f0ef8f60dd0",
+  "build_source_manifest": "source-candidate.json",
+  "build_source_manifest_sha256": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba",
+  "retained_binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba",
+    "source_census_sha256": "67a714a6cfff11921945a42b660f4f714645fc5b6eacc9f6a347179a49839ba0",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "candidate-B2-native-numbered-list-lifecycle.source-before.json",
+    "after_artifact": "candidate-B2-native-numbered-list-lifecycle.source-after.json",
+    "before_sha256": "67a714a6cfff11921945a42b660f4f714645fc5b6eacc9f6a347179a49839ba0",
+    "after_sha256": "67a714a6cfff11921945a42b660f4f714645fc5b6eacc9f6a347179a49839ba0",
+    "before_file_sha256": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba",
+    "after_file_sha256": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "fixture": {
+    "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "plan_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+    "before": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    },
+    "after": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  },
+  "plan_sha256": "450c35112d9a4697d94cf466e432e5c9cb492cdba50ec4144857461b23cd1cb4",
+  "script_sha256": "6e465641e3053410d507aa048ab4331ba870aa18faaaad06a95622c8438e1034",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "candidate-B2-native-numbered-list-lifecycle.json": "7cb1f46d695eb75506fb4322cff3e6bd33215936ef02fa01db9a47f9e4795916",
+    "candidate-B2-native-numbered-list-lifecycle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-B2-native-numbered-list-lifecycle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-B2-native-numbered-list-lifecycle.source-before.json": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba",
+    "candidate-B2-native-numbered-list-lifecycle.source-after.json": "2c7d7be09947d40f06c2a437c8755b10dfc0ddebd1e54fd29bb27c27a1b181ba"
+  }
+}

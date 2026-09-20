@@ -1,0 +1,121 @@
+diff --git a/crates/litchi-docx/src/alt/codec.rs b/crates/litchi-docx/src/alt/codec.rs
+index 83ab21f799..a26834c2c5 100644
+--- a/crates/litchi-docx/src/alt/codec.rs
++++ b/crates/litchi-docx/src/alt/codec.rs
+@@ -115,9 +115,10 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
+         let decoder = reader.decoder();
+         let event = reader
+             .read_event()
+-            .map_err(|error| Error::Xml(error.to_string()))?
+-            .into_owned();
+-        let resolver = reader.resolver().clone();
++            .map_err(|error| Error::Xml(error.to_string()))?;
++        // Slice-backed events and namespace scope remain valid until the next
++        // read; only the parsed chunk metadata escapes this iteration.
++        let resolver = reader.resolver();
+         let (namespace, event) = resolver.resolve_event(event);
+ 
+         match event {
+@@ -130,7 +131,7 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
+                     pending = Some(PendingChunk {
+                         root_depth: event_depth,
+                         start: event_start,
+-                        relationship: relationship(&element, decoder, &resolver)?,
++                        relationship: relationship(&element, decoder, resolver)?,
+                         match_source: None,
+                         saw_properties: false,
+                         properties_depth: None,
+@@ -143,7 +144,7 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
+                         &namespace,
+                         &element,
+                         decoder,
+-                        &resolver,
++                        resolver,
+                         false,
+                     )?;
+                 }
+@@ -155,7 +156,7 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
+                     && is_word_namespace(&namespace)
+                     && element.local_name().as_ref() == b"altChunk"
+                 {
+-                    let chunk = Chunk::new(relationship(&element, decoder, &resolver)?, None);
++                    let chunk = Chunk::new(relationship(&element, decoder, resolver)?, None);
+                     insert_chunk(&mut chunks, event_start, chunk)?;
+                 } else if let Some(chunk) = pending.as_mut() {
+                     parse_child(
+@@ -164,7 +165,7 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
+                         &namespace,
+                         &element,
+                         decoder,
+-                        &resolver,
++                        resolver,
+                         true,
+                     )?;
+                 }
+@@ -420,3 +421,66 @@ fn next_depth(depth: usize) -> Result<usize> {
+ fn invalid(message: impl Into<String>) -> Error {
+     Error::Invalid(message.into())
+ }
++
++#[cfg(test)]
++mod borrowing_tests {
++    use super::{
++        STRICT_RELATIONSHIP_NAMESPACE, STRICT_WORD_NAMESPACE, TRANSITIONAL_RELATIONSHIP_NAMESPACE,
++        TRANSITIONAL_WORD_NAMESPACE, scan,
++    };
++
++    #[test]
++    fn restored_prefix_scope_and_owned_chunk_values_survive_later_events() {
++        for (word, relationships) in [
++            (
++                TRANSITIONAL_WORD_NAMESPACE,
++                TRANSITIONAL_RELATIONSHIP_NAMESPACE,
++            ),
++            (STRICT_WORD_NAMESPACE, STRICT_RELATIONSHIP_NAMESPACE),
++        ] {
++            let xml = format!(
++                r#"<w:document xmlns:w="{word}" xmlns:r="{relationships}" xmlns:f="urn:foreign"><w:body><f:item xmlns:w="urn:shadow"/><w:altChunk r:id="after-empty"/><f:item xmlns:w="urn:shadow"><w:altChunk r:id="ignored"/></f:item><w:altChunk r:id="after-end"><w:altChunkPr><w:matchSrc w:val="0"/></w:altChunkPr></w:altChunk></w:body></w:document>"#
++            );
++            let chunks = scan(xml.as_bytes()).expect("scan restored prefix scope");
++            let actual = chunks
++                .iter()
++                .map(|(offset, chunk)| {
++                    (*offset, chunk.relationship().as_str(), chunk.match_source())
++                })
++                .collect::<Vec<_>>();
++            let offset = |id: &str| {
++                u32::try_from(xml.find(&format!(r#"<w:altChunk r:id="{id}""#)).unwrap()).unwrap()
++            };
++            assert_eq!(
++                actual,
++                vec![
++                    (offset("after-empty"), "after-empty", None),
++                    (offset("after-end"), "after-end", Some(false)),
++                ]
++            );
++        }
++    }
++
++    #[test]
++    fn default_namespace_scope_is_restored_after_empty_and_end() {
++        for (word, relationships) in [
++            (
++                TRANSITIONAL_WORD_NAMESPACE,
++                TRANSITIONAL_RELATIONSHIP_NAMESPACE,
++            ),
++            (STRICT_WORD_NAMESPACE, STRICT_RELATIONSHIP_NAMESPACE),
++        ] {
++            let xml = format!(
++                r#"<document xmlns="{word}" xmlns:r="{relationships}"><body><foreign xmlns="urn:shadow"/><altChunk r:id="after-empty"/><foreign xmlns="urn:shadow"><altChunk r:id="ignored"/></foreign><altChunk r:id="after-end"/></body></document>"#
++            );
++            let chunks = scan(xml.as_bytes()).expect("scan restored default scope");
++            assert_eq!(
++                chunks
++                    .values()
++                    .map(|chunk| chunk.relationship().as_str())
++                    .collect::<Vec<_>>(),
++                vec!["after-empty", "after-end"]
++            );
++        }
++    }
++}

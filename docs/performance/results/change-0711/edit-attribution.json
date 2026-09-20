@@ -1,0 +1,2307 @@
+{
+  "aggregate_diagnostics": {
+    "generated": {
+      "children": {
+        "active_block_ranges": {
+          "inclusive_ir": 3449750,
+          "share_of_document_body_from_xml": 0.3466434991544803,
+          "share_of_document_mut": 0.2380992149196464
+        },
+        "alt_scan": {
+          "inclusive_ir": 3714595,
+          "share_of_document_body_from_xml": 0.3732560935551088,
+          "share_of_document_mut": 0.25637862257973587
+        }
+      },
+      "document_body_from_xml_ir": 9951867,
+      "document_mut_ir": 14488708,
+      "dominant_body_child": "alt_scan",
+      "profile_count": 2
+    },
+    "numbered-list": {
+      "children": {
+        "active_block_ranges": {
+          "inclusive_ir": 2663144,
+          "share_of_document_body_from_xml": 0.6993884686715595,
+          "share_of_document_mut": 0.49618814705453823
+        },
+        "alt_scan": {
+          "inclusive_ir": 692247,
+          "share_of_document_body_from_xml": 0.18179624131195346,
+          "share_of_document_mut": 0.12897716241932952
+        }
+      },
+      "document_body_from_xml_ir": 3807818,
+      "document_mut_ir": 5367206,
+      "dominant_body_child": "active_block_ranges",
+      "profile_count": 2
+    }
+  },
+  "aggregate_partitions": {
+    "document_body_from_xml": {
+      "generated": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 3714595,
+            "name": "litchi_docx::alt::codec::scan",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.3732560935551088
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 3449750,
+            "name": "litchi_docx::parts::document_part::active_block_ranges",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.3466434991544803
+          },
+          {
+            "calls": 2820,
+            "inclusive_ir": 895637,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.08999688199209253
+          },
+          {
+            "calls": 2820,
+            "inclusive_ir": 672496,
+            "name": "quick_xml::name::NamespaceResolver::resolve_event",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.067574858064321
+          },
+          {
+            "calls": 402,
+            "inclusive_ir": 491859,
+            "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.04942379153579926
+          },
+          {
+            "calls": 2820,
+            "inclusive_ir": 351026,
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.03527237652995162
+          },
+          {
+            "calls": 812,
+            "inclusive_ir": 33292,
+            "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+            "raw_edge_count": 6,
+            "share_of_owner": 0.0033453019418366423
+          },
+          {
+            "calls": 1210,
+            "inclusive_ir": 25518,
+            "name": "quick_xml::name::NamespaceResolver::set_level",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.002564141984614545
+          },
+          {
+            "calls": 402,
+            "inclusive_ir": 21730,
+            "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.0021835098881446066
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 12805,
+            "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.001286693240574859
+          },
+          {
+            "calls": 410,
+            "inclusive_ir": 6970,
+            "name": "__memcmp_avx2_movbe",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.0007003710961973266
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 2833,
+            "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00028467020308852603
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 578,
+            "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 5.8079554318802696e-05
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 382,
+            "name": "__rustc::__rust_dealloc",
+            "raw_edge_count": 4,
+            "share_of_owner": 3.83847573525651e-05
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 328,
+            "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+            "raw_edge_count": 4,
+            "share_of_owner": 3.2958639821050665e-05
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 176,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 4,
+            "share_of_owner": 1.768512380641743e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 100,
+            "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+            "raw_edge_count": 2,
+            "share_of_owner": 1.0048365799100813e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 38,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 3.818379003658309e-06
+          }
+        ],
+        "direct_children_ir": 9680113,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 9951867,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 271754
+      },
+      "numbered-list": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 2663144,
+            "name": "litchi_docx::parts::document_part::active_block_ranges",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.6993884686715595
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 692247,
+            "name": "litchi_docx::alt::codec::scan",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.18179624131195346
+          },
+          {
+            "calls": 356,
+            "inclusive_ir": 162675,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.04272131703773657
+          },
+          {
+            "calls": 356,
+            "inclusive_ir": 124394,
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.032668052937404046
+          },
+          {
+            "calls": 356,
+            "inclusive_ir": 79560,
+            "name": "quick_xml::name::NamespaceResolver::resolve_event",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.02089385574625678
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 31034,
+            "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.008150074399564266
+          },
+          {
+            "calls": 12,
+            "inclusive_ir": 10736,
+            "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.0028194624848141376
+          },
+          {
+            "calls": 208,
+            "inclusive_ir": 4590,
+            "name": "quick_xml::name::NamespaceResolver::set_level",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.0012054147545917373
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 3222,
+            "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.0008461538865565529
+          },
+          {
+            "calls": 30,
+            "inclusive_ir": 1230,
+            "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+            "raw_edge_count": 8,
+            "share_of_owner": 0.00032301964011935446
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 1108,
+            "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.00029098029370101195
+          },
+          {
+            "calls": 12,
+            "inclusive_ir": 680,
+            "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.00017857996364322034
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 672,
+            "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00017647902289447657
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 594,
+            "name": "__rustc::__rust_dealloc",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.00015599485059422484
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 320,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 4,
+            "share_of_owner": 8.403762994975075e-05
+          },
+          {
+            "calls": 18,
+            "inclusive_ir": 306,
+            "name": "__memcmp_avx2_movbe",
+            "raw_edge_count": 4,
+            "share_of_owner": 8.036098363944916e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 100,
+            "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+            "raw_edge_count": 2,
+            "share_of_owner": 2.626175935929711e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 38,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 9.979468556532902e-06
+          }
+        ],
+        "direct_children_ir": 3776650,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 3807818,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 31168
+      }
+    },
+    "document_mut": {
+      "generated": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 14463762,
+            "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.9982782453756401
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 19024,
+            "name": "core::str::converts::from_utf8",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.001313022527612538
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 4008,
+            "name": "litchi_opc::packuri::PackURI::new",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00027662922049364236
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 674,
+            "name": "litchi_opc::package::OpcPackage::get_part",
+            "raw_edge_count": 2,
+            "share_of_owner": 4.651898568181511e-05
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 632,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 4,
+            "share_of_owner": 4.362017648502544e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 332,
+            "name": "__rustc::__rust_dealloc",
+            "raw_edge_count": 2,
+            "share_of_owner": 2.2914396507956403e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 38,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 2.622732130428745e-06
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 32,
+            "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+            "raw_edge_count": 2,
+            "share_of_owner": 2.208616530887364e-06
+          }
+        ],
+        "direct_children_ir": 14488502,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 14488708,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 206
+      },
+      "numbered-list": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 5357186,
+            "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.9981331068716199
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 4098,
+            "name": "core::str::converts::from_utf8",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.000763525752505121
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 4008,
+            "name": "litchi_opc::packuri::PackURI::new",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.0007467572513520069
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 668,
+            "name": "litchi_opc::package::OpcPackage::get_part",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00012445954189200116
+          },
+          {
+            "calls": 4,
+            "inclusive_ir": 632,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 4,
+            "share_of_owner": 0.0001177521414307556
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 338,
+            "name": "__rustc::__rust_dealloc",
+            "raw_edge_count": 2,
+            "share_of_owner": 6.297503766391676e-05
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 38,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+            "raw_edge_count": 2,
+            "share_of_owner": 7.080033820203659e-06
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 32,
+            "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+            "raw_edge_count": 2,
+            "share_of_owner": 5.962133743329397e-06
+          }
+        ],
+        "direct_children_ir": 5367000,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 5367206,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 206
+      }
+    },
+    "mutable_document_from_xml": {
+      "generated": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 9951867,
+            "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.6880552238069183
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 3938576,
+            "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.2723064718570452
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 569569,
+            "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.03937903568933172
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 558,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 6,
+            "share_of_owner": 3.857917462967104e-05
+          }
+        ],
+        "direct_children_ir": 14460570,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 14463762,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 3192
+      },
+      "numbered-list": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 3807818,
+            "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.7107869691289419
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 802987,
+            "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.1498896995549529
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 744971,
+            "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.1390601334357254
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 558,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 6,
+            "share_of_owner": 0.00010415916117155537
+          }
+        ],
+        "direct_children_ir": 5356334,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 5357186,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 852
+      }
+    },
+    "validate_section_placement": {
+      "generated": {
+        "children": [
+          {
+            "calls": 400,
+            "inclusive_ir": 3356149,
+            "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.8521224422227729
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 572357,
+            "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.14532079614561202
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 1716,
+            "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00043569046274592645
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 154,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 2,
+            "share_of_owner": 3.910042614386519e-05
+          }
+        ],
+        "direct_children_ir": 3930376,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 3938576,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 8200
+      },
+      "numbered-list": {
+        "children": [
+          {
+            "calls": 2,
+            "inclusive_ir": 743031,
+            "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.9253337849803297
+          },
+          {
+            "calls": 8,
+            "inclusive_ir": 55466,
+            "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.06907459273935941
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 3956,
+            "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.004926605287507768
+          },
+          {
+            "calls": 2,
+            "inclusive_ir": 154,
+            "name": "__memcpy_avx_unaligned_erms",
+            "raw_edge_count": 2,
+            "share_of_owner": 0.00019178392676344697
+          }
+        ],
+        "direct_children_ir": 802607,
+        "disjoint": true,
+        "nested_inclusive_costs_excluded": true,
+        "owner_ir": 802987,
+        "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+        "profile_count": 2,
+        "self_ir": 380
+      }
+    }
+  },
+  "historical_binding": {
+    "0710_publication_change": {
+      "patch": {
+        "bytes": 9367,
+        "file": "docs/performance/results/change-0710/change.patch",
+        "sha256": "953375b5f6b6c37cf22239305235b4d74eac661137bdab7189f78c5ffa717217"
+      },
+      "production_path": "crates/litchi-docx/src/package/codec.rs",
+      "scope": "guard untouched custom-property publication in write_plain; no edit-owner capture was rebuilt",
+      "test_path": "crates/litchi-docx/tests/custom_properties.rs"
+    },
+    "analysis": {
+      "bytes": 157302,
+      "file": "docs/performance/results/change-0709/profile-analysis.json",
+      "sha256": "2b0b99aefee994eb6371dc76f599c03a6f3ac27fd0ce92444e0356e9685fbcc9"
+    },
+    "analysis_sha256": "2b0b99aefee994eb6371dc76f599c03a6f3ac27fd0ce92444e0356e9685fbcc9",
+    "binary": {
+      "bytes": 62889832,
+      "custody": "historical receipt binding; scratch binary is no longer required to replay raw attribution",
+      "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+      "sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0"
+    },
+    "native_plan": {
+      "bytes": 1736,
+      "file": "docs/performance/results/change-0709/plan.json",
+      "sha256": "d69de12689b7537fd00165b48c8f1ba5ca081975f4b68caea0c27879adb2fd17"
+    },
+    "profile_checkout_revision": "1de70e7c702081c2d7a46ff58b2bdc27339fe2ec",
+    "profile_packet": "change-0709-docx-ordinary-save",
+    "profile_plan": {
+      "bytes": 3135,
+      "file": "docs/performance/results/change-0709/profile-plan.json",
+      "sha256": "62bb99d3b05d6da34a5adb51e5e85cc327bba8f6f0271d52c6de21158db9cd77"
+    },
+    "profile_source_revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+    "profile_transition": {
+      "bytes": 693,
+      "file": "docs/performance/results/change-0709/profile-revision-transition.json",
+      "sha256": "373880bb709b422fd7191dbad79e44cdc37fba89079baad456eeffc2e1a0642c"
+    },
+    "source_files": {
+      "crates/litchi-docx/src/alt/codec.rs": "4c60069945e369657a0fd3bcf968f317bf3c0d42fb7dce3795321c41a1aa9725",
+      "crates/litchi-docx/src/namespace.rs": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+      "crates/litchi-docx/src/package/codec.rs": "d64815bf87ab50a3bee88af9a8296dbda6a693aff1f458a309fd82cac93f0bcb",
+      "crates/litchi-docx/src/parts/document_part.rs": "847caf3dba89a7bf948d07c3b70a4729b4e6d742dcc48dae2fdcd25ac26f65a9",
+      "crates/litchi-docx/src/writer/doc/model.rs": "9dcc73b21a417074fb1e039cd18a932dec78679e745977e69106c141f7ed133f",
+      "crates/litchi-docx/src/writer/doc/package.rs": "f5670594685a8035952169487777381e39c950515c59fcc9d176ebedf0e42e92",
+      "crates/litchi-ooxml-common/src/mce/codec.rs": "a5b5b0aca3ec5a392bc7ae1ea6ca482653bd0a72cb9bdd4c30b8ea9faff87bee"
+    },
+    "source_manifest": {
+      "bytes": 887523,
+      "file": "docs/performance/results/change-0709/source-baseline.json",
+      "sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+    }
+  },
+  "limitations": [
+    "The four parts are historical 0709 profiles, not a current-source or 0710 rebuild.",
+    "Callgrind Ir is guest-instruction attribution, not native latency, hardware cycles, allocation counts, RSS, or cache counters.",
+    "Immediate children at one owner boundary are disjoint; every deeper partition is nested inside one child and is excluded from ancestor totals.",
+    "Instruction shares describe this capture and do not establish causality or predict a speedup without a fresh candidate capture.",
+    "The generated and NumberedList corpora are contrasting fixtures; neither represents all DOCX producer or document shapes."
+  ],
+  "recommendation": {
+    "boundary": "litchi_docx::writer::doc::package::DocumentBody::from_xml -> litchi_docx::alt::codec::scan",
+    "bounded_next_experiment": "Prototype one source-preserving seam at the DocumentBody::from_xml -> alt::codec::scan boundary: reuse a validated event/namespace context or prove a bounded no-altChunk fast path, then recapture both corpora. Keep the seam local to DOCX parsing and retain the existing ownership boundary.",
+    "candidate_owner": "litchi_docx::alt::codec::scan",
+    "constraints": [
+      "Preserve exact source ranges, opaque/unknown markup, namespace choices, and lexical bytes.",
+      "Preserve active mc:Choice and mc:Fallback selection and strict/transitional namespace resolution.",
+      "Preserve altChunk relationship validation, source-order offsets, duplicate detection, and typed refusals.",
+      "Retain XML byte/depth/node limits, MAX_CHUNKS, offset conversions, checked arithmetic, and allocation failures.",
+      "Do not classify comments, attributes, or arbitrary prefixes as altChunk anchors through a byte-only shortcut.",
+      "Run preservation, refusal, negative, native latency, allocator, and instruction gates before promotion; this packet has no causal speedup claim."
+    ],
+    "deferred_contrast": "active_block_ranges is the larger retained real-fixture child and should be measured separately before a shared scanner abstraction is proposed.",
+    "instruction_share": {
+      "generated": {
+        "inclusive_ir": 3714595,
+        "share_of_document_body_from_xml": 0.3732560935551088,
+        "share_of_document_mut": 0.25637862257973587
+      },
+      "numbered_list_contrast": {
+        "inclusive_ir": 692247,
+        "share_of_document_body_from_xml": 0.18179624131195346,
+        "share_of_document_mut": 0.12897716241932952
+      },
+      "numbered_list_dominant_alternative": {
+        "inclusive_ir": 2663144,
+        "share_of_document_body_from_xml": 0.6993884686715595,
+        "share_of_document_mut": 0.49618814705453823
+      }
+    },
+    "selection": "The generated corpus selects alt::codec::scan because it is the largest immediate child of DocumentBody::from_xml in both retained repeats. The admitted NumberedList corpus is a required contrast: its largest child is active_block_ranges, so this is not a universal hotspot claim.",
+    "status": "diagnostic_only_no_production_change"
+  },
+  "rows": [
+    {
+      "corpus": "generated",
+      "deeper_diagnostics": {
+        "active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1723971,
+          "share_of_document_body_from_xml": 0.34658744343231884,
+          "share_of_document_mut": 0.23870226307121103
+        },
+        "alt_scan": {
+          "calls": 1,
+          "inclusive_ir": 1856929,
+          "share_of_document_body_from_xml": 0.3733173439375328,
+          "share_of_document_mut": 0.25711172326133147
+        },
+        "dominant_body_child": "litchi_docx::alt::codec::scan",
+        "dominant_mutable_document_child": "litchi_docx::writer::doc::package::DocumentBody::from_xml"
+      },
+      "historical_binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+      "name": "profile-r1-generated-edit",
+      "owner_summary_ir": 7224625,
+      "part": 5,
+      "part_trigger": "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "partitions": {
+        "document_body_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1856929,
+              "name": "litchi_docx::alt::codec::scan",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1723971,
+              "name": "litchi_docx::parts::document_part::active_block_ranges",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 447190,
+              "name": "quick_xml::reader::Reader<R>::read_event_impl",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 336248,
+              "name": "quick_xml::name::NamespaceResolver::resolve_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 201,
+              "inclusive_ir": 246013,
+              "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 175508,
+              "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 406,
+              "inclusive_ir": 16646,
+              "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+              "raw_edge_count": 3
+            },
+            {
+              "calls": 605,
+              "inclusive_ir": 12759,
+              "name": "quick_xml::name::NamespaceResolver::set_level",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 201,
+              "inclusive_ir": 10865,
+              "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 6509,
+              "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 205,
+              "inclusive_ir": 3485,
+              "name": "__memcmp_avx2_movbe",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1329,
+              "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 289,
+              "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 191,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 164,
+              "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 88,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 50,
+              "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 4838253,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 4974130,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 4974130
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 135877
+        },
+        "document_mut": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7209800,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 9512,
+              "name": "core::str::converts::from_utf8",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2004,
+              "name": "litchi_opc::packuri::PackURI::new",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 334,
+              "name": "litchi_opc::package::OpcPackage::get_part",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 322,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 155,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 16,
+              "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 7222162,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7222265,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7222265
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 103
+        },
+        "mutable_document_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 4974130,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1951758,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 282037,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 3,
+              "inclusive_ir": 279,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 3
+            }
+          ],
+          "direct_children_ir": 7208204,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7209800,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "calls": 1,
+                "inclusive_ir": 7209800
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 1596
+        },
+        "owner_edit": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7222265,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2328,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 7224593,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7224625,
+            "raw_edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7224625
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 32
+        },
+        "validate_section_placement": {
+          "children": [
+            {
+              "calls": 200,
+              "inclusive_ir": 1661945,
+              "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 284767,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 869,
+              "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 77,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 1947658,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 1951758,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 1951758
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 4100
+        }
+      },
+      "profile_result": {
+        "binary_identity": {
+          "binary_bytes": 62889832,
+          "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+          "profile": "release"
+        },
+        "file": "profile-r1-generated-edit.json",
+        "sha256": "9b0ce51cc32096cb0478ac870a82ccfbb978904157aa02e6e5fd6d0da3f231eb"
+      },
+      "raw_artifact": {
+        "bytes": 44097,
+        "file": "docs/performance/results/change-0709/profile-r1-generated-edit.callgrind.5",
+        "receipt": "profile-r1-generated-edit.receipt.json",
+        "receipt_sha256": "16231f5eb868e345aad00ba7e20a67fd01708e7c847f35cb11383b24d31310a3",
+        "sha256": "c2a2aa75a56d9e4fc99444c62e348068e4f4a5452c1ac8ee3999ba88435980f6"
+      },
+      "repeat": 1,
+      "validation": {
+        "nested_partitions_excluded_from_ancestor_sums": true,
+        "raw_document_body_partition_reconciles": true,
+        "raw_document_mut_partition_reconciles": true,
+        "raw_edit_partition_reconciles": true,
+        "raw_mutable_document_partition_reconciles": true,
+        "raw_owner_edge_matches_summary": true
+      }
+    },
+    {
+      "corpus": "generated",
+      "deeper_diagnostics": {
+        "active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1725779,
+          "share_of_document_body_from_xml": 0.34669951425718154,
+          "share_of_document_mut": 0.23749983313706582
+        },
+        "alt_scan": {
+          "calls": 1,
+          "inclusive_ir": 1857666,
+          "share_of_document_body_from_xml": 0.37319488755633334,
+          "share_of_document_mut": 0.25564997895118696
+        },
+        "dominant_body_child": "litchi_docx::alt::codec::scan",
+        "dominant_mutable_document_child": "litchi_docx::writer::doc::package::DocumentBody::from_xml"
+      },
+      "historical_binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+      "name": "profile-r2-generated-edit",
+      "owner_summary_ir": 7268758,
+      "part": 5,
+      "part_trigger": "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "partitions": {
+        "document_body_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1857666,
+              "name": "litchi_docx::alt::codec::scan",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1725779,
+              "name": "litchi_docx::parts::document_part::active_block_ranges",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 448447,
+              "name": "quick_xml::reader::Reader<R>::read_event_impl",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 336248,
+              "name": "quick_xml::name::NamespaceResolver::resolve_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 201,
+              "inclusive_ir": 245846,
+              "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1410,
+              "inclusive_ir": 175518,
+              "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 406,
+              "inclusive_ir": 16646,
+              "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+              "raw_edge_count": 3
+            },
+            {
+              "calls": 605,
+              "inclusive_ir": 12759,
+              "name": "quick_xml::name::NamespaceResolver::set_level",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 201,
+              "inclusive_ir": 10865,
+              "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 6296,
+              "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 205,
+              "inclusive_ir": 3485,
+              "name": "__memcmp_avx2_movbe",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1504,
+              "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 289,
+              "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 191,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 164,
+              "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 88,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 50,
+              "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 4841860,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 4977737,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 4977737
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 135877
+        },
+        "document_mut": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7253962,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 9512,
+              "name": "core::str::converts::from_utf8",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2004,
+              "name": "litchi_opc::packuri::PackURI::new",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 340,
+              "name": "litchi_opc::package::OpcPackage::get_part",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 310,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 177,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 16,
+              "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 7266340,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7266443,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7266443
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 103
+        },
+        "mutable_document_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 4977737,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1986818,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 287532,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 3,
+              "inclusive_ir": 279,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 3
+            }
+          ],
+          "direct_children_ir": 7252366,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7253962,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "calls": 1,
+                "inclusive_ir": 7253962
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 1596
+        },
+        "owner_edit": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7266443,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2283,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 7268726,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 7268758,
+            "raw_edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7268758
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 32
+        },
+        "validate_section_placement": {
+          "children": [
+            {
+              "calls": 200,
+              "inclusive_ir": 1694204,
+              "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 287590,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 847,
+              "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 77,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 1982718,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 1986818,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 1986818
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 4100
+        }
+      },
+      "profile_result": {
+        "binary_identity": {
+          "binary_bytes": 62889832,
+          "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+          "profile": "release"
+        },
+        "file": "profile-r2-generated-edit.json",
+        "sha256": "0e773f2c964fa9f47007a9bc99fa5890c504b0c5b843df85d9fcd1baefa40760"
+      },
+      "raw_artifact": {
+        "bytes": 44108,
+        "file": "docs/performance/results/change-0709/profile-r2-generated-edit.callgrind.5",
+        "receipt": "profile-r2-generated-edit.receipt.json",
+        "receipt_sha256": "af589688c030ef4f150bc2e12c032d0929f0d8197874c442a8514e6895c2c7b3",
+        "sha256": "6f46f8af983c4397b16f59cb8b451f8586bc75f0b864e86d9a8a9337e9aa1edf"
+      },
+      "repeat": 2,
+      "validation": {
+        "nested_partitions_excluded_from_ancestor_sums": true,
+        "raw_document_body_partition_reconciles": true,
+        "raw_document_mut_partition_reconciles": true,
+        "raw_edit_partition_reconciles": true,
+        "raw_mutable_document_partition_reconciles": true,
+        "raw_owner_edge_matches_summary": true
+      }
+    },
+    {
+      "corpus": "numbered-list",
+      "deeper_diagnostics": {
+        "active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1331367,
+          "share_of_document_body_from_xml": 0.6992826318974066,
+          "share_of_document_mut": 0.4960101007654929
+        },
+        "alt_scan": {
+          "calls": 1,
+          "inclusive_ir": 346031,
+          "share_of_document_body_from_xml": 0.18174813435971562,
+          "share_of_document_mut": 0.1289162726565885
+        },
+        "dominant_body_child": "litchi_docx::parts::document_part::active_block_ranges",
+        "dominant_mutable_document_child": "litchi_docx::writer::doc::package::DocumentBody::from_xml"
+      },
+      "historical_binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+      "name": "profile-r1-numbered-list-edit",
+      "owner_summary_ir": 2685230,
+      "part": 5,
+      "part_trigger": "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "partitions": {
+        "document_body_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1331367,
+              "name": "litchi_docx::parts::document_part::active_block_ranges",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 346031,
+              "name": "litchi_docx::alt::codec::scan",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 81075,
+              "name": "quick_xml::reader::Reader<R>::read_event_impl",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 62271,
+              "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 39780,
+              "name": "quick_xml::name::NamespaceResolver::resolve_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 15496,
+              "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 6,
+              "inclusive_ir": 5655,
+              "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 104,
+              "inclusive_ir": 2295,
+              "name": "quick_xml::name::NamespaceResolver::set_level",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1642,
+              "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 678,
+              "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 15,
+              "inclusive_ir": 615,
+              "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+              "raw_edge_count": 4
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 385,
+              "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 6,
+              "inclusive_ir": 340,
+              "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 308,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 160,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 9,
+              "inclusive_ir": 153,
+              "name": "__memcmp_avx2_movbe",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 50,
+              "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 1888320,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 1903904,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 1903904
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 15584
+        },
+        "document_mut": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2679151,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2049,
+              "name": "core::str::converts::from_utf8",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2004,
+              "name": "litchi_opc::packuri::PackURI::new",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 334,
+              "name": "litchi_opc::package::OpcPackage::get_part",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 322,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 155,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 16,
+              "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 2684050,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2684153,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2684153
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 103
+        },
+        "mutable_document_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1903904,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 402004,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 372538,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 3,
+              "inclusive_ir": 279,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 3
+            }
+          ],
+          "direct_children_ir": 2678725,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2679151,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "calls": 1,
+                "inclusive_ir": 2679151
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 426
+        },
+        "owner_edit": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2684153,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1045,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 2685198,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2685230,
+            "raw_edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 2685230
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 32
+        },
+        "validate_section_placement": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 371930,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 4,
+              "inclusive_ir": 27875,
+              "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1932,
+              "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 77,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 401814,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 402004,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 402004
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 190
+        }
+      },
+      "profile_result": {
+        "binary_identity": {
+          "binary_bytes": 62889832,
+          "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+          "profile": "release"
+        },
+        "file": "profile-r1-numbered-list-edit.json",
+        "sha256": "d48862f4089718db80685d7f86627d49b16e04eef9dea9a79234597115b40b74"
+      },
+      "raw_artifact": {
+        "bytes": 56146,
+        "file": "docs/performance/results/change-0709/profile-r1-numbered-list-edit.callgrind.5",
+        "receipt": "profile-r1-numbered-list-edit.receipt.json",
+        "receipt_sha256": "4c3d2c7a7c74571834f07c1745418e247209f1895903fb8db154ab66bdc0499c",
+        "sha256": "f14cf51bbf75042291668d203e3407d2a81365ea3c4f732ff830df7d6f81f457"
+      },
+      "repeat": 1,
+      "validation": {
+        "nested_partitions_excluded_from_ancestor_sums": true,
+        "raw_document_body_partition_reconciles": true,
+        "raw_document_mut_partition_reconciles": true,
+        "raw_edit_partition_reconciles": true,
+        "raw_mutable_document_partition_reconciles": true,
+        "raw_owner_edge_matches_summary": true
+      }
+    },
+    {
+      "corpus": "numbered-list",
+      "deeper_diagnostics": {
+        "active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1331777,
+          "share_of_document_body_from_xml": 0.6994943048898217,
+          "share_of_document_mut": 0.49636626633912934
+        },
+        "alt_scan": {
+          "calls": 1,
+          "inclusive_ir": 346216,
+          "share_of_document_body_from_xml": 0.18184434801151733,
+          "share_of_document_mut": 0.12903807714569931
+        },
+        "dominant_body_child": "litchi_docx::parts::document_part::active_block_ranges",
+        "dominant_mutable_document_child": "litchi_docx::writer::doc::package::DocumentBody::from_xml"
+      },
+      "historical_binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+      "name": "profile-r2-numbered-list-edit",
+      "owner_summary_ir": 2684009,
+      "part": 5,
+      "part_trigger": "--dump-after=litchi_perf_baseline::ordinary_save::Owner::edit",
+      "partitions": {
+        "document_body_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1331777,
+              "name": "litchi_docx::parts::document_part::active_block_ranges",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 346216,
+              "name": "litchi_docx::alt::codec::scan",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 81600,
+              "name": "quick_xml::reader::Reader<R>::read_event_impl",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 62123,
+              "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 178,
+              "inclusive_ir": 39780,
+              "name": "quick_xml::name::NamespaceResolver::resolve_event",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 15538,
+              "name": "litchi_docx::writer::doc::package::ensure_writer_namespace_declarations",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 6,
+              "inclusive_ir": 5081,
+              "name": "litchi_docx::writer::doc::package::push_raw_body_xml",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 104,
+              "inclusive_ir": 2295,
+              "name": "quick_xml::name::NamespaceResolver::set_level",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1580,
+              "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 15,
+              "inclusive_ir": 615,
+              "name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+              "raw_edge_count": 4
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 430,
+              "name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 6,
+              "inclusive_ir": 340,
+              "name": "litchi_docx::writer::doc::package::preserved_body_kind",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 287,
+              "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 286,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 160,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 9,
+              "inclusive_ir": 153,
+              "name": "__memcmp_avx2_movbe",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 50,
+              "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 1888330,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 1903914,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 1903914
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 15584
+        },
+        "document_mut": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2678035,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2049,
+              "name": "core::str::converts::from_utf8",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2004,
+              "name": "litchi_opc::packuri::PackURI::new",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 334,
+              "name": "litchi_opc::package::OpcPackage::get_part",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 2,
+              "inclusive_ir": 310,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 2
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 183,
+              "name": "__rustc::__rust_dealloc",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 19,
+              "name": "core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 16,
+              "name": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 2682950,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2683053,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2683053
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 103
+        },
+        "mutable_document_from_xml": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 1903914,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 400983,
+              "name": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 372433,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 3,
+              "inclusive_ir": 279,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 3
+            }
+          ],
+          "direct_children_ir": 2677609,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2678035,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "caller": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "calls": 1,
+                "inclusive_ir": 2678035
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 426
+        },
+        "owner_edit": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2683053,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 924,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 2683977,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 2684009,
+            "raw_edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 2684009
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 32
+        },
+        "validate_section_placement": {
+          "children": [
+            {
+              "calls": 1,
+              "inclusive_ir": 371101,
+              "name": "litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 4,
+              "inclusive_ir": 27591,
+              "name": "litchi_docx::writer::doc::package::paragraph_section_range",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2024,
+              "name": "core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>",
+              "raw_edge_count": 1
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 77,
+              "name": "__memcpy_avx_unaligned_erms",
+              "raw_edge_count": 1
+            }
+          ],
+          "direct_children_ir": 400793,
+          "disjoint": true,
+          "incoming": {
+            "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+            "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+            "calls": 1,
+            "edge_count": 1,
+            "inclusive_ir": 400983,
+            "raw_edges": [
+              {
+                "callee": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+                "caller": "litchi_docx::writer::doc::model::MutableDocument::from_xml",
+                "calls": 1,
+                "inclusive_ir": 400983
+              }
+            ]
+          },
+          "nested_inclusive_costs_excluded": true,
+          "owner": "litchi_docx::writer::doc::package::DocumentBody::validate_section_placement",
+          "partition_equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "self_ir": 190
+        }
+      },
+      "profile_result": {
+        "binary_identity": {
+          "binary_bytes": 62889832,
+          "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+          "executable": true,
+          "mode_bits": 509,
+          "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+          "profile": "release"
+        },
+        "file": "profile-r2-numbered-list-edit.json",
+        "sha256": "4a0a474b4313d93101cc6f75bac8428a7abec1af4723f6a0bf503515ff996a15"
+      },
+      "raw_artifact": {
+        "bytes": 56394,
+        "file": "docs/performance/results/change-0709/profile-r2-numbered-list-edit.callgrind.5",
+        "receipt": "profile-r2-numbered-list-edit.receipt.json",
+        "receipt_sha256": "3c9cf2a4dde624ebae451ef1ead451bbb9e09bdb70cbb4a7c53094b12f49cbfe",
+        "sha256": "c4e98bbebfb0b484147c43ea7d1f9817a955eb527a3df9d5ddcd52590dbb5b84"
+      },
+      "repeat": 2,
+      "validation": {
+        "nested_partitions_excluded_from_ancestor_sums": true,
+        "raw_document_body_partition_reconciles": true,
+        "raw_document_mut_partition_reconciles": true,
+        "raw_edit_partition_reconciles": true,
+        "raw_mutable_document_partition_reconciles": true,
+        "raw_owner_edge_matches_summary": true
+      }
+    }
+  ],
+  "schema": "docx_edit_nested_attribution_v1",
+  "scope": {
+    "corpora": [
+      "generated",
+      "numbered-list"
+    ],
+    "measured_parent": "litchi_perf_baseline::ordinary_save::run_case",
+    "metric": "Callgrind Ir guest instructions",
+    "owner": "litchi_perf_baseline::ordinary_save::Owner::edit",
+    "phase": "edit",
+    "profile_count": 4,
+    "selected_part": 5,
+    "selection_method": "retained raw positive incoming edge from run_case and exact caller/callee names"
+  },
+  "status": "pass"
+}
