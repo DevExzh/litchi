@@ -68,6 +68,171 @@ def oracle_fixture(module, test_source: str, test_receipt: str, test_receipt_has
     }
 
 
+def source_review_fixture(module, root: Path):
+    """Build a complete temporary source-review binding without touching evidence."""
+
+    repo = root / "repo"
+    evidence = root / "evidence"
+    gates = evidence / "gates"
+    source_relative = "crates/litchi-ods/src/codec/formula/evaluation/value.rs"
+    source = repo / source_relative
+    source.parent.mkdir(parents=True)
+    gates.mkdir(parents=True)
+    source.write_text("// frozen source proof fixture\n", encoding="utf-8")
+    report = evidence / "resource-review.md"
+    semantic = evidence / "semantic-review.md"
+    report.write_text("resource reviewer report\n", encoding="utf-8")
+    semantic.write_text("semantic reviewer report\n", encoding="utf-8")
+    freeze = gates / "freeze.json"
+    source_hash = module.digest(source)
+    freeze.write_text(
+        json.dumps(
+            {
+                "schema": "ods-formula-date-time-freeze-v1",
+                "selected_files": {source_relative: source_hash},
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    contract_hash = module.digest(module.CONTRACT)
+    final_review = evidence / "review-receipt.json"
+    final_review.write_text(
+        json.dumps(
+            {
+                "status": "PASS",
+                "contract_sha256": contract_hash,
+                "freeze_sha256": module.digest(freeze),
+                "reviews": {
+                    "semantic": {
+                        "path": semantic.name,
+                        "sha256": module.digest(semantic),
+                        "status": "PASS",
+                    },
+                    "resource": {
+                        "path": report.name,
+                        "sha256": module.digest(report),
+                        "status": "PASS",
+                    },
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    receipt = gates / "source-review-receipt.json"
+    requirement = "resolver access is read-only"
+    receipt_value = {
+        "schema": module.SOURCE_REVIEW_SCHEMA,
+        "contract_sha256": contract_hash,
+        "freeze_sha256": module.digest(freeze),
+        "reviewer": "date_time_resource_review",
+        "report": {
+            "root": "evidence",
+            "path": report.name,
+            "sha256": module.digest(report),
+        },
+        "review_receipt": {
+            "root": "evidence",
+            "path": final_review.name,
+            "sha256": module.digest(final_review),
+        },
+        "proofs": [
+            {
+                "id": "proof.resolver_read_only",
+                "source": {"root": "repo", "path": source_relative, "sha256": source_hash},
+                "requirements": [requirement],
+            }
+        ],
+    }
+    receipt.write_text(json.dumps(receipt_value, sort_keys=True), encoding="utf-8")
+    binding = {
+        "kind": "source_review",
+        "root": "repo",
+        "path": source_relative,
+        "sha256": source_hash,
+        "identifiers": ["proof.resolver_read_only"],
+        "requirements": [requirement],
+        "receipt": {
+            "root": "evidence",
+            "path": "gates/source-review-receipt.json",
+            "sha256": module.digest(receipt),
+        },
+    }
+    return {
+        "repo": repo,
+        "evidence": evidence,
+        "gates": gates,
+        "source": source,
+        "source_relative": source_relative,
+        "source_hash": source_hash,
+        "freeze": freeze,
+        "report": report,
+        "final_review": final_review,
+        "receipt": receipt,
+        "receipt_value": receipt_value,
+        "binding": binding,
+        "requirements": {requirement},
+    }
+
+
+def write_source_review_receipt(module, fixture) -> None:
+    fixture["receipt"].write_text(
+        json.dumps(fixture["receipt_value"], sort_keys=True),
+        encoding="utf-8",
+    )
+    fixture["binding"]["receipt"]["sha256"] = module.digest(fixture["receipt"])
+
+
+def remove_source_from_freeze(module, fixture) -> None:
+    fixture["freeze"].write_text(
+        json.dumps(
+            {
+                "schema": "ods-formula-date-time-freeze-v1",
+                "selected_files": {"other/frozen.rs": "0" * 64},
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    final_review = json.loads(fixture["final_review"].read_text(encoding="utf-8"))
+    final_review["freeze_sha256"] = module.digest(fixture["freeze"])
+    fixture["final_review"].write_text(json.dumps(final_review, sort_keys=True), encoding="utf-8")
+    fixture["receipt_value"]["freeze_sha256"] = module.digest(fixture["freeze"])
+    fixture["receipt_value"]["review_receipt"]["sha256"] = module.digest(fixture["final_review"])
+    write_source_review_receipt(module, fixture)
+
+
+def source_review_case(module, mutate=None):
+    with tempfile.TemporaryDirectory() as directory:
+        fixture = source_review_fixture(module, Path(directory))
+        old = {
+            "REPO": module.REPO,
+            "HERE": module.HERE,
+            "GATES": module.GATES,
+            "REVIEW_RECEIPT": module.REVIEW_RECEIPT,
+        }
+        module.REPO = fixture["repo"]
+        module.HERE = fixture["evidence"]
+        module.GATES = fixture["gates"]
+        module.REVIEW_RECEIPT = fixture["final_review"]
+        try:
+            if mutate is not None:
+                mutate(fixture)
+            return module.validate_binding(
+                fixture["binding"],
+                fixture["requirements"],
+                "source-review fixture",
+                allow_missing=False,
+                contract_hash=module.digest(module.CONTRACT),
+            )
+        finally:
+            module.REPO = old["REPO"]
+            module.HERE = old["HERE"]
+            module.GATES = old["GATES"]
+            module.REVIEW_RECEIPT = old["REVIEW_RECEIPT"]
+
+
 def main() -> int:
     verifier = load_verifier()
     manifest = verifier.read_json(verifier.MANIFEST)
@@ -147,6 +312,92 @@ def main() -> int:
             )
         finally:
             verifier.REPO, verifier.HERE = old_repo, old_here
+
+    if source_review_case(verifier) != []:
+        raise AssertionError("valid source-review binding did not return an empty pending list")
+    rejected(
+        verifier,
+        "source review without reviewer identity",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: (
+                fixture["receipt_value"].pop("reviewer"),
+                write_source_review_receipt(verifier, fixture),
+            ),
+        ),
+        "unexpected fields",
+    )
+    rejected(
+        verifier,
+        "source review with invented status",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: (
+                fixture["receipt_value"].update({"status": "PASS"}),
+                write_source_review_receipt(verifier, fixture),
+            ),
+        ),
+        "unexpected fields",
+    )
+    rejected(
+        verifier,
+        "source review with unmapped proof requirement",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: (
+                fixture["receipt_value"]["proofs"][0]["requirements"].append("unmapped requirement"),
+                write_source_review_receipt(verifier, fixture),
+            ),
+        ),
+        "exact mapped subset",
+    )
+    rejected(
+        verifier,
+        "source review outside source freeze",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: remove_source_from_freeze(verifier, fixture),
+        ),
+        "outside the source freeze",
+    )
+    rejected(
+        verifier,
+        "source review with stale reviewed report hash",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: (
+                fixture["receipt_value"]["report"].update({"sha256": "0" * 64}),
+                write_source_review_receipt(verifier, fixture),
+            ),
+        ),
+        "source-review report hash",
+    )
+    rejected(
+        verifier,
+        "source review without final PASS review receipt",
+        lambda: source_review_case(
+            verifier,
+            lambda fixture: (
+                fixture["final_review"].write_text(
+                    json.dumps(
+                        {
+                            "status": "PENDING",
+                            "contract_sha256": verifier.digest(verifier.CONTRACT),
+                            "freeze_sha256": verifier.digest(fixture["freeze"]),
+                            "reviews": {},
+                        },
+                        sort_keys=True,
+                    ),
+                    encoding="utf-8",
+                ),
+                fixture["receipt_value"]["review_receipt"].update(
+                    {"sha256": verifier.digest(fixture["final_review"])}
+                ),
+                write_source_review_receipt(verifier, fixture),
+            ),
+        ),
+        "review status",
+    )
 
     stale = {
         "schema": verifier.SCHEMA,
