@@ -1,0 +1,15 @@
+{
+  "source_baseline_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+  "source_sha256": "e3a6c3d99d4f7ea11eb9e3f732e380a529a89553621edd13459bcbf8fe8733f9",
+  "patch_sha256": "5dc52e8a377100395d72f4e2e41b6292d4d72d32e0f77c4583e1787e098786dc",
+  "changed_files": [
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/ordinary_save.rs",
+    "tools/perf-baseline/README.md",
+    "tools/test_perf_abba_summary.py"
+  ],
+  "production_crate_changes": [],
+  "mechanism": "Explicit compile-time harness feature;32 empty controls and before/after phase snapshots. Native default contains no new procfs reads.",
+  "validation_plan": "Fresh standalone-harness tests in default and procfs modes, warning-denied Clippy/rustdoc, existing ABBA rejection suite; unchanged format production verification reused."
+}

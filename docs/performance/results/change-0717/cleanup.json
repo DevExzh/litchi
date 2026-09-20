@@ -1,0 +1,20 @@
+{
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-target-0717",
+    "/home/zhuhe/code/litchi-0717-bin",
+    "/home/zhuhe/code/litchi-0717-fs"
+  ],
+  "owned_paths_absent": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0717-bin/native",
+      "sha256": "904fcb6ecab15483a9c90c61aa7203500e3fc223cfab733641eac016c7316010",
+      "bytes": 62888360
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0717-bin/procfs",
+      "sha256": "b75c75e179f3c3844db434151f9b92716b5d06a2b3f5996caec8ade911c2e36e",
+      "bytes": 63168152
+    }
+  ]
+}

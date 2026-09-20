@@ -1,0 +1,71 @@
+{
+  "job": {
+    "name": "native-b13-generated",
+    "lane": "native",
+    "block": 13,
+    "position": 0,
+    "order_index": 48,
+    "corpus": {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    "warmup": 100,
+    "samples": 200,
+    "phase": "counting_publish",
+    "case": "docx_ordinary_save_counting_publish"
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0717-bin/native",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0717/native-b13-generated.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0717-fs"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T12:00:47.860644+00:00",
+  "seconds": 0.570663983002305,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0717-bin/native",
+    "sha256": "904fcb6ecab15483a9c90c61aa7203500e3fc223cfab733641eac016c7316010",
+    "bytes": 62888360
+  },
+  "source_before": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_after": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "fixture_before": null,
+  "fixture_after": null,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+  "build_sha256": "df39ab222b9cbecad4cf6ef7e7a1722884ea1274a42fcc3b956695c71fd18388",
+  "plan_sha256": "6f12358ecc3c5363c8baf14c865cc447787c33bc0a22c6471656ac3882bb3be8",
+  "script_sha256": "77a09493213a5e88093daaf5fbe50133c231d907fa3da3146a621e74e3725942",
+  "artifacts": {
+    "native-b13-generated.context.json": "994303fceaebada14131cb60064194dc7c64e687998ef93d2a901859f5a8655a",
+    "native-b13-generated.json": "5798727e94b7b1116bd41024d3b9f28684c24fccd5c6337b8e5dd76c27429422",
+    "native-b13-generated.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-b13-generated.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,5 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0717 — opt-in DOCX phase process counters
+
+[0717](0717-docx-phase-process-probe.md) retains an opt-in procfs harness feature
+and 64 fixed diagnostic children (12,800 samples). Generated native p50 spans
+17.09% across processes. In five mixed instrumented children, zero-fault and
+78-minor-fault samples have distinct elapsed medians; counters localize this
+association to the probed phase interval without establishing cause. NumberedList
+has no sustained slow median in this matrix, so 0716's outlier remains unexplained.
+All eleven group and eleven within-child flags are retained. Production is
+unchanged; fresh harness tests, lint, docs and repository gates pass. No native
+speedup claim or reversal of 0715's rejection follows. Next: phase-matched
+allocation and mapping attribution. [Evidence packet](results/change-0717/README.md).
+The non-iWork goal remains active.
+
 ## 0716 — unchanged DOCX baseline process variation
 
 [0716](0716-docx-baseline-process-variation.md) retains 32 fixed baseline-only

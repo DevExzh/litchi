@@ -1,0 +1,72 @@
+{
+  "before": {
+    "monotonic_ns": 797286472285443,
+    "/proc/stat": {
+      "text": "cpu  109387060 19818570 14006499 2395006341 9692106 0 172993 122756 0 0\ncpu12 3134775 558587 457854 75252197 228425 0 2767 176 0 0\nctxt 10614351818\nprocs_running 1\nprocs_blocked 0\n"
+    },
+    "/proc/pressure/cpu": {
+      "text": "some avg10=9.36 avg60=3.63 avg300=0.89 total=5448201134\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+    },
+    "/proc/pressure/io": {
+      "text": "some avg10=0.15 avg60=0.23 avg300=0.08 total=6657171883\nfull avg10=0.12 avg60=0.20 avg300=0.07 total=6318704768\n"
+    },
+    "/proc/loadavg": {
+      "text": "1.18 1.43 1.52 1/1778 2651036\n"
+    },
+    "/proc/sys/kernel/perf_event_paranoid": {
+      "text": "1\n"
+    },
+    "/proc/sys/kernel/randomize_va_space": {
+      "text": "2\n"
+    },
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_governor": {
+      "unavailable": "FileNotFoundError",
+      "errno": 2
+    },
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_cur_freq": {
+      "unavailable": "FileNotFoundError",
+      "errno": 2
+    }
+  },
+  "after": {
+    "monotonic_ns": 797286930110374,
+    "/proc/stat": {
+      "text": "cpu  109387086 19818570 14006520 2395007756 9692109 0 172993 122756 0 0\ncpu12 3134799 558587 457874 75252199 228426 0 2767 176 0 0\nctxt 10614356820\nprocs_running 1\nprocs_blocked 0\n"
+    },
+    "/proc/pressure/cpu": {
+      "text": "some avg10=9.84 avg60=3.91 avg300=0.97 total=5448325977\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+    },
+    "/proc/pressure/io": {
+      "text": "some avg10=0.12 avg60=0.22 avg300=0.08 total=6657177562\nfull avg10=0.10 avg60=0.20 avg300=0.07 total=6318710446\n"
+    },
+    "/proc/loadavg": {
+      "text": "1.18 1.43 1.52 1/1778 2651065\n"
+    },
+    "/proc/sys/kernel/perf_event_paranoid": {
+      "text": "1\n"
+    },
+    "/proc/sys/kernel/randomize_va_space": {
+      "text": "2\n"
+    },
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_governor": {
+      "unavailable": "FileNotFoundError",
+      "errno": 2
+    },
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_cur_freq": {
+      "unavailable": "FileNotFoundError",
+      "errno": 2
+    }
+  },
+  "wait4": {
+    "ru_utime": 0.23725,
+    "ru_stime": 0.19824,
+    "ru_maxrss": 102868,
+    "ru_minflt": 17006,
+    "ru_majflt": 0,
+    "ru_inblock": 0,
+    "ru_oublock": 752,
+    "ru_nvcsw": 44,
+    "ru_nivcsw": 86
+  },
+  "scope": "Whole child including setup, warmup, untimed opening, verification and reporting; system snapshots are not owner counters."
+}

@@ -1,0 +1,465 @@
+diff --git a/tools/perf-baseline/Cargo.toml b/tools/perf-baseline/Cargo.toml
+index 5638d6536d..84c5b9b597 100644
+--- a/tools/perf-baseline/Cargo.toml
++++ b/tools/perf-baseline/Cargo.toml
+@@ -6,6 +6,7 @@ publish = false
+ 
+ [features]
+ allocator-metrics = []
++ordinary-save-process-metrics = []
+ xls-source-attribution = ["litchi/xls"]
+ xlsb-crud = ["litchi/xlsb"]
+ 
+diff --git a/tools/perf-baseline/README.md b/tools/perf-baseline/README.md
+index 411f2fdd88..af815ba637 100644
+--- a/tools/perf-baseline/README.md
++++ b/tools/perf-baseline/README.md
+@@ -4666,6 +4666,40 @@ allocator-only comparator; the checked normal policy continues to reject this
+ binary identity. The existing raw `filesystem_evidence` samples remain
+ unchanged.
+ 
++### Optional ordinary-save process-counter diagnostics
++
++The benchmark-only `ordinary-save-process-metrics` feature adds
++`source.ordinary_save.process_probe` to the ordinary-save selectors. It reads
++`/proc/self` immediately before the allocator region and clock and immediately
++after the clock and allocator region, before owner destruction, digesting or
++readback. The resulting raw `Vec<Option<Delta>>` is retained in acquisition
++order for the measured samples; the operation-metrics vectors continue to use
++their existing elapsed/sample-index ordering. The counter windows overlap the
++procfs probing, and the probes also perturb untimed process state, so the
++metadata labels its elapsed values as diagnostic-only latency. Unsupported
++procfs is represented by `null` entries; mixed sampled availability fails
++closed through the existing operation-metrics cardinality check.
++
++Each ordinary-save run also records exactly 32 adjacent empty snapshot-pair
++controls acquired before warmups. They describe the probe's own cost and are
++retained without subtracting them from any operation delta. The feature changes
++the report identity to `ordinary_save_procfs_operation_scoped`; when the
++allocator target is active the combined identity is
++`ordinary_save_procfs_and_system_allocator_operation_scoped`. The native
++default path performs no probes and the existing ordinary-save JSON shape
++remains unchanged when the feature is omitted.
++
++This diagnostic is opt-in and must not be used as a latency comparison or a
++physical-I/O attribution. For example:
++
++```sh
++cargo run --release --locked \
++  --manifest-path tools/perf-baseline/Cargo.toml \
++  --features ordinary-save-process-metrics --bin litchi-perf-baseline -- \
++  --warmup 3 --samples 15 --case docx_ordinary_save_lifecycle \
++  --json ordinary-save-process.json
++```
++
+ The separate checked XLSX repeated-store allocator policy is warm-only and
+ pins exactly `xlsx_source_repeated_store_medium` and
+ `xlsx_source_repeated_store_oversized` to the corpus-key manifest derived from
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 436de8a7ee..9e790c32ee 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -12264,7 +12264,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
+             profile,
+             target_os: std::env::consts::OS,
+             target_arch: std::env::consts::ARCH,
+-            instrumentation: allocation_metrics::instrumentation_identity(),
++            instrumentation: ordinary_save::instrumentation_identity(),
+             allocator_counter_revision: allocation_metrics::counter_revision(),
+         },
+         binary_identity,
+diff --git a/tools/perf-baseline/src/ordinary_save.rs b/tools/perf-baseline/src/ordinary_save.rs
+index 99f46b0ab8..2728e9b71c 100644
+--- a/tools/perf-baseline/src/ordinary_save.rs
++++ b/tools/perf-baseline/src/ordinary_save.rs
+@@ -78,6 +78,58 @@ use crate::{
+     operation_metrics, producer_shape::RealFileProvenance, record_elapsed, sha256_hex, statistics,
+ };
+ 
++#[cfg(feature = "ordinary-save-process-metrics")]
++use crate::process_metrics;
++
++#[cfg(feature = "ordinary-save-process-metrics")]
++const PROCESS_PROBE_CONTROL_COUNT: usize = 32;
++
++#[cfg(feature = "ordinary-save-process-metrics")]
++const PROCESS_PROBE_SCOPE: &str =
++    "ordinary_save_phase_interval_including_before_after_procfs_snapshot_probe_overhead";
++
++#[cfg(feature = "ordinary-save-process-metrics")]
++const PROCESS_PROBE_LATENCY_CLAIM: &str = "diagnostic_only_procfs_probe_instrumentation_latency";
++
++#[cfg(feature = "ordinary-save-process-metrics")]
++const PROCESS_PROBE_CONTROL_SCOPE: &str =
++    "fixed_32_empty_adjacent_procfs_snapshot_pairs_acquired_before_warmups_and_never_subtracted";
++
++/// Selects the report identity for this opt-in diagnostic feature while
++/// preserving the allocator target's identity when the feature is absent.
++#[cfg(feature = "ordinary-save-process-metrics")]
++fn instrumentation_identity_for(allocation_identity: &'static str) -> &'static str {
++    match allocation_identity {
++        "system_allocator_operation_scoped" => {
++            "ordinary_save_procfs_and_system_allocator_operation_scoped"
++        },
++        _ => "ordinary_save_procfs_operation_scoped",
++    }
++}
++
++pub(crate) fn instrumentation_identity() -> &'static str {
++    #[cfg(feature = "ordinary-save-process-metrics")]
++    {
++        return instrumentation_identity_for(allocation_metrics::instrumentation_identity());
++    }
++
++    #[cfg(not(feature = "ordinary-save-process-metrics"))]
++    {
++        allocation_metrics::instrumentation_identity()
++    }
++}
++
++#[cfg(feature = "ordinary-save-process-metrics")]
++fn empty_process_probe_controls() -> Vec<Option<process_metrics::Delta>> {
++    (0..PROCESS_PROBE_CONTROL_COUNT)
++        .map(|_| {
++            let before = process_metrics::Snapshot::read().ok();
++            let after = process_metrics::Snapshot::read().ok();
++            before.zip(after).map(|(before, after)| after.delta(before))
++        })
++        .collect()
++}
++
+ /// Largest `--ooxml-file` input this harness will read. A caller-named file is
+ /// still a bounded resource; the limit matches 0601's `--real-file` and 0627's
+ /// `--ole2-file` bounds.
+@@ -426,6 +478,32 @@ pub(crate) struct OrdinarySaveSummary {
+     /// for the counting phase (the others do not build an in-memory archive).
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub(crate) sample_byte_split: Option<ByteSplit>,
++    /// Feature-gated, in-process procfs observations. This is deliberately
++    /// additive to the ordinary-save evidence: the default binary does not
++    /// read procfs and therefore does not serialize this field.
++    #[cfg(feature = "ordinary-save-process-metrics")]
++    #[serde(skip_serializing_if = "Option::is_none")]
++    pub(crate) process_probe: Option<ProcessProbeSummary>,
++}
++
++/// Raw process-counter observations for the ordinary-save phase.
++///
++/// The controls are adjacent empty snapshot pairs collected before any
++/// warmup. They document the probe's own cost; they are retained as evidence
++/// and are never subtracted from an operation delta.
++#[cfg(feature = "ordinary-save-process-metrics")]
++#[derive(Clone, Debug, Serialize)]
++pub(crate) struct ProcessProbeSummary {
++    pub(crate) phase: &'static str,
++    pub(crate) timing_scope: &'static str,
++    pub(crate) scope: &'static str,
++    pub(crate) latency_claim: &'static str,
++    pub(crate) control_scope: &'static str,
++    pub(crate) fixed_count: usize,
++    pub(crate) empty_adjacent_snapshot_controls: Vec<Option<process_metrics::Delta>>,
++    /// Retained samples in iteration acquisition order, before the elapsed
++    /// vector is sorted for operation-metrics alignment.
++    pub(crate) sample_deltas: Vec<Option<process_metrics::Delta>>,
+ }
+ 
+ const ATOMIC_STEPS: &str = "litchi_opc::atomic::replace_with: destination permission probe, \
+@@ -1226,6 +1304,10 @@ pub(crate) fn run_case(
+     let mut sink_summaries = Vec::with_capacity(samples);
+     let mut observations = Vec::with_capacity(samples);
+     let mut sample_split = None;
++    #[cfg(feature = "ordinary-save-process-metrics")]
++    let empty_adjacent_snapshot_controls = empty_process_probe_controls();
++    #[cfg(feature = "ordinary-save-process-metrics")]
++    let mut process_probe_samples = Vec::with_capacity(samples);
+ 
+     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+         // The allocation region opens immediately before the clock and closes
+@@ -1236,8 +1318,10 @@ pub(crate) fn run_case(
+         // every phase, as it has always been), so `live_bytes_after` is
+         // retained memory rather than a leak, exactly as the ODP and XLSX
+         // source-backed families already report it.
+-        let (duration, digest, sink, outcome, allocation) = match phase {
++        let (duration, digest, sink, outcome, allocation, process) = match phase {
+             Phase::Lifecycle => {
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process_before = process_metrics::Snapshot::read().ok();
+                 let region = allocation_metrics::begin();
+                 let started = Instant::now();
+                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+@@ -1245,45 +1329,87 @@ pub(crate) fn run_case(
+                 owner.save(&corpus.workspace.destination)?;
+                 let duration = started.elapsed();
+                 let allocation = region.finish();
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process = {
++                    let process_after = process_metrics::Snapshot::read().ok();
++                    process_before
++                        .zip(process_after)
++                        .map(|(before, after)| after.delta(before))
++                };
++                #[cfg(not(feature = "ordinary-save-process-metrics"))]
++                let process = None;
+                 drop(owner);
+                 let digest = sha256_hex(&fs::read(&corpus.workspace.destination)?);
+                 fs::remove_file(&corpus.workspace.destination)?;
+-                (duration, Some(digest), None, outcome, allocation)
++                (duration, Some(digest), None, outcome, allocation, process)
+             },
+             Phase::Edit => {
+                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process_before = process_metrics::Snapshot::read().ok();
+                 let region = allocation_metrics::begin();
+                 let started = Instant::now();
+                 let outcome = owner.edit(corpus)?;
+                 let duration = started.elapsed();
+                 let allocation = region.finish();
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process = {
++                    let process_after = process_metrics::Snapshot::read().ok();
++                    process_before
++                        .zip(process_after)
++                        .map(|(before, after)| after.delta(before))
++                };
++                #[cfg(not(feature = "ordinary-save-process-metrics"))]
++                let process = None;
+                 std::hint::black_box(&outcome);
+                 drop(owner);
+-                (duration, None, None, outcome, allocation)
++                (duration, None, None, outcome, allocation, process)
+             },
+             Phase::AtomicPublish => {
+                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+                 let outcome = owner.edit(corpus)?;
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process_before = process_metrics::Snapshot::read().ok();
+                 let region = allocation_metrics::begin();
+                 let started = Instant::now();
+                 owner.save(&corpus.workspace.destination)?;
+                 let duration = started.elapsed();
+                 let allocation = region.finish();
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process = {
++                    let process_after = process_metrics::Snapshot::read().ok();
++                    process_before
++                        .zip(process_after)
++                        .map(|(before, after)| after.delta(before))
++                };
++                #[cfg(not(feature = "ordinary-save-process-metrics"))]
++                let process = None;
+                 drop(owner);
+                 let digest = sha256_hex(&fs::read(&corpus.workspace.destination)?);
+                 fs::remove_file(&corpus.workspace.destination)?;
+-                (duration, Some(digest), None, outcome, allocation)
++                (duration, Some(digest), None, outcome, allocation, process)
+             },
+             Phase::CountingPublish => {
+                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+                 let outcome = owner.edit(corpus)?;
+                 let mut sink = BoundedSink::bounded(budget);
+                 sink.reserve_budget()?;
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process_before = process_metrics::Snapshot::read().ok();
+                 let region = allocation_metrics::begin();
+                 let started = Instant::now();
+                 owner.write_to(&mut sink)?;
+                 let duration = started.elapsed();
+                 let allocation = region.finish();
++                #[cfg(feature = "ordinary-save-process-metrics")]
++                let process = {
++                    let process_after = process_metrics::Snapshot::read().ok();
++                    process_before
++                        .zip(process_after)
++                        .map(|(before, after)| after.delta(before))
++                };
++                #[cfg(not(feature = "ordinary-save-process-metrics"))]
++                let process = None;
+                 drop(owner);
+                 let digest = sha256_hex(&sink.bytes);
+                 if sample_split.is_none() {
+@@ -1291,13 +1417,22 @@ pub(crate) fn run_case(
+                 }
+                 let summary = sink.summary();
+                 std::hint::black_box(&sink.bytes);
+-                (duration, Some(digest), Some(summary), outcome, allocation)
++                (
++                    duration,
++                    Some(digest),
++                    Some(summary),
++                    outcome,
++                    allocation,
++                    process,
++                )
+             },
+         };
+         if iteration >= warmup_iterations {
++            #[cfg(feature = "ordinary-save-process-metrics")]
++            process_probe_samples.push(process);
+             observations.push(operation_metrics::InProcessObservation {
+                 elapsed_ns: elapsed_ns(duration)?,
+-                process_metrics: None,
++                process_metrics: process,
+                 allocation_metrics: Some(
+                     allocation.unwrap_or_else(allocation_metrics::unavailable_sample),
+                 ),
+@@ -1358,6 +1493,17 @@ pub(crate) fn run_case(
+             edit_outcome_sha256,
+             edit_outcomes_identical,
+             sample_byte_split: sample_split,
++            #[cfg(feature = "ordinary-save-process-metrics")]
++            process_probe: Some(ProcessProbeSummary {
++                phase: phase.as_str(),
++                timing_scope: phase.timing_scope(),
++                scope: PROCESS_PROBE_SCOPE,
++                latency_claim: PROCESS_PROBE_LATENCY_CLAIM,
++                control_scope: PROCESS_PROBE_CONTROL_SCOPE,
++                fixed_count: PROCESS_PROBE_CONTROL_COUNT,
++                empty_adjacent_snapshot_controls,
++                sample_deltas: process_probe_samples,
++            }),
+         })),
+         ..SourceSummary::default()
+     };
+@@ -1461,6 +1607,49 @@ mod tests {
+         assert_eq!(Origin::RealFile.marker_variant(), None);
+     }
+ 
++    #[cfg(not(feature = "ordinary-save-process-metrics"))]
++    #[test]
++    fn instrumentation_identity_preserves_the_allocator_identity_without_the_probe_feature() {
++        assert_eq!(
++            instrumentation_identity(),
++            allocation_metrics::instrumentation_identity()
++        );
++    }
++
++    #[cfg(feature = "ordinary-save-process-metrics")]
++    #[test]
++    fn process_probe_identity_is_distinct_from_native_and_allocator_identities() {
++        assert_eq!(
++            instrumentation_identity_for("none"),
++            "ordinary_save_procfs_operation_scoped"
++        );
++        assert_eq!(
++            instrumentation_identity_for("system_allocator_operation_scoped"),
++            "ordinary_save_procfs_and_system_allocator_operation_scoped"
++        );
++    }
++
++    #[cfg(not(feature = "ordinary-save-process-metrics"))]
++    #[test]
++    fn default_ordinary_save_omits_process_probe_and_marks_process_unavailable() {
++        let corpus = build_corpus(Format::Docx, Origin::Generated, None, None).unwrap();
++        let result = run_case(
++            Case::DocxOrdinarySaveLifecycle,
++            Phase::Lifecycle,
++            &corpus,
++            0,
++            2,
++        )
++        .unwrap();
++        let source = result.source.unwrap();
++        let serialized = serde_json::to_value(&source).unwrap();
++        assert!(serialized["ordinary_save"].get("process_probe").is_none());
++        assert_eq!(
++            result.operation_metrics.unwrap().process.status,
++            operation_metrics::MetricStatus::Unavailable
++        );
++    }
++
+     #[test]
+     fn every_ordinary_save_case_is_opt_in_and_round_trips() {
+         let mut seen = 0;
+@@ -1524,9 +1713,56 @@ mod tests {
+             ),
+         ] {
+             let result = run_case(case, phase, &corpus, 0, 2).unwrap();
+-            let source = result.source.unwrap().ordinary_save.unwrap();
++            #[cfg(feature = "ordinary-save-process-metrics")]
++            let metrics = result
++                .operation_metrics
++                .as_ref()
++                .expect("ordinary-save operation metrics");
++            let source = result
++                .source
++                .as_ref()
++                .and_then(|source| source.ordinary_save.as_ref())
++                .expect("ordinary-save source metadata");
+             assert!(source.publications_identical);
+             assert_eq!(source.format, "DOCX");
++            #[cfg(feature = "ordinary-save-process-metrics")]
++            {
++                let probe = source
++                    .process_probe
++                    .as_ref()
++                    .expect("feature-enabled ordinary-save probe metadata");
++                assert_eq!(probe.phase, phase.as_str());
++                assert_eq!(probe.timing_scope, phase.timing_scope());
++                assert_eq!(probe.fixed_count, PROCESS_PROBE_CONTROL_COUNT);
++                assert_eq!(
++                    probe.empty_adjacent_snapshot_controls.len(),
++                    PROCESS_PROBE_CONTROL_COUNT
++                );
++                assert_eq!(probe.sample_deltas.len(), 2);
++                let samples_available = probe.sample_deltas.iter().all(Option::is_some);
++                let samples_unavailable = probe.sample_deltas.iter().all(Option::is_none);
++                assert!(samples_available || samples_unavailable);
++                assert!(probe.scope.contains("procfs_snapshot_probe_overhead"));
++                assert!(probe.latency_claim.starts_with("diagnostic_only"));
++                assert!(probe.control_scope.contains("never_subtracted"));
++                if samples_available {
++                    let user_cpu_ticks = metrics
++                        .process
++                        .user_cpu_ticks
++                        .values
++                        .as_ref()
++                        .expect("measured process metric");
++                    assert_eq!(metrics.sample_indices.len(), user_cpu_ticks.len());
++                    for (ordered, &sample_index) in metrics.sample_indices.iter().enumerate() {
++                        assert_eq!(
++                            user_cpu_ticks[ordered],
++                            probe.sample_deltas[sample_index]
++                                .expect("raw process delta")
++                                .user_cpu_ticks
++                        );
++                    }
++                }
++            }
+             if phase == Phase::CountingPublish {
+                 assert!(source.sample_byte_split.is_some());
+                 assert!(result.sink.is_some());
+diff --git a/tools/test_perf_abba_summary.py b/tools/test_perf_abba_summary.py
+index 445aa23984..48a25a8c4e 100644
+--- a/tools/test_perf_abba_summary.py
++++ b/tools/test_perf_abba_summary.py
+@@ -3156,15 +3156,21 @@ class PerfAbbaSummaryTests(unittest.TestCase):
+         ):
+             perf_abba_summary.summarize_reports(arbitrary_hash)
+ 
+-    def test_allocator_instrumentation_is_not_accepted_for_latency_abba(self):
+-        legs = four_legs()
+-        for leg in legs:
+-            leg["tool"]["instrumentation"] = "system_allocator"
+-        with self.assertRaisesRegex(
+-            perf_abba_summary.AbbaSummaryInputError,
+-            "instrumentation.*latency ABBA",
++    def test_instrumentation_is_not_accepted_for_latency_abba(self):
++        for instrumentation in (
++            "system_allocator",
++            "ordinary_save_procfs_operation_scoped",
++            "ordinary_save_procfs_and_system_allocator_operation_scoped",
+         ):
+-            perf_abba_summary.summarize_reports(legs)
++            with self.subTest(instrumentation=instrumentation):
++                legs = four_legs()
++                for leg in legs:
++                    leg["tool"]["instrumentation"] = instrumentation
++                with self.assertRaisesRegex(
++                    perf_abba_summary.AbbaSummaryInputError,
++                    "instrumentation.*latency ABBA",
++                ):
++                    perf_abba_summary.summarize_reports(legs)
+ 
+     def test_opc_source_overlay_nested_schema_projection_and_sample_binding(self):
+         identity = copy.deepcopy(

@@ -1,0 +1,81 @@
+{
+  "job": {
+    "name": "procfs-b13-numbered-list",
+    "lane": "procfs",
+    "block": 13,
+    "position": 3,
+    "order_index": 51,
+    "corpus": {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    },
+    "warmup": 100,
+    "samples": 200,
+    "phase": "counting_publish",
+    "case": "docx_real_file_ordinary_save_counting_publish"
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0717-bin/procfs",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_real_file_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0717/procfs-b13-numbered-list.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0717-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T12:00:51.188532+00:00",
+  "seconds": 0.490379658062011,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0717-bin/procfs",
+    "sha256": "b75c75e179f3c3844db434151f9b92716b5d06a2b3f5996caec8ade911c2e36e",
+    "bytes": 63168152
+  },
+  "source_before": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "source_after": "ea1cf15490963b2b88f0ca4e3ed12f02f0921e7b6f4fb070c1904f005e50fc04",
+  "fixture_before": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "fixture_after": {
+    "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+  "build_sha256": "df39ab222b9cbecad4cf6ef7e7a1722884ea1274a42fcc3b956695c71fd18388",
+  "plan_sha256": "6f12358ecc3c5363c8baf14c865cc447787c33bc0a22c6471656ac3882bb3be8",
+  "script_sha256": "77a09493213a5e88093daaf5fbe50133c231d907fa3da3146a621e74e3725942",
+  "artifacts": {
+    "procfs-b13-numbered-list.context.json": "cfecaea5ba2f787c78a98b8c3d8b4fabd773198ee099ec15dbb86244dda7a88c",
+    "procfs-b13-numbered-list.json": "a895338eacbd49c61b807e4eea39bd66a31bf171d31e5c29be3ce94c1a685597",
+    "procfs-b13-numbered-list.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "procfs-b13-numbered-list.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

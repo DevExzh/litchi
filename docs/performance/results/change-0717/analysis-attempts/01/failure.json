@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0717/analyze.py"
+  ],
+  "exit_code": 1,
+  "observed_output": "analysis failed: child artifact inventory is not exactly the frozen 64-child set",
+  "cause": "The broad *-b* glob also included source-baseline.json; restrict artifact inventory to the two explicit child lane prefixes. No captures changed."
+}

@@ -4666,6 +4666,43 @@ allocator-only comparator; the checked normal policy continues to reject this
 binary identity. The existing raw `filesystem_evidence` samples remain
 unchanged.
 
+### Optional ordinary-save process-counter diagnostics
+
+The benchmark-only `ordinary-save-process-metrics` feature adds
+`source.ordinary_save.process_probe` to the ordinary-save selectors. It reads
+`/proc/self` immediately before the allocator region and clock and immediately
+after the clock and allocator region, before owner destruction, digesting or
+readback. The resulting raw `Vec<Option<Delta>>` is retained in acquisition
+order for the measured samples; the operation-metrics vectors continue to use
+their existing elapsed/sample-index ordering. The counter windows overlap the
+procfs probing, and the probes also perturb untimed process state, so the
+metadata labels its elapsed values as diagnostic-only latency. Unsupported
+procfs is represented by `null` entries; mixed sampled availability fails
+closed through the existing operation-metrics cardinality check. These are
+same-process counter observations, not owner-exclusive measurements; other
+activity reflected by the procfs fields can contribute.
+
+Each ordinary-save run also records exactly 32 adjacent empty snapshot-pair
+controls acquired before warmups. They record counter-delta overhead only;
+their wall-clock durations are not measured. Controls are retained without
+subtracting them from any operation delta. The feature changes
+the report identity to `ordinary_save_procfs_operation_scoped`; when the
+allocator target is active the combined identity is
+`ordinary_save_procfs_and_system_allocator_operation_scoped`. The native
+default path performs no probes and the existing ordinary-save JSON shape
+remains unchanged when the feature is omitted.
+
+This diagnostic is opt-in and must not be used as a latency comparison or a
+physical-I/O attribution. For example:
+
+```sh
+cargo run --release --locked \
+  --manifest-path tools/perf-baseline/Cargo.toml \
+  --features ordinary-save-process-metrics --bin litchi-perf-baseline -- \
+  --warmup 3 --samples 15 --case docx_ordinary_save_lifecycle \
+  --json ordinary-save-process.json
+```
+
 The separate checked XLSX repeated-store allocator policy is warm-only and
 pins exactly `xlsx_source_repeated_store_medium` and
 `xlsx_source_repeated_store_oversized` to the corpus-key manifest derived from

@@ -1,0 +1,10 @@
+{
+  "prior_analysis_sha256": "25c81b530b02ac6ef613d7973a4f2ee8e50ea5900f6f9166e6a1764ccca55a16",
+  "final_analysis_sha256": "273ae44a007dc8d2cf88a7be26a787b54d21e32096cdbf840aea541a282da091",
+  "changed_fields": [
+    "builds.native.binary_custody",
+    "builds.procfs.binary_custody",
+    "freeze_bindings.analyzer_sha256"
+  ],
+  "all_statistics_and_capture_bindings_unchanged": true
+}

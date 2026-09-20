@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0717/audit.py"
+  ],
+  "exit_code": 1,
+  "observed_output": "analysis failed: analysis output is not deterministic: /home/zhuhe/code/litchi/docs/performance/results/change-0717/analysis.json\n",
+  "cause": "Analyzer serialized live-binary vs cleanup-witness validation mode into the derived build record. Cleanup changed this mode without changing any evidence. Use the same identity-validated label after either strict validation route. No captures or statistics changed.",
+  "regeneration_note": "The corrected analyzer first refused to replace existing analysis.json; after verifying the archived copy byte-for-byte, the top-level derived file was removed for regeneration."
+}

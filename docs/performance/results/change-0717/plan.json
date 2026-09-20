@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "packet": "change-0717-docx-phase-process-probe",
+  "revision": "24894c34a155e879d253dc12c879d3b6cd1f7654",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0717-fs",
+  "corpora": [
+    {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    {
+      "id": "numbered-list",
+      "label": "NumberedList.docx",
+      "origin": "caller-named-real-file",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    }
+  ],
+  "blocks": 16,
+  "samples": 200,
+  "expected_children": 64,
+  "order": "Four corpus/lane treatments in cyclic Latin order repeated four times; every treatment occupies each position four times.",
+  "environment_keys": [
+    "LC_ALL",
+    "LANG",
+    "TZ",
+    "RUSTFLAGS",
+    "LD_PRELOAD",
+    "MALLOC_CONF",
+    "GLIBC_TUNABLES",
+    "PERL_HASH_SEED",
+    "PERL_PERTURB_KEYS"
+  ],
+  "environment_overrides": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "expected_environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "context_paths": [
+    "/proc/stat",
+    "/proc/pressure/cpu",
+    "/proc/pressure/io",
+    "/proc/loadavg",
+    "/proc/sys/kernel/perf_event_paranoid",
+    "/proc/sys/kernel/randomize_va_space",
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_governor",
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_cur_freq"
+  ],
+  "analysis": {
+    "block_samples": 50,
+    "flag_percent": 5,
+    "metrics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "within_child": "Four sequential 50-sample means and half means; descriptive spans.",
+    "between_children": "Sixteen process summaries per corpus and lane; (max-min)/min.",
+    "process_probe": "32 empty adjacent snapshot counter controls before warmup; per-operation process metric vectors. No control durations are collected. Never subtract control quantiles or compare instrumented elapsed as native latency.",
+    "phase_fault_summary": "Per-child minor/major fault distributions aligned with elapsed samples and empty controls; paired elapsed summaries for exact fault buckets, no causal inference."
+  },
+  "limits": [
+    "No optimization candidate or acceptance gate; 0715 rejection unchanged.",
+    "Native lane carries instrumentation none; procfs lane has separate feature/binary/identity and its elapsed values are diagnostic only.",
+    "Process snapshots bracket allocator region and timer but include procfs probe overhead; after snapshot precedes owner drop and digest verification.",
+    "32 empty counter controls precede warmups and are never subtracted from operation observations.",
+    "CPU tick resolution can exceed the operation duration; do not derive fine-grained CPU utilization or hardware counters.",
+    "RSS delta is a nonnegative endpoint delta; VmHWM is process-lifetime high water, not operation peak.",
+    "One fresh process per job, 200 in-process samples; generic filesystem isolation flags do not describe this route.",
+    "Rust hash seeds, allocator/ASLR layout, and unlisted environment variables remain uncontrolled.",
+    "No exclusions, replacement children, stop-on-good-result, cold cache, throughput, scaling or causal claims.",
+    "External wait4/context retains whole-process observations separately from operation probe.",
+    "Counters are same-process observations, not owner-exclusive; other activity reflected by each procfs field can contribute.",
+    "Empty controls record counter deltas only. Their wall-clock durations are not measured and they do not quantify latency overhead."
+  ],
+  "lanes": [
+    "native",
+    "procfs"
+  ],
+  "warmup": 100
+}

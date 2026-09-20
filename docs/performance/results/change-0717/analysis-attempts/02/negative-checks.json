@@ -1,0 +1,54 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "elapsed-mean",
+      "rejected": true,
+      "error": "native-b1-generated.elapsed_ns.mean: 330062.65000000014 != 330061.65"
+    },
+    {
+      "name": "sample-permutation",
+      "rejected": true,
+      "error": "native-b1-generated.elapsed_ns.sample_order is not a permutation"
+    },
+    {
+      "name": "command-cpu",
+      "rejected": true,
+      "error": "native-b1-generated command changed"
+    },
+    {
+      "name": "decoded-target-size",
+      "rejected": true,
+      "error": "native-b1-numbered-list decoded target manifest identity changed"
+    },
+    {
+      "name": "negative-process-counter",
+      "rejected": true,
+      "error": "native-b1-generated.wait4.ru_nivcsw is negative"
+    },
+    {
+      "name": "instrumentation",
+      "rejected": true,
+      "error": "procfs-b1-generated instrumentation changed: 'none'"
+    },
+    {
+      "name": "process-alignment",
+      "rejected": true,
+      "error": "procfs-b1-generated.minor_faults vector is not aligned to sample_order"
+    },
+    {
+      "name": "control-count",
+      "rejected": true,
+      "error": "procfs-b1-generated control count changed"
+    },
+    {
+      "name": "process-scope",
+      "rejected": true,
+      "error": "procfs-b1-generated procfs probe metadata changed"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "positive_exact_replay": true,
+  "analysis_sha256": "25c81b530b02ac6ef613d7973a4f2ee8e50ea5900f6f9166e6a1764ccca55a16",
+  "analyzer_sha256": "92c6a942b35e74a57d3a342ac25d6bf106958ee7734335f46f8a689e7d8070cd"
+}

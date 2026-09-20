@@ -1,0 +1,56 @@
+{
+  "native": {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2"
+    ],
+    "exit_code": 0,
+    "seconds": 455.69831682997756,
+    "source_sha256": "e3a6c3d99d4f7ea11eb9e3f732e380a529a89553621edd13459bcbf8fe8733f9",
+    "log": "build-native.log",
+    "log_sha256": "7d92d697be6ad93334dc9eb7651f788868c6c0819c8f77b09cabcbe3736b0717",
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-0717-bin/native",
+      "sha256": "b71c17b28face321ca8d5ad92b1f2af8199af9f3b010407addf9ef10027e0293",
+      "bytes": 62888360
+    }
+  },
+  "procfs": {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2",
+      "--features",
+      "ordinary-save-process-metrics"
+    ],
+    "exit_code": 0,
+    "seconds": 94.43860350607429,
+    "source_sha256": "e3a6c3d99d4f7ea11eb9e3f732e380a529a89553621edd13459bcbf8fe8733f9",
+    "log": "build-procfs.log",
+    "log_sha256": "431e66f73aa5bec09f645e8a8034e37f051d53bc48b4ac33d17d215a01ab5329",
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-0717-bin/procfs",
+      "sha256": "3663f9eb069dd38f1b6291191ec2542b9cf70bacd90ed5a0b4007d10c6cf5df3",
+      "bytes": 63168912
+    }
+  }
+}

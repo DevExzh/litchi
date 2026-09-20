@@ -1,0 +1,16 @@
+{
+  "reason": "Unused initial build predates final scope wording and Clippy cleanup; no captures used these binaries.",
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0717-bin/native",
+      "sha256": "b71c17b28face321ca8d5ad92b1f2af8199af9f3b010407addf9ef10027e0293",
+      "bytes": 62888360
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0717-bin/procfs",
+      "sha256": "3663f9eb069dd38f1b6291191ec2542b9cf70bacd90ed5a0b4007d10c6cf5df3",
+      "bytes": 63168912
+    }
+  ],
+  "binaries_removed": true
+}
