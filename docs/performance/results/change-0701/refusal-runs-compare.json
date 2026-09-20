@@ -1,0 +1,78 @@
+[
+  {
+    "leg": "a2",
+    "phase": "baseline",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0701-bin/baseline-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.5727404430508614,
+    "output": "refusal/a2.tsv",
+    "output_sha256": "cf0818d979f2fa5cc752f5380cc5ac3808f39e34be55adb628984fd2feebd772",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c"
+  },
+  {
+    "leg": "b0",
+    "phase": "candidate",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0701-bin/candidate-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.1994913211092353,
+    "output": "refusal/b0.tsv",
+    "output_sha256": "f9b7f1b41c4e287248c15dfd75db0a78512eed5f30af37f9ca55732d8753b5b2",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3"
+  },
+  {
+    "leg": "b1",
+    "phase": "candidate",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0701-bin/candidate-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.1941177350236103,
+    "output": "refusal/b1.tsv",
+    "output_sha256": "a27a5a45f2ed2454c77c59fe536bb6ea7fa49ef984c53d9a939fd23935f07117",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3"
+  },
+  {
+    "leg": "a3",
+    "phase": "baseline",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0701-bin/baseline-refusal",
+      "matrix",
+      "100",
+      "5"
+    ],
+    "exit_code": 0,
+    "seconds": 2.575918775051832,
+    "output": "refusal/a3.tsv",
+    "output_sha256": "20fe240d1420349b7952c489f40880545473a0c747f261b7ebb44757590324b8",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c"
+  }
+]

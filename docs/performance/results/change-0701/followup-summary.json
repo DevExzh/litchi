@@ -1,0 +1,4690 @@
+{
+  "native": [
+    {
+      "kind": "native",
+      "case": "noop-real",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "noop",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "7d2c682fdc588e09f779596a520f0fb1fcab4dd6ea0770038724a5c9cd3da3da",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "noop"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "before_archive_bytes": [
+          "109520"
+        ],
+        "before_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "after_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "after_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "after_semantic_payload_bytes": [
+          "5591"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "after_archive_bytes": [
+          "109520"
+        ],
+        "after_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "commit_is_changed": [
+          "false"
+        ],
+        "revision_identical": [
+          "true"
+        ],
+        "output_identical": [
+          "true"
+        ],
+        "correctness_target_text_sha256": [
+          "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 5094180.0,
+          "mean_ns": 5046042.58,
+          "p95_ns": 5246846,
+          "p99_ns": 5293397,
+          "min_ns": 4697613,
+          "max_ns": 5503268
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16860.0,
+          "mean_ns": 17083.493333333332,
+          "p95_ns": 18230,
+          "p99_ns": 24410,
+          "min_ns": 15810,
+          "max_ns": 32450
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 359816.0,
+          "mean_ns": 357596.36666666664,
+          "p95_ns": 374362,
+          "p99_ns": 467372,
+          "min_ns": 304652,
+          "max_ns": 559693
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 67590.0,
+          "mean_ns": 68430.79666666666,
+          "p95_ns": 75141,
+          "p99_ns": 87460,
+          "min_ns": 65890,
+          "max_ns": 91320
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 51125.5,
+          "mean_ns": 52173.596666666665,
+          "p95_ns": 59780,
+          "p99_ns": 61320,
+          "min_ns": 49750,
+          "max_ns": 82861
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5588233.0,
+          "mean_ns": 5541559.07,
+          "p95_ns": 5753158,
+          "p99_ns": 5804759,
+          "min_ns": 5165636,
+          "max_ns": 6018800
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "noop-real",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "noop",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "7d2c682fdc588e09f779596a520f0fb1fcab4dd6ea0770038724a5c9cd3da3da",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "noop"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "before_archive_bytes": [
+          "109520"
+        ],
+        "before_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "after_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "after_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "after_semantic_payload_bytes": [
+          "5591"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "after_archive_bytes": [
+          "109520"
+        ],
+        "after_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "commit_is_changed": [
+          "false"
+        ],
+        "revision_identical": [
+          "true"
+        ],
+        "output_identical": [
+          "true"
+        ],
+        "correctness_target_text_sha256": [
+          "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4757263.5,
+          "mean_ns": 4758334.363333333,
+          "p95_ns": 4792664,
+          "p99_ns": 4806494,
+          "min_ns": 4711283,
+          "max_ns": 5097635
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 17205.5,
+          "mean_ns": 17432.023333333334,
+          "p95_ns": 18510,
+          "p99_ns": 24560,
+          "min_ns": 16260,
+          "max_ns": 32830
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 308171.0,
+          "mean_ns": 310549.2766666667,
+          "p95_ns": 318292,
+          "p99_ns": 322401,
+          "min_ns": 303441,
+          "max_ns": 491233
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 67370.5,
+          "mean_ns": 67962.44666666667,
+          "p95_ns": 74310,
+          "p99_ns": 78130,
+          "min_ns": 65541,
+          "max_ns": 80380
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 51190.0,
+          "mean_ns": 51546.96333333333,
+          "p95_ns": 55720,
+          "p99_ns": 59990,
+          "min_ns": 49530,
+          "max_ns": 60391
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5204446.0,
+          "mean_ns": 5206064.713333333,
+          "p95_ns": 5241316,
+          "p99_ns": 5264256,
+          "min_ns": 5159506,
+          "max_ns": 5543527
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "noop-real",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "noop",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "7d2c682fdc588e09f779596a520f0fb1fcab4dd6ea0770038724a5c9cd3da3da",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "noop"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "before_archive_bytes": [
+          "109520"
+        ],
+        "before_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "after_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "after_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "after_semantic_payload_bytes": [
+          "5591"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "after_archive_bytes": [
+          "109520"
+        ],
+        "after_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "commit_is_changed": [
+          "false"
+        ],
+        "revision_identical": [
+          "true"
+        ],
+        "output_identical": [
+          "true"
+        ],
+        "correctness_target_text_sha256": [
+          "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4745723.5,
+          "mean_ns": 4747348.816666666,
+          "p95_ns": 4778463,
+          "p99_ns": 4798443,
+          "min_ns": 4686574,
+          "max_ns": 5091375
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16960.0,
+          "mean_ns": 17144.09,
+          "p95_ns": 18040,
+          "p99_ns": 24330,
+          "min_ns": 15930,
+          "max_ns": 26660
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 303286.0,
+          "mean_ns": 305903.7166666667,
+          "p95_ns": 313491,
+          "p99_ns": 325142,
+          "min_ns": 298352,
+          "max_ns": 502792
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 67610.0,
+          "mean_ns": 68326.55666666667,
+          "p95_ns": 74791,
+          "p99_ns": 77180,
+          "min_ns": 65750,
+          "max_ns": 89151
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 50700.0,
+          "mean_ns": 51433.74333333333,
+          "p95_ns": 58470,
+          "p99_ns": 62300,
+          "min_ns": 49310,
+          "max_ns": 81120
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5189081.0,
+          "mean_ns": 5190371.756666667,
+          "p95_ns": 5227226,
+          "p99_ns": 5269816,
+          "min_ns": 5118326,
+          "max_ns": 5542127
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "noop-real",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "noop",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "7d2c682fdc588e09f779596a520f0fb1fcab4dd6ea0770038724a5c9cd3da3da",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "noop"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "before_archive_bytes": [
+          "109520"
+        ],
+        "before_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "after_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "after_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "after_semantic_payload_bytes": [
+          "5591"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "after_archive_bytes": [
+          "109520"
+        ],
+        "after_archive_sha256": [
+          "f04310752c4dac82a0652e82e538159d31e158236c84e165c86778b2cff1af91"
+        ],
+        "commit_is_changed": [
+          "false"
+        ],
+        "revision_identical": [
+          "true"
+        ],
+        "output_identical": [
+          "true"
+        ],
+        "correctness_target_text_sha256": [
+          "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4747863.5,
+          "mean_ns": 4751439.96,
+          "p95_ns": 4784914,
+          "p99_ns": 4836594,
+          "min_ns": 4697913,
+          "max_ns": 4957145
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16630.0,
+          "mean_ns": 16912.403333333332,
+          "p95_ns": 18241,
+          "p99_ns": 24280,
+          "min_ns": 15630,
+          "max_ns": 27530
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 305586.5,
+          "mean_ns": 306947.2233333333,
+          "p95_ns": 316632,
+          "p99_ns": 320562,
+          "min_ns": 297992,
+          "max_ns": 328502
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 67270.0,
+          "mean_ns": 67676.45,
+          "p95_ns": 70591,
+          "p99_ns": 75851,
+          "min_ns": 65800,
+          "max_ns": 97141
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 50030.0,
+          "mean_ns": 50665.07,
+          "p95_ns": 57801,
+          "p99_ns": 60421,
+          "min_ns": 48650,
+          "max_ns": 61810
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5190636.0,
+          "mean_ns": 5193899.606666666,
+          "p95_ns": 5230575,
+          "p99_ns": 5285117,
+          "min_ns": 5138405,
+          "max_ns": 5387827
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-control",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "semantic_identity_sha256": "57a8459c08cd1c867b2404ab12ae9efaa44bb3d96a8e54f2abf830a89a220a20",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0701/marker-control.pptx"
+        ],
+        "source_archive_bytes": [
+          "106536"
+        ],
+        "source_archive_sha256": [
+          "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109515"
+        ],
+        "candidate_archive_sha256": [
+          "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 2611018.0,
+          "mean_ns": 2612359.73,
+          "p95_ns": 2635683,
+          "p99_ns": 2649763,
+          "min_ns": 2575403,
+          "max_ns": 2926684
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16900.0,
+          "mean_ns": 17105.746666666666,
+          "p95_ns": 18010,
+          "p99_ns": 23920,
+          "min_ns": 15890,
+          "max_ns": 33651
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 553323.0,
+          "mean_ns": 554779.2233333334,
+          "p95_ns": 564292,
+          "p99_ns": 568083,
+          "min_ns": 541432,
+          "max_ns": 866434
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 2740028.5,
+          "mean_ns": 2741740.8766666665,
+          "p95_ns": 2770704,
+          "p99_ns": 2790973,
+          "min_ns": 2697334,
+          "max_ns": 3060325
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 77345.0,
+          "mean_ns": 78013.43,
+          "p95_ns": 84091,
+          "p99_ns": 86820,
+          "min_ns": 75560,
+          "max_ns": 94171
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5999079.0,
+          "mean_ns": 6004287.54,
+          "p95_ns": 6054690,
+          "p99_ns": 6282332,
+          "min_ns": 5932249,
+          "max_ns": 6388462
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-control",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "semantic_identity_sha256": "57a8459c08cd1c867b2404ab12ae9efaa44bb3d96a8e54f2abf830a89a220a20",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0701/marker-control.pptx"
+        ],
+        "source_archive_bytes": [
+          "106536"
+        ],
+        "source_archive_sha256": [
+          "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109515"
+        ],
+        "candidate_archive_sha256": [
+          "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 2601573.0,
+          "mean_ns": 2606295.2933333335,
+          "p95_ns": 2649613,
+          "p99_ns": 2678754,
+          "min_ns": 2565753,
+          "max_ns": 2957135
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16555.5,
+          "mean_ns": 16707.623333333333,
+          "p95_ns": 17680,
+          "p99_ns": 22820,
+          "min_ns": 15520,
+          "max_ns": 23540
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 553668.0,
+          "mean_ns": 554175.59,
+          "p95_ns": 566912,
+          "p99_ns": 570683,
+          "min_ns": 542403,
+          "max_ns": 589963
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 2729493.0,
+          "mean_ns": 2731888.47,
+          "p95_ns": 2767404,
+          "p99_ns": 2787223,
+          "min_ns": 2693783,
+          "max_ns": 2809694
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 76926.0,
+          "mean_ns": 77516.35666666667,
+          "p95_ns": 83190,
+          "p99_ns": 86131,
+          "min_ns": 75000,
+          "max_ns": 88200
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5980354.5,
+          "mean_ns": 5986911.636666667,
+          "p95_ns": 6052060,
+          "p99_ns": 6111031,
+          "min_ns": 5918800,
+          "max_ns": 6340531
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-control",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "semantic_identity_sha256": "57a8459c08cd1c867b2404ab12ae9efaa44bb3d96a8e54f2abf830a89a220a20",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0701/marker-control.pptx"
+        ],
+        "source_archive_bytes": [
+          "106536"
+        ],
+        "source_archive_sha256": [
+          "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109515"
+        ],
+        "candidate_archive_sha256": [
+          "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 2231436.0,
+          "mean_ns": 2232158.9133333336,
+          "p95_ns": 2250882,
+          "p99_ns": 2270132,
+          "min_ns": 2206651,
+          "max_ns": 2277201
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16235.0,
+          "mean_ns": 16530.916666666668,
+          "p95_ns": 17410,
+          "p99_ns": 24321,
+          "min_ns": 15431,
+          "max_ns": 25430
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 501057.5,
+          "mean_ns": 501968.24666666664,
+          "p95_ns": 510683,
+          "p99_ns": 516682,
+          "min_ns": 490692,
+          "max_ns": 741543
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 2304046.5,
+          "mean_ns": 2307523.84,
+          "p95_ns": 2325151,
+          "p99_ns": 2351222,
+          "min_ns": 2282352,
+          "max_ns": 2688023
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 73105.5,
+          "mean_ns": 73475.74666666667,
+          "p95_ns": 79141,
+          "p99_ns": 80470,
+          "min_ns": 71491,
+          "max_ns": 86351
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5127805.0,
+          "mean_ns": 5131914.163333333,
+          "p95_ns": 5164795,
+          "p99_ns": 5182225,
+          "min_ns": 5088915,
+          "max_ns": 5539327
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-control",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "semantic_identity_sha256": "57a8459c08cd1c867b2404ab12ae9efaa44bb3d96a8e54f2abf830a89a220a20",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0701/marker-control.pptx"
+        ],
+        "source_archive_bytes": [
+          "106536"
+        ],
+        "source_archive_sha256": [
+          "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "c6da4ae94e54865ec8c6376a694390b1fba3cc2c2d0c9affe80f479f7bee842b"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "c4e801ad41c2908da7749e79feb4a0aea2bfd44d718aa5b2ede552a13834cad9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109515"
+        ],
+        "candidate_archive_sha256": [
+          "c1e5ec52f5c3b9a1a19c4834af7fa00259cd0c5e735d0fb12fce724715ca2549"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 2230486.0,
+          "mean_ns": 2231767.5033333334,
+          "p95_ns": 2251601,
+          "p99_ns": 2269172,
+          "min_ns": 2197381,
+          "max_ns": 2406732
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 15815.0,
+          "mean_ns": 16047.18,
+          "p95_ns": 17230,
+          "p99_ns": 22381,
+          "min_ns": 15080,
+          "max_ns": 31560
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 500582.0,
+          "mean_ns": 501064.39666666667,
+          "p95_ns": 508933,
+          "p99_ns": 518293,
+          "min_ns": 488853,
+          "max_ns": 689063
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 2304581.0,
+          "mean_ns": 2307529.1066666665,
+          "p95_ns": 2325842,
+          "p99_ns": 2346591,
+          "min_ns": 2267531,
+          "max_ns": 2678193
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 74056.0,
+          "mean_ns": 74931.95,
+          "p95_ns": 80971,
+          "p99_ns": 84000,
+          "min_ns": 72231,
+          "max_ns": 129621
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 5130416.0,
+          "mean_ns": 5131580.1033333335,
+          "p95_ns": 5168796,
+          "p99_ns": 5336686,
+          "min_ns": 5061035,
+          "max_ns": 5516157
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-generated",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": null,
+      "semantic_identity_sha256": "55549c2ace3758687d3266a6be3011803f343e5faca5c212b7121b15e177dfdf",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "generated:12x8"
+        ],
+        "source_archive_bytes": [
+          "40797"
+        ],
+        "source_archive_sha256": [
+          "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+        ],
+        "before_semantic_sha256": [
+          "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+        ],
+        "before_semantic_payload_bytes": [
+          "12480"
+        ],
+        "before_slides": [
+          "12"
+        ],
+        "before_shapes": [
+          "96"
+        ],
+        "after_revision_sha256": [
+          "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+        ],
+        "after_semantic_sha256": [
+          "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+        ],
+        "after_semantic_payload_bytes": [
+          "12426"
+        ],
+        "after_slides": [
+          "12"
+        ],
+        "after_shapes": [
+          "96"
+        ],
+        "candidate_archive_bytes": [
+          "40810"
+        ],
+        "candidate_archive_sha256": [
+          "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 639813.0,
+          "mean_ns": 639394.91,
+          "p95_ns": 648603,
+          "p99_ns": 656424,
+          "min_ns": 627593,
+          "max_ns": 670034
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 12070.0,
+          "mean_ns": 12132.023333333333,
+          "p95_ns": 12480,
+          "p99_ns": 12800,
+          "min_ns": 11450,
+          "max_ns": 18710
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 136285.5,
+          "mean_ns": 137598.48666666666,
+          "p95_ns": 143531,
+          "p99_ns": 148661,
+          "min_ns": 134401,
+          "max_ns": 196351
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 722654.0,
+          "mean_ns": 723175.4266666666,
+          "p95_ns": 729763,
+          "p99_ns": 734164,
+          "min_ns": 709694,
+          "max_ns": 1002035
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 49170.0,
+          "mean_ns": 49546.34,
+          "p95_ns": 54780,
+          "p99_ns": 56271,
+          "min_ns": 47491,
+          "max_ns": 56680
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1560508.0,
+          "mean_ns": 1562084.3866666667,
+          "p95_ns": 1573607,
+          "p99_ns": 1583428,
+          "min_ns": 1544177,
+          "max_ns": 1892810
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-generated",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": null,
+      "semantic_identity_sha256": "55549c2ace3758687d3266a6be3011803f343e5faca5c212b7121b15e177dfdf",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "generated:12x8"
+        ],
+        "source_archive_bytes": [
+          "40797"
+        ],
+        "source_archive_sha256": [
+          "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+        ],
+        "before_semantic_sha256": [
+          "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+        ],
+        "before_semantic_payload_bytes": [
+          "12480"
+        ],
+        "before_slides": [
+          "12"
+        ],
+        "before_shapes": [
+          "96"
+        ],
+        "after_revision_sha256": [
+          "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+        ],
+        "after_semantic_sha256": [
+          "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+        ],
+        "after_semantic_payload_bytes": [
+          "12426"
+        ],
+        "after_slides": [
+          "12"
+        ],
+        "after_shapes": [
+          "96"
+        ],
+        "candidate_archive_bytes": [
+          "40810"
+        ],
+        "candidate_archive_sha256": [
+          "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 639513.5,
+          "mean_ns": 639039.7366666667,
+          "p95_ns": 647144,
+          "p99_ns": 651113,
+          "min_ns": 629123,
+          "max_ns": 655113
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 12150.0,
+          "mean_ns": 12278.773333333333,
+          "p95_ns": 12640,
+          "p99_ns": 19310,
+          "min_ns": 11430,
+          "max_ns": 23280
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 136111.0,
+          "mean_ns": 137117.19666666666,
+          "p95_ns": 143451,
+          "p99_ns": 148020,
+          "min_ns": 134021,
+          "max_ns": 148571
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 721963.5,
+          "mean_ns": 722040.49,
+          "p95_ns": 729414,
+          "p99_ns": 741644,
+          "min_ns": 711224,
+          "max_ns": 745503
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 49070.5,
+          "mean_ns": 49412.36,
+          "p95_ns": 51590,
+          "p99_ns": 57030,
+          "min_ns": 47730,
+          "max_ns": 57841
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1559557.5,
+          "mean_ns": 1560143.16,
+          "p95_ns": 1569748,
+          "p99_ns": 1579427,
+          "min_ns": 1545868,
+          "max_ns": 1592808
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-generated",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": null,
+      "semantic_identity_sha256": "55549c2ace3758687d3266a6be3011803f343e5faca5c212b7121b15e177dfdf",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "generated:12x8"
+        ],
+        "source_archive_bytes": [
+          "40797"
+        ],
+        "source_archive_sha256": [
+          "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+        ],
+        "before_semantic_sha256": [
+          "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+        ],
+        "before_semantic_payload_bytes": [
+          "12480"
+        ],
+        "before_slides": [
+          "12"
+        ],
+        "before_shapes": [
+          "96"
+        ],
+        "after_revision_sha256": [
+          "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+        ],
+        "after_semantic_sha256": [
+          "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+        ],
+        "after_semantic_payload_bytes": [
+          "12426"
+        ],
+        "after_slides": [
+          "12"
+        ],
+        "after_shapes": [
+          "96"
+        ],
+        "candidate_archive_bytes": [
+          "40810"
+        ],
+        "candidate_archive_sha256": [
+          "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 561333.0,
+          "mean_ns": 560853.61,
+          "p95_ns": 570363,
+          "p99_ns": 580123,
+          "min_ns": 550583,
+          "max_ns": 623113
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 11725.0,
+          "mean_ns": 11860.903333333334,
+          "p95_ns": 12210,
+          "p99_ns": 19250,
+          "min_ns": 11141,
+          "max_ns": 20400
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 125601.0,
+          "mean_ns": 126647.45,
+          "p95_ns": 134310,
+          "p99_ns": 135350,
+          "min_ns": 124020,
+          "max_ns": 138541
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 631803.5,
+          "mean_ns": 631193.27,
+          "p95_ns": 639763,
+          "p99_ns": 641823,
+          "min_ns": 620163,
+          "max_ns": 645423
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 47270.0,
+          "mean_ns": 47661.11,
+          "p95_ns": 53681,
+          "p99_ns": 56510,
+          "min_ns": 45691,
+          "max_ns": 56991
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1377352.0,
+          "mean_ns": 1378456.6766666668,
+          "p95_ns": 1389877,
+          "p99_ns": 1397037,
+          "min_ns": 1365726,
+          "max_ns": 1437827
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-generated",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": null,
+      "semantic_identity_sha256": "55549c2ace3758687d3266a6be3011803f343e5faca5c212b7121b15e177dfdf",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "generated:12x8"
+        ],
+        "source_archive_bytes": [
+          "40797"
+        ],
+        "source_archive_sha256": [
+          "86ea0f3914140cd4c62175ec3b9fdf8b988bd91de1adf23be907daaf4394a0ec"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "f79e492278f495b16135450069bf078291f3a9e046748660b4b9d88e1ab3ab4b"
+        ],
+        "before_semantic_sha256": [
+          "3b822dbe0102d297fb02ac9ef9cddc3715565869b3c836a800d9f00176cb32a3"
+        ],
+        "before_semantic_payload_bytes": [
+          "12480"
+        ],
+        "before_slides": [
+          "12"
+        ],
+        "before_shapes": [
+          "96"
+        ],
+        "after_revision_sha256": [
+          "af1a58b248633cbe51ed5e5c8c65cda2ff23ce736d9b7dd4bc29fcfc434ea383"
+        ],
+        "after_semantic_sha256": [
+          "4329f2be5e46e33bfb4a28e0d4049ecb8b01eb1e0a0dc4823b7e84f7279c5242"
+        ],
+        "after_semantic_payload_bytes": [
+          "12426"
+        ],
+        "after_slides": [
+          "12"
+        ],
+        "after_shapes": [
+          "96"
+        ],
+        "candidate_archive_bytes": [
+          "40810"
+        ],
+        "candidate_archive_sha256": [
+          "6d7a4b53699dc309d03733b351dc60672e9b892454508e9c659ec2712a494783"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 567323.0,
+          "mean_ns": 567373.3666666667,
+          "p95_ns": 576673,
+          "p99_ns": 594302,
+          "min_ns": 556012,
+          "max_ns": 618403
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 11671.0,
+          "mean_ns": 11737.786666666667,
+          "p95_ns": 12111,
+          "p99_ns": 12300,
+          "min_ns": 10940,
+          "max_ns": 19450
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 126811.0,
+          "mean_ns": 127821.68,
+          "p95_ns": 134870,
+          "p99_ns": 138081,
+          "min_ns": 124820,
+          "max_ns": 147191
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 630713.0,
+          "mean_ns": 630666.2033333334,
+          "p95_ns": 640033,
+          "p99_ns": 649053,
+          "min_ns": 618104,
+          "max_ns": 720023
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 47110.0,
+          "mean_ns": 47730.956666666665,
+          "p95_ns": 53781,
+          "p99_ns": 55440,
+          "min_ns": 45491,
+          "max_ns": 81361
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1383622.0,
+          "mean_ns": 1385557.3266666667,
+          "p95_ns": 1401957,
+          "p99_ns": 1434397,
+          "min_ns": 1369887,
+          "max_ns": 1513858
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-notes-poi",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad",
+      "semantic_identity_sha256": "9bf01b116f9d7272f52e5b9bf7480d41617e3c3cc70cb3278946656512c58c4f",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+        ],
+        "source_archive_bytes": [
+          "30976"
+        ],
+        "source_archive_sha256": [
+          "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+        ],
+        "before_semantic_sha256": [
+          "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+        ],
+        "before_semantic_payload_bytes": [
+          "117"
+        ],
+        "before_slides": [
+          "1"
+        ],
+        "before_shapes": [
+          "3"
+        ],
+        "after_revision_sha256": [
+          "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+        ],
+        "after_semantic_sha256": [
+          "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+        ],
+        "after_semantic_payload_bytes": [
+          "163"
+        ],
+        "after_slides": [
+          "1"
+        ],
+        "after_shapes": [
+          "3"
+        ],
+        "candidate_archive_bytes": [
+          "26401"
+        ],
+        "candidate_archive_sha256": [
+          "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 394467.0,
+          "mean_ns": 397209.9166666667,
+          "p95_ns": 407202,
+          "p99_ns": 423993,
+          "min_ns": 387982,
+          "max_ns": 550323
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 5600.0,
+          "mean_ns": 5623.9,
+          "p95_ns": 5880,
+          "p99_ns": 6110,
+          "min_ns": 4970,
+          "max_ns": 12240
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 137106.0,
+          "mean_ns": 139197.92666666667,
+          "p95_ns": 148520,
+          "p99_ns": 153680,
+          "min_ns": 134490,
+          "max_ns": 218971
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 478658.0,
+          "mean_ns": 479556.5,
+          "p95_ns": 486352,
+          "p99_ns": 491363,
+          "min_ns": 470392,
+          "max_ns": 713523
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 29970.0,
+          "mean_ns": 30208.643333333333,
+          "p95_ns": 30600,
+          "p99_ns": 38680,
+          "min_ns": 29040,
+          "max_ns": 46290
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1048985.0,
+          "mean_ns": 1052000.4533333334,
+          "p95_ns": 1063265,
+          "p99_ns": 1108856,
+          "min_ns": 1039865,
+          "max_ns": 1330517
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-notes-poi",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad",
+      "semantic_identity_sha256": "9bf01b116f9d7272f52e5b9bf7480d41617e3c3cc70cb3278946656512c58c4f",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+        ],
+        "source_archive_bytes": [
+          "30976"
+        ],
+        "source_archive_sha256": [
+          "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+        ],
+        "before_semantic_sha256": [
+          "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+        ],
+        "before_semantic_payload_bytes": [
+          "117"
+        ],
+        "before_slides": [
+          "1"
+        ],
+        "before_shapes": [
+          "3"
+        ],
+        "after_revision_sha256": [
+          "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+        ],
+        "after_semantic_sha256": [
+          "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+        ],
+        "after_semantic_payload_bytes": [
+          "163"
+        ],
+        "after_slides": [
+          "1"
+        ],
+        "after_shapes": [
+          "3"
+        ],
+        "candidate_archive_bytes": [
+          "26401"
+        ],
+        "candidate_archive_sha256": [
+          "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 394972.0,
+          "mean_ns": 397458.31333333335,
+          "p95_ns": 406552,
+          "p99_ns": 409342,
+          "min_ns": 390932,
+          "max_ns": 428972
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 5560.5,
+          "mean_ns": 5640.096666666666,
+          "p95_ns": 5870,
+          "p99_ns": 6350,
+          "min_ns": 4990,
+          "max_ns": 13270
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 136225.5,
+          "mean_ns": 137721.11666666667,
+          "p95_ns": 144551,
+          "p99_ns": 149810,
+          "min_ns": 133930,
+          "max_ns": 170570
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 477443.0,
+          "mean_ns": 479108.11333333334,
+          "p95_ns": 486653,
+          "p99_ns": 488522,
+          "min_ns": 471172,
+          "max_ns": 495972
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 29875.5,
+          "mean_ns": 30124.41,
+          "p95_ns": 30610,
+          "p99_ns": 36310,
+          "min_ns": 28780,
+          "max_ns": 40210
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 1049860.0,
+          "mean_ns": 1050217.7166666666,
+          "p95_ns": 1056685,
+          "p99_ns": 1065365,
+          "min_ns": 1039675,
+          "max_ns": 1122735
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-notes-poi",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad",
+      "semantic_identity_sha256": "9bf01b116f9d7272f52e5b9bf7480d41617e3c3cc70cb3278946656512c58c4f",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+        ],
+        "source_archive_bytes": [
+          "30976"
+        ],
+        "source_archive_sha256": [
+          "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+        ],
+        "before_semantic_sha256": [
+          "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+        ],
+        "before_semantic_payload_bytes": [
+          "117"
+        ],
+        "before_slides": [
+          "1"
+        ],
+        "before_shapes": [
+          "3"
+        ],
+        "after_revision_sha256": [
+          "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+        ],
+        "after_semantic_sha256": [
+          "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+        ],
+        "after_semantic_payload_bytes": [
+          "163"
+        ],
+        "after_slides": [
+          "1"
+        ],
+        "after_shapes": [
+          "3"
+        ],
+        "candidate_archive_bytes": [
+          "26401"
+        ],
+        "candidate_archive_sha256": [
+          "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 334826.5,
+          "mean_ns": 338566.95666666667,
+          "p95_ns": 347042,
+          "p99_ns": 371712,
+          "min_ns": 330852,
+          "max_ns": 509473
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 5410.0,
+          "mean_ns": 5460.956666666667,
+          "p95_ns": 5730,
+          "p99_ns": 6140,
+          "min_ns": 4880,
+          "max_ns": 12670
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 122960.5,
+          "mean_ns": 124207.70666666667,
+          "p95_ns": 131551,
+          "p99_ns": 134611,
+          "min_ns": 120880,
+          "max_ns": 195921
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 403162.0,
+          "mean_ns": 406237.2733333333,
+          "p95_ns": 414622,
+          "p99_ns": 435172,
+          "min_ns": 398022,
+          "max_ns": 491522
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 24410.0,
+          "mean_ns": 24684.47333333333,
+          "p95_ns": 25100,
+          "p99_ns": 31691,
+          "min_ns": 23660,
+          "max_ns": 41350
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 896769.0,
+          "mean_ns": 899342.8033333333,
+          "p95_ns": 905605,
+          "p99_ns": 974355,
+          "min_ns": 884495,
+          "max_ns": 1145396
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-notes-poi",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad",
+      "semantic_identity_sha256": "9bf01b116f9d7272f52e5b9bf7480d41617e3c3cc70cb3278946656512c58c4f",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx"
+        ],
+        "source_archive_bytes": [
+          "30976"
+        ],
+        "source_archive_sha256": [
+          "b6d031d7cd670a007489465c57a0f233c497e89aed62a0a9f7d916cf173c86ad"
+        ],
+        "target": [
+          "slide:0",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "4f291b4e8766ba3f7f5554c1f4c98ae5d0e3f84d465c03ab555443185e03347a"
+        ],
+        "before_semantic_sha256": [
+          "a7c600e3c13edfd28a1588c4f83bc2b8689b8376f0da973bec2b327a11621922"
+        ],
+        "before_semantic_payload_bytes": [
+          "117"
+        ],
+        "before_slides": [
+          "1"
+        ],
+        "before_shapes": [
+          "3"
+        ],
+        "after_revision_sha256": [
+          "efb6ada353147a481144e89ab7b9ecd51abca5a04dde4da7500737bb19763fee"
+        ],
+        "after_semantic_sha256": [
+          "560a10252cec5e05796ec4465cfc9a0f2d13d5d086e9d80c83347ba1fb1880c6"
+        ],
+        "after_semantic_payload_bytes": [
+          "163"
+        ],
+        "after_slides": [
+          "1"
+        ],
+        "after_shapes": [
+          "3"
+        ],
+        "candidate_archive_bytes": [
+          "26401"
+        ],
+        "candidate_archive_sha256": [
+          "e9810d60ddb4248c1e43e676d171dc1512d33d37175c8a79790371f515388711"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 332592.0,
+          "mean_ns": 334880.41333333333,
+          "p95_ns": 343882,
+          "p99_ns": 346982,
+          "min_ns": 328391,
+          "max_ns": 372792
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 5565.0,
+          "mean_ns": 5639.5,
+          "p95_ns": 5870,
+          "p99_ns": 9100,
+          "min_ns": 5030,
+          "max_ns": 13350
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 124480.5,
+          "mean_ns": 125822.42,
+          "p95_ns": 133000,
+          "p99_ns": 136440,
+          "min_ns": 122310,
+          "max_ns": 208151
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 401977.0,
+          "mean_ns": 404833.30666666664,
+          "p95_ns": 412452,
+          "p99_ns": 419842,
+          "min_ns": 395742,
+          "max_ns": 659634
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 24730.0,
+          "mean_ns": 25020.713333333333,
+          "p95_ns": 25480,
+          "p99_ns": 33220,
+          "min_ns": 23660,
+          "max_ns": 45260
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 894749.5,
+          "mean_ns": 896355.6866666666,
+          "p95_ns": 904275,
+          "p99_ns": 911305,
+          "min_ns": 879474,
+          "max_ns": 1268656
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-real",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "e03a3a80e1355bc62f4597644dd4de091e33789cc3e0ffd88e6e87c2f0c88303",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109501"
+        ],
+        "candidate_archive_sha256": [
+          "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4750874.0,
+          "mean_ns": 4756287.053333334,
+          "p95_ns": 4823944,
+          "p99_ns": 4880784,
+          "min_ns": 4678573,
+          "max_ns": 5062495
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16590.0,
+          "mean_ns": 16795.03,
+          "p95_ns": 17580,
+          "p99_ns": 22710,
+          "min_ns": 15770,
+          "max_ns": 34511
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1022890.0,
+          "mean_ns": 1022789.7466666667,
+          "p95_ns": 1031555,
+          "p99_ns": 1036305,
+          "min_ns": 1003975,
+          "max_ns": 1046246
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5123885.0,
+          "mean_ns": 5134992.4366666665,
+          "p95_ns": 5186226,
+          "p99_ns": 5474207,
+          "min_ns": 5037085,
+          "max_ns": 5825819
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 91310.5,
+          "mean_ns": 92292.31333333334,
+          "p95_ns": 98910,
+          "p99_ns": 101440,
+          "min_ns": 89490,
+          "max_ns": 116141
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11011819.0,
+          "mean_ns": 11023440.946666667,
+          "p95_ns": 11124045,
+          "p99_ns": 11359266,
+          "min_ns": 10833513,
+          "max_ns": 11685058
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-real",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "one",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "e03a3a80e1355bc62f4597644dd4de091e33789cc3e0ffd88e6e87c2f0c88303",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109501"
+        ],
+        "candidate_archive_sha256": [
+          "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4739353.5,
+          "mean_ns": 4749151.23,
+          "p95_ns": 4807474,
+          "p99_ns": 5093595,
+          "min_ns": 4646853,
+          "max_ns": 5150426
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16320.0,
+          "mean_ns": 16550.356666666667,
+          "p95_ns": 17560,
+          "p99_ns": 22410,
+          "min_ns": 15560,
+          "max_ns": 26280
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1026430.0,
+          "mean_ns": 1026954.2766666666,
+          "p95_ns": 1035926,
+          "p99_ns": 1051385,
+          "min_ns": 1008125,
+          "max_ns": 1088516
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5142621.0,
+          "mean_ns": 5148651.67,
+          "p95_ns": 5194836,
+          "p99_ns": 5484917,
+          "min_ns": 5005815,
+          "max_ns": 5509547
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 92531.0,
+          "mean_ns": 93798.12666666666,
+          "p95_ns": 99550,
+          "p99_ns": 102341,
+          "min_ns": 90411,
+          "max_ns": 159631
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11024110.0,
+          "mean_ns": 11035358.393333333,
+          "p95_ns": 11122045,
+          "p99_ns": 11394347,
+          "min_ns": 10809514,
+          "max_ns": 11429557
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-real",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "e03a3a80e1355bc62f4597644dd4de091e33789cc3e0ffd88e6e87c2f0c88303",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109501"
+        ],
+        "candidate_archive_sha256": [
+          "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4751724.0,
+          "mean_ns": 4764501.613333333,
+          "p95_ns": 4851704,
+          "p99_ns": 4894955,
+          "min_ns": 4696764,
+          "max_ns": 5188926
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16245.5,
+          "mean_ns": 16450.13,
+          "p95_ns": 17400,
+          "p99_ns": 21090,
+          "min_ns": 15370,
+          "max_ns": 33520
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1015200.0,
+          "mean_ns": 1015909.3466666667,
+          "p95_ns": 1023825,
+          "p99_ns": 1032475,
+          "min_ns": 1003115,
+          "max_ns": 1160236
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5137725.5,
+          "mean_ns": 5145756.906666666,
+          "p95_ns": 5189286,
+          "p99_ns": 5473527,
+          "min_ns": 5088815,
+          "max_ns": 5520017
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 89960.0,
+          "mean_ns": 90693.33,
+          "p95_ns": 97350,
+          "p99_ns": 101901,
+          "min_ns": 88310,
+          "max_ns": 111581
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11019734.0,
+          "mean_ns": 11033575.83,
+          "p95_ns": 11128295,
+          "p99_ns": 11350376,
+          "min_ns": 10920004,
+          "max_ns": 11834809
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "one-real",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "one",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "e03a3a80e1355bc62f4597644dd4de091e33789cc3e0ffd88e6e87c2f0c88303",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target": [
+          "slide:1",
+          "shape:1"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "f66897fcfa2e0b7195b49888be833a2367311f486b883acdab07e15b2c8cdaf9"
+        ],
+        "after_semantic_sha256": [
+          "a23816e311e9c8957105f848b8614d451d5a67c0b94f24f5bee662244ddc097f"
+        ],
+        "after_semantic_payload_bytes": [
+          "5647"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109501"
+        ],
+        "candidate_archive_sha256": [
+          "af63e363859328cd8ea76cf2ad579831feca78483ac5c262fdf5414c68b329e5"
+        ],
+        "reopened_target_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4791834.0,
+          "mean_ns": 4788529.713333333,
+          "p95_ns": 4828264,
+          "p99_ns": 4853174,
+          "min_ns": 4723043,
+          "max_ns": 5132376
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16370.0,
+          "mean_ns": 16647.053333333333,
+          "p95_ns": 17640,
+          "p99_ns": 24091,
+          "min_ns": 15520,
+          "max_ns": 27220
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1017965.0,
+          "mean_ns": 1018797.5466666666,
+          "p95_ns": 1029765,
+          "p99_ns": 1035445,
+          "min_ns": 1003885,
+          "max_ns": 1060915
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5178945.0,
+          "mean_ns": 5178089.593333334,
+          "p95_ns": 5240886,
+          "p99_ns": 5265626,
+          "min_ns": 5086295,
+          "max_ns": 5307937
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 90285.0,
+          "mean_ns": 90986.84333333334,
+          "p95_ns": 97580,
+          "p99_ns": 100070,
+          "min_ns": 88330,
+          "max_ns": 109741
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11099615.0,
+          "mean_ns": 11093339.99,
+          "p95_ns": 11181395,
+          "p99_ns": 11228055,
+          "min_ns": 10943264,
+          "max_ns": 11448077
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "two-real",
+      "leg": "a0",
+      "phase": "baseline",
+      "workflow": "two",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "191bbc9dcd4ebe260e3f17543e0b2355459ba3e5556c5f4a9446584d6db1182a",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "two"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "target2": [
+          "slide:2",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+        ],
+        "after_semantic_sha256": [
+          "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+        ],
+        "after_semantic_payload_bytes": [
+          "5703"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109491"
+        ],
+        "candidate_archive_sha256": [
+          "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+        ],
+        "reopened_target1_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "reopened_target2_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4765733.5,
+          "mean_ns": 4774402.37,
+          "p95_ns": 4837404,
+          "p99_ns": 4876974,
+          "min_ns": 4690403,
+          "max_ns": 5133375
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16970.0,
+          "mean_ns": 17219.28,
+          "p95_ns": 18190,
+          "p99_ns": 23740,
+          "min_ns": 16140,
+          "max_ns": 37580
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1202656.0,
+          "mean_ns": 1203913.4766666666,
+          "p95_ns": 1212746,
+          "p99_ns": 1216826,
+          "min_ns": 1188136,
+          "max_ns": 1530898
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5271636.5,
+          "mean_ns": 5275852.25,
+          "p95_ns": 5310367,
+          "p99_ns": 5355476,
+          "min_ns": 5197276,
+          "max_ns": 5621998
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 96105.5,
+          "mean_ns": 96697.35,
+          "p95_ns": 102581,
+          "p99_ns": 105140,
+          "min_ns": 94431,
+          "max_ns": 106420
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11359366.0,
+          "mean_ns": 11368507.826666666,
+          "p95_ns": 11455877,
+          "p99_ns": 11682888,
+          "min_ns": 11206505,
+          "max_ns": 11700958
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "two-real",
+      "leg": "a3",
+      "phase": "baseline",
+      "workflow": "two",
+      "binary_sha256": "1f69bb3d99693a8cbaf3de29693b94d6f3548d4c13cd603062396d80dd1e46fa",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "191bbc9dcd4ebe260e3f17543e0b2355459ba3e5556c5f4a9446584d6db1182a",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "two"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "target2": [
+          "slide:2",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+        ],
+        "after_semantic_sha256": [
+          "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+        ],
+        "after_semantic_payload_bytes": [
+          "5703"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109491"
+        ],
+        "candidate_archive_sha256": [
+          "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+        ],
+        "reopened_target1_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "reopened_target2_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4740613.5,
+          "mean_ns": 4746548.3966666665,
+          "p95_ns": 4795663,
+          "p99_ns": 4832454,
+          "min_ns": 4652503,
+          "max_ns": 5092286
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 17021.0,
+          "mean_ns": 17235.486666666668,
+          "p95_ns": 18420,
+          "p99_ns": 23870,
+          "min_ns": 16060,
+          "max_ns": 24930
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1202111.0,
+          "mean_ns": 1202553.54,
+          "p95_ns": 1211086,
+          "p99_ns": 1226516,
+          "min_ns": 1184385,
+          "max_ns": 1274476
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5252951.0,
+          "mean_ns": 5257675.263333334,
+          "p95_ns": 5292787,
+          "p99_ns": 5578138,
+          "min_ns": 5151406,
+          "max_ns": 5638748
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 95746.0,
+          "mean_ns": 96653.12,
+          "p95_ns": 103231,
+          "p99_ns": 106561,
+          "min_ns": 93350,
+          "max_ns": 114931
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11312871.0,
+          "mean_ns": 11320944.706666667,
+          "p95_ns": 11391347,
+          "p99_ns": 11662798,
+          "min_ns": 11109235,
+          "max_ns": 11705429
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "two-real",
+      "leg": "b0",
+      "phase": "candidate",
+      "workflow": "two",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "191bbc9dcd4ebe260e3f17543e0b2355459ba3e5556c5f4a9446584d6db1182a",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "two"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "target2": [
+          "slide:2",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+        ],
+        "after_semantic_sha256": [
+          "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+        ],
+        "after_semantic_payload_bytes": [
+          "5703"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109491"
+        ],
+        "candidate_archive_sha256": [
+          "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+        ],
+        "reopened_target1_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "reopened_target2_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4736878.0,
+          "mean_ns": 4747357.02,
+          "p95_ns": 4801604,
+          "p99_ns": 5042585,
+          "min_ns": 4687823,
+          "max_ns": 5153106
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16390.0,
+          "mean_ns": 16542.676666666666,
+          "p95_ns": 17480,
+          "p99_ns": 22340,
+          "min_ns": 15550,
+          "max_ns": 24200
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1195225.5,
+          "mean_ns": 1195638.86,
+          "p95_ns": 1206285,
+          "p99_ns": 1210936,
+          "min_ns": 1179546,
+          "max_ns": 1215866
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5244326.0,
+          "mean_ns": 5250032.276666666,
+          "p95_ns": 5296636,
+          "p99_ns": 5351867,
+          "min_ns": 5173455,
+          "max_ns": 5593068
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 94340.5,
+          "mean_ns": 95104.09333333334,
+          "p95_ns": 101291,
+          "p99_ns": 105371,
+          "min_ns": 92560,
+          "max_ns": 114810
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11290031.0,
+          "mean_ns": 11304937.226666667,
+          "p95_ns": 11398026,
+          "p99_ns": 11641157,
+          "min_ns": 11169275,
+          "max_ns": 11704948
+        }
+      }
+    },
+    {
+      "kind": "native",
+      "case": "two-real",
+      "leg": "b1",
+      "phase": "candidate",
+      "workflow": "two",
+      "binary_sha256": "217c5e53da0683beeb55f703e939bb4a98d7f9d707fc440e2a4d8a543ce9bdfd",
+      "source_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "semantic_identity_sha256": "191bbc9dcd4ebe260e3f17543e0b2355459ba3e5556c5f4a9446584d6db1182a",
+      "metadata": {
+        "probe": [
+          "0701"
+        ],
+        "workflow": [
+          "two"
+        ],
+        "source": [
+          "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        ],
+        "source_archive_bytes": [
+          "108164"
+        ],
+        "source_archive_sha256": [
+          "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+        ],
+        "target1": [
+          "slide:1",
+          "shape:1"
+        ],
+        "target2": [
+          "slide:2",
+          "shape:0"
+        ],
+        "samples": [
+          "300"
+        ],
+        "warmups": [
+          "10"
+        ],
+        "before_revision_sha256": [
+          "0f97526a3fe1effd3fa353765d61fe574e58aa2ad207ceb6d532932ce1cedd41"
+        ],
+        "before_semantic_sha256": [
+          "b131f61626ff380599d75eb6a45956d8586c132d2a406e09c3ba73a154514e27"
+        ],
+        "before_semantic_payload_bytes": [
+          "5591"
+        ],
+        "before_slides": [
+          "13"
+        ],
+        "before_shapes": [
+          "253"
+        ],
+        "after_revision_sha256": [
+          "46573a7580454e089deda06ba94072f997c94cf27b7f7758df6b09a8d4f3be3f"
+        ],
+        "after_semantic_sha256": [
+          "17400bbb9cf33dd70ea51dae4e6514ad65b008904a2675ef6b074be982e1443a"
+        ],
+        "after_semantic_payload_bytes": [
+          "5703"
+        ],
+        "after_slides": [
+          "13"
+        ],
+        "after_shapes": [
+          "253"
+        ],
+        "candidate_archive_bytes": [
+          "109491"
+        ],
+        "candidate_archive_sha256": [
+          "82394009364444f1daa5747d2c718b4e9f83120ef75a29518acb430e23aed382"
+        ],
+        "reopened_target1_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "reopened_target2_text_sha256": [
+          "d4f5294fa27d4aee8b7bd75aedd7fe47dcb5d0b6615583a8f034a2ed20b5a412"
+        ],
+        "correctness_target_text": [
+          "litchi-perf-0691-opened-phase"
+        ]
+      },
+      "stats": {
+        "capture_ns": {
+          "samples": 300,
+          "p50_ns": 4759853.5,
+          "mean_ns": 4773785.946666666,
+          "p95_ns": 4866654,
+          "p99_ns": 4904274,
+          "min_ns": 4690234,
+          "max_ns": 5142506
+        },
+        "clone_ns": {
+          "samples": 300,
+          "p50_ns": 16430.0,
+          "mean_ns": 16672.403333333332,
+          "p95_ns": 17741,
+          "p99_ns": 24370,
+          "min_ns": 15580,
+          "max_ns": 25510
+        },
+        "settext_ns": {
+          "samples": 300,
+          "p50_ns": 1193505.5,
+          "mean_ns": 1194595.77,
+          "p95_ns": 1208236,
+          "p99_ns": 1215346,
+          "min_ns": 1178696,
+          "max_ns": 1252546
+        },
+        "commit_ns": {
+          "samples": 300,
+          "p50_ns": 5276116.5,
+          "mean_ns": 5279202.09,
+          "p95_ns": 5315866,
+          "p99_ns": 5352787,
+          "min_ns": 5211906,
+          "max_ns": 5597298
+        },
+        "apply_ns": {
+          "samples": 300,
+          "p50_ns": 94675.0,
+          "mean_ns": 95562.44333333333,
+          "p95_ns": 102360,
+          "p99_ns": 105190,
+          "min_ns": 92360,
+          "max_ns": 161481
+        },
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 11351316.5,
+          "mean_ns": 11360082.82,
+          "p95_ns": 11476747,
+          "p99_ns": 11522097,
+          "min_ns": 11209906,
+          "max_ns": 11693578
+        }
+      }
+    }
+  ],
+  "refusal": [
+    {
+      "kind": "refusal",
+      "case": "early-name-error",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "8ced4b4e9b7f5c2d8938b1a2cb5e75b74f698a5076893d0a304b9a53a0863396",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+        ],
+        "expected_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ],
+        "observed_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 35730.0,
+          "mean_ns": 35925.04666666667,
+          "p95_ns": 35960,
+          "p99_ns": 41160,
+          "min_ns": 35370,
+          "max_ns": 41921
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "early-name-error",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "8ced4b4e9b7f5c2d8938b1a2cb5e75b74f698a5076893d0a304b9a53a0863396",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+        ],
+        "expected_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ],
+        "observed_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 35850.0,
+          "mean_ns": 36142.043333333335,
+          "p95_ns": 36181,
+          "p99_ns": 43060,
+          "min_ns": 35510,
+          "max_ns": 53800
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "early-name-error",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "8ced4b4e9b7f5c2d8938b1a2cb5e75b74f698a5076893d0a304b9a53a0863396",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+        ],
+        "expected_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ],
+        "observed_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 18520.0,
+          "mean_ns": 18729.03,
+          "p95_ns": 18751,
+          "p99_ns": 24670,
+          "min_ns": 18140,
+          "max_ns": 50730
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "early-name-error",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "8ced4b4e9b7f5c2d8938b1a2cb5e75b74f698a5076893d0a304b9a53a0863396",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a76662c5a3bd149eabb9a12b0a9ef79b538ab57be1c3536eb794135ea5ca74ce"
+        ],
+        "expected_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ],
+        "observed_error_debug": [
+          "Decode(Malformed(\"position 24: duplicated attribute, previous declaration at position 7\"))"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 18540.0,
+          "mean_ns": 18637.593333333334,
+          "p95_ns": 18731,
+          "p99_ns": 23800,
+          "min_ns": 18260,
+          "max_ns": 25000
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "generated-12x8-valid",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "4da845b27329b463df4e380bc85e0b4f6ff22c2c338a3615f9b89d6b589386aa",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "40992"
+        ],
+        "authoring_base_archive_sha256": [
+          "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+        ],
+        "prepared_input_graph_sha256": [
+          "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+        ],
+        "expected_error_debug": [
+          "ok (slides=12, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 627168.0,
+          "mean_ns": 626842.16,
+          "p95_ns": 632863,
+          "p99_ns": 636653,
+          "min_ns": 619303,
+          "max_ns": 638954
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "generated-12x8-valid",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "4da845b27329b463df4e380bc85e0b4f6ff22c2c338a3615f9b89d6b589386aa",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "40992"
+        ],
+        "authoring_base_archive_sha256": [
+          "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+        ],
+        "prepared_input_graph_sha256": [
+          "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+        ],
+        "expected_error_debug": [
+          "ok (slides=12, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 637288.0,
+          "mean_ns": 637258.8966666666,
+          "p95_ns": 649134,
+          "p99_ns": 651803,
+          "min_ns": 627393,
+          "max_ns": 661473
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "generated-12x8-valid",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "4da845b27329b463df4e380bc85e0b4f6ff22c2c338a3615f9b89d6b589386aa",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "40992"
+        ],
+        "authoring_base_archive_sha256": [
+          "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+        ],
+        "prepared_input_graph_sha256": [
+          "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+        ],
+        "expected_error_debug": [
+          "ok (slides=12, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 547602.5,
+          "mean_ns": 548215.37,
+          "p95_ns": 555573,
+          "p99_ns": 558583,
+          "min_ns": 537173,
+          "max_ns": 595523
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "generated-12x8-valid",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "4da845b27329b463df4e380bc85e0b4f6ff22c2c338a3615f9b89d6b589386aa",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "40992"
+        ],
+        "authoring_base_archive_sha256": [
+          "fa73291bf586d6ea826d0a12d98e108f5b30712e487043d3126dce20f9882019"
+        ],
+        "prepared_input_graph_sha256": [
+          "de25931067b7c76c455225ea8a95b1cdef99f1b661fbac1d8c81b3dfa624a614"
+        ],
+        "expected_error_debug": [
+          "ok (slides=12, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 545818.0,
+          "mean_ns": 545367.3366666667,
+          "p95_ns": 551563,
+          "p99_ns": 553353,
+          "min_ns": 538593,
+          "max_ns": 568323
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "67839ce2bfde2f4101ff49d5e1c5c4edcee2a0ac10f3079d47f5fb957de18262",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 73100.0,
+          "mean_ns": 73500.42666666667,
+          "p95_ns": 78450,
+          "p99_ns": 79541,
+          "min_ns": 72381,
+          "max_ns": 81141
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "67839ce2bfde2f4101ff49d5e1c5c4edcee2a0ac10f3079d47f5fb957de18262",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 73931.0,
+          "mean_ns": 74456.90333333334,
+          "p95_ns": 79770,
+          "p99_ns": 81881,
+          "min_ns": 73401,
+          "max_ns": 82520
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "67839ce2bfde2f4101ff49d5e1c5c4edcee2a0ac10f3079d47f5fb957de18262",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 60885.5,
+          "mean_ns": 61383.07,
+          "p95_ns": 66790,
+          "p99_ns": 69940,
+          "min_ns": 60281,
+          "max_ns": 80430
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "67839ce2bfde2f4101ff49d5e1c5c4edcee2a0ac10f3079d47f5fb957de18262",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "ce53762aeb06a35b447b132c2e6978dfb7448db054a27fe97d8bea6c333a7ef3"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 60220.0,
+          "mean_ns": 60591.433333333334,
+          "p95_ns": 65400,
+          "p99_ns": 66670,
+          "min_ns": 59560,
+          "max_ns": 67850
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship-mce",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "444813f6e4d506c756bf196940e39948a287c331786430b13454105812a51b65",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 143390.0,
+          "mean_ns": 144338.58,
+          "p95_ns": 149590,
+          "p99_ns": 151570,
+          "min_ns": 142481,
+          "max_ns": 158481
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship-mce",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "444813f6e4d506c756bf196940e39948a287c331786430b13454105812a51b65",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 145030.5,
+          "mean_ns": 145949.52333333335,
+          "p95_ns": 151730,
+          "p99_ns": 153390,
+          "min_ns": 144021,
+          "max_ns": 154961
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship-mce",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "444813f6e4d506c756bf196940e39948a287c331786430b13454105812a51b65",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 140561.0,
+          "mean_ns": 141586.4,
+          "p95_ns": 147571,
+          "p99_ns": 149910,
+          "min_ns": 139571,
+          "max_ns": 162341
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-missing-relationship-mce",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "444813f6e4d506c756bf196940e39948a287c331786430b13454105812a51b65",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "880f80546b3c37b952a1c0a0c0d98f94661d01d4e46c80f481d05fe78e69687c"
+        ],
+        "expected_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ],
+        "observed_error_debug": [
+          "Relationship(\"presentation slide reference is missing relationship 'rId6'\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 140236.0,
+          "mean_ns": 141080.20333333334,
+          "p95_ns": 146301,
+          "p99_ns": 148881,
+          "min_ns": 139111,
+          "max_ns": 150390
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "21f918010bbee30659ca3854ab5fc6b7c94c4a12b63fb5ced55a5e2a29315175",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 80241.0,
+          "mean_ns": 80776,
+          "p95_ns": 85910,
+          "p99_ns": 87371,
+          "min_ns": 79550,
+          "max_ns": 87900
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "21f918010bbee30659ca3854ab5fc6b7c94c4a12b63fb5ced55a5e2a29315175",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 81005.5,
+          "mean_ns": 81533.40666666666,
+          "p95_ns": 86900,
+          "p99_ns": 88630,
+          "min_ns": 80280,
+          "max_ns": 91660
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "21f918010bbee30659ca3854ab5fc6b7c94c4a12b63fb5ced55a5e2a29315175",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 62695.0,
+          "mean_ns": 63238.41333333333,
+          "p95_ns": 68891,
+          "p99_ns": 71170,
+          "min_ns": 62090,
+          "max_ns": 82691
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "21f918010bbee30659ca3854ab5fc6b7c94c4a12b63fb5ced55a5e2a29315175",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "91e019f0126da1551bad887ca212c9266dbab796e79b2f39ed36dc5c099e93cd"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 63020.0,
+          "mean_ns": 63455.113333333335,
+          "p95_ns": 68480,
+          "p99_ns": 69831,
+          "min_ns": 62461,
+          "max_ns": 78781
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error-mce",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "31ada6eb06cb1e6a94c0b799d2530c297b58d28c12c595dc73946cd7ce88e083",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 150901.0,
+          "mean_ns": 151874.15333333332,
+          "p95_ns": 157291,
+          "p99_ns": 159230,
+          "min_ns": 149821,
+          "max_ns": 166841
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error-mce",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "31ada6eb06cb1e6a94c0b799d2530c297b58d28c12c595dc73946cd7ce88e083",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 151461.0,
+          "mean_ns": 152445.18666666668,
+          "p95_ns": 158061,
+          "p99_ns": 160251,
+          "min_ns": 150411,
+          "max_ns": 166600
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error-mce",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "31ada6eb06cb1e6a94c0b799d2530c297b58d28c12c595dc73946cd7ce88e083",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 143905.5,
+          "mean_ns": 144748.38333333333,
+          "p95_ns": 150730,
+          "p99_ns": 153650,
+          "min_ns": 142261,
+          "max_ns": 155580
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "late-root-error-mce",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "31ada6eb06cb1e6a94c0b799d2530c297b58d28c12c595dc73946cd7ce88e083",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "98f654e797bb1404e627a1ed37216b1968485ce9244baf5c914241361f989e92"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide part does not have a p:sld root\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 142701.0,
+          "mean_ns": 143625.84666666668,
+          "p95_ns": 149090,
+          "p99_ns": 151830,
+          "min_ns": 141440,
+          "max_ns": 159850
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "mixed-conformance",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "adb46d5669366e8b488f94b1b80430211e5117652790a67d8428d25cbb65f20d",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 115805.5,
+          "mean_ns": 116503.67666666667,
+          "p95_ns": 121421,
+          "p99_ns": 123991,
+          "min_ns": 114701,
+          "max_ns": 127101
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "mixed-conformance",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "adb46d5669366e8b488f94b1b80430211e5117652790a67d8428d25cbb65f20d",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 117540.5,
+          "mean_ns": 118442.99,
+          "p95_ns": 124091,
+          "p99_ns": 127561,
+          "min_ns": 116321,
+          "max_ns": 164090
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "mixed-conformance",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "adb46d5669366e8b488f94b1b80430211e5117652790a67d8428d25cbb65f20d",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 97685.5,
+          "mean_ns": 98373.62,
+          "p95_ns": 104190,
+          "p99_ns": 106380,
+          "min_ns": 96270,
+          "max_ns": 115880
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "mixed-conformance",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "adb46d5669366e8b488f94b1b80430211e5117652790a67d8428d25cbb65f20d",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "a491ba2fd3c7765d6412ab324fa36799287ce757a7f1f1348e5820217d2191b2"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"slide conformance differs from presentation\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 96220.0,
+          "mean_ns": 96833.91666666667,
+          "p95_ns": 101720,
+          "p99_ns": 103731,
+          "min_ns": 95491,
+          "max_ns": 114821
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "notes-invalid-tail",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "f5556af522326343f035671c475d2299877e4dad57a9132f55d52dda0945d5ae",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+        ],
+        "expected_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ],
+        "observed_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 236116.0,
+          "mean_ns": 235466.36,
+          "p95_ns": 243741,
+          "p99_ns": 245382,
+          "min_ns": 230272,
+          "max_ns": 256031
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "notes-invalid-tail",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "f5556af522326343f035671c475d2299877e4dad57a9132f55d52dda0945d5ae",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+        ],
+        "expected_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ],
+        "observed_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 246976.5,
+          "mean_ns": 248490.97,
+          "p95_ns": 254821,
+          "p99_ns": 257711,
+          "min_ns": 245111,
+          "max_ns": 268551
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "notes-invalid-tail",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "f5556af522326343f035671c475d2299877e4dad57a9132f55d52dda0945d5ae",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+        ],
+        "expected_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ],
+        "observed_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 195971.0,
+          "mean_ns": 197346.28,
+          "p95_ns": 203731,
+          "p99_ns": 206451,
+          "min_ns": 192361,
+          "max_ns": 208581
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "notes-invalid-tail",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "f5556af522326343f035671c475d2299877e4dad57a9132f55d52dda0945d5ae",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "fc05a21f819eeec3eb3131ed067387b325a06aeebd0e8edaaafb9ab2fc184ebf"
+        ],
+        "expected_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ],
+        "observed_error_debug": [
+          "Xml(\"syntax error: tag not closed: `>` not found before end of input\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 192091.0,
+          "mean_ns": 193222.76,
+          "p95_ns": 198411,
+          "p99_ns": 200761,
+          "min_ns": 190911,
+          "max_ns": 202501
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "slide-raw-overlimit-16m-to-64m",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "4fe09d03125ad97dce0dc91e9d4dd59a2dd52ec986f18527fe8c0987d98ba764",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 22580732.0,
+          "mean_ns": 22662267.19,
+          "p95_ns": 23062874,
+          "p99_ns": 23218405,
+          "min_ns": 22506411,
+          "max_ns": 23435695
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "slide-raw-overlimit-16m-to-64m",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "4fe09d03125ad97dce0dc91e9d4dd59a2dd52ec986f18527fe8c0987d98ba764",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 22551912.0,
+          "mean_ns": 22559754.196666665,
+          "p95_ns": 22627662,
+          "p99_ns": 22659703,
+          "min_ns": 22508201,
+          "max_ns": 22698963
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "slide-raw-overlimit-16m-to-64m",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "4fe09d03125ad97dce0dc91e9d4dd59a2dd52ec986f18527fe8c0987d98ba764",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 162301.0,
+          "mean_ns": 163002.70666666667,
+          "p95_ns": 177281,
+          "p99_ns": 182681,
+          "min_ns": 153881,
+          "max_ns": 189741
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "slide-raw-overlimit-16m-to-64m",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "4fe09d03125ad97dce0dc91e9d4dd59a2dd52ec986f18527fe8c0987d98ba764",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "32713"
+        ],
+        "authoring_base_archive_sha256": [
+          "ceba4e6005adba5a6ec2d926b6e03a037b283532f25be2c50578d5c67a10aa97"
+        ],
+        "prepared_input_graph_sha256": [
+          "df832e4cca8264a5aa1e309cb4b5d00ba42000f5f6d84e0c03389081ca2fb0f8"
+        ],
+        "expected_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ],
+        "observed_error_debug": [
+          "Invalid(\"invalid sld root or namespace\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 161601.0,
+          "mean_ns": 163134.91,
+          "p95_ns": 178231,
+          "p99_ns": 185011,
+          "min_ns": 152591,
+          "max_ns": 197561
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "small-valid",
+      "leg": "a0",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "1de32d6dfdf55c9fffe78f8b6a1711fbf5d06e7fd8206edb22ac2347d4695db4",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "31554"
+        ],
+        "authoring_base_archive_sha256": [
+          "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+        ],
+        "prepared_input_graph_sha256": [
+          "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+        ],
+        "expected_error_debug": [
+          "ok (slides=2, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 254011.0,
+          "mean_ns": 254846.36,
+          "p95_ns": 265661,
+          "p99_ns": 269111,
+          "min_ns": 247902,
+          "max_ns": 270891
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "small-valid",
+      "leg": "a3",
+      "phase": "baseline",
+      "binary_sha256": "c81f2134a6e78c891fffce6799d259b50b9905bcf330f3d7b6ed41e9709a134c",
+      "semantic_identity_sha256": "1de32d6dfdf55c9fffe78f8b6a1711fbf5d06e7fd8206edb22ac2347d4695db4",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "31554"
+        ],
+        "authoring_base_archive_sha256": [
+          "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+        ],
+        "prepared_input_graph_sha256": [
+          "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+        ],
+        "expected_error_debug": [
+          "ok (slides=2, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 252356.0,
+          "mean_ns": 253114.92333333334,
+          "p95_ns": 261221,
+          "p99_ns": 264401,
+          "min_ns": 247121,
+          "max_ns": 266592
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "small-valid",
+      "leg": "b0",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "1de32d6dfdf55c9fffe78f8b6a1711fbf5d06e7fd8206edb22ac2347d4695db4",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "31554"
+        ],
+        "authoring_base_archive_sha256": [
+          "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+        ],
+        "prepared_input_graph_sha256": [
+          "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+        ],
+        "expected_error_debug": [
+          "ok (slides=2, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 219226.0,
+          "mean_ns": 220693.62666666668,
+          "p95_ns": 227771,
+          "p99_ns": 231981,
+          "min_ns": 217271,
+          "max_ns": 244431
+        }
+      }
+    },
+    {
+      "kind": "refusal",
+      "case": "small-valid",
+      "leg": "b1",
+      "phase": "candidate",
+      "binary_sha256": "f7ad097ce755cffcd70dd994ca37ebcf8cfa31f64f9143210c4135fbedc6dbd3",
+      "semantic_identity_sha256": "1de32d6dfdf55c9fffe78f8b6a1711fbf5d06e7fd8206edb22ac2347d4695db4",
+      "metadata": {
+        "authoring_base_archive_bytes": [
+          "31554"
+        ],
+        "authoring_base_archive_sha256": [
+          "7c2afe94f07d18af4114aec9778d159d188f1004369723e772627ec2df54b4d3"
+        ],
+        "prepared_input_graph_sha256": [
+          "cfff5cfb8182b86770cc48d7792194560072a98cffe0c63dddf45b5eacadb3d4"
+        ],
+        "expected_error_debug": [
+          "ok (slides=2, first_name=\"Slide 256\")"
+        ]
+      },
+      "stats": {
+        "total_ns": {
+          "samples": 300,
+          "p50_ns": 218876.0,
+          "mean_ns": 220231.06,
+          "p95_ns": 226831,
+          "p99_ns": 228752,
+          "min_ns": 216912,
+          "max_ns": 230001
+        }
+      }
+    }
+  ]
+}

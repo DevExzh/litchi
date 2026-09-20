@@ -1,0 +1,155 @@
+[
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 20.852202040308534,
+    "delta_ns": 16761
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 46.96258503401361,
+    "delta_ns": 41421
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 34.069668649107896,
+    "delta_ns": 8020
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 16.797663582292444,
+    "delta_ns": 99100
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 40.66319738593731,
+    "delta_ns": 23520
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 50.390625,
+    "delta_ns": 6450
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 9.032602886157125,
+    "delta_ns": 1690
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 12.559064909226558,
+    "delta_ns": 5050
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 43.307086614173215,
+    "delta_ns": 2750
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 32.998233771261276,
+    "delta_ns": 163662
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 22.032596587911122,
+    "delta_ns": 37581
+  },
+  {
+    "kind": "native",
+    "case": "one-notes-poi",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 12.996922693244617,
+    "delta_ns": 145921
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 7.5011155734047374,
+    "delta_ns": 1681
+  },
+  {
+    "kind": "native",
+    "case": "one-real",
+    "phase": "settext_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 10.895143207238078,
+    "delta_ns": 113990
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "apply_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 7.883856417966539,
+    "delta_ns": 8390
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 40.50256240700942,
+    "delta_ns": 46550
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 21.013334605567625,
+    "delta_ns": 8809
+  }
+]

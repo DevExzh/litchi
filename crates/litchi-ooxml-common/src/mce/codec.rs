@@ -617,6 +617,24 @@ struct Attr<'a> {
     value: Cow<'a, str>,
     keep: bool,
 }
+
+#[inline(never)]
+fn contains_mce_namespace(mut remaining: &[u8]) -> bool {
+    let needle = NAMESPACE.as_bytes();
+    let first = needle[0];
+    while remaining.len() >= needle.len() {
+        let valid_starts = remaining.len() - needle.len() + 1;
+        let Some(offset) = memchr::memchr(first, &remaining[..valid_starts]) else {
+            return false;
+        };
+        if remaining[offset..].starts_with(needle) {
+            return true;
+        }
+        remaining = &remaining[offset + 1..];
+    }
+    false
+}
+
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -629,10 +647,7 @@ pub fn process_markup_compatibility<'a>(
     if xml.len() > lim.max_input_bytes {
         return Err(limit("input bytes"));
     }
-    if !xml
-        .windows(NAMESPACE.len())
-        .any(|w| w == NAMESPACE.as_bytes())
-    {
+    if !contains_mce_namespace(xml) {
         if xml.len() > lim.max_output_bytes {
             return Err(limit("output bytes"));
         }

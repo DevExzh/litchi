@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0701 — first-byte search removes marker-free scan work
+
+[0701](0701-mce-first-byte-marker-search.md) retains the lower-setup helper:
+longer marker-free/generated/notes workflow medians improve 11–15%, early-name
+refusal improves about 48%, and the padded over-limit scan improves about
+99.28% while preserving the same refusal. Tiny marked inputs improve 7–9%.
+The initial real-deck 1.1–2.8% cost does not repeat at that magnitude in the
+longer edit runs, which stay within ±0.7%; a drifting no-op baseline prevents
+a gain claim there. Allocation metrics do not change. Retain shared DOCX and
+clone p99 outliers as follow-up work, alongside remaining marked XML parser
+cost. No general save, memory, cold-cache or cross-platform gain is established.
+
 ## 0700 — avoid per-call substring-search setup on marked XML
 
 [0700](0700-mce-marker-substring-search.md) confirms that replacing the

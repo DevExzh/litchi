@@ -1,0 +1,8 @@
+Native summary: 468 leg/phase records across 13 cases
+Native comparisons: 312 explicit A/A or candidate pairs
+Candidate comparisons are descriptive b0/a2 and b1/a3 pairs; raw legs remain separate.
+Allocation summary: 156 process/phase records
+Allocation comparisons: 78 candidate-baseline process pairs
+Allocation values are descriptive diagnostics; they are not native timing claims.
+verified 6 native refusal matrix receipts; 60 case legs
+tables and triggers derived; trigger count 15
