@@ -93,3 +93,12 @@ All **18 tests passed**, including the added cross-bucket compensation and
 endpoint tie/probe-order regressions. The temporary standalone harness was
 removed automatically. This is kernel evidence only; independent source
 re-review and public evaluator/resource validation remain open.
+
+## Exact-zero boundary and lint follow-up
+
+The retained root probe passes **19 tests** against solver SHA256
+`6b883f407e9c1805f35a48bc427b7d199ec23dc86adea80d91d7522f3f33f889`.
+This includes the guarded exact-zero RATE boundary regression, followed by
+the Clippy-requested eager midpoint fallback cleanup. The standalone harness
+removed its temporary sources and binary. Public roots replay had already
+passed before the equivalent fallback cleanup; final frozen gates remain open.
