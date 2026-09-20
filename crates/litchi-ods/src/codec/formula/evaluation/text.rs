@@ -12,6 +12,13 @@ mod format;
 mod fraction;
 mod search;
 mod unicode;
+
+/// Iterate the pinned Unicode C+F case-fold mapping for a lookup comparator.
+/// The lookup family shares this table but keeps its own fixed-state iterator;
+/// exposing the mapping here avoids a second Unicode data copy in that module.
+pub(super) fn case_fold(value: char) -> impl Iterator<Item = char> {
+    unicode::case_fold(value).iter()
+}
 mod width;
 
 use super::{EvaluationFailure, EvaluationResult, Evaluator, Node, TextValue, WorkingValue};

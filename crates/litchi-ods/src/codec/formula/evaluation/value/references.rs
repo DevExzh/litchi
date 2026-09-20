@@ -668,6 +668,7 @@ where
                     area_reservation: None,
                     record_reservation: None,
                     is_list: false,
+                    preserve_scalar_result: false,
                 })
             },
             RuntimeValue::Empty
@@ -681,7 +682,7 @@ where
         }
     }
 
-    fn reference_limit_error(&self, observed: usize) -> EvaluationFailure {
+    pub(super) fn reference_limit_error(&self, observed: usize) -> EvaluationFailure {
         EvaluationFailure::ResourceLimit(self.local_limit(
             Resource::Objects,
             u64::try_from(observed).unwrap_or(u64::MAX),
@@ -689,14 +690,14 @@ where
         ))
     }
 
-    fn check_reference_cells(&self, cells: usize) -> EvaluationResult<()> {
+    pub(super) fn check_reference_cells(&self, cells: usize) -> EvaluationResult<()> {
         if cells > self.limits.max_reference_cells {
             return Err(self.reference_limit_error(cells));
         }
         Ok(())
     }
 
-    fn check_reference_areas(&self, areas: usize) -> EvaluationResult<()> {
+    pub(super) fn check_reference_areas(&self, areas: usize) -> EvaluationResult<()> {
         if areas > self.limits.max_reference_areas {
             return Err(EvaluationFailure::ResourceLimit(self.local_limit(
                 Resource::Objects,

@@ -188,6 +188,7 @@ mod discrete;
 mod dyadic;
 mod elementary;
 mod inspection;
+mod lookup;
 pub(super) mod numerics;
 mod order;
 mod paired;
@@ -653,6 +654,7 @@ enum Frame<'a> {
     Visit(Node<'a>),
     Apply(Node<'a>),
     VisitArgument(Node<'a>),
+    ChooseAfterIndex(Node<'a>),
 }
 
 #[derive(Debug)]
@@ -782,6 +784,7 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
                 Frame::Visit(node) => self.visit(node)?,
                 Frame::Apply(node) => self.apply(node)?,
                 Frame::VisitArgument(node) => self.visit_argument(node)?,
+                Frame::ChooseAfterIndex(node) => self.finish_choose(node)?,
             }
         }
 
@@ -951,6 +954,21 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        // CHOOSE is lazy in its value arguments.  Evaluate only the index;
+        // the continuation selects one branch and visits that AST node after
+        // the index has been converted.  This keeps unselected references,
+        // formula errors, and provider operations completely untouched.
+        if name.eq_ignore_ascii_case("CHOOSE") {
+            if node.child_count() < 2 {
+                return self.push_value(WorkingValue::Error(ScalarError::Value));
+            }
+            let index = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE index is missing from the expression tree",
+            ))?;
+            self.push_frame(Frame::ChooseAfterIndex(node))?;
+            return self.push_frame(Frame::VisitArgument(index));
+        }
+
         if discrete::is_discrete_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1019,6 +1037,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if lookup::is_lookup_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -1081,6 +1103,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
             return self.dispatch_if_error(node);
+        }
+        if lookup::is_lookup_function(name) {
+            return lookup::apply(self, node, name);
         }
         if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
             return self.apply_and_or(node, name.eq_ignore_ascii_case("AND"));
@@ -1147,6 +1172,25 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         // scheduled arguments so the value stack remains balanced and retain
         // the leftmost formula error if one was produced.
         self.finish_invalid_arity(node)
+    }
+
+    fn finish_choose(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        let index = self.pop_value()?;
+        let index = match to_integer(index, self)? {
+            Ok(value) if value >= 1.0 && value.is_finite() => value,
+            Ok(_) => return self.push_value(WorkingValue::Error(ScalarError::Value)),
+            Err(error) => return self.push_value(WorkingValue::Error(error)),
+        };
+        let index = index as usize;
+        let branch = node
+            .child(index)
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "CHOOSE branch index overflows the expression tree",
+            ));
+        let Some(branch) = branch.ok() else {
+            return self.push_value(WorkingValue::Error(ScalarError::Value));
+        };
+        self.push_frame(Frame::VisitArgument(branch))
     }
 
     #[inline(never)]
