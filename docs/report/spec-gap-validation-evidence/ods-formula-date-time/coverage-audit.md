@@ -1,9 +1,9 @@
 # ODS date/time coverage audit
 
 This audit records the final retained evidence for the 24-function date/time
-batch. The coverage manifest is temporarily pending: the independent semantic
-audit found two narrow function-level gaps that need new frozen source proofs.
-All other function and cross-cutting bindings remain exact and hash-checked.
+batch. The coverage manifest is PASS: the two narrow function-level gaps found
+by the independent semantic audit are closed by selected frozen source proofs.
+Every function and cross-cutting binding is exact and hash-checked.
 The verifier validates each focused test against its defining Rust test and
 passing gate line, each structured receipt against its typed case fields, and
 each source proof against the frozen source map.
@@ -16,8 +16,8 @@ and 20 cross-cutting requirements. It is SHA-256
 The contract is SHA-256
 `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`.
 `coverage-requirements.json` is the mutable evidence binding and is currently
-SHA-256 `5384f48406e9438f19f9a9bc38b7ed5c28a2dc4795874cf142e0160f0a9d8a23`.
-It contains 221 function bindings and 54 cross-cutting bindings. Every retained binding
+SHA-256 `f1c0f1053f2394aa7b1463c6c2b374078df20e59552c98629148c28235c0788a`.
+It contains 223 function bindings and 54 cross-cutting bindings. Every retained binding
 is tied to a current source or retained receipt hash; identifiers were reviewed
 against the defining Rust test, structured receipt fields, or oracle/native
 case IDs. Broad family names are not used as substitutes for a function case.
@@ -74,6 +74,13 @@ ISOWEEKNUM receipt is SHA-256
 select one independently reviewed proof ID from the shared date-parameter
 report, SHA-256
 `836c5fbfa24ec9aa7a6d04ba69bbe23f2eb7d5eadf440e06698fab9d344f7126`.
+The calendar-branch receipts close the remaining function-specific gaps:
+`gates/source-review-calendar-weeknum.json` is SHA-256
+`7259327bd46ace4efd695ab0464d4ff6ceecd3e2fe23a4b475b21d4b81e174a4`, and
+`gates/source-review-calendar-eastersunday.json` is SHA-256
+`0f321e5a685a117e5faf2eb417ae5787f96c81d04964af2bcb8763b23d63449d`; both
+select proofs from `calendar-branch-source-review.md`, SHA-256
+`4c5734203eda9aa93afde9722b129d989a9ed93460651f976a15f544e3e348fe`.
 
 The retained performance bundle has two captures and 4,620 rows. Its verified
 report is SHA-256
@@ -101,7 +108,7 @@ argument-taking names. Function-specific rows use the matching oracle IDs.
 | `DAY` | date-bound and component-bound tests; family arity/error test | flooring, text, out-of-domain |
 | `DAYS` | `days_converts_logicals_and_single_cell_references`; family formula-error test | retained fractions, reversed interval, text/number conversion |
 | `DAYS360` | optional-slot, date-bound, and family formula-error tests | US February, European sign/31st, reversed US |
-| `EASTERSUNDAY` | timestamp and family arity/error tests; branch source proof pending | explicit years, timestamp-relative year, invalid year, missing clock |
+| `EASTERSUNDAY` | timestamp and family arity/error tests; selected calendar-branch source proof | explicit years, timestamp-relative year, invalid year, missing clock |
 | `EDATE` | date-bound, component-bound, and family formula-error tests | month-end clamping, negative/fractional month |
 | `EOMONTH` | date-bound, component-bound, and family formula-error tests | leap/previous month and invalid domain |
 | `HOUR` | finite time-domain and family arity/error tests | midday, negative time, final second |
@@ -115,7 +122,7 @@ argument-taking names. Function-specific rows use the matching oracle IDs.
 | `TIMEVALUE` | fixed parser, numeric fallback, borrowed-text, and leap-second tests | clock/datetime, numeric/fraction fallback, 24:00/date-only/leap-second refusal |
 | `TODAY` | explicit timestamp and family arity tests | explicit and missing timestamp |
 | `WEEKDAY` | optional-slot, component, and matrix tests | all accepted types, omitted type, invalid type |
-| `WEEKNUM` | optional-slot tests; fractional DateParam source proof pending | accepted modes, aliases, ISO modes, omitted/non-integer mode |
+| `WEEKNUM` | optional-slot tests; selected calendar-branch source proof | accepted modes, aliases, ISO modes, omitted/non-integer mode |
 | `WORKDAY` | sequence/cancellation/limit tests; checked WORKDAY offset source proof | forward/backward stepping, exact zero offset, holiday/custom/all-off |
 | `YEAR` | date-bound, component-bound, and family arity/error tests | pivot, datetime, profile boundary, invalid text |
 | `YEARFRAC` | optional-slot, basis, floor, and 30/31st tests | all bases, reversed nonnegative result, invalid basis |
@@ -153,20 +160,12 @@ the receipts so DATEDIF evidence cannot accidentally certify ISOWEEKNUM, or
 vice versa. Valid ISO-date oracle rows are not used to certify ISOWEEKNUM error
 handling; valid named-text rows are not used to certify MONTH error handling.
 
-## Outstanding semantic evidence
-
-The independent audit found these entries insufficient and they remain
-pending until the new frozen source-review receipts arrive:
-
-* `WEEKNUM` has only integer-date oracle rows. Its existing component-bound
-  test exercises `ISOWEEKNUM`, not `WEEKNUM`, so neither is retained as evidence
-  for `DateParam flooring and week-start calculation`. The mode vectors remain
-  valid evidence for their own mode requirements.
-* `EASTERSUNDAY` has a timestamp vector after the current year's Easter but no
-  vector for the before-Easter current-year branch. The `1582` invalid-year row
-  remains evidence for explicit Year conversion, but is not attached to the
-  timestamp-range requirement. A branch-specific source proof is pending for
-  the current-year selection and the lower-bound refusal.
+The independent audit's two remaining gaps are closed by the selected
+`calendar_branch.weeknum_floor` and `calendar_branch.eastersunday_timestamp`
+source proofs. The former covers WEEKNUM's fractional DateParam floor and
+week-start dispatch even though the retained oracle mode rows use integer
+dates. The latter covers both Easter timestamp branches and the checked lower
+bound; the `1582` oracle remains bound only to explicit Year conversion.
 
 
 ## Cross-cutting evidence
@@ -187,14 +186,13 @@ receipt proof's schema and source identity.
 The final command
 
 ```text
-python3 docs/report/spec-gap-validation-evidence/ods-formula-date-time/verify.py --allow-pending
+python3 docs/report/spec-gap-validation-evidence/ods-formula-date-time/verify.py
 ```
 
-passes contract, scope, source closure, gate, review, oracle, native, and
-performance custody checks with `verified: false` and reports only the two
-function-level coverage entries above as pending. Strict mode is expected to
-reject the manifest until those proofs are integrated. The negative-case suite
-and four source-proof selection regressions still pass. No production, test,
+passes contract, scope, coverage, source closure, gate, review, oracle, native,
+and performance custody checks with `verified: true`; the coverage check reports
+223 function bindings and 54 cross-cutting bindings. The negative-case suite
+and four source-proof selection regressions also pass. No production, test,
 contract, freeze, gate, oracle, native, or performance input was changed by
 this audit pass.
 
