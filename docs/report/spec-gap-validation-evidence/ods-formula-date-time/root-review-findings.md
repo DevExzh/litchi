@@ -170,3 +170,34 @@ After the fix, isolated locked/offline validation passed 19 semantic tests,
 10 resource tests, and the 132-vector oracle target. All-target strict Clippy,
 Rust 2024 formatting, and diff checks passed. These remain development
 checks; final frozen gates and performance capture are still outstanding.
+
+## Corrected provenance and measurement-path review
+
+The corpus specification-archive identity omitted its final hexadecimal digit.
+The contract and actual archive already agreed on the complete SHA-256 ending
+`a8aac4`. Commit `d46264299e` corrects only that metadata and dependent current
+hash bindings, and makes the independent checker verify the archive and Part 4
+member bytes. All 132 vector IDs, formulas, and expected results are unchanged.
+The raw native capture log remains untouched; the provenance record explicitly
+states that native capture was not rerun.
+
+The replacement isolated run passed all seven gates and 1,745 tests. Its
+source-before and source-after maps matched. That snapshot is retained under
+`gates/history-harness-checksum/` while the harness is corrected; it is not the
+final performance snapshot.
+
+The first performance capture stopped on the baseline
+`literal-aggregate-4x1-sum.evaluate.sample-01` with `missing array checksum`.
+The evaluator correctly returned a scalar SUM from matrix-mode input. The
+harness validated the scalar, then incorrectly selected array checksum logic
+from the requested mode. Checksumming must use the returned value kind.
+
+A subsequent measurement-path diagnostic exposed a separate contamination:
+`validate_date_value` recomputed the independent NETWORKDAYS oracle inside each
+timed iteration, and its holiday model repeatedly walked calendar years.
+Resolver fixtures also recalculated date serials during reads. Root stopped
+that diagnostic. Independent expectations and fixture constants must be
+prepared outside measurement, and scalar `NumberAny` date expectations must
+be checked numerically rather than accepting any number. Both measurement
+phases must pass for every workload before another freeze or capture.
+No timings from these incomplete attempts support a performance claim.
