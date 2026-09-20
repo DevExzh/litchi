@@ -9,9 +9,9 @@
       "litchi-ods"
     ],
     "exit_code": 0,
-    "log_sha256": "09b18806ba774faad16131edaf38a30a2d0a9c0e335b1682a7c43200a1787e72",
+    "log_sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922",
     "name": "ods-tests",
-    "seconds": 13.828646357986145
+    "seconds": 14.679238912998699
   },
   {
     "command": [
@@ -27,9 +27,9 @@
       "warnings"
     ],
     "exit_code": 0,
-    "log_sha256": "3abe78fd1485d5f68335e52d530296ab68bbd76d970b09bed1f901cb2ef844aa",
+    "log_sha256": "6b5f774d1c1310c9fc23aae7e64ffa23f83fa8f5ba1ecab06828dcf30bcae952",
     "name": "clippy",
-    "seconds": 8.136415501940064
+    "seconds": 8.227474367944524
   },
   {
     "command": [
@@ -42,9 +42,9 @@
       "--no-deps"
     ],
     "exit_code": 0,
-    "log_sha256": "25d5ce5344de8a2482a9e5c708fbb6708cb5d1abf86e527305e48280db70b8be",
+    "log_sha256": "732d19f0d64d9e96e5565354edbce4b3a839f83013d00dd424cc3b42fe442618",
     "name": "rustdoc",
-    "seconds": 3.242374697001651
+    "seconds": 3.26115120400209
   },
   {
     "command": [
@@ -58,7 +58,7 @@
     "exit_code": 0,
     "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "name": "format",
-    "seconds": 1.2468103220453486
+    "seconds": 1.2477372749708593
   },
   {
     "command": [
@@ -107,7 +107,7 @@
     "exit_code": 0,
     "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "name": "batch-format",
-    "seconds": 0.17433976801112294
+    "seconds": 0.17499008495360613
   },
   {
     "command": [
@@ -117,7 +117,7 @@
     "exit_code": 0,
     "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa",
     "name": "boundaries",
-    "seconds": 227.14641606702935
+    "seconds": 226.9868949459633
   },
   {
     "command": [
@@ -128,6 +128,6 @@
     "exit_code": 0,
     "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "name": "diff-check",
-    "seconds": 0.19753679307177663
+    "seconds": 0.1872743999119848
   }
 ]

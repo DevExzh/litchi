@@ -4,4 +4,4 @@
     Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-lookups-gates-hYbIgA/checkout/crates/xml-minifier)
     Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-lookups-gates-hYbIgA/checkout/crates/litchi-odf-common)
     Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-lookups-gates-hYbIgA/checkout/crates/litchi-ods)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.04s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.13s
