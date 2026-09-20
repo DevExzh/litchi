@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "-p",
+    "litchi-xlsb",
+    "--locked",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0713",
+    "-j",
+    "2",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 101,
+  "seconds": 17.16277289192658,
+  "log_sha256": "98143270effe47a8cad1b6744484f5d8c3a2644c01f5a1ccf776a384cc71fb14",
+  "source_manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+  "purpose": "Reproduce preexisting four XLSB test expect_used failures under baseline shared-MCE source."
+}

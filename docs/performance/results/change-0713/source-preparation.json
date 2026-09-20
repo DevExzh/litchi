@@ -1,0 +1,11 @@
+{
+  "baseline": "original production plus cfg(test) differential guards; guards shared with candidate",
+  "candidate": "same differential guards plus private find_bytes replacement and additional cfg(test) all-salt refusal guard; cfg-only guard does not enter release timings",
+  "original_sha256": "a5b5b0aca3ec5a392bc7ae1ea6ca482653bd0a72cb9bdd4c30b8ea9faff87bee",
+  "baseline_sha256": "0eaea3751520843c05b1cdfaf2b158651fb1b13cf3fe80c4df917d7bb69f498d",
+  "candidate_sha256": "76b617a0c951caf9632caa5792c5ac9ee90f561c3942fb35ac36cfdd167ce049",
+  "patch_sha256": {
+    "baseline-tests.patch": "d397c284a55d8b65c5bfaa12c2ddf5ce6dcea3385996fcbd45b07eb39b248a81",
+    "candidate.patch": "43cd1c696dd5d998f6540585baa4387154d5509ac307adf94ebac2f6bbd0d8f4"
+  }
+}

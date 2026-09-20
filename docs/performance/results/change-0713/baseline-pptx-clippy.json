@@ -1,0 +1,23 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "-p",
+    "litchi-pptx",
+    "--locked",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0713",
+    "-j",
+    "2",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 101,
+  "seconds": 21.458919114083983,
+  "log_sha256": "9d636c63f7a0139f2040f7af4f0932622b1fd2fbfb5cab8cb830ba2b6babc9b8",
+  "source_manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+  "purpose": "Reproduce preexisting three PPTX test err_expect failures under baseline shared-MCE source."
+}

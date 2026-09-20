@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "packet": "change-0713-docx-ordinary-save-paired-pilot",
+  "name": "baseline-A2-allocator-generated-edit",
+  "stage": "baseline-A2",
+  "source_label": "baseline",
+  "build_label": "baseline",
+  "pair": "pair-2",
+  "lane": "allocator",
+  "stage_order": "reverse",
+  "stage_order_index": 3,
+  "corpus_id": "generated",
+  "corpus_label": "generated-medium",
+  "corpus_origin": "generated-harness-corpus",
+  "phase": "edit",
+  "case": "docx_ordinary_save_edit",
+  "samples": 3,
+  "warmup": 0,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0713-bin/baseline-alloc",
+    "--warmup",
+    "0",
+    "--samples",
+    "3",
+    "--case",
+    "docx_ordinary_save_edit",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0713/baseline-A2-allocator-generated-edit.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0713-fs"
+  ],
+  "start_utc": "2026-09-20T09:33:09.900783+00:00",
+  "end_utc": "2026-09-20T09:33:10.527137+00:00",
+  "seconds": 0.3242375800618902,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0713-bin/baseline-alloc",
+  "binary_sha256": "f87150ac4143ea3fec26c9d8bfad90ef9e631d8ce8ee89f13a7a47b24c2bd34f",
+  "binary_bytes": 62989392,
+  "build_record": "build-baseline.json",
+  "build_record_sha256": "5a6e0ae97c1e2f68ac302d5df6d903bda97aa2f564915f805c9be1fc9e9c626b",
+  "build_source_manifest": "source-baseline.json",
+  "build_source_manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "source_census_sha256": "cad0032e69cd9d418692219d147de08438bc9a8c7691713c273c5704fd6ff919",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "baseline-A2-allocator-generated-edit.source-before.json",
+    "after_artifact": "baseline-A2-allocator-generated-edit.source-after.json",
+    "before_sha256": "cad0032e69cd9d418692219d147de08438bc9a8c7691713c273c5704fd6ff919",
+    "after_sha256": "cad0032e69cd9d418692219d147de08438bc9a8c7691713c273c5704fd6ff919",
+    "before_file_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "after_file_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "fixture": {
+    "plan_path": null,
+    "plan_sha256": null,
+    "before": null,
+    "after": null
+  },
+  "plan_sha256": "f2a34aac1beb77941d0fb6e0ee10a769dd7b492e24e0e47164f47989e4f090d6",
+  "script_sha256": "f0ebabe10d06ab9edf1117b6aab550c9ad8847a524270b2a4740a273c1fda2fb",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "baseline-A2-allocator-generated-edit.json": "ab9df6847de0cc321227783f82b353640ddb916fe2c38a60547b32842029c0ce",
+    "baseline-A2-allocator-generated-edit.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-A2-allocator-generated-edit.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-A2-allocator-generated-edit.source-before.json": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "baseline-A2-allocator-generated-edit.source-after.json": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16"
+  }
+}

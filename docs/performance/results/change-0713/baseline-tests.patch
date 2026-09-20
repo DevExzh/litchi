@@ -1,0 +1,148 @@
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -1485,3 +1485,145 @@
+             .map_err(|error| Error::Xml(format!("MCE output is not UTF-8: {error}"))),
+     }
+ }
++
++#[cfg(test)]
++mod search_equivalence_tests {
++    fn scalar_windows_find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
++        if needle.is_empty() {
++            return Some(0);
++        }
++        haystack
++            .windows(needle.len())
++            .position(|window| window == needle)
++    }
++
++    fn assert_same(haystack: &[u8], needle: &[u8]) {
++        let expected = scalar_windows_find(haystack, needle);
++        assert_eq!(
++            super::find_bytes(haystack, needle),
++            expected,
++            "search mismatch for haystack {haystack:?} and needle {needle:?}"
++        );
++    }
++
++    fn binary_words(max_len: usize) -> Vec<Vec<u8>> {
++        let mut words = Vec::new();
++        for length in 0..=max_len {
++            let count = 1usize << length;
++            for bits in 0..count {
++                let mut word = Vec::with_capacity(length);
++                for bit in 0..length {
++                    word.push(if bits & (1usize << bit) == 0 {
++                        0
++                    } else {
++                        u8::MAX
++                    });
++                }
++                words.push(word);
++            }
++        }
++        words
++    }
++
++    #[test]
++    fn small_binary_words_match_scalar_windows_exhaustively() {
++        let haystacks = binary_words(7);
++        let needles = binary_words(8);
++        for haystack in &haystacks {
++            for needle in &needles {
++                assert_same(haystack, needle);
++            }
++        }
++
++        for (haystack, needle) in [
++            (b"\0\0\0\0".as_slice(), b"\0\0\0".as_slice()),
++            (b"\xff\0\xff\0\xff".as_slice(), b"\xff\0\xff".as_slice()),
++            (b"\0\xff\0\xff".as_slice(), b"\xff\0\xff".as_slice()),
++        ] {
++            assert_same(haystack, needle);
++        }
++    }
++
++    fn adversarial_haystacks() -> Vec<Vec<u8>> {
++        let namespace = super::NAMESPACE.as_bytes();
++        let marker = &super::ACTIVE_MARKER_TEMPLATE[..];
++        let mut corpus = vec![Vec::new(), vec![0u8; 513], vec![u8::MAX; 1025]];
++
++        let mut alternating = Vec::with_capacity(2049);
++        for index in 0..2049 {
++            alternating.push(if index & 1 == 0 { 0 } else { u8::MAX });
++        }
++        corpus.push(alternating);
++
++        let mut repeated = vec![b'a'; 2048];
++        repeated.extend_from_slice(b"aaabaa");
++        corpus.push(repeated);
++
++        let mut namespace_case = vec![0xa5; 1024];
++        namespace_case.extend_from_slice(namespace);
++        namespace_case.extend_from_slice(&[0, u8::MAX, b'<', b'>']);
++        namespace_case.extend_from_slice(namespace);
++        corpus.push(namespace_case);
++
++        let mut marker_case = vec![u8::MAX; 777];
++        marker_case.extend_from_slice(marker);
++        marker_case.extend_from_slice(&[0, u8::MAX, 0, u8::MAX]);
++        marker_case.extend_from_slice(marker);
++        corpus.push(marker_case);
++
++        let mut generated = Vec::with_capacity(4096);
++        let mut state = 0x0123_4567_89ab_cdefu64;
++        for _ in 0..4096 {
++            state = state
++                .wrapping_mul(0x9e37_79b9_7f4a_7c15)
++                .wrapping_add(0xd1b5_4a32_d192_ed03);
++            generated.push(state.to_le_bytes()[3]);
++        }
++        generated.extend_from_slice(namespace);
++        generated.extend_from_slice(marker);
++        corpus.push(generated);
++        corpus
++    }
++
++    fn adversarial_needles() -> Vec<Vec<u8>> {
++        let namespace = super::NAMESPACE.as_bytes();
++        let marker = &super::ACTIVE_MARKER_TEMPLATE[..];
++        let mut namespace_prefix = namespace.to_vec();
++        namespace_prefix.truncate(namespace_prefix.len().saturating_sub(1));
++        let mut marker_prefix = marker.to_vec();
++        marker_prefix.truncate(marker_prefix.len().saturating_sub(1));
++        let mut near_namespace = namespace.to_vec();
++        if let Some(last) = near_namespace.last_mut() {
++            *last ^= 1;
++        }
++        let mut near_marker = marker.to_vec();
++        if let Some(last) = near_marker.last_mut() {
++            *last ^= 1;
++        }
++
++        vec![
++            Vec::new(),
++            vec![0],
++            vec![u8::MAX],
++            vec![0, u8::MAX, 0, u8::MAX],
++            vec![u8::MAX; 256],
++            vec![b'a'; 256],
++            vec![0xa5; 5000],
++            namespace.to_vec(),
++            namespace_prefix,
++            near_namespace,
++            marker.to_vec(),
++            marker_prefix,
++            near_marker,
++        ]
++    }
++
++    #[test]
++    fn larger_binary_and_mce_patterns_match_scalar_windows() {
++        for haystack in adversarial_haystacks() {
++            for needle in adversarial_needles() {
++                assert_same(&haystack, &needle);
++            }
++        }
++    }
++}

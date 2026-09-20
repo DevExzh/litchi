@@ -1,0 +1,513 @@
+{
+  "limitations": [
+    "Inclusive callee rows overlap and must not be added together.",
+    "All incoming calls are not an exclusive selected-parent partition.",
+    "Absent standalone find_bytes edges can mean inlining, not absent search.",
+    "Callgrind calls are not allocator request counts or native latency."
+  ],
+  "mechanism_analysis_sha256": "f51df82580fff52eccb1d84a1758d18895b9dabf695d6d5eac90d8767b8fb028",
+  "rows": [
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 1856664,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1727365,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 516556,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 0,
+          "inclusive_ir": 0,
+          "raw_edge_count": 0
+        }
+      },
+      "corpus": "generated",
+      "file": "mechanism-profile-baseline-A1-generated-edit.callgrind.5",
+      "owner_ir": 7190936,
+      "raw_edges": [
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 516556
+        },
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1856664
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1727365
+        }
+      ],
+      "sha256": "8208dd2a826d1bdee803824549c4abe54badc80dd5372f2368b0ef8f2e96fe09",
+      "stage": "baseline-A1"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 346308,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1333600,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 1105302,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 11,
+          "inclusive_ir": 118719,
+          "raw_edge_count": 3
+        }
+      },
+      "corpus": "numbered-list",
+      "file": "mechanism-profile-baseline-A1-numbered-list-edit.callgrind.5",
+      "owner_ir": 2684609,
+      "raw_edges": [
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 1105302
+        },
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 346308
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1333600
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 26737
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 91567
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 415
+        }
+      ],
+      "sha256": "4e627e650662d0ac4fe204fb502fd2e56f39842a136f78145cff453aca578ec9",
+      "stage": "baseline-A1"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 1857011,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1222054,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 13760,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 1,
+          "inclusive_ir": 12269,
+          "raw_edge_count": 1
+        }
+      },
+      "corpus": "generated",
+      "file": "mechanism-profile-candidate-B1-generated-edit.callgrind.5",
+      "owner_ir": 6712693,
+      "raw_edges": [
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 13760
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 12269
+        },
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1857011
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1222054
+        }
+      ],
+      "sha256": "cc4ca4cf0e1953fbb8e7da169be32f9714113f42e51491a4f63ed43de545cc67",
+      "stage": "candidate-B1"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 346544,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1135577,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 908772,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 13,
+          "inclusive_ir": 36113,
+          "raw_edge_count": 5
+        }
+      },
+      "corpus": "numbered-list",
+      "file": "mechanism-profile-candidate-B1-numbered-list-edit.callgrind.5",
+      "owner_ir": 2490323,
+      "raw_edges": [
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 5508
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 4908
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 4107
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 19565
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 2025
+        },
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 346544
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1135577
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 908772
+        }
+      ],
+      "sha256": "f00eed0f387f5cf132fab2a882e9eecdee32ad229b981db99bc523036b797041",
+      "stage": "candidate-B1"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 346318,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1136363,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 909361,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 13,
+          "inclusive_ir": 36113,
+          "raw_edge_count": 5
+        }
+      },
+      "corpus": "numbered-list",
+      "file": "mechanism-profile-candidate-B2-numbered-list-edit.callgrind.5",
+      "owner_ir": 2488150,
+      "raw_edges": [
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 5508
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 4908
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 4107
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 19565
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 2025
+        },
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 346318
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1136363
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 909361
+        }
+      ],
+      "sha256": "bcfa2f97f531410b7155794eb1e8db86bc4cd49ed9cac4d0f11a7d22e714441a",
+      "stage": "candidate-B2"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 1857970,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1222643,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 13772,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 1,
+          "inclusive_ir": 12269,
+          "raw_edge_count": 1
+        }
+      },
+      "corpus": "generated",
+      "file": "mechanism-profile-candidate-B2-generated-edit.callgrind.5",
+      "owner_ir": 6732795,
+      "raw_edges": [
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1857970
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1222643
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 12269
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 13772
+        }
+      ],
+      "sha256": "a46c192bd7493b2ae870402c2ad99d3921fe0d6c883e531b343a79171189ed8d",
+      "stage": "candidate-B2"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 346066,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1330829,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 1103750,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 11,
+          "inclusive_ir": 118719,
+          "raw_edge_count": 3
+        }
+      },
+      "corpus": "numbered-list",
+      "file": "mechanism-profile-baseline-A2-numbered-list-edit.callgrind.5",
+      "owner_ir": 2685708,
+      "raw_edges": [
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 346066
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1330829
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 1,
+          "inclusive_ir": 26737
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 91567
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::find_bytes",
+          "caller": "litchi_ooxml_common::mce::codec::active_offsets",
+          "calls": 5,
+          "inclusive_ir": 415
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 1103750
+        }
+      ],
+      "sha256": "95dd2a79a3852e9bf886f6b84807e3e62e57db209e24d5d9d3ae5638c38f09cc",
+      "stage": "baseline-A2"
+    },
+    {
+      "all_incoming_by_exact_callee": {
+        "litchi_docx::alt::codec::scan": {
+          "calls": 1,
+          "inclusive_ir": 1857070,
+          "raw_edge_count": 1
+        },
+        "litchi_docx::parts::document_part::active_block_ranges": {
+          "calls": 1,
+          "inclusive_ir": 1725070,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::active_offsets": {
+          "calls": 2,
+          "inclusive_ir": 516556,
+          "raw_edge_count": 1
+        },
+        "litchi_ooxml_common::mce::codec::find_bytes": {
+          "calls": 0,
+          "inclusive_ir": 0,
+          "raw_edge_count": 0
+        }
+      },
+      "corpus": "generated",
+      "file": "mechanism-profile-baseline-A2-generated-edit.callgrind.5",
+      "owner_ir": 7219671,
+      "raw_edges": [
+        {
+          "callee": "litchi_docx::alt::codec::scan",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1857070
+        },
+        {
+          "callee": "litchi_docx::parts::document_part::active_block_ranges",
+          "caller": "litchi_docx::writer::doc::package::DocumentBody::from_xml",
+          "calls": 1,
+          "inclusive_ir": 1725070
+        },
+        {
+          "callee": "litchi_ooxml_common::mce::codec::active_offsets",
+          "caller": "litchi_docx::alt::codec::active",
+          "calls": 2,
+          "inclusive_ir": 516556
+        }
+      ],
+      "sha256": "0c61321b06a6352069ebabcab7088cd65ff7456aa9faa02c1c35abb61a7dafe0",
+      "stage": "baseline-A2"
+    }
+  ],
+  "schema_version": 1,
+  "selection": "post-capture diagnostic; not an added acceptance gate"
+}

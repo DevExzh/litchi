@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-ooxml-common",
+    "--locked",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0713",
+    "-j2",
+    "--lib",
+    "mce::codec"
+  ],
+  "exit_code": 0,
+  "seconds": 1.501580274081789,
+  "source_sha256": "76b617a0c951caf9632caa5792c5ac9ee90f561c3942fb35ac36cfdd167ce049",
+  "log_sha256": "f36841a549b18c4059009fe89f30b16cb0105217404ffe987ce1c24731173b76"
+}

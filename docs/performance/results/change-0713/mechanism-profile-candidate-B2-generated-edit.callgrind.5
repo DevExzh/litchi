@@ -1,0 +1,4293 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 2361215
+cmd:  /home/zhuhe/code/litchi-0713-bin/candidate-native --warmup 0 --samples 1 --case docx_ordinary_save_edit --json /home/zhuhe/code/litchi/docs/performance/results/change-0713/mechanism-profile-candidate-B2-generated-edit.json --filesystem-root /home/zhuhe/code/litchi-0713-fs
+part: 5
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 19843489 - 26131789
+desc: Trigger: --dump-after=litchi_perf_baseline::ordinary_save::Owner::edit
+
+positions: line
+events: Ir
+summary: 6732795
+
+
+ob=(7) /home/zhuhe/code/litchi-0713-bin/candidate-native
+fl=(165) ???
+fn=(2238) core::ptr::drop_in_place<litchi_docx::writer::section::codec::xml::RootMetadata>
+0 28
+cfn=(844) __rustc::__rust_dealloc
+calls=2 0 
+0 338
+0 32
+cfn=(844)
+calls=2 0 
+0 310
+0 12
+cfn=(844)
+calls=2 0 
+0 70
+0 18
+cfn=(844)
+calls=2 0 
+0 70
+0 54
+cfn=(844)
+calls=2 0 
+0 310
+0 32
+cfn=(844)
+calls=2 0 
+0 360
+0 12
+cfn=(844)
+calls=2 0 
+0 70
+0 18
+cfn=(844)
+calls=2 0 
+0 70
+0 26
+
+fn=(982) litchi_opc::packuri::PackURI::new
+0 13
+cfn=(828) __rustc::__rust_no_alloc_shim_is_unstable_v2
+calls=1 0 
+0 1
+0 4
+cfn=(830) __rustc::__rust_alloc
+calls=1 0 
+0 40
+0 7
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(724) __memcpy_avx_unaligned_erms
+calls=1 255 
+0 11
+0 16
+cfn=(984) <&str as core::str::pattern::Pattern>::is_contained_in
+calls=1 0 
+0 87
+0 8
+cfn=(930) core::slice::memchr::memchr_aligned
+calls=1 0 
+0 50
+0 213
+cfn=(924) core::iter::traits::iterator::Iterator::try_fold
+calls=1 0 
+0 259
+0 15
+cfn=(986) <core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold
+calls=1 0 
+0 431
+0 6
+cfn=(988) litchi_opc::packuri::PackURI::validate_percent_encoding
+calls=1 0 
+0 334
+0 31
+cfn=(910) <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+calls=1 0 
+0 115
+0 49
+cfn=(924)
+calls=1 0 
+0 149
+0 4
+cfn=(990) core::str::iter::SplitInternal<P>::next
+calls=1 0 
+0 146
+0 15
+
+fn=(930)
+0 5034
+
+fn=(1166) litchi_opc::package::OpcPackage::get_part
+0 15
+cfn=(1028) core::hash::BuildHasher::hash_one
+calls=9 0 
+0 210
+0 42
+cob=(2)
+cfi=(233) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(900) __memcmp_avx2_movbe
+calls=9 73 
+0 19
+0 12
+cfn=(1904) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::ensure_payload
+calls=5 0 
+0 21
+0 15
+
+fn=(1196) memchr::arch::x86_64::avx2::memchr::One::find_raw
+0 157516
+cfn=(1198) memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2
+calls=13 0 
+0 132
+0 21258
+
+fn=(1200) quick_xml::reader::state::ReaderState::emit_question_mark
+0 90
+
+fn=(1264) litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text
+0 7
+cfn=(1266) litchi_docx::writer::doc::package::DocumentBody::add_paragraph
+calls=1 0 
+0 1590
+0 5
+cfn=(1268) litchi_docx::writer::paragraph::MutableParagraph::add_run_with_text
+calls=1 0 
+0 667
+0 5
+
+fn=(1266)
+0 1251
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 161
+0 4
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 161
+0 13
+
+fn=(1312) litchi_docx::writer::section::validation::<impl litchi_docx::writer::section::model::SectionProperties>::validate
+0 188
+cfn=(1314) <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop
+calls=4 0 
+0 36
+0 18
+
+fn=(1372) quick_xml::reader::state::ReaderState::emit_end
+0 115728
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=7240 73 
+0 48257
+0 81974
+
+fn=(1888) std::thread::local::LocalKey<T>::with
+0 48
+cfn=(970) core::ops::function::FnOnce::call_once
+calls=12 0 
+0 96
+0 108
+
+fn=(1998) litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline
+0 298
+cfn=(828)
+calls=34 0 
+0 34
+0 136
+cfn=(830)
+calls=34 0 
+0 1360
+0 238
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=34 255 
+0 426
+0 306
+cfn=(1040) hashbrown::map::HashMap<K,V,S,A>::insert
+calls=34 0 
+0 30635
+0 304
+
+fn=(2162) <core::iter::adapters::copied::Copied<I> as core::iter::traits::iterator::Iterator>::fold
+0 13
+
+fn=(2208) <core::str::pattern::StrSearcher>::new
+0 908
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 88
+0 297
+
+fn=(2258) litchi_docx::writer::section::codec::xml::attr
+0 176
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=8 73 
+0 114
+0 82
+
+fn=(2236) core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<u8>>>
+0 46
+cfn=(844)
+calls=2 0 
+0 70
+
+fn=(832) __rustc::__rdl_alloc
+0 66960
+cob=(2)
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(646) malloc
+calls=18682 3283 
+0 281532
+
+fn=(986)
+0 19
+cfn=(910)
+calls=1 0 
+0 120
+0 28
+cfn=(910)
+calls=2 0 
+0 235
+0 29
+
+fn=(1100) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+0 30483
+cfn=(1102) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=5163 0 
+0 284992
+0 10161
+
+fn=(1214) memchr::arch::x86_64::avx2::memchr::Three::find_raw
+0 86215
+cfn=(1216) memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+calls=16938 0 
+0 117912
+0 18217
+
+fn=(1240) quick_xml::escape::normalize_attribute_value
+0 4964
+
+fn=(1350) litchi_docx::writer::section::codec::xml::escape
+0 120
+cfn=(1352) alloc::str::<impl str>::replace
+calls=12 0 
+0 3756
+0 96
+cfn=(1352)
+calls=12 0 
+0 3756
+0 96
+cfn=(1352)
+calls=12 0 
+0 3756
+0 72
+cfn=(844)
+calls=12 0 
+0 420
+0 72
+cfn=(844)
+calls=12 0 
+0 420
+0 72
+
+fn=(1904)
+0 21
+
+fn=(2172) litchi_docx::parts::document_part::active_block_ranges
+0 27
+cfn=(2010) litchi_docx::namespace::scan_word_element_ranges
+calls=1 0 
+0 1147652
+0 14
+cfn=(2164) litchi_docx::alt::codec::active
+calls=1 0 
+0 31658
+0 14
+cfn=(2188) <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,alloc::vec::into_iter::IntoIter<T>>>::from_iter
+calls=1 0 
+0 29
+0 16
+cfn=(2194) alloc::collections::btree::map::BTreeMap<K,V,A>::bulk_build_from_sorted_iter
+calls=1 0 
+0 5997
+0 28353
+cfn=(1666) <alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 4771
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 16
+cfn=(1102)
+calls=1 0 
+0 81
+0 2224
+cfn=(2190) core::slice::sort::stable::driftsort_main
+calls=1 0 
+0 1747
+0 2
+
+fn=(2190)
+0 30
+cfn=(2192) core::slice::sort::stable::drift::sort
+calls=1 0 
+0 1707
+0 10
+
+fn=(2204) litchi_docx::writer::doc::package::ensure_writer_namespace_declarations::{{closure}}
+0 80
+cfn=(1012) alloc::fmt::format::format_inner
+calls=4 0 
+0 1346
+0 20
+cfn=(2206) <&alloc::string::String as core::str::pattern::Pattern>::into_searcher
+calls=4 0 
+0 1317
+0 3108
+cfn=(844)
+calls=4 0 
+0 140
+0 52
+
+fn=(2218) litchi_docx::writer::section::codec::xml::root_metadata
+0 100
+cfn=(1172) <quick_xml::name::NamespaceResolver as core::default::Default>::default
+calls=4 0 
+0 4792
+0 148
+cfn=(1176) quick_xml::reader::Reader<R>::read_event_impl
+calls=4 0 
+0 3228
+0 16
+cfn=(1202) quick_xml::reader::ns_reader::NsReader<R>::process_event
+calls=4 0 
+0 5153
+0 76
+cfn=(1204) quick_xml::name::NamespaceResolver::resolve_event
+calls=4 0 
+0 684
+0 128
+cfn=(2036) quick_xml::name::QName::prefix
+calls=4 0 
+0 224
+0 24
+cfn=(2220) <alloc::string::String>::from_utf8_lossy
+calls=4 0 
+0 264
+0 44
+cfn=(828)
+calls=4 0 
+0 4
+0 16
+cfn=(830)
+calls=4 0 
+0 144
+0 32
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 64
+0 36
+cfn=(1194) memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+calls=4 0 
+0 164
+0 132
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 68
+0 68
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 68
+0 52
+cfn=(1290) <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+calls=4 0 
+0 392
+0 12
+cfn=(1290)
+calls=4 0 
+0 603
+0 56
+cfn=(1888)
+calls=4 0 
+0 84
+0 36
+cfn=(1888)
+calls=4 0 
+0 84
+0 40
+cfn=(1888)
+calls=4 0 
+0 84
+0 92
+cfn=(1234) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=4 0 
+0 2900
+0 4
+cfn=(1234)
+calls=4 0 
+0 228
+0 92
+cfn=(828)
+calls=4 0 
+0 4
+0 16
+cfn=(830)
+calls=4 0 
+0 144
+0 36
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 60
+0 20
+cfn=(1040)
+calls=4 0 
+0 1784
+0 52
+cfn=(1236) quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+calls=4 0 
+0 2412
+0 60
+cfn=(948) alloc::raw_vec::RawVecInner<A>::try_allocate_in
+calls=4 0 
+0 328
+0 40
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 48
+0 76
+cfn=(992) <alloc::string::String as core::clone::Clone>::clone
+calls=4 0 
+0 344
+0 28
+cfn=(1040)
+calls=4 0 
+0 1964
+0 60
+cfn=(1158) alloc::raw_vec::RawVec<T,A>::grow_one
+calls=4 0 
+0 420
+0 96
+cfn=(2220)
+calls=4 0 
+0 264
+0 52
+cfn=(948)
+calls=4 0 
+0 446
+0 44
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 64
+0 12
+cfn=(1802) core::ptr::drop_in_place<quick_xml::events::attributes::Attributes>
+calls=4 0 
+0 196
+0 36
+cfn=(952) <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any
+calls=4 0 
+0 136
+0 140
+cfn=(1314)
+calls=4 0 
+0 532
+0 12
+cfn=(1314)
+calls=4 0 
+0 520
+0 8
+cfn=(1314)
+calls=4 0 
+0 72
+0 8
+cfn=(2160) core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>
+calls=4 0 
+0 344
+0 44
+cfn=(1250) core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>
+calls=4 0 
+0 1156
+0 4
+
+fn=(2228) litchi_docx::writer::section::codec::xml::decode_attributes
+0 204
+cfn=(828)
+calls=12 0 
+0 12
+0 48
+cfn=(830)
+calls=12 0 
+0 480
+0 684
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=12 255 
+0 192
+0 192
+cfn=(1350)
+calls=12 0 
+0 12636
+0 168
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=12 255 
+0 144
+0 96
+cfn=(844)
+calls=12 0 
+0 420
+0 360
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=12 255 
+0 204
+0 360
+cfn=(1172)
+calls=12 0 
+0 14908
+0 528
+cfn=(1176)
+calls=24 0 
+0 23847
+0 96
+cfn=(1202)
+calls=24 0 
+0 31577
+0 456
+cfn=(1204)
+calls=24 0 
+0 4284
+0 576
+cfn=(1194)
+calls=12 0 
+0 1008
+0 156
+cfn=(1194)
+calls=12 0 
+0 492
+0 468
+cfn=(844)
+calls=12 0 
+0 420
+0 84
+cfn=(844)
+calls=12 0 
+0 1380
+0 72
+cfn=(844)
+calls=12 0 
+0 1910
+0 84
+cfn=(844)
+calls=12 0 
+0 1838
+0 72
+cfn=(844)
+calls=12 0 
+0 420
+0 192
+cfn=(828)
+calls=12 0 
+0 12
+0 36
+cfn=(830)
+calls=12 0 
+0 480
+0 84
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=12 255 
+0 360
+0 108
+cfn=(828)
+calls=12 0 
+0 12
+0 36
+cfn=(830)
+calls=12 0 
+0 620
+0 1092
+cfn=(1234)
+calls=12 0 
+0 4488
+0 60
+cfn=(1234)
+calls=60 0 
+0 21280
+0 1236
+cfn=(828)
+calls=60 0 
+0 60
+0 180
+cfn=(830)
+calls=60 0 
+0 2770
+0 540
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=60 255 
+0 876
+0 300
+cfn=(1040)
+calls=60 0 
+0 24886
+0 240
+cfn=(2040) quick_xml::name::QName::local_name
+calls=60 0 
+0 3960
+0 180
+cfn=(2220)
+calls=60 0 
+0 5388
+0 840
+cfn=(828)
+calls=60 0 
+0 60
+0 180
+cfn=(830)
+calls=60 0 
+0 5762
+0 420
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=60 255 
+0 930
+0 780
+cfn=(2220)
+calls=60 0 
+0 6228
+0 840
+cfn=(828)
+calls=60 0 
+0 60
+0 180
+cfn=(830)
+calls=60 0 
+0 7163
+0 420
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=60 255 
+0 876
+0 960
+cfn=(2032) quick_xml::name::QName::decompose
+calls=60 0 
+0 4200
+0 360
+cfn=(1228) quick_xml::name::NamespaceResolver::resolve_prefix
+calls=60 0 
+0 4620
+0 1296
+cfn=(2230) litchi_docx::writer::section::codec::xml::namespace_key
+calls=60 0 
+0 115868
+0 180
+cfn=(992)
+calls=60 0 
+0 10554
+0 720
+cfn=(1040)
+calls=60 0 
+0 43808
+0 540
+cfn=(2036)
+calls=60 0 
+0 3360
+0 540
+cfn=(828)
+calls=60 0 
+0 60
+0 180
+cfn=(830)
+calls=60 0 
+0 6588
+0 420
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=60 255 
+0 960
+0 540
+cfn=(1236)
+calls=60 0 
+0 11070
+0 900
+cfn=(828)
+calls=60 0 
+0 60
+0 180
+cfn=(830)
+calls=60 0 
+0 7237
+0 420
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=60 255 
+0 930
+0 1020
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=60 73 
+0 1020
+0 1236
+cfn=(1158)
+calls=18 0 
+0 7061
+0 1440
+cfn=(844)
+calls=60 0 
+0 2100
+0 984
+cfn=(844)
+calls=12 0 
+0 900
+0 1368
+cfn=(844)
+calls=60 0 
+0 2100
+0 216
+cfn=(844)
+calls=12 0 
+0 420
+0 24
+cfn=(1314)
+calls=12 0 
+0 13940
+0 72
+cfn=(844)
+calls=12 0 
+0 1784
+0 72
+cfn=(844)
+calls=12 0 
+0 420
+0 108
+
+fn=(2232) <alloc::borrow::Cow<B> as core::fmt::Display>::fmt
+0 300
+cfn=(1090) <str as core::fmt::Display>::fmt
+calls=60 0 
+0 29150
+
+fn=(2234) litchi_docx::writer::section::codec::xml::child_name
+0 80
+cfn=(1194)
+calls=4 0 
+0 164
+0 48
+cfn=(2220)
+calls=4 0 
+0 362
+0 36
+cfn=(828)
+calls=4 0 
+0 4
+0 16
+cfn=(830)
+calls=4 0 
+0 144
+0 28
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 60
+0 44
+
+fn=(2252) litchi_docx::writer::section::codec::xml::modeled_attributes
+0 68
+
+fn=(836) std::rt::lang_start::{{closure}}
+cfn=(838) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 0 
+0 6732795
+
+fn=(848) litchi_perf_baseline::run
+cfn=(2472) litchi_perf_baseline::ordinary_save::run_case
+calls=0 0 
+0 6732795
+
+fn=(920) alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+0 27
+
+fn=(948)
+0 220
+cfn=(828)
+calls=10 0 
+0 10
+0 170
+cfn=(830)
+calls=10 0 
+0 518
+0 20
+
+fn=(984)
+0 87
+
+fn=(1032) hashbrown::raw::RawTable<T,A>::reserve_rehash
+0 228
+cfn=(828)
+calls=4 0 
+0 4
+0 12
+cfn=(830)
+calls=4 0 
+0 160
+0 76
+cob=(2)
+cfi=(219) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+cfn=(796) __memset_avx2_unaligned_erms
+calls=4 198 
+0 44
+0 1378
+cfn=(828)
+calls=23 0 
+0 22
+0 66
+cfn=(830)
+calls=23 0 
+0 880
+0 418
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=23 198 
+0 242
+0 516
+cfn=(1028)
+calls=18 0 
+0 3546
+0 886
+cfn=(844)
+calls=6 0 
+0 210
+0 1188
+cfn=(828)
+calls=18 0 
+0 18
+0 54
+cfn=(830)
+calls=18 0 
+0 720
+0 342
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=18 198 
+0 198
+0 486
+cfn=(1028)
+calls=18 0 
+0 7842
+0 928
+cfn=(844)
+calls=6 0 
+0 210
+0 754
+cfn=(828)
+calls=13 0 
+0 10
+0 30
+cfn=(830)
+calls=13 0 
+0 400
+0 190
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=13 198 
+0 114
+0 702
+cfn=(1028)
+calls=51 0 
+0 14114
+0 1756
+cfn=(844)
+calls=7 0 
+0 210
+0 90
+
+fn=(876) <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+0 2400
+cfn=(878) <alloc::raw_vec::RawVecInner>::finish_grow
+calls=258 0 
+0 52304
+0 1200
+
+fn=(918) <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+0 32
+cfn=(2162)
+calls=1 0 
+0 13
+0 12
+
+fn=(952)
+0 136
+
+fn=(988)
+0 334
+
+fn=(1090)
+0 320
+cfn=(1092) <core::fmt::Formatter>::pad
+calls=170 0 
+0 29128
+
+fn=(1212) memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+0 183492
+cfn=(1214)
+calls=20021 0 
+0 222344
+0 20388
+
+fn=(1218) quick_xml::reader::state::ReaderState::emit_start
+0 120954
+cfn=(1158)
+calls=1037 0 
+0 24598
+0 44832
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=7256 255 
+0 43557
+0 59408
+cfn=(1100)
+calls=2044 0 
+0 55563
+0 1281
+
+fn=(1258) litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut
+0 20
+cfn=(982)
+calls=1 0 
+0 2004
+0 10
+cfn=(1166)
+calls=1 0 
+0 334
+0 8
+cfn=(1984) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob
+calls=1 0 
+0 16
+0 3
+cfn=(908) core::str::converts::from_utf8
+calls=1 0 
+0 9512
+0 6
+cfn=(2154) litchi_docx::writer::doc::model::MutableDocument::from_xml
+calls=1 0 
+0 6718036
+0 17
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 149
+0 2
+cfn=(1636) core::ptr::drop_in_place<core::option::Option<litchi_docx::writer::doc::model::MutableDocument>>
+calls=1 0 
+0 19
+0 16
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 161
+0 8
+cfn=(844)
+calls=1 0 
+0 155
+0 13
+
+fn=(1314)
+0 172
+cfn=(844)
+calls=4 0 
+0 140
+0 80
+cfn=(844)
+calls=4 0 
+0 140
+0 268
+cfn=(844)
+calls=4 0 
+0 140
+0 80
+cfn=(844)
+calls=4 0 
+0 140
+0 1392
+cfn=(844)
+calls=60 0 
+0 8684
+0 360
+cfn=(844)
+calls=60 0 
+0 2820
+0 300
+cfn=(844)
+calls=12 0 
+0 420
+
+fn=(1996) <litchi_ooxml_common::mce::model::Capabilities as core::default::Default>::default
+0 2
+cfn=(1998)
+calls=2 0 
+0 33737
+
+fn=(2180) memchr::memmem::searcher::searcher_kind_two_way_with_prefilter
+0 72
+cfn=(2182) memchr::memmem::searcher::prefilter_kind_avx2
+calls=1 0 
+0 7407
+0 20
+
+fn=(2182)
+0 7
+cfn=(2184) memchr::arch::x86_64::avx2::packedpair::Finder::find_prefilter_impl
+calls=1 0 
+0 7400
+
+fn=(2246) litchi_docx::writer::section::codec::xml::element_inner
+0 100
+cfn=(1172)
+calls=4 0 
+0 5035
+0 156
+cfn=(1176)
+calls=4 0 
+0 5038
+0 16
+cfn=(1202)
+calls=4 0 
+0 5256
+0 76
+cfn=(1204)
+calls=4 0 
+0 912
+0 60
+cfn=(844)
+calls=4 0 
+0 140
+0 116
+cfn=(844)
+calls=4 0 
+0 706
+0 28
+cfn=(844)
+calls=4 0 
+0 140
+0 32
+
+fn=(992)
+0 936
+cfn=(828)
+calls=436 0 
+0 78
+0 234
+cfn=(830)
+calls=436 0 
+0 8256
+0 546
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=436 255 
+0 1210
+0 858
+
+fn=(574) (below main)
+cob=(2)
+cfi=(166) ./csu/../csu/libc-start.c
+cfn=(576) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 6732795
+
+fn=(970)
+0 96
+
+fn=(990)
+0 12
+cfn=(910)
+calls=1 0 
+0 120
+0 14
+
+fn=(1176)
+0 141600
+cfn=(1184) memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+calls=13104 0 
+0 276013
+0 120621
+cfn=(1194)
+calls=5 0 
+0 222
+0 75
+cfn=(1200)
+calls=5 0 
+0 90
+0 2053
+cfn=(1244) quick_xml::reader::state::ReaderState::emit_text
+calls=1007 0 
+0 1640
+0 12410
+cfn=(1244)
+calls=2002 0 
+0 6400
+0 22918
+cfn=(1212)
+calls=6023 0 
+0 161372
+0 72666
+cfn=(1212)
+calls=6069 0 
+0 147180
+0 29284
+cfn=(1212)
+calls=2200 0 
+0 58156
+0 8694
+cfn=(1212)
+calls=2200 0 
+0 59516
+0 98042
+cfn=(1372)
+calls=6023 0 
+0 245959
+0 39170
+cfn=(1218)
+calls=6069 0 
+0 350193
+0 77798
+
+fn=(1188) memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+0 95831
+
+fn=(1246) core::ptr::drop_in_place<quick_xml::events::Event>
+0 12
+
+fn=(2170) <alloc::collections::btree::map::ExtractIf<K,V,R,F,A> as core::iter::traits::iterator::Iterator>::next
+0 11
+
+fn=(2214) litchi_docx::writer::doc::package::paragraph_section_range
+0 4200
+cfn=(2010)
+calls=1000 0 
+0 1660160
+0 4200
+
+fn=(606) main
+cfn=(608) std::rt::lang_start_internal
+calls=0 0 
+0 6732795
+
+fn=(828)
+0 7440
+
+fn=(924)
+0 278
+cfn=(910)
+calls=1 0 
+0 120
+0 10
+
+fn=(882) __rustc::__rdl_realloc
+0 18414
+cob=(2)
+cfi=(155)
+cfn=(716) realloc
+calls=3524 3380 
+0 418038
+
+fn=(1092)
+0 1600
+cfn=(1016) <alloc::string::String as core::fmt::Write>::write_str
+calls=164 0 
+0 27528
+
+fn=(1194)
+0 92443
+cfn=(1196)
+calls=15172 0 
+0 178906
+0 21333
+
+fn=(1202)
+0 130912
+cfn=(1220) quick_xml::name::NamespaceResolver::push
+calls=4827 0 
+0 468434
+0 96836
+cfn=(1220)
+calls=26 0 
+0 32916
+0 19748
+
+fn=(1206) quick_xml::events::Event::into_owned
+0 31207
+cfn=(828)
+calls=803 0 
+0 803
+0 3212
+cfn=(830)
+calls=803 0 
+0 29712
+0 5621
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=803 255 
+0 13241
+0 5030
+cfn=(828)
+calls=608 0 
+0 606
+0 2424
+cfn=(830)
+calls=608 0 
+0 22636
+0 4242
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=608 255 
+0 9548
+0 23569
+
+fn=(1224) quick_xml::events::attributes::IterState::check_for_duplicates
+0 12878
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=121 73 
+0 924
+0 426
+cfn=(1158)
+calls=1300 0 
+0 5242
+0 11950
+
+fn=(1234)
+0 800
+cfn=(1222) quick_xml::events::attributes::IterState::next
+calls=3380 0 
+0 25168
+0 2928
+
+fn=(1268)
+0 8
+cfn=(1270) litchi_docx::writer::paragraph::MutableParagraph::add_run
+calls=1 0 
+0 564
+0 5
+cfn=(828)
+calls=1 0 
+0 1
+0 4
+cfn=(830)
+calls=1 0 
+0 40
+0 7
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 11
+0 27
+
+fn=(1660) core::ptr::drop_in_place<litchi_docx::writer::section::model::SectionProperties>
+0 69
+cfn=(844)
+calls=1 0 
+0 177
+0 33
+cfn=(844)
+calls=2 0 
+0 70
+0 22
+cfn=(844)
+calls=1 0 
+0 35
+0 16
+cfn=(844)
+calls=1 0 
+0 155
+0 6
+cfn=(844)
+calls=1 0 
+0 35
+0 9
+cfn=(844)
+calls=1 0 
+0 35
+0 9
+cfn=(844)
+calls=1 0 
+0 205
+0 15
+
+fn=(2032)
+0 720
+cfn=(1194)
+calls=60 0 
+0 2460
+0 1020
+
+fn=(2062) memchr::arch::x86_64::avx2::packedpair::Finder::with_pair_impl
+0 36
+
+fn=(2156) litchi_docx::writer::doc::package::DocumentBody::from_xml
+0 25
+cfn=(2158) litchi_docx::alt::codec::scan
+calls=1 0 
+0 1857970
+0 21
+cfn=(2172)
+calls=1 0 
+0 1222643
+0 1024
+cfn=(844)
+calls=1 0 
+0 153
+0 16
+cfn=(1172)
+calls=1 0 
+0 1243
+0 12325
+cfn=(1242) quick_xml::name::NamespaceResolver::set_level
+calls=605 0 
+0 12759
+0 2420
+cfn=(1176)
+calls=605 0 
+0 197616
+0 2415
+cfn=(1176)
+calls=805 0 
+0 249663
+0 5640
+cfn=(1202)
+calls=1410 0 
+0 175462
+0 28200
+cfn=(1204)
+calls=1410 0 
+0 336248
+0 36705
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=203 73 
+0 3451
+0 2030
+cfn=(1194)
+calls=203 0 
+0 8323
+0 5257
+cfn=(1194)
+calls=201 0 
+0 8241
+0 2613
+cfn=(2196) litchi_docx::writer::doc::package::preserved_body_kind
+calls=201 0 
+0 10865
+0 35600
+cfn=(2198) litchi_docx::writer::doc::package::push_raw_body_xml
+calls=201 0 
+0 246158
+0 1409
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=2 73 
+0 34
+0 16
+cfn=(1194)
+calls=2 0 
+0 82
+0 55
+cfn=(2200) litchi_docx::writer::doc::package::ensure_writer_namespace_declarations
+calls=1 0 
+0 6294
+0 15
+cfn=(948)
+calls=1 0 
+0 82
+0 23
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 77
+0 21
+cfn=(948)
+calls=1 0 
+0 82
+0 12
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 11
+0 20
+cfn=(844)
+calls=1 0 
+0 35
+0 2
+cfn=(1250)
+calls=1 0 
+0 289
+0 2
+cfn=(2210) core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::writer::doc::package::PreservedAltRange>>
+calls=1 0 
+0 19
+0 2
+cfn=(1666)
+calls=1 0 
+0 50
+0 9
+
+fn=(2160)
+0 8
+cfn=(844)
+calls=1 0 
+0 35
+0 8
+cfn=(844)
+calls=1 0 
+0 35
+0 32
+cfn=(844)
+calls=4 0 
+0 140
+0 32
+cfn=(844)
+calls=4 0 
+0 140
+
+fn=(2192)
+0 1707
+
+fn=(2210)
+0 19
+
+fn=(2220)
+0 2880
+cfn=(2222) <core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next
+calls=192 0 
+0 34526
+0 3840
+
+fn=(2224) litchi_docx::writer::section::codec::xml::direct_children
+0 24
+cfn=(2218)
+calls=2 0 
+0 16271
+0 74
+cfn=(828)
+calls=2 0 
+0 2
+0 8
+cfn=(830)
+calls=2 0 
+0 72
+0 14
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=2 255 
+0 32
+0 36
+cfn=(1172)
+calls=2 0 
+0 2382
+0 160
+cfn=(1242)
+calls=6 0 
+0 152
+0 24
+cfn=(1176)
+calls=6 0 
+0 4010
+0 12
+cfn=(1176)
+calls=4 0 
+0 3242
+0 40
+cfn=(1202)
+calls=10 0 
+0 7951
+0 210
+cfn=(1204)
+calls=10 0 
+0 1444
+0 234
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=6 73 
+0 102
+0 364
+cfn=(2228)
+calls=4 0 
+0 152873
+0 1110
+cfn=(844)
+calls=20 0 
+0 2324
+0 120
+cfn=(844)
+calls=20 0 
+0 2489
+0 120
+cfn=(844)
+calls=20 0 
+0 2567
+0 36
+cfn=(950) <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop
+calls=4 0 
+0 583
+0 74
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=2 73 
+0 38
+0 34
+cfn=(844)
+calls=2 0 
+0 70
+0 68
+cfn=(2234)
+calls=4 0 
+0 986
+0 102
+cfn=(1194)
+calls=2 0 
+0 82
+0 58
+cfn=(828)
+calls=2 0 
+0 2
+0 6
+cfn=(830)
+calls=2 0 
+0 72
+0 14
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=2 255 
+0 26
+0 10
+cfn=(2226) <alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one
+calls=2 0 
+0 218
+0 90
+cfn=(828)
+calls=4 0 
+0 4
+0 16
+cfn=(830)
+calls=4 0 
+0 160
+0 56
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 68
+0 48
+cfn=(1158)
+calls=2 0 
+0 210
+0 76
+cfn=(1246)
+calls=2 0 
+0 8
+0 28
+cfn=(2236)
+calls=2 0 
+0 116
+0 14
+cfn=(1250)
+calls=2 0 
+0 1342
+0 14
+cfn=(844)
+calls=2 0 
+0 310
+0 4
+cfn=(2238)
+calls=2 0 
+0 926
+0 20
+
+fn=(2240) litchi_docx::writer::section::codec::xml::section_child_rank
+0 62
+
+fn=(2250) litchi_docx::writer::section::codec::xml::preserved_attribute_tokens
+0 56
+cfn=(2252)
+calls=4 0 
+0 68
+0 108
+cfn=(2228)
+calls=4 0 
+0 148378
+0 1438
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=34 73 
+0 666
+0 228
+cfn=(844)
+calls=20 0 
+0 2268
+0 120
+cfn=(844)
+calls=20 0 
+0 2915
+0 120
+cfn=(844)
+calls=20 0 
+0 2765
+0 140
+cfn=(950)
+calls=4 0 
+0 575
+0 64
+cfn=(2254) alloc::vec::in_place_collect::from_iter_in_place
+calls=4 0 
+0 168
+0 72
+
+fn=(2254)
+0 168
+
+fn=(2256) litchi_docx::writer::section::codec::xml::attributes
+0 72
+cfn=(2228)
+calls=4 0 
+0 146676
+0 100
+cfn=(844)
+calls=20 0 
+0 2257
+0 1238
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=14 73 
+0 284
+0 340
+cfn=(1158)
+calls=6 0 
+0 1675
+0 402
+cfn=(950)
+calls=4 0 
+0 538
+0 56
+
+fn=(2260) litchi_docx::writer::section::codec::xml::parse_twips_u32
+0 1168
+
+fn=(2264) core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,alloc::string::String)>>
+0 80
+cfn=(844)
+calls=6 0 
+0 450
+0 36
+cfn=(844)
+calls=6 0 
+0 450
+0 32
+cfn=(844)
+calls=2 0 
+0 70
+
+fn=(840) litchi_perf_baseline::main
+cfn=(848)
+calls=0 0 
+0 6732795
+
+fn=(880) __rustc::__rust_realloc
+0 837
+cfn=(882)
+calls=3524 0 
+0 436452
+
+fn=(1014) core::fmt::write
+0 3344
+cfn=(1016)
+calls=186 0 
+0 37126
+0 1456
+cfn=(2232)
+calls=60 0 
+0 29450
+cfn=(1088) <&T as core::fmt::Display>::fmt
+calls=6 0 
+0 318
+0 960
+
+fn=(846) __rustc::__rdl_dealloc
+0 7226
+cob=(2)
+cfi=(155)
+cfn=(758) free
+calls=18688 3319 
+0 302272
+
+fn=(1172)
+0 3150
+cfn=(1158)
+calls=1029 0 
+0 23625
+0 2700
+cfn=(1100)
+calls=1029 0 
+0 25511
+0 15750
+cfn=(1100)
+calls=1029 0 
+0 99331
+0 2025
+cfn=(1100)
+calls=1029 0 
+0 131755
+0 675
+
+fn=(1204)
+0 79734
+cfn=(1194)
+calls=47 0 
+0 1066
+0 21855
+cfn=(1194)
+calls=4814 0 
+0 98851
+0 43590
+cfn=(1194)
+calls=4830 0 
+0 100023
+0 33230
+cfn=(1228)
+calls=4811 0 
+0 404065
+0 21759
+cfn=(1228)
+calls=15 0 
+0 588
+0 9660
+cfn=(1228)
+calls=4815 0 
+0 404373
+0 24374
+cfn=(1228)
+calls=27 0 
+0 2218
+0 53082
+
+fn=(1244)
+0 8040
+
+fn=(1666)
+0 2684
+cfn=(844)
+calls=17 0 
+0 1011
+0 823
+cfn=(844)
+calls=1 0 
+0 155
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 21
+cfn=(844)
+calls=1 0 
+0 35
+0 15
+cfn=(920)
+calls=1 0 
+0 27
+0 8
+
+fn=(2036)
+0 2376
+cfn=(1194)
+calls=1064 0 
+0 10824
+0 1584
+
+fn=(2154)
+0 10
+cfn=(2156)
+calls=1 0 
+0 4473727
+0 26
+cfn=(2212) litchi_docx::writer::doc::package::DocumentBody::validate_section_placement
+calls=1 0 
+0 1960100
+0 1217
+cfn=(2216) litchi_docx::writer::section::codec::xml::<impl litchi_docx::writer::section::model::SectionProperties>::from_xml
+calls=1 0 
+0 282334
+0 291
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 77
+0 4
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 65
+0 16
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 137
+0 32
+
+fn=(2158)
+0 28
+cfn=(1172)
+calls=1 0 
+0 1400
+0 12924
+cfn=(1242)
+calls=605 0 
+0 12759
+0 2420
+cfn=(1176)
+calls=605 0 
+0 197967
+0 2415
+cfn=(1176)
+calls=805 0 
+0 249936
+0 5640
+cfn=(1202)
+calls=1410 0 
+0 175535
+0 18330
+cfn=(1206)
+calls=1410 0 
+0 151851
+0 8460
+cfn=(828)
+calls=1410 0 
+0 1410
+0 4230
+cfn=(830)
+calls=1410 0 
+0 56667
+0 9870
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1410 255 
+0 91612
+0 14100
+cfn=(828)
+calls=1410 0 
+0 1410
+0 4230
+cfn=(830)
+calls=1410 0 
+0 56400
+0 139530
+cfn=(1204)
+calls=1410 0 
+0 336248
+0 28654
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=2 73 
+0 34
+0 20508
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=603 73 
+0 10251
+0 8454
+cfn=(844)
+calls=605 0 
+0 21175
+0 1208
+cfn=(844)
+calls=604 0 
+0 21140
+0 15499
+cfn=(844)
+calls=1409 0 
+0 49315
+0 8454
+cfn=(844)
+calls=1409 0 
+0 49315
+0 2609
+cfn=(844)
+calls=200 0 
+0 7000
+0 424
+cfn=(1194)
+calls=2 0 
+0 82
+0 7258
+cfn=(1194)
+calls=603 0 
+0 24723
+0 7850
+cfn=(1246)
+calls=1 0 
+0 4
+0 5
+cfn=(2160)
+calls=1 0 
+0 86
+0 20
+cfn=(918)
+calls=1 0 
+0 57
+0 7
+cfn=(2164)
+calls=1 0 
+0 17973
+0 29
+cfn=(2168) alloc::collections::btree::map::BTreeMap<K,V,A>::retain
+calls=1 0 
+0 40
+0 14
+cfn=(1250)
+calls=1 0 
+0 409
+0 1
+
+fn=(2168)
+0 22
+cfn=(2170)
+calls=1 0 
+0 11
+0 7
+
+fn=(2194)
+0 10
+cfn=(828)
+calls=1 0 
+0 1
+0 3
+cfn=(830)
+calls=1 0 
+0 40
+0 3978
+cfn=(828)
+calls=2 0 
+0 2
+0 6
+cfn=(830)
+calls=2 0 
+0 80
+0 28
+cfn=(828)
+calls=2 0 
+0 2
+0 28
+cfn=(828)
+calls=14 0 
+0 14
+0 48
+cfn=(830)
+calls=16 0 
+0 805
+0 146
+cfn=(828)
+calls=1 0 
+0 1
+0 3
+cfn=(830)
+calls=1 0 
+0 40
+0 568
+cfn=(844)
+calls=1 0 
+0 35
+0 14
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 12
+0 7
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 13
+0 56
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 11
+0 10
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 13
+0 23
+
+fn=(2198)
+0 9049
+cfn=(828)
+calls=1 0 
+0 1
+0 4
+cfn=(830)
+calls=1 0 
+0 40
+0 7
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 30
+0 808
+cfn=(828)
+calls=200 0 
+0 200
+0 800
+cfn=(830)
+calls=200 0 
+0 40467
+0 1400
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=200 255 
+0 4400
+0 1618
+cfn=(1158)
+calls=9 0 
+0 153179
+0 1014
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=201 255 
+0 32337
+0 804
+
+fn=(2202) <alloc::string::String as core::iter::traits::collect::FromIterator<alloc::string::String>>::from_iter
+0 38
+cfn=(2204)
+calls=4 0 
+0 6063
+0 24
+
+fn=(2206)
+0 24
+cfn=(2208)
+calls=4 0 
+0 1293
+
+fn=(2248) litchi_docx::writer::section::codec::xml::authored_child
+0 152
+
+fn=(950)
+0 324
+cfn=(844)
+calls=12 0 
+0 1372
+
+fn=(1030) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+0 51347
+
+fn=(1040)
+0 720
+cfn=(1028)
+calls=60 0 
+0 26160
+0 1700
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=1 73 
+0 17
+0 3228
+cfn=(1032)
+calls=18 0 
+0 11950
+0 81
+cfn=(1028)
+calls=4 0 
+0 636
+0 302
+cfn=(1032)
+calls=2 0 
+0 324
+0 50
+cfn=(1028)
+calls=4 0 
+0 932
+0 332
+cfn=(1032)
+calls=4 0 
+0 648
+0 772
+cfn=(1028)
+calls=64 0 
+0 12796
+0 4836
+cfn=(1032)
+calls=22 0 
+0 8238
+0 440
+cfn=(1028)
+calls=34 0 
+0 9786
+0 2549
+cfn=(1032)
+calls=8 0 
+0 17884
+0 8
+
+fn=(910)
+0 354
+cfn=(930)
+calls=4 0 
+0 160
+0 68
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 40
+0 1420
+cfn=(930)
+calls=36 0 
+0 4824
+0 540
+
+fn=(1198)
+0 132
+
+fn=(1226) quick_xml::name::NamespaceResolver::add
+0 1368
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=41 255 
+0 582
+0 450
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=41 255 
+0 492
+0 222
+cfn=(1158)
+calls=4 0 
+0 1350
+0 855
+cfn=(1100)
+calls=29 0 
+0 13476
+0 54
+
+fn=(1242)
+0 51029
+
+fn=(1250)
+0 8
+cfn=(844)
+calls=1 0 
+0 155
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 6
+cfn=(844)
+calls=1 0 
+0 35
+0 8
+cfn=(844)
+calls=1 0 
+0 155
+0 8
+cfn=(844)
+calls=1 0 
+0 35
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 6
+cfn=(844)
+calls=1 0 
+0 155
+0 8
+cfn=(844)
+calls=1 0 
+0 35
+0 48
+cfn=(844)
+calls=6 0 
+0 450
+0 42
+cfn=(844)
+calls=6 0 
+0 472
+0 36
+cfn=(844)
+calls=6 0 
+0 952
+0 48
+cfn=(844)
+calls=6 0 
+0 450
+
+fn=(1290)
+0 36
+cfn=(828)
+calls=4 0 
+0 4
+0 12
+cfn=(830)
+calls=4 0 
+0 160
+0 32
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 120
+0 136
+cfn=(828)
+calls=4 0 
+0 4
+0 12
+cfn=(830)
+calls=4 0 
+0 351
+0 216
+cfn=(828)
+calls=2 0 
+0 2
+0 8
+cfn=(830)
+calls=2 0 
+0 80
+0 38
+cfn=(992)
+calls=2 0 
+0 172
+0 16
+cfn=(992)
+calls=2 0 
+0 172
+0 64
+
+fn=(1984)
+0 16
+
+fn=(2166) litchi_ooxml_common::mce::codec::active_offsets
+0 1245
+cfn=(2174) litchi_ooxml_common::mce::codec::find_bytes
+calls=1 0 
+0 12269
+0 12
+cfn=(2186) litchi_ooxml_common::mce::codec::copy_offsets
+calls=1 0 
+0 227
+0 19
+
+fn=(2178) memchr::arch::all::twoway::Shift::forward
+0 13
+
+fn=(2188)
+0 29
+
+fn=(2222)
+0 34526
+
+fn=(2242) litchi_docx::writer::section::codec::xml::is_leaf_content_child
+0 58
+
+fn=(2472)
+cfn=(2152) litchi_perf_baseline::ordinary_save::Owner::edit
+calls=1 0 
+0 6732795
+
+fn=(830)
+0 7440
+cfn=(832)
+calls=18689 0 
+0 348492
+
+fn=(1028)
+0 76
+cfn=(1030)
+calls=4 0 
+0 124
+0 20
+cfn=(1030)
+calls=4 0 
+0 140
+0 1748
+cfn=(1030)
+calls=64 0 
+0 3584
+0 256
+cfn=(1030)
+calls=64 0 
+0 2940
+0 4648
+cfn=(1030)
+calls=4 0 
+0 224
+0 28
+cfn=(1030)
+calls=4 0 
+0 132
+0 20
+cfn=(1030)
+calls=4 0 
+0 140
+0 1484
+cfn=(1030)
+calls=60 0 
+0 10920
+0 300
+cfn=(1030)
+calls=60 0 
+0 2100
+0 240
+cfn=(1030)
+calls=60 0 
+0 4824
+0 300
+cfn=(1030)
+calls=60 0 
+0 2076
+0 4846
+cfn=(1030)
+calls=34 0 
+0 5278
+0 170
+cfn=(1030)
+calls=34 0 
+0 1346
+0 2365
+cfn=(1030)
+calls=320 0 
+0 82
+0 5
+cfn=(1030)
+calls=320 0 
+0 35
+0 483
+cfn=(1030)
+calls=30 0 
+0 1008
+0 72
+cfn=(1030)
+calls=30 0 
+0 774
+0 1638
+cfn=(1030)
+calls=18 0 
+0 3276
+0 90
+cfn=(1030)
+calls=18 0 
+0 630
+0 72
+cfn=(1030)
+calls=18 0 
+0 1434
+0 90
+cfn=(1030)
+calls=18 0 
+0 630
+0 2172
+cfn=(1030)
+calls=51 0 
+0 7902
+0 240
+cfn=(1030)
+calls=51 0 
+0 1748
+0 3312
+
+fn=(878)
+0 50
+cfn=(828)
+calls=2 0 
+0 2
+0 6
+cfn=(830)
+calls=2 0 
+0 80
+0 2186
+cfn=(880)
+calls=197 0 
+0 48584
+0 1560
+
+fn=(908)
+0 14126
+
+fn=(1088)
+0 20
+cfn=(1090)
+calls=8 0 
+0 298
+
+fn=(1102)
+0 1044
+cfn=(880)
+calls=26 0 
+0 159510
+0 112
+cfn=(828)
+calls=26 0 
+0 24
+0 72
+cfn=(830)
+calls=26 0 
+0 3243
+0 556
+cfn=(828)
+calls=1 0 
+0 1
+0 3
+cfn=(830)
+calls=1 0 
+0 40
+0 193
+cfn=(880)
+calls=2 0 
+0 1127
+0 22
+cfn=(828)
+calls=6 0 
+0 6
+0 18
+cfn=(830)
+calls=6 0 
+0 240
+0 37933
+cfn=(880)
+calls=3134 0 
+0 228068
+0 4114
+cfn=(828)
+calls=5399 0 
+0 908
+0 2724
+cfn=(830)
+calls=5399 0 
+0 35335
+0 19449
+
+fn=(1158)
+0 60
+cfn=(1102)
+calls=4 0 
+0 324
+0 66
+cfn=(1102)
+calls=2 0 
+0 162
+0 288
+cfn=(1102)
+calls=18 0 
+0 6629
+0 297
+cfn=(1102)
+calls=9 0 
+0 152963
+0 111
+cfn=(1102)
+calls=2 0 
+0 162
+0 33
+cfn=(1102)
+calls=1 0 
+0 431
+0 129
+cfn=(1102)
+calls=8 0 
+0 1693
+0 402
+cfn=(1102)
+calls=1300 0 
+0 4714
+0 3558
+cfn=(1102)
+calls=1037 0 
+0 19222
+0 5436
+cfn=(1102)
+calls=1033 0 
+0 19503
+0 2052
+
+fn=(1216)
+0 117912
+
+fn=(1352)
+0 612
+cfn=(828)
+calls=36 0 
+0 36
+0 144
+cfn=(830)
+calls=36 0 
+0 1440
+0 828
+cfn=(910)
+calls=36 0 
+0 6696
+0 576
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=36 255 
+0 432
+0 504
+
+fn=(1636)
+0 19
+
+fn=(1802)
+0 36
+cfn=(844)
+calls=4 0 
+0 140
+0 20
+
+fn=(2012) litchi_docx::namespace::emit_word_element_range
+0 8684
+cfn=(1102)
+calls=7 0 
+0 3785
+0 91
+
+fn=(2040)
+0 660
+cfn=(1194)
+calls=60 0 
+0 2460
+0 840
+
+fn=(2060) <core::iter::adapters::take::Take<I> as core::iter::traits::iterator::Iterator>::nth
+0 23
+
+fn=(2152)
+0 14
+cfn=(1258)
+calls=1 0 
+0 6730489
+0 6
+cfn=(1264)
+calls=1 0 
+0 2274
+0 12
+
+fn=(2176) memchr::arch::all::twoway::Finder::new
+0 2496
+cfn=(2178)
+calls=1 0 
+0 13
+0 10
+
+fn=(2184)
+0 7400
+
+fn=(2196)
+0 3819
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=201 73 
+0 3417
+0 3629
+
+fn=(2200)
+0 19
+cfn=(2202)
+calls=1 0 
+0 6125
+0 7
+cfn=(828)
+calls=1 0 
+0 1
+0 4
+cfn=(830)
+calls=1 0 
+0 40
+0 7
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 75
+0 16
+
+fn=(2226)
+0 34
+cfn=(878)
+calls=2 0 
+0 164
+0 20
+
+fn=(2230)
+0 1440
+cfn=(2220)
+calls=60 0 
+0 28740
+0 420
+cfn=(1012)
+calls=60 0 
+0 84668
+0 600
+
+fn=(2244) litchi_docx::writer::section::codec::xml::validate_leaf_content
+0 40
+cfn=(2246)
+calls=4 0 
+0 17811
+0 72
+
+fn=(844)
+0 7226
+cfn=(846)
+calls=18688 0 
+0 309498
+
+fn=(608)
+cfn=(836)
+calls=0 0 
+0 6732795
+
+fn=(838)
+cfn=(840)
+calls=0 0 
+0 6732795
+
+fn=(1012)
+0 4956
+cfn=(828)
+calls=70 0 
+0 64
+0 256
+cfn=(830)
+calls=70 0 
+0 6484
+0 640
+cfn=(1014)
+calls=70 0 
+0 72654
+0 960
+
+fn=(1016)
+0 3332
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=344 255 
+0 2766
+0 2292
+cfn=(876)
+calls=258 0 
+0 55904
+0 360
+
+fn=(1184)
+0 106512
+cfn=(1186) memchr::arch::x86_64::avx2::memchr::Two::find_raw
+calls=15590 0 
+0 154285
+0 15216
+
+fn=(1186)
+0 47658
+cfn=(1188)
+calls=12555 0 
+0 95831
+0 10796
+
+fn=(1220)
+0 78496
+cfn=(1222)
+calls=4877 0 
+0 256070
+0 3864
+cfn=(1222)
+calls=1823 0 
+0 54362
+0 50245
+cfn=(1226)
+calls=44 0 
+0 18849
+0 39464
+
+fn=(1222)
+0 210512
+cfn=(1224)
+calls=3281 0 
+0 31420
+0 93668
+
+fn=(1228)
+0 440856
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=14546 73 
+0 145440
+0 100972
+cfn=(828)
+calls=6004 0 
+0 1204
+0 4816
+cfn=(830)
+calls=6004 0 
+0 43344
+0 9632
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=6004 255 
+0 19264
+0 50336
+
+fn=(1236)
+0 192
+cfn=(1238) quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+calls=1356 0 
+0 13098
+0 192
+
+fn=(1238)
+0 1152
+cfn=(908)
+calls=1356 0 
+0 4614
+0 960
+cfn=(1240)
+calls=1356 0 
+0 4964
+0 1408
+
+fn=(1270)
+0 26
+cfn=(1158)
+calls=1 0 
+0 455
+0 5
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 65
+0 13
+
+fn=(2010)
+0 5600
+cfn=(1172)
+calls=1000 0 
+0 273447
+0 17800
+cfn=(1242)
+calls=3000 0 
+0 12600
+0 2400
+cfn=(1176)
+calls=3000 0 
+0 162255
+0 3000
+cfn=(1176)
+calls=5000 0 
+0 387964
+0 6400
+cfn=(1202)
+calls=8000 0 
+0 172400
+0 33600
+cfn=(1204)
+calls=8000 0 
+0 282400
+0 46000
+cfn=(2036)
+calls=1000 0 
+0 11200
+0 1800
+cfn=(828)
+calls=1000 0 
+0 200
+0 600
+cfn=(830)
+calls=1000 0 
+0 13998
+0 1400
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1000 255 
+0 3200
+0 24000
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=3000 73 
+0 6000
+0 14400
+cfn=(1194)
+calls=3000 0 
+0 24600
+0 28800
+cfn=(844)
+calls=6000 0 
+0 42000
+0 13400
+cfn=(844)
+calls=1000 0 
+0 7000
+0 1200
+cfn=(844)
+calls=1000 0 
+0 7000
+0 1400
+cfn=(844)
+calls=1000 0 
+0 7000
+0 1200
+cfn=(844)
+calls=1000 0 
+0 33696
+0 1400
+cfn=(844)
+calls=1000 0 
+0 7000
+0 1828
+cfn=(1172)
+calls=1 0 
+0 1315
+0 10900
+cfn=(1242)
+calls=605 0 
+0 12759
+0 2420
+cfn=(1176)
+calls=605 0 
+0 197724
+0 2415
+cfn=(1176)
+calls=805 0 
+0 249582
+0 5640
+cfn=(1202)
+calls=1410 0 
+0 175512
+0 29610
+cfn=(1204)
+calls=1410 0 
+0 336248
+0 51554
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=2 73 
+0 34
+0 94
+cfn=(1194)
+calls=6 0 
+0 246
+0 5350
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=203 73 
+0 3451
+0 25701
+cfn=(2012)
+calls=200 0 
+0 12560
+0 4932
+cfn=(1194)
+calls=209 0 
+0 8569
+0 3529
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=201 73 
+0 2022
+0 5048
+cfn=(844)
+calls=1 0 
+0 35
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 6
+cfn=(844)
+calls=1 0 
+0 155
+0 7
+cfn=(844)
+calls=1 0 
+0 155
+0 9
+
+fn=(2058) memchr::memmem::FinderBuilder::build_forward_with_ranker
+0 1992
+cfn=(2060)
+calls=1 0 
+0 23
+0 26
+cfn=(2062)
+calls=1 0 
+0 36
+0 51
+cfn=(2176)
+calls=1 0 
+0 2519
+0 40
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 30
+0 9
+
+fn=(2164)
+0 52
+cfn=(1996)
+calls=2 0 
+0 33739
+0 18
+cfn=(2166)
+calls=2 0 
+0 13772
+0 676
+cfn=(844)
+calls=34 0 
+0 1190
+0 56
+cfn=(844)
+calls=2 0 
+0 70
+0 4
+cfn=(1314)
+calls=2 0 
+0 36
+0 18
+
+fn=(2174)
+0 19
+cfn=(2058)
+calls=1 0 
+0 4726
+0 13
+cfn=(2180)
+calls=1 0 
+0 7499
+0 12
+
+fn=(2186)
+0 15
+cfn=(1102)
+calls=1 0 
+0 81
+0 7
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 113
+0 11
+
+fn=(2212)
+0 820
+cfn=(2214)
+calls=200 0 
+0 1668560
+0 3218
+cfn=(2216)
+calls=1 0 
+0 286472
+0 19
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 77
+0 14
+cfn=(1660)
+calls=1 0 
+0 891
+0 29
+
+fn=(2216)
+0 26
+cfn=(2218)
+calls=2 0 
+0 16247
+0 58
+cfn=(2224)
+calls=2 0 
+0 204452
+0 30
+cfn=(1290)
+calls=2 0 
+0 584
+0 10
+cfn=(992)
+calls=2 0 
+0 172
+0 16
+cfn=(1290)
+calls=2 0 
+0 56
+0 292
+cfn=(2240)
+calls=4 0 
+0 62
+0 48
+cfn=(992)
+calls=4 0 
+0 340
+0 12
+cfn=(1040)
+calls=4 0 
+0 1312
+0 40
+cfn=(2242)
+calls=4 0 
+0 58
+0 32
+cfn=(2244)
+calls=4 0 
+0 17923
+0 44
+cfn=(2248)
+calls=4 0 
+0 152
+0 70
+cfn=(1158)
+calls=2 0 
+0 210
+0 104
+cfn=(2250)
+calls=4 0 
+0 160149
+0 112
+cfn=(992)
+calls=4 0 
+0 364
+0 56
+cfn=(1158)
+calls=2 0 
+0 210
+0 120
+cfn=(2256)
+calls=2 0 
+0 106873
+0 76
+cfn=(2260)
+calls=2 0 
+0 134
+0 64
+
+ob=(2)
+fl=(219)
+fn=(796)
+198 54
++1 108
++5 54
++1 54
++1 4
++1 4
++1 4
++2 4
++1 4
++1 8
+341 50
++9 50
++1 50
++31 50
++1 50
++1 50
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606)
+calls=0 0 
+59 6732795
+
+fl=(233)
+fn=(900)
+73 19156
++7 19156
++1 19156
++3 1291
++1 1291
++1 1291
++4 1291
++1 1291
++2 1291
++1 1291
++62 68
++10 68
++1 68
++1 68
++3 136
+337 1291
++1 1291
++1 1291
++1 1291
++1 1291
++1 2582
++59 17865
++1 17865
++5 2503
++1 2503
++1 2503
++1 2503
++1 2503
++3 2224
++1 2224
++1 2224
++1 2224
++3 2224
++1 2224
++1 2156
++1 4312
++6 279
++1 279
++2 279
++1 279
++2 279
++1 279
++2 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++2 6
++2 3
++4 15362
++1 15362
++1 15362
++1 15362
++2 15362
++4 3
++1 3
++2 3
++87 273
++1 273
++1 273
++1 273
++1 273
++1 273
++1 273
++1 273
++1 273
++1 273
++2 273
++2 273
+
+fl=(189) ./misc/./misc/sbrk.c
+fn=(654) sbrk
+37 10
++6 4
+-3 4
++18 4
++4 4
++4 2
++1 2
+-1 6
++8 2
+cfi=(190) ./misc/../sysdeps/unix/sysv/linux/brk.c
+cfn=(656) brk
+calls=4 -38 
+* 18
+* 6
++4 6
+
+fl=(155)
+fn=(648) __libc_malloc2
+3247 2586
++4 862
++28 2155
+-26 1293
+cfn=(650) _int_malloc
+calls=1503 3790 
+* 65049
++1 2155
+fi=(154) ./malloc/./malloc/arena.c
+151 862
+fe=(155)
+
+fn=(716)
+3380 1674
++7 1674
+-7 7533
++11 1674
+4837 837
++1 837
+-1 837
++1 837
+-1 1674
++2 2511
+3425 634
+-22 634
++22 3170
++4 1268
+1288 3804
+3436 1268
+fi=(154)
+151 1902
+fe=(155)
+3469 1268
+4840 837
+3411 1674
++2 406
++1 406
++36 203
++51 7533
+-30 2536
+cfn=(720) _int_realloc
+calls=2415 4559 
+* 363433
+* 634
++1 3170
+fi=(154)
+151 1902
+fe=(155)
+3472 1268
+
+fn=(726) _int_free_chunk
+4351 4400
++8 1100
+-3 1100
++3 1100
+-3 2200
++6 2200
++6 1100
+cfn=(728) _int_free_merge_chunk
+calls=4464 +39 
+* 117570
++5 2200
++27 3300
+
+fn=(758)
+3319 7226
++3 14452
++15 14452
+-4 21678
++8 21678
++6 21675
++6 7225
+-3 14450
++3 7225
+-3 7225
++1 14450
++2 21675
+3007 6753
++8 6753
+-12 6753
++4 20259
++1 6753
++7 6753
+3354 6753
++10 1416
+-34 473
++40 946
+fi=(154)
+151 1419
+fe=(155)
+3374 1419
+cfn=(726)
+calls=2072 4351 
+* 62411
+
+fn=(658) alloc_perturb
+1887 240
++1 720
++2 240
+
+fn=(646)
+3283 7440
+1269 14880
++19 7440
+3287 7440
+1288 19030
+3287 8300
++2 12444
++2 8296
++2 44628
+3030 14018
++4 28036
++4 7009
++1 7009
+3294 7009
+-7 6580
++19 431
+cfn=(648)
+calls=1503 -59 
+* 74962
+-17 6580
+
+fn=(650)
+3790 9153
++32 2034
+1288 5875
+3831 1580
++16 1580
++54 50
++18 639
+-1 639
++12 1278
+-11 1278
+-1 1917
++12 1278
+-6 362
++5 362
+-7 362
++2 724
++9 724
++3 724
+-3 20
++3 20
++1 1116
+-3 372
++5 372
++1 1488
++2 1488
+-10 372
++12 744
++1 744
++2 744
++11 1470
++29 42
++1 42
++4 84
++31 84
++8 168
++1 7
++1 7
+-1 7
++4 14
+-4 28
++1 28
+-1 28
++4 56
++5 8
+-2 2
++3 4
++6 3
++3 3
++2 2
++33 2
++9 1
+-9 4
++1 1
++1 1
++1 1
++1 1
++6 2
+-10 202
++9 101
+-9 404
++1 101
++1 101
++1 101
++1 101
++6 202
+3053 32
+-27 32
++27 32
+-27 32
++4 64
++4 128
++4 32
++1 32
+4113 32
+3831 908
+1288 227
+3850 227
++2 227
+-2 227
++2 454
+-2 780
++2 780
+-2 780
++2 1560
++2 378
++1 756
++2 378
++1 378
++1 378
++2 1512
++6 1134
++1 756
+2919 756
+3872 1134
++4 3600
++1 804
++2 552
++2 276
++1 276
++1 552
++2 276
+2999 276
++16 276
+3886 276
+3003 552
++4 1104
++1 276
++7 276
++32 1032
+1888 378
+3893 378
+1888 756
+4340 9153
+3901 869
+-52 4680
+4105 306
+3930 402
+4111 496
++13 369
+-2 738
++2 20
++3 10
+-3 10
++3 20
++1 4
++3 4
++1 10
++6 4
++5 2
++1 4
+-1 8
++1 2
+cfn=(790) unlink_chunk.isra.0
+calls=11 1592 
+* 62
++3 12
++13 2
++1 4
++3 2
+-8 2
++8 4
++1 2
++1 2
++1 4
+4277 48
++3 192
++2 72
++1 24
+1888 24
+4286 24
+1888 48
+4280 2440
++2 915
++1 305
+1888 305
+4286 305
+1888 648
+4286 38
+1888 76
+3994 32
++1 32
+-1 32
++1 64
+2919 64
+3998 96
++4 64
++1 96
+3003 32
+3981 32
+3015 32
+4006 32
+3003 32
++4 128
++1 32
++7 32
+4007 32
++24 318
++52 33
+-51 33
++51 99
+3959 710
++2 330
+-1 660
++27 92
++1 92
++4 184
++31 300
++2 120
++1 180
++1 60
+-1 60
++1 60
+-2 14
++1 21
++1 7
+-1 7
++1 11
++4 16
++26 3
++1 2
++6 1
++7 1
+-1 3
++2 2
++2 1
++1 3
++2 1
++1 2
+-47 18
+4195 367
++1 367
++1 367
+-1 367
++1 367
++1 734
++1 1101
++5 1496
++16 4470
++2 8940
+-4 9904
++8 482
++3 964
++2 234
++1 117
++1 117
+-2 117
+-27 117
++4 132
++3 168
+-3 45
++3 60
+-3 21
++3 28
++97 4
++1 6
++2 4
++3 8
+2324 2
++12 2
+-12 4
++12 2
+4336 6
+cfn=(658)
+calls=3 1887 
+* 10
+* 2
+4208 42
++5 168
++1 84
++24 730
++3 730
+
+ob=(7)
+fl=(165)
+fn=(2216)
+0 12
+cfn=(2260)
+calls=2 0 
+0 134
+0 76
+cfn=(2260)
+calls=2 0 
+0 134
+0 66
+cfn=(2260)
+calls=2 0 
+0 134
+0 112
+cfn=(2260)
+calls=2 0 
+0 118
+0 138
+cfn=(2260)
+calls=2 0 
+0 118
+0 164
+cfn=(2260)
+calls=2 0 
+0 96
+0 144
+cfn=(844)
+calls=14 0 
+0 2507
+0 84
+cfn=(844)
+calls=14 0 
+0 2236
+0 42
+cfn=(2256)
+calls=2 0 
+0 46765
+0 36
+cfn=(2258)
+calls=2 0 
+0 92
+0 14
+cfn=(2260)
+calls=2 0 
+0 150
+0 20
+cfn=(2258)
+calls=2 0 
+0 134
+0 14
+cfn=(2260)
+calls=2 0 
+0 150
+0 20
+cfn=(2258)
+calls=2 0 
+0 146
+0 10
+cfn=(2262) litchi_docx::writer::section::model::PageOrientation::parse
+calls=2 0 
+0 38
+0 14
+cfn=(2264)
+calls=2 0 
+0 1118
+0 4
+cfn=(844)
+calls=2 0 
+0 70
+0 26
+cfn=(844)
+calls=4 0 
+0 140
+0 24
+cfn=(844)
+calls=4 0 
+0 720
+0 20
+cfn=(844)
+calls=2 0 
+0 70
+0 6
+cfn=(1312)
+calls=2 0 
+0 242
+0 14
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=2 255 
+0 154
+0 6
+
+ob=(2)
+fl=(155)
+fn=(650)
+4243 365
++3 730
+-3 1460
++3 365
+cfn=(790)
+calls=1860 1592 
+* 7247
++3 2190
++15 327
++1 654
++3 327
+-9 327
++9 654
++1 327
++1 327
++3 654
++1 321
++1 677
+2325 2
++36 8
++1 2
+-1 2
++1 2
++9 20
++6 6
++3 8
+2698 6
++5 2
++1 4
++3 4
++5 4
+-2 2
++2 2
+-3 2
++2 2
++4 2
+-3 2
++1 2
+-1 6
++1 2
+4335 2
+-83 38
+-1 38
++1 76
+2441 4
++8 4
++1 2
++10 4
++7 8
++8 4
+3965 238
++3 238
+-4 476
++3 238
+-1 238
++1 476
++1 476
++1 476
++2 220
++4 110
++6 110
+-6 770
++2 330
++5 110
+-4 110
++4 220
+cfn=(658)
+calls=159 1887 
+* 550
+-7 128
++6 128
+-6 896
++2 384
++5 128
+-4 128
++4 256
+cfn=(658)
+calls=189 1887 
+* 640
++1 238
+2477 8
+cfi=(188) ./malloc/./malloc/morecore.c
+cfn=(652) __glibc_morecore
+calls=3 25 
+* 88
++1 6
+-1 2
++1 2
+1912 4
+2480 2
++3 4
++38 8
++2 4
++6 2
+-6 2
++6 10
++1 12
+
+fn=(720)
+4559 2536
++11 7608
++8 1268
++2 634
++1 1902
++1 2536
++4 1268
++14 49
++53 98
+-53 98
++57 49
+-57 49
++57 98
+-2 98
++2 14
++1 7
++16 7
++1 28
+-1 42
++1 2508
+-79 1268
++12 1266
++12 4102
+cfn=(650)
+calls=2260 3790 
+* 88020
+* 586
++1 1172
++3 586
++6 1758
+-5 1
++7 1
++19 1
+-26 1
++7 1
++19 2
+-13 1
++20 2
++8 42
+-4 42
++3 42
++5 42
+-4 42
+-1 42
++5 42
+-4 42
++4 42
+-1 42
++1 126
+cfn=(726)
+calls=133 4351 
+* 4710
+* 42
+-60 68
+-1 136
++5 288
+cfn=(790)
+calls=147 1592 
+* 1014
++44 240
+-48 96
++28 585
+fi=(214) ./malloc/../string/bits/string_fortified.h
+29 585
+fe=(155)
+4637 585
+fi=(214)
+29 1170
+fe=(155)
+4638 1170
+fi=(214)
+29 585
+cob=(3) ???
+cfi=(152) ???
+cfn=(722) 0x0000000007b9a680
+calls=2259 -29 
+* 158115
+fe=(155)
+4642 3510
+cfn=(726)
+calls=2259 4351 
+* 69149
++2 1170
+-47 1
++1 1
+-2 2
+
+fn=(730) _int_free_maybe_trim
+4528 12100
++3 2200
++2 12
++3 18
++14 12100
+
+fn=(728)
+4407 8800
++7 5500
+-6 1100
++9 3300
++5 3300
++4 2200
+-1 2200
++1 2200
+1895 3300
+4433 2200
++2 61
++2 61
++1 244
++2 61
+-4 61
++4 61
+cfn=(790)
+calls=448 1592 
+* 1159
++18 2200
++6 2198
++4 821
++4 2198
++9 50
+-1 50
++2 100
++2 150
++7 2098
++1 4196
++1 1049
++2 2098
++3 6294
++4 1049
+-1 1049
++2 1049
++1 1049
++2 3147
++1 1049
+-61 1049
+-1 2098
++1 6294
+-1 1049
+cfn=(730)
+calls=3811 +83 
+* 25176
++57 50
+-1 50
++2 50
++1 50
++2 150
++1 50
+-61 50
+-1 100
++1 300
+-1 50
+cfn=(730)
+calls=653 +83 
+* 1220
++1 1
+-1 2
++1 6
+-1 1
+cfn=(730)
+calls=6 +83 
+* 34
++70 1
++1 3
++1 2
+-52 278
++1 278
+-1 278
+cfn=(790)
+calls=1231 1592 
+* 5420
++1 278
+-49 5500
+
+fn=(790)
+1592 754
++2 2262
+-2 754
++2 1508
++3 754
++3 1508
+-2 754
++2 1508
++3 754
++1 754
++1 1724
++2 80
++1 120
++3 80
++14 40
++1 40
++3 1508
+
+fl=(188)
+fn=(652)
+25 2
++1 4
+-1 4
++4 2
+cfi=(189)
+cfn=(654)
+calls=6 +8 
+* 68
++1 4
++4 4
+
+fl=(190)
+fn=(656)
+36 2
+fi=(242) ./misc/../sysdeps/unix/sysv/linux/brk_call.h
+-12 4
+fe=(190)
++13 4
++1 4
++6 2
++1 2
+
+fl=(166)
+fn=(576)
+cfi=(168)
+cfn=(598)
+calls=0 30 
+360 6732795
+
+fl=(203)
+fn=(724)
+255 8447
++1 8447
++6 8447
++1 8447
++2 2577
++1 2577
++1 2577
++3 617
++1 617
++1 617
++3 1234
++30 5870
++1 5870
++2 5405
++1 5405
++2 5310
++4 5310
++1 5133
++1 5133
++1 5132
++1 5132
++1 3452
++1 3452
++2 3452
++2 3452
+-2 1680
++2 1681
++6 177
++1 177
++1 177
++1 177
++1 177
++7 465
++1 465
++1 465
++1 465
++2 465
++17 95
++1 95
++1 95
++1 95
++1 95
++7 292
++1 292
++1 292
++1 292
++1 292
++1 292
++1 584
++5 1960
++1 1960
++5 1957
++1 1957
++2 319
++1 319
++1 319
++2 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 27
++1 54
++4 1638
++1 1638
++4 1638
++2 1638
++4 1638
++1 1638
++11 1638
++3 1638
++2 1638
++2 1638
++4 1638
++1 1638
++9 1625
++1 1625
++2 1625
++2 1625
++1 1625
++1 1625
++3 1625
++2 1625
++2 1625
++2 3250
++6 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
++1 1625
+-11 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++1 3227
++2 1625
++1 1625
++1 1625
++1 1625
++2 1625
++4 3250
++13 13
++1 13
++2 13
++1 13
++1 13
++2 13
++2 13
++2 26
++6 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 13
+-11 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
++1 110
+
+ob=(7)
+fl=(165)
+fn=(2216)
+0 44
+
+ob=(2)
+fl=(203)
+fn=(724)
+548 13
++1 13
++1 13
++1 13
++2 13
++1 26
++9 3
++7 3
++1 3
++30 3
++1 3
++4 3
++2 3
++3 3
++4 3
++1 3
++4 3
++4 3
++24 3
++2 3
++2 3
++2 3
++3 3
++1 3
++2 148043
++3 3
++2 3
++2 6
+
+ob=(7)
+fl=(165)
+fn=(2216)
+0 48
+cfn=(844)
+calls=4 0 
+0 648
+0 28
+cfn=(844)
+calls=2 0 
+0 70
+0 6
+cfn=(2238)
+calls=2 0 
+0 904
+0 18
+
+fn=(2262)
+0 38
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7)
+cfi=(165)
+cfn=(574)
+calls=0 0 
+0 6732795
+
+ob=(3)
+fl=(152)
+fn=(722)
+0 1170
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=2259 255 
+0 156945
+
+totals: 6732795

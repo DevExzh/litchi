@@ -1,0 +1,38 @@
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -295,12 +295,7 @@
+ }
+ 
+ pub(crate) fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+-    if needle.is_empty() {
+-        return Some(0);
+-    }
+-    haystack
+-        .windows(needle.len())
+-        .position(|window| window == needle)
++    memchr::memmem::find(haystack, needle)
+ }
+ #[derive(Clone, PartialEq, Eq, Hash)]
+ enum NamePattern {
+@@ -1627,3 +1622,21 @@
+         }
+     }
+ }
++
++#[cfg(test)]
++mod marker_exhaustion_test {
++    #[test]
++    fn all_marker_salts_preserve_the_exact_refusal() {
++        let hash = 0x0123_4567_89ab_cdef_u64;
++        let mut source = Vec::new();
++        for salt in u8::MIN..=u8::MAX {
++            let marker = format!("litchi-mce-active-{hash:016x}-{salt:02x}:");
++            source.extend_from_slice(marker.as_bytes());
++        }
++        assert!(matches!(
++            super::active_marker_with_hash(&source, hash),
++            Err(super::Error::NonConformant(message))
++                if message == "source XML collides with active-offset markers"
++        ));
++    }
++}

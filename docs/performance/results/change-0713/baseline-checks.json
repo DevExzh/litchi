@@ -1,0 +1,44 @@
+[
+  {
+    "name": "baseline-search-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-ooxml-common",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0713",
+      "-j",
+      "2",
+      "--lib",
+      "mce::codec::search_equivalence_tests"
+    ],
+    "exit_code": 0,
+    "seconds": 23.619235924910754,
+    "log_sha256": "b1e4dd1c55691703fa3086715b44832cac1b2d7e82abb7c5ec9adaa6b7a31feb",
+    "codec_sha256": "0eaea3751520843c05b1cdfaf2b158651fb1b13cf3fe80c4df917d7bb69f498d"
+  },
+  {
+    "name": "baseline-common-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-ooxml-common",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0713",
+      "-j",
+      "2",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 12.248111724038608,
+    "log_sha256": "3ef5a5f8b4a14e7137b98702899f8cb60686ae84f75500c68a1d37ea2b60e9d4",
+    "codec_sha256": "0eaea3751520843c05b1cdfaf2b158651fb1b13cf3fe80c4df917d7bb69f498d"
+  }
+]

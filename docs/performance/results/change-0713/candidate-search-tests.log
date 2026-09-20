@@ -1,0 +1,11 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.46s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0713/debug/deps/litchi_ooxml_common-e28769f41225b587)
+
+running 3 tests
+test mce::codec::search_equivalence_tests::larger_binary_and_mce_patterns_match_scalar_windows ... ok
+test mce::codec::marker_exhaustion_test::all_marker_salts_preserve_the_exact_refusal ... ok
+test mce::codec::search_equivalence_tests::small_binary_words_match_scalar_windows_exhaustively ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 285 filtered out; finished in 0.01s
+

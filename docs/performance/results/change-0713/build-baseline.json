@@ -1,0 +1,52 @@
+[
+  {
+    "lane": "native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0713",
+      "-j",
+      "2"
+    ],
+    "exit_code": 0,
+    "seconds": 455.59756446804386,
+    "log_sha256": "d2c773a0805cb5f5d56e8ab60684fdbbd956a43bea48b2e6ec6885657813cda2",
+    "source_manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "binary": "/home/zhuhe/code/litchi-0713-bin/baseline-native",
+    "binary_sha256": "432f47e645a44a484d4da94370da77947acdeb88e84c833464987eec13245cfa",
+    "binary_bytes": 62889656
+  },
+  {
+    "lane": "alloc",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline-alloc",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0713",
+      "-j",
+      "2",
+      "--features",
+      "allocator-metrics"
+    ],
+    "exit_code": 0,
+    "seconds": 92.88935146003496,
+    "log_sha256": "509e7a3322c83f0b6930e9088429879c3988746a716fda7d62f84317381906eb",
+    "source_manifest_sha256": "06ba06f5a3d78a3cd5866129c9ebafbec9209a9cc00adaa2eb17fd01ae5abe16",
+    "binary": "/home/zhuhe/code/litchi-0713-bin/baseline-alloc",
+    "binary_sha256": "f87150ac4143ea3fec26c9d8bfad90ef9e631d8ce8ee89f13a7a47b24c2bd34f",
+    "binary_bytes": 62989392
+  }
+]

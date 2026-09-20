@@ -1,0 +1,20 @@
+{
+  "before_captures": true,
+  "changes": [
+    "Read native/allocator sample policy from pilot plan, not mechanism plan.",
+    "Normalize analyzer binary custody for byte-exact replay after cleanup; retain exact live or witness verification.",
+    "Validate exact receipt identities/artifact names and contiguous raw profile parts.",
+    "Permit separate profile/RSS lane capture without premature final parity witness.",
+    "Compute RSS repeat spread from numeric min/max instead of stage order."
+  ],
+  "prior_freeze": {
+    "mechanism-plan.json": "fa46c9f3985f51659a7a299fc30d3fb11bec6a7cf57191e09dc7a2012d3d2c2d",
+    "mechanism.py": "4c92d8fa84b0b51cc063eae2b44910659926371ec0cdb00a8fe844b3825d3c8e",
+    "analyze_mechanism.py": "de5fae6259c4b9ae2cdfc0192b853cbe25fa1b2da53ced2d8ed02e77c3b7e133"
+  },
+  "final_freeze": {
+    "mechanism-plan.json": "fa46c9f3985f51659a7a299fc30d3fb11bec6a7cf57191e09dc7a2012d3d2c2d",
+    "mechanism.py": "4c92d8fa84b0b51cc063eae2b44910659926371ec0cdb00a8fe844b3825d3c8e",
+    "analyze_mechanism.py": "97addb151254e701c360aa91a2ffcf5012851893908c2c9a6e722aa1bd6a296b"
+  }
+}
