@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py", line 226, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py", line 211, in main
+    verify_rows(results / CANDIDATE, candidate_records, list(expected_candidate), args.expected_warmups, args.expected_samples)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py", line 155, in verify_rows
+    raise RuntimeError(f"{directory} {key}: reads {reads} outside expected bounds {bounds}")
+RuntimeError: /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/results/candidate-final ('reference-metadata-row-computed-if-matrix', 'evaluate'): reads 2 outside expected bounds (0, 0)

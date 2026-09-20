@@ -1,0 +1,374 @@
+{
+  "schema": "ods-formula-reference-metadata-native-v1",
+  "scope": {
+    "functions": [
+      "AREAS",
+      "COLUMN",
+      "COLUMNS",
+      "ISREF",
+      "ROW",
+      "ROWS",
+      "SHEET",
+      "SHEETS"
+    ],
+    "formula_rows": 32
+  },
+  "observations": [
+    {
+      "case": "areas.single_cell",
+      "function": "AREAS",
+      "formula": "of:=AREAS([.A1])",
+      "native_formula": "of:=AREAS([.A1])",
+      "native": {
+        "type": "number",
+        "value": 1
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "areas.ordered_list",
+      "function": "AREAS",
+      "formula": "of:=AREAS([.A1]~[.B2])",
+      "native_formula": "of:=AREAS([.A1]~[.B2])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "areas.three_dimensional",
+      "function": "AREAS",
+      "formula": "of:=AREAS([Data.A1:Archive.B2])",
+      "native_formula": "of:=AREAS([Data.A1:Archive.B2])",
+      "native": {
+        "type": "number",
+        "value": 1
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "areas.duplicate",
+      "function": "AREAS",
+      "formula": "of:=AREAS([.A1]~[.A1])",
+      "native_formula": "of:=AREAS([.A1]~[.A1])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "column.omitted_current",
+      "function": "COLUMN",
+      "formula": "of:=COLUMN()",
+      "native_formula": "of:=COLUMN()",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "column.vector_scalar",
+      "function": "COLUMN",
+      "formula": "of:=COLUMN([.B2:.D2])",
+      "native_formula": "of:=COLUMN([.B2:.D2])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "column.three_dimensional",
+      "function": "COLUMN",
+      "formula": "of:=COLUMN([Data.B2:Archive.D4])",
+      "native_formula": "of:=COLUMN([Data.B2:Archive.D4])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "columns.reference",
+      "function": "COLUMNS",
+      "formula": "of:=COLUMNS([.B2:.D4])",
+      "native_formula": "of:=COLUMNS([.B2:.D4])",
+      "native": {
+        "type": "number",
+        "value": 3
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "columns.array",
+      "function": "COLUMNS",
+      "formula": "of:=COLUMNS({1;2|3;4})",
+      "native_formula": "of:=COLUMNS({1;2|3;4})",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "columns.list",
+      "function": "COLUMNS",
+      "formula": "of:=COLUMNS([.A1]~[.B2])",
+      "native_formula": "of:=COLUMNS([.A1]~[.B2])",
+      "native": {
+        "type": "error",
+        "value": "Err:504"
+      },
+      "comparison": "divergence",
+      "divergence": "LibreOffice reports Err:504 for a ReferenceList where the local profile refuses the non-ReferenceList argument with #VALUE!."
+    },
+    {
+      "case": "isref.reference",
+      "function": "ISREF",
+      "formula": "of:=ISREF([.A1])",
+      "native_formula": "of:=ISREF([.A1])",
+      "native": {
+        "type": "logical",
+        "value": true
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "isref.list",
+      "function": "ISREF",
+      "formula": "of:=ISREF([.A1]~[.B2])",
+      "native_formula": "of:=ISREF([.A1]~[.B2])",
+      "native": {
+        "type": "logical",
+        "value": true
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "isref.number",
+      "function": "ISREF",
+      "formula": "of:=ISREF(42)",
+      "native_formula": "of:=ISREF(42)",
+      "native": {
+        "type": "logical",
+        "value": false
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "row.omitted_current",
+      "function": "ROW",
+      "formula": "of:=ROW()",
+      "native_formula": "of:=ROW()",
+      "native": {
+        "type": "number",
+        "value": 15
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "row.vector_scalar",
+      "function": "ROW",
+      "formula": "of:=ROW([.B2:.B4])",
+      "native_formula": "of:=ROW([.B2:.B4])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "row.three_dimensional",
+      "function": "ROW",
+      "formula": "of:=ROW([Data.B2:Archive.D4])",
+      "native_formula": "of:=ROW([Data.B2:Archive.D4])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "rows.reference",
+      "function": "ROWS",
+      "formula": "of:=ROWS([.B2:.D4])",
+      "native_formula": "of:=ROWS([.B2:.D4])",
+      "native": {
+        "type": "number",
+        "value": 3
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "rows.array",
+      "function": "ROWS",
+      "formula": "of:=ROWS({1;2|3;4})",
+      "native_formula": "of:=ROWS({1;2|3;4})",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "rows.list",
+      "function": "ROWS",
+      "formula": "of:=ROWS([.A1]~[.B2])",
+      "native_formula": "of:=ROWS([.A1]~[.B2])",
+      "native": {
+        "type": "error",
+        "value": "Err:504"
+      },
+      "comparison": "divergence",
+      "divergence": "LibreOffice reports Err:504 for a ReferenceList where the local profile refuses the non-ReferenceList argument with #VALUE!."
+    },
+    {
+      "case": "sheet.local_reference",
+      "function": "SHEET",
+      "formula": "of:=SHEET([Data.A1])",
+      "native_formula": "of:=SHEET([Data.A1])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheet.text",
+      "function": "SHEET",
+      "formula": "of:=SHEET(\"Data\")",
+      "native_formula": "of:=SHEET(\"Data\")",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheet.three_dimensional",
+      "function": "SHEET",
+      "formula": "of:=SHEET([Data.A1:Archive.B2])",
+      "native_formula": "of:=SHEET([Data.A1:Archive.B2])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheet.list",
+      "function": "SHEET",
+      "formula": "of:=SHEET([.A1]~[.B2])",
+      "native_formula": "of:=SHEET([.A1]~[.B2])",
+      "native": {
+        "type": "error",
+        "value": "Err:504"
+      },
+      "comparison": "divergence",
+      "divergence": "LibreOffice reports Err:504 for a ReferenceList where the local profile refuses the non-ReferenceList argument with #VALUE!."
+    },
+    {
+      "case": "sheets.omitted",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS()",
+      "native_formula": "of:=SHEETS()",
+      "native": {
+        "type": "number",
+        "value": 4
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheets.local_reference",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS([.A1])",
+      "native_formula": "of:=SHEETS([.A1])",
+      "native": {
+        "type": "number",
+        "value": 1
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheets.three_dimensional",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS([Data.A1:Archive.B2])",
+      "native_formula": "of:=SHEETS([Data.A1:Archive.B2])",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheets.list",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS([.A1]~[.B2])",
+      "native_formula": "of:=SHEETS([.A1]~[.B2])",
+      "native": {
+        "type": "error",
+        "value": "Err:504"
+      },
+      "comparison": "divergence",
+      "divergence": "LibreOffice reports Err:504 for a ReferenceList where the local profile refuses the non-ReferenceList argument with #VALUE!."
+    },
+    {
+      "case": "sheet.current",
+      "function": "SHEET",
+      "formula": "of:=SHEET()",
+      "native_formula": "of:=SHEET()",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheets.document",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS()",
+      "native_formula": "of:=SHEETS()",
+      "native": {
+        "type": "number",
+        "value": 4
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "column.current",
+      "function": "COLUMN",
+      "formula": "of:=COLUMN()",
+      "native_formula": "of:=COLUMN()",
+      "native": {
+        "type": "number",
+        "value": 2
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheet.current",
+      "function": "SHEET",
+      "formula": "of:=SHEET()",
+      "native_formula": "of:=SHEET()",
+      "native": {
+        "type": "number",
+        "value": 3
+      },
+      "comparison": "exact"
+    },
+    {
+      "case": "sheets.document",
+      "function": "SHEETS",
+      "formula": "of:=SHEETS()",
+      "native_formula": "of:=SHEETS()",
+      "native": {
+        "type": "number",
+        "value": 4
+      },
+      "comparison": "exact"
+    }
+  ]
+}

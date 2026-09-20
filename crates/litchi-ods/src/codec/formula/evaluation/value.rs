@@ -186,6 +186,7 @@ mod matrix;
 mod order;
 mod owned;
 mod paired;
+mod reference_metadata;
 mod references;
 mod scalar;
 mod statistical;
@@ -944,7 +945,8 @@ impl<'a> Evaluated<'a> {
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Areas(_) => None,
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => None,
         }
     }
 
@@ -964,7 +966,8 @@ impl<'a> Evaluated<'a> {
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_)
-            | RuntimeValue::Areas(_) => None,
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => None,
         }
     }
 
@@ -980,7 +983,8 @@ impl<'a> Evaluated<'a> {
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Array(_) => None,
+            | RuntimeValue::Array(_)
+            | RuntimeValue::SourceReference => None,
         }
     }
 
@@ -1333,6 +1337,11 @@ enum RuntimeValue<'a> {
     Scalar(WorkingValue<'a>),
     Array(RuntimeArrayValue<'a>),
     Areas(RuntimeAreaSet<'a>),
+    /// A source-qualified reference whose identity is known without an
+    /// external provider.  Metadata functions may inspect this marker (ISREF)
+    /// or reject it at their own syntax boundary (SHEET/SHEETS); ordinary
+    /// value consumers must retain the typed external-reference refusal.
+    SourceReference,
     /// A scalar-demand reference token.  The cell geometry is retained until
     /// its consuming operation projects it, which preserves sibling resolver
     /// ordering without allocating first-class reference metadata vectors.
@@ -1407,7 +1416,7 @@ impl<'a> RuntimeValue<'a> {
             // The evaluator consumes this private token before constructing
             // `Evaluated`; keep a defensive projection for any future frame
             // path that reaches the borrowed inspection boundary.
-            Self::ScalarCell(_) => Value::Error(ScalarError::Value),
+            Self::ScalarCell(_) | Self::SourceReference => Value::Error(ScalarError::Value),
             Self::Array(array) => Value::Array(ArrayView {
                 shape: array.shape,
                 cells: &array.cells,
@@ -1432,7 +1441,8 @@ impl<'a> RuntimeValue<'a> {
             | Self::Missing
             | Self::Scalar(_)
             | Self::ScalarCell(_)
-            | Self::Areas(_) => None,
+            | Self::Areas(_)
+            | Self::SourceReference => None,
         }
     }
 }
@@ -1509,6 +1519,10 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     resolver: &'expr R,
     execution: &'exec ExecutionContext,
     position: Position<'position>,
+    /// The explicit formula position remains fixed while a matrix result is
+    /// projected over output coordinates.  No-argument metadata functions
+    /// use this context, rather than the transient per-cell position.
+    formula_position: Position<'position>,
     mode: Mode,
     /// When a lazy matrix branch is evaluated, this is the outer matrix
     /// point currently being requested.  Scalar projection normally chooses
@@ -1532,6 +1546,12 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     argument_contexts: Vec<SavedValueContext<'expr, 'position>>,
     argument_context_reservation: Option<Reservation>,
     matrix: Option<MatrixState<'expr, 'position>>,
+    /// A metadata argument can inspect a source-qualified reference's kind
+    /// without asking an external provider to resolve it.  Keep these modes
+    /// scoped to the argument context so ordinary consumers retain the typed
+    /// external-reference refusal.
+    reference_kind_only: bool,
+    reject_source_reference: bool,
     shape_frames: Vec<ShapeFrame<'expr>>,
     shape_values: Vec<Option<Shape>>,
     shape_frame_reservation: Option<Reservation>,
@@ -1575,6 +1595,10 @@ enum ValueFrame<'a> {
     /// uses this to consume one `[0,0]` input element rather than invoking a
     /// separate matrix call for every output element.
     VisitScalarArgument(super::Node<'a>),
+    /// Visit a complete metadata argument while applying one source-reference
+    /// policy: `true` means ISREF kind inspection, `false` means the SHEET /
+    /// SHEETS source-location formula refusal.
+    VisitReferenceMetadataArgument(super::Node<'a>, bool),
     /// Restore the context saved by one of the argument-entry frames.
     RestoreArgumentContext,
     Apply(super::Node<'a>),
@@ -1584,8 +1608,16 @@ enum ValueFrame<'a> {
         node: super::Node<'a>,
         function: MatrixFunction,
     },
-    IfAfterCondition(super::Node<'a>),
-    IfErrorAfterValue(super::Node<'a>),
+    IfAfterCondition {
+        node: super::Node<'a>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    },
+    IfErrorAfterValue {
+        node: super::Node<'a>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    },
     MatrixStep,
     MatrixCollect,
     FinishArray {
@@ -1609,6 +1641,8 @@ struct SavedValueContext<'expr, 'position> {
     position: Position<'position>,
     projection: Option<(Shape, usize)>,
     matrix: Option<MatrixState<'expr, 'position>>,
+    reference_kind_only: bool,
+    reject_source_reference: bool,
 }
 
 /// A nested value probe may force array evaluation and enter another shape
@@ -1769,6 +1803,28 @@ enum ReferenceShapeFrame<'a> {
     },
 }
 
+/// Outcomes that are private to the descriptor-shape probe. `Deferred`
+/// means unknown geometry. `Refused` marks a computed array that cannot be
+/// consumed by a reference operator; only metadata discovery may defer it
+/// to ordinary value evaluation. Provider failures continue through
+/// `EvaluationFailure` and are never reclassified from their public kind.
+enum ReferenceShapeOutcome<'a> {
+    Resolved(Option<RuntimeValue<'a>>),
+    Deferred,
+    Refused,
+}
+
+enum ReferenceShapeStepError {
+    Deferred,
+    Evaluation(EvaluationFailure),
+}
+
+impl From<EvaluationFailure> for ReferenceShapeStepError {
+    fn from(error: EvaluationFailure) -> Self {
+        Self::Evaluation(error)
+    }
+}
+
 /// Temporary stacks for reference geometry evaluation.
 ///
 /// The vector is declared before its reservation so struct-field drop order
@@ -1796,6 +1852,8 @@ impl<'a> ReferenceShapeScratch<'a> {
 enum ReferenceOperandKind {
     Scalar,
     Reference,
+    /// An admitted metadata descriptor, never an array of external values.
+    SourceReference,
     ReferenceList,
     Array,
     Error(ScalarError),
@@ -1887,6 +1945,7 @@ where
             resolver,
             execution: context.execution,
             position: context.position,
+            formula_position: context.position,
             mode: context.mode,
             projection: None,
             limits,
@@ -1899,6 +1958,8 @@ where
             argument_contexts: Vec::new(),
             argument_context_reservation: None,
             matrix: None,
+            reference_kind_only: false,
+            reject_source_reference: false,
             shape_frames: Vec::new(),
             shape_values: Vec::new(),
             shape_frame_reservation: None,
@@ -1956,6 +2017,9 @@ where
                 },
                 ValueFrame::VisitCompleteArgument(node) => self.visit_complete_argument(node)?,
                 ValueFrame::VisitScalarArgument(node) => self.visit_scalar_argument(node)?,
+                ValueFrame::VisitReferenceMetadataArgument(node, is_ref) => {
+                    self.visit_reference_metadata_argument(node, is_ref)?
+                },
                 ValueFrame::RestoreArgumentContext => self.restore_argument_context()?,
                 ValueFrame::Apply(node) => self.apply(node)?,
                 ValueFrame::ApplyForecastQuery(node) => {
@@ -1965,8 +2029,16 @@ where
                 ValueFrame::ApplyMatrix { node, function } => {
                     self.apply_matrix_function(node, function)?
                 },
-                ValueFrame::IfAfterCondition(node) => self.finish_if(node)?,
-                ValueFrame::IfErrorAfterValue(node) => self.finish_if_error(node)?,
+                ValueFrame::IfAfterCondition {
+                    node,
+                    reference_kind_only,
+                    reject_source_reference,
+                } => self.finish_if(node, reference_kind_only, reject_source_reference)?,
+                ValueFrame::IfErrorAfterValue {
+                    node,
+                    reference_kind_only,
+                    reject_source_reference,
+                } => self.finish_if_error(node, reference_kind_only, reject_source_reference)?,
                 ValueFrame::MatrixStep => self.matrix_step()?,
                 ValueFrame::MatrixCollect => self.matrix_collect()?,
                 ValueFrame::FinishArray {
@@ -2043,6 +2115,9 @@ where
             RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Err(
                 EvaluationFailure::Unsupported(super::UnsupportedKind::Array),
             ),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -2061,6 +2136,9 @@ where
                 self.element_to_runtime(element)
             },
             RuntimeValue::Areas(areas) => self.project_area_value(&areas),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -2287,6 +2365,11 @@ where
                 })
             },
             super::Kind::Prefix(_) | super::Kind::Postfix(_) => {
+                // A unary numeric/text operation cannot preserve a reference
+                // descriptor.  Metadata source policies apply only while a
+                // descriptor-producing expression is being inspected.
+                self.reference_kind_only = false;
+                self.reject_source_reference = false;
                 let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                     "unary value node has no child",
                 ))?;
@@ -2298,6 +2381,12 @@ where
                 })
             },
             super::Kind::Infix(operator) => {
+                // Reference operators still require external geometry and do
+                // not preserve a source descriptor as a final metadata
+                // operand.  A source nested in `:`, `!`, or `~` therefore
+                // retains the normal typed provider refusal.
+                self.reference_kind_only = false;
+                self.reject_source_reference = false;
                 let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                     "infix value node has no left child",
                 ))?;
@@ -2392,6 +2481,25 @@ where
         self.visit_complete_argument(node)
     }
 
+    fn visit_reference_metadata_argument(
+        &mut self,
+        node: super::Node<'expr>,
+        is_ref: bool,
+    ) -> EvaluationResult<()> {
+        let mode = if self.projection.is_some() {
+            Mode::Matrix
+        } else {
+            self.mode
+        };
+        self.enter_argument_context(node, mode)?;
+        if is_ref {
+            self.reference_kind_only = true;
+        } else {
+            self.reject_source_reference = true;
+        }
+        Ok(())
+    }
+
     fn matrix_scalar_parameter(
         &mut self,
         value: RuntimeValue<'expr>,
@@ -2461,10 +2569,14 @@ where
             position: self.position,
             projection: self.projection,
             matrix: self.matrix.take(),
+            reference_kind_only: self.reference_kind_only,
+            reject_source_reference: self.reject_source_reference,
         };
         self.argument_contexts.push(saved);
         self.mode = mode;
         self.projection = None;
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
         self.frames.push(ValueFrame::RestoreArgumentContext);
         self.frames.push(ValueFrame::VisitArgument(node));
         Ok(())
@@ -2481,6 +2593,8 @@ where
         self.position = saved.position;
         self.projection = saved.projection;
         self.matrix = saved.matrix;
+        self.reference_kind_only = saved.reference_kind_only;
+        self.reject_source_reference = saved.reject_source_reference;
         Ok(())
     }
 
@@ -2571,6 +2685,8 @@ where
     fn visit_function(&mut self, node: super::Node<'expr>, name: &str) -> EvaluationResult<()> {
         self.scalar.charge_bytes(name.len())?;
         if let Some(function) = Self::matrix_function(name) {
+            self.reference_kind_only = false;
+            self.reject_source_reference = false;
             return self.visit_matrix_function(node, function);
         }
         if database::is_database_function(name)
@@ -2588,7 +2704,15 @@ where
             let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                 "IF condition is missing",
             ))?;
-            self.push_frame(ValueFrame::IfAfterCondition(node))?;
+            let reference_kind_only = self.reference_kind_only;
+            let reject_source_reference = self.reject_source_reference;
+            self.reference_kind_only = false;
+            self.reject_source_reference = false;
+            self.push_frame(ValueFrame::IfAfterCondition {
+                node,
+                reference_kind_only,
+                reject_source_reference,
+            })?;
             return self.push_frame(ValueFrame::VisitArgument(condition));
         }
         if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
@@ -2598,7 +2722,11 @@ where
             let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                 "error handler value is missing",
             ))?;
-            self.push_frame(ValueFrame::IfErrorAfterValue(node))?;
+            self.push_frame(ValueFrame::IfErrorAfterValue {
+                node,
+                reference_kind_only: self.reference_kind_only,
+                reject_source_reference: self.reject_source_reference,
+            })?;
             return self.push_frame(ValueFrame::VisitArgument(value));
         }
 
@@ -2607,6 +2735,19 @@ where
                 return self.push_scalar(WorkingValue::Error(ScalarError::Value));
             }
         }
+        if let Some(function) = super::reference_metadata::Function::from_name(name) {
+            if !function.valid_arity(node.child_count()) {
+                return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+            }
+        }
+
+        // Ordinary functions consume values or arrays rather than preserving
+        // a reference descriptor.  Nested IF/IFERROR are handled above and
+        // retain the metadata policy only for their selected descriptor
+        // branches; all other nested calls must retain the normal typed
+        // external-reference refusal.
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
 
         // A coordinate-independent sequence aggregate may sit inside an
         // array-producing branch. Its arguments normally belong to the eager
@@ -2624,6 +2765,7 @@ where
             || descriptive::is_descriptive_function(name)
             || paired::is_paired_function(name)
             || order::is_order_function(name)
+            || reference_metadata::is_reference_metadata_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
@@ -2661,6 +2803,21 @@ where
                 ValueFrame::VisitMatrixArgument(child)
             } else if order::is_order_function(name) && order::matrix_argument(name, index, child) {
                 ValueFrame::VisitMatrixArgument(child)
+            } else if reference_metadata::is_reference_metadata_function(name) {
+                // Reference metadata consumes descriptors rather than cell
+                // values. Keep a direct or computed reference complete while
+                // a lazy matrix branch is projected; the reducer itself
+                // selects one generated axis element when required.
+                match super::reference_metadata::Function::from_name(name) {
+                    Some(super::reference_metadata::Function::IsRef) => {
+                        ValueFrame::VisitReferenceMetadataArgument(child, true)
+                    },
+                    Some(
+                        super::reference_metadata::Function::Sheet
+                        | super::reference_metadata::Function::Sheets,
+                    ) => ValueFrame::VisitReferenceMetadataArgument(child, false),
+                    _ => ValueFrame::VisitCompleteArgument(child),
+                }
             } else if name.eq_ignore_ascii_case("TYPE") || name.eq_ignore_ascii_case("N") {
                 ValueFrame::VisitCompleteArgument(child)
             } else if (statistical::is_statistical_function(name)
@@ -2752,8 +2909,18 @@ where
         Ok(())
     }
 
-    fn finish_if(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+    fn finish_if(
+        &mut self,
+        node: super::Node<'expr>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    ) -> EvaluationResult<()> {
         let raw_condition = self.pop_value()?;
+        // The condition was evaluated with metadata source handling disabled;
+        // only the selected branch may produce the descriptor inspected by
+        // ISREF or rejected by SHEET/SHEETS.
+        self.reference_kind_only = reference_kind_only;
+        self.reject_source_reference = reject_source_reference;
         if self.mode == Mode::Matrix && raw_condition.is_array_like() {
             return self.start_matrix_if(node, raw_condition);
         }
@@ -2782,8 +2949,21 @@ where
         }
     }
 
-    fn finish_if_error(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+    fn finish_if_error(
+        &mut self,
+        node: super::Node<'expr>,
+        reference_kind_only: bool,
+        reject_source_reference: bool,
+    ) -> EvaluationResult<()> {
         let raw_value = self.pop_value()?;
+        self.reference_kind_only = reference_kind_only;
+        self.reject_source_reference = reject_source_reference;
+        // A source descriptor admitted by a metadata argument is a reference,
+        // not an error to catch or a cell value to dereference. Keep its
+        // identity until the metadata consumer applies its source constraint.
+        if matches!(raw_value, RuntimeValue::SourceReference) {
+            return self.push_value(raw_value);
+        }
         if self.mode == Mode::Matrix && raw_value.is_array_like() {
             return self.start_matrix_if_error(node, raw_value);
         }
@@ -2812,6 +2992,10 @@ where
         node: super::Node<'expr>,
         condition: RuntimeValue<'expr>,
     ) -> EvaluationResult<()> {
+        // Matrix branches publish cell values, not reference descriptors.
+        // A source reference here requires the unsupported external provider.
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
         let condition = self.materialize_for_array(condition)?;
         let RuntimeValue::Array(condition) = condition else {
             return self.push_scalar(WorkingValue::Error(ScalarError::Value));
@@ -2888,6 +3072,8 @@ where
         node: super::Node<'expr>,
         value: RuntimeValue<'expr>,
     ) -> EvaluationResult<()> {
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
         let value = self.materialize_for_array(value)?;
         let RuntimeValue::Array(value) = value else {
             return self.push_scalar(WorkingValue::Error(ScalarError::Value));
@@ -3172,6 +3358,16 @@ where
             {
                 self.cacheable_matrix_branch(node)
             },
+            // ROW/COLUMN can depend on the projected output coordinate and
+            // SHEET/SHEETS may consult the current workbook position. Keep
+            // their coordinate-sensitive forms out of the demand cache while
+            // allowing the metadata classifier below to admit invariant
+            // scalar payloads.
+            super::Kind::Function { name }
+                if let Some(function) = super::reference_metadata::Function::from_name(name) =>
+            {
+                reference_metadata::cacheable_branch(self, node, function)
+            },
             super::Kind::Function { name } if super::inspection::is_inspection_function(name) => {
                 if name.eq_ignore_ascii_case("TYPE")
                     && node.child_count() == 1
@@ -3299,6 +3495,7 @@ where
                         // this cache even when their reference geometry is fixed.
                         if super::text::is_text_function(name)
                             || super::inspection::is_inspection_function(name)
+                            || reference_metadata::is_reference_metadata_function(name)
                         {
                             return Ok(false);
                         }
@@ -3495,6 +3692,13 @@ where
                         // result across projected positions.
                         return Ok(false);
                     }
+                    if reference_metadata::is_reference_metadata_function(name) {
+                        // A metadata reducer has its own complete argument
+                        // propagation rules; nested calls are conservative
+                        // criterion expressions unless their outer branch is
+                        // classified directly.
+                        return Ok(false);
+                    }
                     let full_arguments = aggregate::is_aggregate_function(name)
                         || name.eq_ignore_ascii_case("TYPE")
                         || statistical::is_statistical_function(name)
@@ -3643,7 +3847,8 @@ where
             RuntimeValue::Scalar(WorkingValue::Text(_))
             | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_)
-            | RuntimeValue::Areas(_) => return Ok(()),
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => return Ok(()),
         };
         let (index, present) = self.demand_cache_position(node)?;
         if present {
@@ -3858,7 +4063,10 @@ where
             },
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ConditionCacheValue::Error(*error),
             RuntimeValue::Scalar(WorkingValue::Complex(_)) => return Ok(()),
-            RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
+            RuntimeValue::ScalarCell(_)
+            | RuntimeValue::Array(_)
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => {
                 return Ok(());
             },
         };
@@ -3893,6 +4101,10 @@ where
     }
 
     fn matrix_step(&mut self) -> EvaluationResult<()> {
+        // Each selected cell starts in value context, independently of the
+        // function or metadata argument evaluated for the previous cell.
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
         let mut matrix = self
             .matrix
             .take()
@@ -4134,6 +4346,41 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
+                        if let Some(function) = super::reference_metadata::Function::from_name(name)
+                        {
+                            if !function.valid_arity(node.child_count()) {
+                                self.push_shape_value(Some(Shape::new(1, 1)?))?;
+                                continue;
+                            }
+                            let shape = reference_metadata::shape_base(self, node, function)?;
+                            if let Some(shape) = shape {
+                                self.push_shape_value(Some(shape))?;
+                                continue;
+                            }
+                            // A computed SHEET argument can itself be
+                            // matrix-valued.  Preserve that shape by
+                            // traversing the argument with the ordinary
+                            // planner; the metadata reducer still publishes
+                            // sheet numbers elementwise at runtime.
+                            let children = node.child_count();
+                            self.push_shape_frame(ShapeFrame::Exit {
+                                node,
+                                children,
+                                base: None,
+                            })?;
+                            for index in (0..children).rev() {
+                                let child = node.child(index).ok_or(
+                                    EvaluationFailure::InvalidExpression(
+                                        "metadata shape argument is missing",
+                                    ),
+                                )?;
+                                self.push_shape_frame(ShapeFrame::Enter {
+                                    node: child,
+                                    demand,
+                                })?;
+                            }
+                            continue;
+                        }
                         let order_function = super::order::OrderFunction::from_name(name);
                         let paired_function = super::paired::PairedFunction::from_name(name);
                         if order_function.is_some() || paired_function.is_some() {
@@ -4367,11 +4614,8 @@ where
         // first-element and coercion rules as final evaluation.  The probe
         // uses the bounded, isolated probe path without constructing a
         // second evaluator.
-        let value = match self.evaluate_matrix_value(argument) {
-            Ok(value) => self.matrix_scalar_parameter(value)?,
-            Err(EvaluationFailure::Unsupported(_)) => return Ok(None),
-            Err(error) => return Err(error),
-        };
+        let value = self.evaluate_matrix_value(argument)?;
+        let value = self.matrix_scalar_parameter(value)?;
         let RuntimeValue::Scalar(WorkingValue::Number(value)) = value else {
             return Ok(Some(Shape::new(1, 1)?));
         };
@@ -4475,10 +4719,10 @@ where
     /// unselected branches are never visited.  A list or a multi-plane result
     /// has no unambiguous broadcast shape and is deliberately left unknown for
     /// the normal reference path.
-    fn reference_shape_value(
+    fn reference_shape_probe_value(
         &mut self,
         root: super::Node<'expr>,
-    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
+    ) -> EvaluationResult<ReferenceShapeOutcome<'expr>> {
         let mut scratch = ReferenceShapeScratch::new();
         ensure_capacity(
             &mut scratch.frames,
@@ -4511,14 +4755,13 @@ where
                         scratch.frames.push(ReferenceShapeFrame::Visit(child));
                     },
                     super::Kind::Reference(reference) => {
-                        let value = match self.reference_value(reference) {
-                            Ok(value) => value,
-                            Err(EvaluationFailure::Unsupported(
-                                super::UnsupportedKind::Reference
-                                | super::UnsupportedKind::ReferenceOperator,
-                            )) => return Ok(None),
-                            Err(error) => return Err(error),
-                        };
+                        if matches!(reference, Reference::Source { .. })
+                            && !self.reference_kind_only
+                            && !self.reject_source_reference
+                        {
+                            return Ok(ReferenceShapeOutcome::Deferred);
+                        }
+                        let value = self.reference_value(reference)?;
                         ensure_capacity(
                             &mut scratch.values,
                             &mut scratch.value_reservation,
@@ -4531,14 +4774,20 @@ where
                         scratch.values.push(value);
                     },
                     super::Kind::Function { name } if Self::is_reference_value_handler(name) => {
-                        self.schedule_reference_handler(
+                        match self.schedule_reference_handler(
                             node,
                             name,
                             &mut scratch.frames,
                             &mut scratch.frame_reservation,
                             &mut scratch.values,
                             &mut scratch.value_reservation,
-                        )?;
+                        ) {
+                            Ok(()) => {},
+                            Err(ReferenceShapeStepError::Deferred) => {
+                                return Ok(ReferenceShapeOutcome::Refused);
+                            },
+                            Err(ReferenceShapeStepError::Evaluation(error)) => return Err(error),
+                        }
                     },
                     super::Kind::Infix(operator)
                         if matches!(
@@ -4567,7 +4816,7 @@ where
                         scratch.frames.push(ReferenceShapeFrame::Visit(right));
                         scratch.frames.push(ReferenceShapeFrame::Visit(left));
                     },
-                    _ => return Ok(None),
+                    _ => return Ok(ReferenceShapeOutcome::Deferred),
                 },
                 ReferenceShapeFrame::Apply(operator) => {
                     let right =
@@ -4583,6 +4832,16 @@ where
                         .ok_or(EvaluationFailure::InvalidExpression(
                             "reference shape left value is missing",
                         ))?;
+                    // A non-reference operand is the probe's own typed
+                    // refusal. Once both operands are retained references,
+                    // every error from the operator is allowed to bubble so
+                    // a resolver's `Unsupported(ReferenceOperator)` cannot
+                    // be mistaken for probe deferral.
+                    if !Self::reference_operator_operand(&left)
+                        || !Self::reference_operator_operand(&right)
+                    {
+                        return Ok(ReferenceShapeOutcome::Deferred);
+                    }
                     let value = match operator {
                         super::InfixOperator::Range => self.combine_range(left, right),
                         super::InfixOperator::Intersection => self.intersect_ranges(left, right),
@@ -4593,14 +4852,7 @@ where
                             ));
                         },
                     };
-                    let value = match value {
-                        Ok(value) => value,
-                        Err(EvaluationFailure::Unsupported(
-                            super::UnsupportedKind::Reference
-                            | super::UnsupportedKind::ReferenceOperator,
-                        )) => return Ok(None),
-                        Err(error) => return Err(error),
-                    };
+                    let value = value?;
                     ensure_capacity(
                         &mut scratch.values,
                         &mut scratch.value_reservation,
@@ -4639,13 +4891,19 @@ where
                             if !catches_not_available || *error == ScalarError::NotAvailable
                     );
                     if caught {
-                        self.push_reference_value(
+                        match self.push_reference_value(
                             alternative,
                             &mut scratch.frames,
                             &mut scratch.frame_reservation,
                             &mut scratch.values,
                             &mut scratch.value_reservation,
-                        )?;
+                        ) {
+                            Ok(()) => {},
+                            Err(ReferenceShapeStepError::Deferred) => {
+                                return Ok(ReferenceShapeOutcome::Refused);
+                            },
+                            Err(ReferenceShapeStepError::Evaluation(error)) => return Err(error),
+                        }
                     } else {
                         ensure_capacity(
                             &mut scratch.values,
@@ -4666,13 +4924,33 @@ where
                 "reference shape evaluator did not produce one value",
             ));
         }
-        Ok(scratch.values.pop())
+        Ok(ReferenceShapeOutcome::Resolved(scratch.values.pop()))
+    }
+
+    /// Resolve reference geometry for the existing shared shape callers.
+    /// Internal probe refusal remains an ordinary unknown shape here, while
+    /// provider failures preserve their original typed error.
+    fn reference_shape_value(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
+        match self.reference_shape_probe_value(root)? {
+            ReferenceShapeOutcome::Deferred => Ok(None),
+            ReferenceShapeOutcome::Refused => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::ReferenceOperator,
+            )),
+            ReferenceShapeOutcome::Resolved(value) => Ok(value),
+        }
     }
 
     fn is_reference_value_handler(name: &str) -> bool {
         name.eq_ignore_ascii_case("IF")
             || name.eq_ignore_ascii_case("IFERROR")
             || name.eq_ignore_ascii_case("IFNA")
+    }
+
+    fn reference_operator_operand(value: &RuntimeValue<'_>) -> bool {
+        matches!(value, RuntimeValue::Areas(_)) || is_reference_error(value)
     }
 
     fn reference_candidate(&mut self, mut node: super::Node<'expr>) -> EvaluationResult<bool> {
@@ -4735,6 +5013,7 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_) => ReferenceOperandKind::Scalar,
+            RuntimeValue::SourceReference => ReferenceOperandKind::SourceReference,
         }
     }
 
@@ -4808,20 +5087,18 @@ where
                             ReferenceOperandKind::Array,
                         )?,
                     super::Kind::Reference(reference) => {
-                        let value = match self.reference_value(reference) {
-                            Ok(value) => value,
-                            Err(EvaluationFailure::Unsupported(
-                                super::UnsupportedKind::Reference,
-                            )) => {
-                                self.push_reference_kind_value(
-                                    &mut scratch.values,
-                                    &mut scratch.value_reservation,
-                                    ReferenceOperandKind::Unknown,
-                                )?;
-                                continue;
-                            },
-                            Err(error) => return Err(error),
-                        };
+                        if matches!(reference, Reference::Source { .. })
+                            && !self.reference_kind_only
+                            && !self.reject_source_reference
+                        {
+                            self.push_reference_kind_value(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                ReferenceOperandKind::Unknown,
+                            )?;
+                            continue;
+                        }
+                        let value = self.reference_value(reference)?;
                         self.push_reference_kind_runtime(
                             &mut scratch.values,
                             &mut scratch.value_reservation,
@@ -4950,6 +5227,16 @@ where
                             )?;
                             continue;
                         }
+                        if let Some(function) = super::reference_metadata::Function::from_name(name)
+                            && !function.valid_arity(count)
+                        {
+                            self.push_reference_kind_value(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                ReferenceOperandKind::Error(ScalarError::Value),
+                            )?;
+                            continue;
+                        }
                         self.push_reference_kind_frame(
                             &mut scratch.frames,
                             &mut scratch.frame_reservation,
@@ -5031,16 +5318,7 @@ where
                                         },
                                         _ => unreachable!("checked reference operator"),
                                     };
-                                    match result {
-                                        Ok(value) => ReferenceKindValue::Runtime(value),
-                                        Err(EvaluationFailure::Unsupported(
-                                            super::UnsupportedKind::Reference
-                                            | super::UnsupportedKind::ReferenceOperator,
-                                        )) => {
-                                            ReferenceKindValue::Known(ReferenceOperandKind::Unknown)
-                                        },
-                                        Err(error) => return Err(error),
-                                    }
+                                    ReferenceKindValue::Runtime(result?)
                                 },
                                 _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
                             },
@@ -5090,10 +5368,19 @@ where
                 },
                 ReferenceKindFrame::Function { node, name, count } => {
                     let mut kind = ReferenceOperandKind::Scalar;
+                    let metadata_function = super::reference_metadata::Function::from_name(name);
+                    let mut metadata_argument = None;
                     let order_function = super::order::OrderFunction::from_name(name);
                     let paired_function = super::paired::PairedFunction::from_name(name);
                     for index in (0..count).rev() {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
+                        if metadata_function.is_some() {
+                            if index == 0 {
+                                metadata_argument =
+                                    Some(Self::reference_kind_value_into_kind(child));
+                            }
+                            continue;
+                        }
                         if order_function.is_some_and(|function| function.data_argument(index))
                             || paired_function.is_some_and(|function| function.data_argument(index))
                         {
@@ -5143,7 +5430,9 @@ where
                             _ => ReferenceOperandKind::Scalar,
                         };
                     }
-                    if let Some(function) = Self::matrix_function(name) {
+                    if let Some(function) = metadata_function {
+                        kind = reference_metadata::reference_kind(function, metadata_argument);
+                    } else if let Some(function) = Self::matrix_function(name) {
                         kind = match function {
                             MatrixFunction::Determinant => ReferenceOperandKind::Scalar,
                             MatrixFunction::Inverse
@@ -5247,6 +5536,14 @@ where
                 ReferenceKindFrame::IfErrorAfterValue { node } => {
                     let value_value = self.pop_reference_kind_value(&mut scratch.values)?;
                     let value_kind = Self::reference_kind_value_kind(&value_value);
+                    if value_kind == ReferenceOperandKind::SourceReference {
+                        self.push_reference_kind_entry(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            value_value,
+                        )?;
+                        continue;
+                    }
                     if value_kind == ReferenceOperandKind::ReferenceList {
                         let alternative =
                             node.child(1).ok_or(EvaluationFailure::InvalidExpression(
@@ -5449,13 +5746,11 @@ where
         frame_reservation: &mut Option<Reservation>,
         values: &mut Vec<RuntimeValue<'expr>>,
         value_reservation: &mut Option<Reservation>,
-    ) -> EvaluationResult<()> {
+    ) -> Result<(), ReferenceShapeStepError> {
         if node.is_missing() {
-            return self.push_reference_runtime_value(
-                RuntimeValue::Empty,
-                values,
-                value_reservation,
-            );
+            return self
+                .push_reference_runtime_value(RuntimeValue::Empty, values, value_reservation)
+                .map_err(Into::into);
         }
         // Resolve a selected matrix function once in array mode.  Its
         // runtime result, rather than its declared function family, decides
@@ -5465,19 +5760,17 @@ where
         if self.direct_matrix_function(node)?.is_some() {
             let value = self.evaluate_matrix_value(node)?;
             if value.is_array_like() {
-                return Err(EvaluationFailure::Unsupported(
-                    super::UnsupportedKind::ReferenceOperator,
-                ));
+                return Err(ReferenceShapeStepError::Deferred);
             }
-            return self.push_reference_runtime_value(value, values, value_reservation);
+            return self
+                .push_reference_runtime_value(value, values, value_reservation)
+                .map_err(Into::into);
         }
         if matches!(
             self.reference_handler_operand_kind(node)?,
             ReferenceOperandKind::Array
         ) {
-            return Err(EvaluationFailure::Unsupported(
-                super::UnsupportedKind::ReferenceOperator,
-            ));
+            return Err(ReferenceShapeStepError::Deferred);
         }
         if self.reference_candidate(node)? {
             ensure_capacity(
@@ -5494,6 +5787,7 @@ where
         }
         let value = self.evaluate_scalar_at(node, Shape::new(1, 1)?, 0)?;
         self.push_reference_runtime_value(value, values, value_reservation)
+            .map_err(Into::into)
     }
 
     fn push_reference_runtime_value(
@@ -5523,15 +5817,17 @@ where
         frame_reservation: &mut Option<Reservation>,
         values: &mut Vec<RuntimeValue<'expr>>,
         value_reservation: &mut Option<Reservation>,
-    ) -> EvaluationResult<()> {
+    ) -> Result<(), ReferenceShapeStepError> {
         let count = node.child_count();
         if name.eq_ignore_ascii_case("IF") {
             if !(1..=3).contains(&count) {
-                return self.push_reference_runtime_value(
-                    RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
-                    values,
-                    value_reservation,
-                );
+                return self
+                    .push_reference_runtime_value(
+                        RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
+                        values,
+                        value_reservation,
+                    )
+                    .map_err(Into::into);
             }
             let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                 "reference IF condition is missing",
@@ -5540,38 +5836,42 @@ where
                 self.reference_handler_operand_kind(condition)?,
                 ReferenceOperandKind::Array | ReferenceOperandKind::Reference
             ) {
-                return Err(EvaluationFailure::Unsupported(
-                    super::UnsupportedKind::ReferenceOperator,
-                ));
+                return Err(ReferenceShapeStepError::Deferred);
             }
             let condition = self.evaluate_scalar_at(condition, Shape::new(1, 1)?, 0)?;
             let condition = match self.scalar_logical(condition)? {
                 Ok(value) => value,
                 Err(error) => {
-                    return self.push_reference_runtime_value(
-                        RuntimeValue::Scalar(WorkingValue::Error(error)),
-                        values,
-                        value_reservation,
-                    );
+                    return self
+                        .push_reference_runtime_value(
+                            RuntimeValue::Scalar(WorkingValue::Error(error)),
+                            values,
+                            value_reservation,
+                        )
+                        .map_err(Into::into);
                 },
             };
             if count == 1 {
-                return self.push_reference_runtime_value(
-                    RuntimeValue::Scalar(WorkingValue::Logical(condition)),
-                    values,
-                    value_reservation,
-                );
+                return self
+                    .push_reference_runtime_value(
+                        RuntimeValue::Scalar(WorkingValue::Logical(condition)),
+                        values,
+                        value_reservation,
+                    )
+                    .map_err(Into::into);
             }
             let branch = if condition {
                 node.child(1)
             } else if count == 3 {
                 node.child(2)
             } else {
-                return self.push_reference_runtime_value(
-                    RuntimeValue::Scalar(WorkingValue::Logical(false)),
-                    values,
-                    value_reservation,
-                );
+                return self
+                    .push_reference_runtime_value(
+                        RuntimeValue::Scalar(WorkingValue::Logical(false)),
+                        values,
+                        value_reservation,
+                    )
+                    .map_err(Into::into);
             };
             let branch = branch.ok_or(EvaluationFailure::InvalidExpression(
                 "reference IF branch is missing",
@@ -5586,11 +5886,13 @@ where
         }
 
         if count != 2 {
-            return self.push_reference_runtime_value(
-                RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
-                values,
-                value_reservation,
-            );
+            return self
+                .push_reference_runtime_value(
+                    RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
+                    values,
+                    value_reservation,
+                )
+                .map_err(Into::into);
         }
         let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
             "reference error-handler value is missing",
@@ -5606,9 +5908,7 @@ where
         if self.direct_matrix_function(value)?.is_some() {
             let value = self.evaluate_matrix_value(value)?;
             if value.is_array_like() {
-                return Err(EvaluationFailure::Unsupported(
-                    super::UnsupportedKind::ReferenceOperator,
-                ));
+                return Err(ReferenceShapeStepError::Deferred);
             }
             let caught = matches!(
                 &value,
@@ -5625,15 +5925,15 @@ where
                     value_reservation,
                 );
             }
-            return self.push_reference_runtime_value(value, values, value_reservation);
+            return self
+                .push_reference_runtime_value(value, values, value_reservation)
+                .map_err(Into::into);
         }
         if matches!(
             self.reference_handler_operand_kind(value)?,
             ReferenceOperandKind::Array | ReferenceOperandKind::Reference
         ) {
-            return Err(EvaluationFailure::Unsupported(
-                super::UnsupportedKind::ReferenceOperator,
-            ));
+            return Err(ReferenceShapeStepError::Deferred);
         }
         if self.reference_candidate(value)? {
             ensure_capacity(
@@ -5669,6 +5969,7 @@ where
                 )
             } else {
                 self.push_reference_runtime_value(value, values, value_reservation)
+                    .map_err(Into::into)
             }
         }
     }
@@ -5705,6 +6006,9 @@ where
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_) => Ok(Some(Shape::new(1, 1)?)),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -6102,6 +6406,8 @@ where
         let saved_argument_contexts = std::mem::take(&mut self.argument_contexts);
         let saved_argument_context_reservation = self.argument_context_reservation.take();
         let saved_matrix = self.matrix.take();
+        let saved_reference_kind_only = self.reference_kind_only;
+        let saved_reject_source_reference = self.reject_source_reference;
         let saved_mode = self.mode;
         let saved_position = self.position;
         let saved_projection = self.projection;
@@ -6136,6 +6442,8 @@ where
         let probe_argument_contexts = std::mem::take(&mut self.argument_contexts);
         let probe_argument_context_reservation = self.argument_context_reservation.take();
         let probe_matrix = self.matrix.take();
+        self.reference_kind_only = false;
+        self.reject_source_reference = false;
         drop(probe_frames);
         drop(probe_values);
         drop(probe_frame_reservation);
@@ -6152,6 +6460,8 @@ where
         self.argument_contexts = saved_argument_contexts;
         self.argument_context_reservation = saved_argument_context_reservation;
         self.matrix = saved_matrix;
+        self.reference_kind_only = saved_reference_kind_only;
+        self.reject_source_reference = saved_reject_source_reference;
         self.mode = saved_mode;
         self.position = saved_position;
         self.projection = saved_projection;
@@ -6301,10 +6611,10 @@ where
         &mut self,
         reference: &'expr Reference,
     ) -> EvaluationResult<Option<Shape>> {
-        match self.reference_shape(reference) {
-            Err(EvaluationFailure::Unsupported(super::UnsupportedKind::Reference)) => Ok(None),
-            result => result,
-        }
+        // Unknown geometry is represented by None inside reference_shape.
+        // A provider can also return Unsupported(Reference), so its failure
+        // must never be reclassified as a missing hint and retried.
+        self.reference_shape(reference)
     }
 
     fn reference_shape(&mut self, reference: &'expr Reference) -> EvaluationResult<Option<Shape>> {
@@ -6410,6 +6720,9 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_) => Shape::new(1, 1),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -6453,6 +6766,9 @@ where
                     Ok,
                 ),
             RuntimeValue::Areas(areas) => self.select_area_element(areas, output, index),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -6578,6 +6894,18 @@ where
             arguments.push(self.pop_value()?);
         }
         arguments.reverse();
+
+        // Reference metadata consumes complete descriptors and workbook
+        // metadata directly. It is deliberately outside the demand-cache
+        // branches because ROW/COLUMN and current-sheet operations can be
+        // position-sensitive under a projected matrix branch.
+        if reference_metadata::is_reference_metadata_function(name) {
+            let value = reference_metadata::apply(self, name, arguments)?;
+            if self.projection.is_some() && self.cacheable_scalar_branch(node)? {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
 
         if aggregate::is_aggregate_function(name) {
             let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
@@ -6792,6 +7120,11 @@ where
         for (argument_index, argument) in arguments.into_iter().enumerate() {
             self.scalar.charge_work(1)?;
             match argument {
+                RuntimeValue::SourceReference => {
+                    return Err(EvaluationFailure::Unsupported(
+                        super::UnsupportedKind::Reference,
+                    ));
+                },
                 RuntimeValue::Areas(areas) => {
                     for area_index in 0..areas.areas.len() {
                         let area = &areas.areas[area_index];
@@ -6863,7 +7196,8 @@ where
                         },
                         RuntimeValue::ScalarCell(_)
                         | RuntimeValue::Array(_)
-                        | RuntimeValue::Areas(_) => {
+                        | RuntimeValue::Areas(_)
+                        | RuntimeValue::SourceReference => {
                             return Err(EvaluationFailure::InvalidExpression(
                                 "scalar cell projection remained non-scalar",
                             ));
@@ -7148,13 +7482,16 @@ where
         let left = element_to_slot(left);
         let right = element_to_slot(right);
         self.scalar_apply_infix(operator, left, right)
-            .map(|value| match value {
-                RuntimeValue::Empty => RuntimeElement::Empty,
-                RuntimeValue::Missing => RuntimeElement::Missing,
-                RuntimeValue::Scalar(value) => RuntimeElement::Present(value),
+            .and_then(|value| match value {
+                RuntimeValue::Empty => Ok(RuntimeElement::Empty),
+                RuntimeValue::Missing => Ok(RuntimeElement::Missing),
+                RuntimeValue::Scalar(value) => Ok(RuntimeElement::Present(value)),
                 RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
-                    RuntimeElement::Missing
+                    Ok(RuntimeElement::Missing)
                 },
+                RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                    super::UnsupportedKind::Reference,
+                )),
             })
     }
 
@@ -7455,6 +7792,9 @@ where
                 let projected = self.project_area_value(&areas)?;
                 self.value_to_slot(projected)
             },
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -7473,6 +7813,9 @@ where
                 self.scalar_logical(projected)
             },
             RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Ok(Err(ScalarError::Value)),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
+            )),
         }
     }
 
@@ -7544,6 +7887,9 @@ where
                 }),
             RuntimeValue::Areas(_) => Err(EvaluationFailure::InvalidExpression(
                 "area remained before function broadcast",
+            )),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::Reference,
             )),
         }
     }

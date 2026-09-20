@@ -1,0 +1,26 @@
+{
+  "ambient_context": "capture-context-before.json",
+  "captures": [
+    {
+      "baseline_records": 840,
+      "candidate_records": 3810,
+      "command": "python3 docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/run_profile.py --candidate-root /var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout --candidate-freeze docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json --warmups 3 --samples 15",
+      "diagnostic_attempts": 0,
+      "disposition": "complete authorized frozen-source baseline/candidate pair",
+      "results": [
+        "baseline-049c09cdde3978593149079c4257df047a3fa419",
+        "candidate-final"
+      ],
+      "session_id": 2878
+    }
+  ],
+  "generated_at_utc": "2026-09-20T08:49:38.310661+00:00",
+  "schema": "ods-formula-reference-metadata-capture-history-v1",
+  "source_freeze_sha256": "e9d8dbac4eb9d9fe964693ccb801e74a031f7c223b3595e5003de03e36f02288",
+  "verification": {
+    "analysis": "capture-analysis.json",
+    "performance_report": "performance-report.md",
+    "status": "PASS",
+    "verifier_command": "performance/verify.py --expected-warmups 3 --expected-samples 15"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "RUSTDOCFLAGS": "-D warnings",
+  "RUSTFLAGS": null,
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "freeze_base_commit": "049c09cdde3978593149079c4257df047a3fa419",
+  "gate_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "head": "049c09cdde3978593149079c4257df047a3fa419",
+  "kernel": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux",
+  "repo": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "target": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/target"
+}

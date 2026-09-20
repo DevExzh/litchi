@@ -1,0 +1,1 @@
+runner setup failed before build: candidate-freeze was resolved relative to the batch directory, producing a duplicated docs/report path. No timed rows were created.

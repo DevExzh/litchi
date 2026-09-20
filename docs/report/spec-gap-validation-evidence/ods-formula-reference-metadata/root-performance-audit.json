@@ -1,0 +1,3262 @@
+{
+  "accounting_fields": [
+    "alloc_calls",
+    "live_after",
+    "live_before",
+    "memory_retained",
+    "output_bytes",
+    "peak_live_delta",
+    "reference_reads",
+    "released_bytes",
+    "requested_bytes",
+    "work"
+  ],
+  "accounting_sets_unchanged": true,
+  "baseline_commit": "049c09cdde3978593149079c4257df047a3fa419",
+  "bootstrap": {
+    "method": "independent unpaired median ratios; percentile interval",
+    "resamples": 5000,
+    "review_threshold_percent": 5.0,
+    "seed": 5554865353495640424
+  },
+  "candidate_label": "candidate-final",
+  "candidate_only": [
+    {
+      "case": "reference-metadata-areas-3d",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-3d",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-arity",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-arity",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-array-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-array-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-duplicate-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-duplicate-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-range",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-range",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-resource",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-areas-resource",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-3d-cell",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-3d-cell",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-array-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-array-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-cell",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-cell",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-if-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-if-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-iferror-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-iferror-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-ifna-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-computed-ifna-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-current",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-current",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-one-entry-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-one-entry-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-projected",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-projected",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-column-scalar-vector",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-column-scalar-vector",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-3d",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-3d",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-arity",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-arity",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-array",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-array",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-formula-error",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-formula-error",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-one-entry-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-one-entry-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-projected",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-projected",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-range",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-range",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-scalar-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-columns-scalar-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-arity",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-arity",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-array",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-array",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-error",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-error",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source-arithmetic",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source-arithmetic",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-iferror-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source-arithmetic",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source-arithmetic",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-ifna-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-number",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-number",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-reference",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-reference",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-selected-local",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-selected-local",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-selected-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-selected-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source-array-false-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source-array-false-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source-array-true-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-isref-source-array-true-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-large-range",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-large-range",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-3d-cell",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-3d-cell",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-array-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-array-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-cell",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-cell",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-if-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-if-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-iferror-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-iferror-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-ifna-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-computed-ifna-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-current",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-current",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-one-entry-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-one-entry-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-projected",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-projected",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-row-scalar-vector",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-row-scalar-vector",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-3d",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-3d",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-array",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-array",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-one-entry-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-one-entry-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-projected",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-projected",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-range",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-range",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-resource",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-resource",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-scalar-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-rows-scalar-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-3d",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-3d",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-array-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-array-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-array-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-array-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-cancel",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-cancel",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-if-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-if-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-iferror-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-iferror-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-ifna-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-ifna-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-scalar",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-computed-scalar",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-current",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-current",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-hidden-text",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-hidden-text",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-iferror-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-iferror-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-iferror-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-iferror-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-ifna-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-ifna-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-ifna-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-ifna-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-logical-coercion",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-logical-coercion",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-number-coercion",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-number-coercion",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-reference",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-reference",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-selected-local",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-selected-local",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-selected-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-selected-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source-array-false-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source-array-false-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source-array-true-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-source-array-true-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-text",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-text",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-unknown-text",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheet-unknown-text",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-3d",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-3d",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-array-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-array-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-current",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-current",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-formula-error",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-formula-error",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-iferror-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-iferror-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-iferror-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-iferror-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-ifna-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-ifna-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-ifna-source-fallback",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-ifna-source-fallback",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-list-refusal",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-list-refusal",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-one-entry-list",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-one-entry-list",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-reference",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-reference",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-selected-local",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-selected-local",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-selected-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-selected-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source-array-false-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source-array-false-matrix",
+      "phase": "parse-evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source-array-true-matrix",
+      "phase": "evaluate"
+    },
+    {
+      "case": "reference-metadata-sheets-source-array-true-matrix",
+      "phase": "parse-evaluate"
+    }
+  ],
+  "candidate_only_groups": 216,
+  "captures": [
+    {
+      "baseline": "baseline-049c09cdde3978593149079c4257df047a3fa419",
+      "baseline_samples": 840,
+      "candidate": "candidate-final",
+      "candidate_samples": 4080,
+      "comparisons": [
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 46730.25,
+          "baseline_rss_kib": 3740,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 46675.25,
+          "candidate_rss_kib": 3600,
+          "candidate_samples": 15,
+          "case": "array-control-16x16-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -1.0581388513314915,
+            4.393349046771533
+          ],
+          "latency_delta_percent": -0.11769678099303738,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -140,
+          "rss_delta_percent": -3.7433155080213942
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 61705.25,
+          "baseline_rss_kib": 3748,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 61317.75,
+          "candidate_rss_kib": 3760,
+          "candidate_samples": 15,
+          "case": "array-control-16x16-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -3.2392832627168744,
+            2.709870233300893
+          ],
+          "latency_delta_percent": -0.6279854631494053,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 12,
+          "rss_delta_percent": 0.32017075773747017
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 128495.5,
+          "baseline_rss_kib": 4136,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 128293.0,
+          "candidate_rss_kib": 4224,
+          "candidate_samples": 15,
+          "case": "array-control-16x16-sin",
+          "latency_bootstrap_95_percent": [
+            -1.7709615727083405,
+            1.5399473428513222
+          ],
+          "latency_delta_percent": -0.15759306746150337,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 88,
+          "rss_delta_percent": 2.127659574468077
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 144665.5,
+          "baseline_rss_kib": 4180,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 144105.75,
+          "candidate_rss_kib": 4232,
+          "candidate_samples": 15,
+          "case": "array-control-16x16-sin",
+          "latency_bootstrap_95_percent": [
+            -1.3084976692922634,
+            0.773452053271062
+          ],
+          "latency_delta_percent": -0.38692708351334426,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 52,
+          "rss_delta_percent": 1.2440191387559807
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 4450.3875,
+          "baseline_rss_kib": 3532,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 4445.775,
+          "candidate_rss_kib": 3340,
+          "candidate_samples": 15,
+          "case": "array-control-4x4-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -1.5734567591803583,
+            2.951675255896369
+          ],
+          "latency_delta_percent": -0.1036426603301388,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -192,
+          "rss_delta_percent": -5.436013590033973
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 5213.9,
+          "baseline_rss_kib": 3496,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 5241.65,
+          "candidate_rss_kib": 3512,
+          "candidate_samples": 15,
+          "case": "array-control-4x4-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -1.6154553120529047,
+            2.449090979346602
+          ],
+          "latency_delta_percent": 0.5322311513454414,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 16,
+          "rss_delta_percent": 0.4576659038901587
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 9825.925,
+          "baseline_rss_kib": 3936,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 9853.8,
+          "candidate_rss_kib": 3960,
+          "candidate_samples": 15,
+          "case": "array-control-4x4-sin",
+          "latency_bootstrap_95_percent": [
+            -1.2914924975226505,
+            1.1865040925421955
+          ],
+          "latency_delta_percent": 0.28368830415457236,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 24,
+          "rss_delta_percent": 0.6097560975609762
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 10715.05,
+          "baseline_rss_kib": 4060,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 10739.5625,
+          "candidate_rss_kib": 4196,
+          "candidate_samples": 15,
+          "case": "array-control-4x4-sin",
+          "latency_bootstrap_95_percent": [
+            -0.6198485947395138,
+            0.8740361097107963
+          ],
+          "latency_delta_percent": 0.22876701461962412,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 136,
+          "rss_delta_percent": 3.349753694581281
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 718.984,
+          "baseline_rss_kib": 3320,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 721.964,
+          "candidate_rss_kib": 3364,
+          "candidate_samples": 15,
+          "case": "concat-borrowed-literals",
+          "latency_bootstrap_95_percent": [
+            -0.009589819780886355,
+            0.8183876508510046
+          ],
+          "latency_delta_percent": 0.4144737574132362,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 44,
+          "rss_delta_percent": 1.3253012048192847
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 853.534,
+          "baseline_rss_kib": 3328,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 862.855,
+          "candidate_rss_kib": 3376,
+          "candidate_samples": 15,
+          "case": "concat-borrowed-literals",
+          "latency_bootstrap_95_percent": [
+            -0.1169167158199591,
+            1.6234930375543133
+          ],
+          "latency_delta_percent": 1.0920478856144111,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 48,
+          "rss_delta_percent": 1.4423076923076872
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1895.929,
+          "baseline_rss_kib": 3316,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1896.37,
+          "candidate_rss_kib": 3364,
+          "candidate_samples": 15,
+          "case": "concat-growth-chain",
+          "latency_bootstrap_95_percent": [
+            -0.9086078639744977,
+            0.4466730811931052
+          ],
+          "latency_delta_percent": 0.023260364707744507,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 48,
+          "rss_delta_percent": 1.4475271411338975
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 2270.811,
+          "baseline_rss_kib": 3292,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 2262.211,
+          "candidate_rss_kib": 3316,
+          "candidate_samples": 15,
+          "case": "concat-growth-chain",
+          "latency_bootstrap_95_percent": [
+            -1.143640932147083,
+            0.5682342077875546
+          ],
+          "latency_delta_percent": -0.3787193209827011,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 24,
+          "rss_delta_percent": 0.7290400972053357
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1068.705,
+          "baseline_rss_kib": 3344,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1071.606,
+          "candidate_rss_kib": 3392,
+          "candidate_samples": 15,
+          "case": "concat-owned-left",
+          "latency_bootstrap_95_percent": [
+            -0.016842814434281372,
+            1.0627093403986487
+          ],
+          "latency_delta_percent": 0.27145002596600243,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 48,
+          "rss_delta_percent": 1.4354066985645897
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1305.256,
+          "baseline_rss_kib": 3328,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1276.197,
+          "candidate_rss_kib": 3444,
+          "candidate_samples": 15,
+          "case": "concat-owned-left",
+          "latency_bootstrap_95_percent": [
+            -2.455864305817501,
+            -1.2623658846366625
+          ],
+          "latency_delta_percent": -2.2263065636166535,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 116,
+          "rss_delta_percent": 3.4855769230769162
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1085.055,
+          "baseline_rss_kib": 3332,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1083.496,
+          "candidate_rss_kib": 3324,
+          "candidate_samples": 15,
+          "case": "concat-owned-right",
+          "latency_bootstrap_95_percent": [
+            -0.7268573323690908,
+            0.4384639486227693
+          ],
+          "latency_delta_percent": -0.14367935265954257,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -8,
+          "rss_delta_percent": -0.24009603841537164
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1388.977,
+          "baseline_rss_kib": 3328,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1325.486,
+          "candidate_rss_kib": 3468,
+          "candidate_samples": 15,
+          "case": "concat-owned-right",
+          "latency_bootstrap_95_percent": [
+            -4.9347912076709965,
+            -4.213841063762047
+          ],
+          "latency_delta_percent": -4.5710620118259655,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 140,
+          "rss_delta_percent": 4.206730769230771
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 3940.0,
+          "baseline_rss_kib": 3700,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 3940.0,
+          "candidate_rss_kib": 3632,
+          "candidate_samples": 15,
+          "case": "database-control-dstdev",
+          "latency_bootstrap_95_percent": [
+            -1.0101010101010055,
+            3.6082474226804218
+          ],
+          "latency_delta_percent": 0.0,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -68,
+          "rss_delta_percent": -1.8378378378378413
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 4460.0,
+          "baseline_rss_kib": 3604,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 4490.0,
+          "candidate_rss_kib": 3772,
+          "candidate_samples": 15,
+          "case": "database-control-dstdev",
+          "latency_bootstrap_95_percent": [
+            -3.063457330415753,
+            2.0179372197309364
+          ],
+          "latency_delta_percent": 0.6726457399103047,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 168,
+          "rss_delta_percent": 4.661487236404005
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 3990.0,
+          "baseline_rss_kib": 3568,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 4070.0,
+          "candidate_rss_kib": 3684,
+          "candidate_samples": 15,
+          "case": "database-control-dsum",
+          "latency_bootstrap_95_percent": [
+            0.0,
+            6.060606060606055
+          ],
+          "latency_delta_percent": 2.0050125313283207,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 116,
+          "rss_delta_percent": 3.2511210762331766
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 4600.0,
+          "baseline_rss_kib": 3696,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 4680.0,
+          "candidate_rss_kib": 3656,
+          "candidate_samples": 15,
+          "case": "database-control-dsum",
+          "latency_bootstrap_95_percent": [
+            -1.521739130434785,
+            2.8508771929824483
+          ],
+          "latency_delta_percent": 1.7391304347825987,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -40,
+          "rss_delta_percent": -1.0822510822510845
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 3940.0,
+          "baseline_rss_kib": 3728,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 3920.0,
+          "candidate_rss_kib": 3656,
+          "candidate_samples": 15,
+          "case": "database-control-dvar",
+          "latency_bootstrap_95_percent": [
+            -2.244389027431426,
+            1.2690355329949332
+          ],
+          "latency_delta_percent": -0.5076142131979711,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -72,
+          "rss_delta_percent": -1.931330472102999
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 4540.0,
+          "baseline_rss_kib": 3612,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 4610.0,
+          "candidate_rss_kib": 3652,
+          "candidate_samples": 15,
+          "case": "database-control-dvar",
+          "latency_bootstrap_95_percent": [
+            -0.8810572687224627,
+            3.3333333333333437
+          ],
+          "latency_delta_percent": 1.541850220264318,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 40,
+          "rss_delta_percent": 1.1074197120708673
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1830.0,
+          "baseline_rss_kib": 3664,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1840.0,
+          "candidate_rss_kib": 3656,
+          "candidate_samples": 15,
+          "case": "literal-aggregate-4x1-sum",
+          "latency_bootstrap_95_percent": [
+            -1.6304347826086918,
+            3.3149171270718147
+          ],
+          "latency_delta_percent": 0.5464480874316946,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -8,
+          "rss_delta_percent": -0.21834061135370675
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 2560.0,
+          "baseline_rss_kib": 3640,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 2540.0,
+          "candidate_rss_kib": 3684,
+          "candidate_samples": 15,
+          "case": "literal-aggregate-4x1-sum",
+          "latency_bootstrap_95_percent": [
+            -3.076923076923077,
+            3.1372549019607954
+          ],
+          "latency_delta_percent": -0.78125,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 44,
+          "rss_delta_percent": 1.2087912087912045
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 10290.0,
+          "baseline_rss_kib": 3552,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 10492.75,
+          "candidate_rss_kib": 3716,
+          "candidate_samples": 15,
+          "case": "reference-aggregate-64x4-sum",
+          "latency_bootstrap_95_percent": [
+            1.4053792100799711,
+            2.733201436213095
+          ],
+          "latency_delta_percent": 1.970359572400393,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 164,
+          "rss_delta_percent": 4.61711711711712
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 10742.5,
+          "baseline_rss_kib": 3624,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 10845.25,
+          "candidate_rss_kib": 3604,
+          "candidate_samples": 15,
+          "case": "reference-aggregate-64x4-sum",
+          "latency_bootstrap_95_percent": [
+            0.13992537313431974,
+            1.6404968361846795
+          ],
+          "latency_delta_percent": 0.9564812659995425,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -20,
+          "rss_delta_percent": -0.551876379690952
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 9481.175,
+          "baseline_rss_kib": 3500,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 9532.3,
+          "candidate_rss_kib": 3368,
+          "candidate_samples": 15,
+          "case": "reference-array-16x4-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -0.5397143059746812,
+            1.6934204968960698
+          ],
+          "latency_delta_percent": 0.5392264144475689,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -132,
+          "rss_delta_percent": -3.77142857142857
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 9819.925,
+          "baseline_rss_kib": 3472,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 9869.3,
+          "candidate_rss_kib": 3428,
+          "candidate_samples": 15,
+          "case": "reference-array-16x4-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -0.5422733006873903,
+            1.9122569707920922
+          ],
+          "latency_delta_percent": 0.5028042474866101,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -44,
+          "rss_delta_percent": -1.2672811059907807
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 83060.5,
+          "baseline_rss_kib": 3728,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 88280.0,
+          "candidate_rss_kib": 3660,
+          "candidate_samples": 15,
+          "case": "reference-conditional-256x4-sumifs",
+          "latency_bootstrap_95_percent": [
+            -0.9367322738594419,
+            12.013774608398853
+          ],
+          "latency_delta_percent": 6.283973729991987,
+          "phase": "evaluate",
+          "review_reasons": [
+            "latency"
+          ],
+          "review_trigger": true,
+          "rss_delta_kib": -68,
+          "rss_delta_percent": -1.8240343347639465
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 88555.5,
+          "baseline_rss_kib": 3668,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 86915.5,
+          "candidate_rss_kib": 3764,
+          "candidate_samples": 15,
+          "case": "reference-conditional-256x4-sumifs",
+          "latency_bootstrap_95_percent": [
+            -5.301728240240511,
+            7.106716139684344
+          ],
+          "latency_delta_percent": -1.8519459547967076,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 96,
+          "rss_delta_percent": 2.6172300981461394
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 10325.0,
+          "baseline_rss_kib": 3536,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 10342.5,
+          "candidate_rss_kib": 3636,
+          "candidate_samples": 15,
+          "case": "reference-control-average",
+          "latency_bootstrap_95_percent": [
+            -0.922778047595918,
+            0.975287819901749
+          ],
+          "latency_delta_percent": 0.16949152542373724,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 100,
+          "rss_delta_percent": 2.828054298642524
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 10757.75,
+          "baseline_rss_kib": 3540,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 10630.25,
+          "candidate_rss_kib": 3652,
+          "candidate_samples": 15,
+          "case": "reference-control-average",
+          "latency_bootstrap_95_percent": [
+            -1.7763917763917725,
+            0.7892714954250257
+          ],
+          "latency_delta_percent": -1.1851920708326524,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 112,
+          "rss_delta_percent": 3.1638418079096065
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 8670.25,
+          "baseline_rss_kib": 3532,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 8682.75,
+          "candidate_rss_kib": 3620,
+          "candidate_samples": 15,
+          "case": "reference-control-counta",
+          "latency_bootstrap_95_percent": [
+            -0.3140305387496434,
+            1.5337954939341314
+          ],
+          "latency_delta_percent": 0.14417116000116081,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 88,
+          "rss_delta_percent": 2.491506228765572
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 9105.0,
+          "baseline_rss_kib": 3544,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 9077.5,
+          "candidate_rss_kib": 3644,
+          "candidate_samples": 15,
+          "case": "reference-control-counta",
+          "latency_bootstrap_95_percent": [
+            -1.0626702997275195,
+            0.4983480176211419
+          ],
+          "latency_delta_percent": -0.3020318506315234,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 100,
+          "rss_delta_percent": 2.8216704288938965
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1605.298,
+          "baseline_rss_kib": 3508,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1597.289,
+          "candidate_rss_kib": 3592,
+          "candidate_samples": 15,
+          "case": "representative-median",
+          "latency_bootstrap_95_percent": [
+            -0.9162624454316926,
+            0.2656850573976355
+          ],
+          "latency_delta_percent": -0.4989104826642832,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 84,
+          "rss_delta_percent": 2.394526795895091
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1886.15,
+          "baseline_rss_kib": 3456,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1876.71,
+          "candidate_rss_kib": 3564,
+          "candidate_samples": 15,
+          "case": "representative-median",
+          "latency_bootstrap_95_percent": [
+            -1.3513277830011439,
+            0.7391579698035722
+          ],
+          "latency_delta_percent": -0.5004904169869873,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 108,
+          "rss_delta_percent": 3.125
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 971.404,
+          "baseline_rss_kib": 3460,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 964.235,
+          "candidate_rss_kib": 3568,
+          "candidate_samples": 15,
+          "case": "representative-percentrank",
+          "latency_bootstrap_95_percent": [
+            -1.3997274231222323,
+            -0.2730284001050909
+          ],
+          "latency_delta_percent": -0.7380039612766676,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 108,
+          "rss_delta_percent": 3.121387283236987
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1212.476,
+          "baseline_rss_kib": 3508,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1215.036,
+          "candidate_rss_kib": 3560,
+          "candidate_samples": 15,
+          "case": "representative-percentrank",
+          "latency_bootstrap_95_percent": [
+            -0.7258173814076563,
+            0.5706423897281043
+          ],
+          "latency_delta_percent": 0.2111381998489037,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 52,
+          "rss_delta_percent": 1.4823261117445918
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 919.775,
+          "baseline_rss_kib": 3476,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 918.034,
+          "candidate_rss_kib": 3564,
+          "candidate_samples": 15,
+          "case": "representative-rank",
+          "latency_bootstrap_95_percent": [
+            -0.9317693598812404,
+            0.3530810971530629
+          ],
+          "latency_delta_percent": -0.18928542306542173,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 88,
+          "rss_delta_percent": 2.5316455696202445
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1127.015,
+          "baseline_rss_kib": 3464,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1131.586,
+          "candidate_rss_kib": 3528,
+          "candidate_samples": 15,
+          "case": "representative-rank",
+          "latency_bootstrap_95_percent": [
+            0.09921197346789423,
+            0.9488768224074295
+          ],
+          "latency_delta_percent": 0.40558466391307224,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 64,
+          "rss_delta_percent": 1.8475750577367167
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 579.722,
+          "baseline_rss_kib": 3452,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 569.073,
+          "candidate_rss_kib": 3444,
+          "candidate_samples": 15,
+          "case": "scalar-aggregate-sum",
+          "latency_bootstrap_95_percent": [
+            -4.26224466701105,
+            1.0731566930130443
+          ],
+          "latency_delta_percent": -1.836914935089573,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -8,
+          "rss_delta_percent": -0.2317497103128674
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 748.384,
+          "baseline_rss_kib": 3488,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 749.364,
+          "candidate_rss_kib": 3456,
+          "candidate_samples": 15,
+          "case": "scalar-aggregate-sum",
+          "latency_bootstrap_95_percent": [
+            -1.2470140275755326,
+            1.0609666346138358
+          ],
+          "latency_delta_percent": 0.13094881771924527,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -32,
+          "rss_delta_percent": -0.917431192660545
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 570.023,
+          "baseline_rss_kib": 3408,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 564.543,
+          "candidate_rss_kib": 3484,
+          "candidate_samples": 15,
+          "case": "scalar-control-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -1.7714423083623032,
+            0.5762884251554024
+          ],
+          "latency_delta_percent": -0.9613647168623007,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 76,
+          "rss_delta_percent": 2.230046948356801
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 703.403,
+          "baseline_rss_kib": 3304,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 699.784,
+          "candidate_rss_kib": 3460,
+          "candidate_samples": 15,
+          "case": "scalar-control-arithmetic",
+          "latency_bootstrap_95_percent": [
+            -2.245997131811417,
+            0.6703366450226067
+          ],
+          "latency_delta_percent": -0.514498800829688,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 156,
+          "rss_delta_percent": 4.721549636803868
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1031.685,
+          "baseline_rss_kib": 3488,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1023.215,
+          "candidate_rss_kib": 3496,
+          "candidate_samples": 15,
+          "case": "scalar-control-average",
+          "latency_bootstrap_95_percent": [
+            -1.7521196006622275,
+            0.20171408246891787
+          ],
+          "latency_delta_percent": -0.82098702607869,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 8,
+          "rss_delta_percent": 0.2293577981651307
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1257.076,
+          "baseline_rss_kib": 3444,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1251.886,
+          "candidate_rss_kib": 3476,
+          "candidate_samples": 15,
+          "case": "scalar-control-average",
+          "latency_bootstrap_95_percent": [
+            -1.0885844429595615,
+            0.3430570228100782
+          ],
+          "latency_delta_percent": -0.4128628658887856,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 32,
+          "rss_delta_percent": 0.9291521486643362
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 838.515,
+          "baseline_rss_kib": 3460,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 825.464,
+          "candidate_rss_kib": 3476,
+          "candidate_samples": 15,
+          "case": "scalar-control-counta",
+          "latency_bootstrap_95_percent": [
+            -2.7853803574551694,
+            -0.5630374856252174
+          ],
+          "latency_delta_percent": -1.5564420433742954,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 16,
+          "rss_delta_percent": 0.46242774566473965
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1083.015,
+          "baseline_rss_kib": 3420,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1073.116,
+          "candidate_rss_kib": 3420,
+          "candidate_samples": 15,
+          "case": "scalar-control-counta",
+          "latency_bootstrap_95_percent": [
+            -2.375307716520547,
+            -0.21737200847669058
+          ],
+          "latency_delta_percent": -0.9140224281288911,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 0,
+          "rss_delta_percent": 0.0
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1451.457,
+          "baseline_rss_kib": 3380,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1432.087,
+          "candidate_rss_kib": 3476,
+          "candidate_samples": 15,
+          "case": "scalar-control-imsum",
+          "latency_bootstrap_95_percent": [
+            -2.793129108528003,
+            -0.27010308142081385
+          ],
+          "latency_delta_percent": -1.3345211053444994,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 96,
+          "rss_delta_percent": 2.8402366863905293
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1995.71,
+          "baseline_rss_kib": 3348,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1963.16,
+          "candidate_rss_kib": 3488,
+          "candidate_samples": 15,
+          "case": "scalar-control-imsum",
+          "latency_bootstrap_95_percent": [
+            -1.92919281410735,
+            -0.7475531641033206
+          ],
+          "latency_delta_percent": -1.6309984917648346,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 140,
+          "rss_delta_percent": 4.1816009557944955
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 463.582,
+          "baseline_rss_kib": 3776,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 461.233,
+          "candidate_rss_kib": 3868,
+          "candidate_samples": 15,
+          "case": "scalar-control-sin",
+          "latency_bootstrap_95_percent": [
+            -1.3503544141058144,
+            0.3720914133416242
+          ],
+          "latency_delta_percent": -0.5067064726413051,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 92,
+          "rss_delta_percent": 2.436440677966112
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 650.644,
+          "baseline_rss_kib": 3780,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 649.714,
+          "candidate_rss_kib": 3840,
+          "candidate_samples": 15,
+          "case": "scalar-control-sin",
+          "latency_bootstrap_95_percent": [
+            -0.7160309851698909,
+            1.2264239164927915
+          ],
+          "latency_delta_percent": -0.14293530717257585,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 60,
+          "rss_delta_percent": 1.5873015873015817
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 856.404,
+          "baseline_rss_kib": 3476,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 854.784,
+          "candidate_rss_kib": 3444,
+          "candidate_samples": 15,
+          "case": "scalar-control-stdev",
+          "latency_bootstrap_95_percent": [
+            -1.5148461875212682,
+            0.18401010766349035
+          ],
+          "latency_delta_percent": -0.18916305855647408,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": -32,
+          "rss_delta_percent": -0.9205983889528202
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1074.395,
+          "baseline_rss_kib": 3420,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1079.445,
+          "candidate_rss_kib": 3504,
+          "candidate_samples": 15,
+          "case": "scalar-control-stdev",
+          "latency_bootstrap_95_percent": [
+            -0.1692446417424054,
+            0.8882967533833552
+          ],
+          "latency_delta_percent": 0.47003197148161036,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 84,
+          "rss_delta_percent": 2.4561403508772006
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 846.704,
+          "baseline_rss_kib": 3400,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 847.004,
+          "candidate_rss_kib": 3464,
+          "candidate_samples": 15,
+          "case": "scalar-control-var",
+          "latency_bootstrap_95_percent": [
+            -1.1484034362494566,
+            0.882859756486698
+          ],
+          "latency_delta_percent": 0.03543150853191346,
+          "phase": "evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 64,
+          "rss_delta_percent": 1.8823529411764683
+        },
+        {
+          "accounting_fields": [
+            "alloc_calls",
+            "requested_bytes",
+            "released_bytes",
+            "live_before",
+            "live_after",
+            "peak_live_delta",
+            "work",
+            "memory_retained",
+            "reference_reads",
+            "output_bytes"
+          ],
+          "baseline_ns_per_repeat": 1054.905,
+          "baseline_rss_kib": 3368,
+          "baseline_samples": 15,
+          "candidate_ns_per_repeat": 1055.386,
+          "candidate_rss_kib": 3472,
+          "candidate_samples": 15,
+          "case": "scalar-control-var",
+          "latency_bootstrap_95_percent": [
+            -0.8613622357537487,
+            0.5508701567751961
+          ],
+          "latency_delta_percent": 0.045596522909652215,
+          "phase": "parse-evaluate",
+          "review_reasons": [],
+          "review_trigger": false,
+          "rss_delta_kib": 104,
+          "rss_delta_percent": 3.087885985748229
+        }
+      ],
+      "label": "single-complete-pair",
+      "manifest_sha256": {
+        "baseline-049c09cdde3978593149079c4257df047a3fa419": "83b21afc6fa1838a66e734a92df9d0470126099274aa5c7fc10dd6baddfe3a7f",
+        "candidate-final": "a02ac1db99df1722cbb93985b2b44aff5a2c3278f4d029962c8c88edf257f5fb"
+      },
+      "matched_groups": 56
+    }
+  ],
+  "gate_workspace_payloads_excluded_from_profiler_closure": [
+    "crates/litchi-odf-common/tests/fixtures/signatures/rsa-cert.der",
+    "crates/litchi-odf-common/tests/fixtures/signatures/rsa-key.pk8",
+    "crates/litchi-ods/tests/fixtures/libreoffice-draw-image-link-compact.fods",
+    "crates/litchi-ods/tests/fixtures/odfdo-test-flat-lo-compact.fods",
+    "crates/litchi-ods/tests/fixtures/odfpy-sheet-dde-source-compact.fods",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/differential-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/byte-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/native-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-elementary-math/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/steyx-deviation-proof.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference-metadata-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-statistical-reducers/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-statistical-reducers/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-statistical-reducers/numeric-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/native/provenance.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/text-goldens.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-trigonometry/native/cached-results.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-value-inspection/inspection-goldens.json",
+    "test-data/libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods",
+    "test-data/libreoffice-core/sc/qa/unit/data/ods/formats.ods",
+    "test-data/odf/corpus/calc-formulas.ods",
+    "test-data/odf/ods/grid-padding-package.ods"
+  ],
+  "matched_control_groups": 56,
+  "retained_verifier_read_bound_correction": {
+    "captured_verifier_failure": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/results/candidate-final ('reference-metadata-row-computed-if-matrix', 'evaluate'): reads 2 outside expected bounds (0, 0)",
+    "corrected": true,
+    "corrected_cases": [
+      "reference-metadata-column-computed-if-matrix",
+      "reference-metadata-column-computed-iferror-matrix",
+      "reference-metadata-column-computed-ifna-matrix",
+      "reference-metadata-row-computed-if-matrix",
+      "reference-metadata-row-computed-iferror-matrix",
+      "reference-metadata-row-computed-ifna-matrix",
+      "reference-metadata-sheet-computed-scalar"
+    ],
+    "raw_reference_read_totals": {
+      "reference-metadata-areas-3d": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-arity": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-array-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-duplicate-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-range": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-areas-resource": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-3d-cell": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-array-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-cell": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-computed-if-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-column-computed-iferror-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-column-computed-ifna-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-column-current": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-one-entry-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-projected": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-column-scalar-vector": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-3d": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-arity": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-array": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-formula-error": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-one-entry-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-projected": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-range": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-columns-scalar-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-arity": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-array": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-error": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-iferror-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-iferror-source-arithmetic": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-iferror-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-ifna-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-ifna-source-arithmetic": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-ifna-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-number": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-reference": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-selected-local": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-selected-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-source-array-false-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-isref-source-array-true-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-large-range": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-3d-cell": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-array-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-cell": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-computed-if-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-row-computed-iferror-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-row-computed-ifna-matrix": {
+        "expected": 60,
+        "observed": 60,
+        "rows": 30
+      },
+      "reference-metadata-row-current": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-one-entry-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-projected": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-row-scalar-vector": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-3d": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-array": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-one-entry-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-projected": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-range": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-resource": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-rows-scalar-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-3d": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-array-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-array-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-cancel": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-computed-if-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-computed-iferror-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-computed-ifna-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-computed-scalar": {
+        "expected": 30,
+        "observed": 30,
+        "rows": 30
+      },
+      "reference-metadata-sheet-current": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-hidden-text": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-iferror-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-iferror-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-ifna-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-ifna-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-logical-coercion": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-number-coercion": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-reference": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-selected-local": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-selected-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-source-array-false-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-source-array-true-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-text": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheet-unknown-text": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-3d": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-array-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-current": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-formula-error": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-iferror-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-iferror-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-ifna-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-ifna-source-fallback": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-list-refusal": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-one-entry-list": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-reference": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-selected-local": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-selected-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-source": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-source-array-false-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      },
+      "reference-metadata-sheets-source-array-true-matrix": {
+        "expected": 0,
+        "observed": 0,
+        "rows": 30
+      }
+    }
+  },
+  "reviewed_read_contract": {
+    "candidate_preflight_verified": true,
+    "candidate_rows_verified": true,
+    "default": 0,
+    "exceptions": {
+      "reference-metadata-column-computed-if-matrix": 2,
+      "reference-metadata-column-computed-iferror-matrix": 2,
+      "reference-metadata-column-computed-ifna-matrix": 2,
+      "reference-metadata-row-computed-if-matrix": 2,
+      "reference-metadata-row-computed-iferror-matrix": 2,
+      "reference-metadata-row-computed-ifna-matrix": 2,
+      "reference-metadata-sheet-computed-scalar": 1
+    }
+  },
+  "status": "verified; individual performance flags retained",
+  "verified_complete_samples": 4920
+}
