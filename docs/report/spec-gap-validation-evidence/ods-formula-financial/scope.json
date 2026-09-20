@@ -1,0 +1,338 @@
+{
+  "schema": "ods-formula-financial-scope-v1",
+  "status": "planning; no implementation or validation claim",
+  "authority": {
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "common_conventions_section": "6.12.1"
+  },
+  "scope_note": "All 54 financial functions remain in scope. contract.md currently drafts only the 20 cash-flow and annuity functions; other groups require separate contracts. Grouping is for implementation planning, not a normative classification.",
+  "functions": [
+    {
+      "section": "6.12.2",
+      "name": "ACCRINT",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.3",
+      "name": "ACCRINTM",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.4",
+      "name": "AMORLINC",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.5",
+      "name": "COUPDAYBS",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.6",
+      "name": "COUPDAYS",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.7",
+      "name": "COUPDAYSNC",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.8",
+      "name": "COUPNCD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.9",
+      "name": "COUPNUM",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.10",
+      "name": "COUPPCD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.11",
+      "name": "CUMIPMT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.12",
+      "name": "CUMPRINC",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.13",
+      "name": "DB",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.14",
+      "name": "DDB",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.15",
+      "name": "DISC",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.16",
+      "name": "DOLLARDE",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.17",
+      "name": "DOLLARFR",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.18",
+      "name": "DURATION",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.19",
+      "name": "EFFECT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.20",
+      "name": "FV",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.21",
+      "name": "FVSCHEDULE",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.22",
+      "name": "INTRATE",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.23",
+      "name": "IPMT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.24",
+      "name": "IRR",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.25",
+      "name": "ISPMT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.26",
+      "name": "MDURATION",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.27",
+      "name": "MIRR",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.28",
+      "name": "NOMINAL",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.29",
+      "name": "NPER",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.30",
+      "name": "NPV",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.31",
+      "name": "ODDFPRICE",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.32",
+      "name": "ODDFYIELD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.33",
+      "name": "ODDLPRICE",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.34",
+      "name": "ODDLYIELD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.35",
+      "name": "PDURATION",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.36",
+      "name": "PMT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.37",
+      "name": "PPMT",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.38",
+      "name": "PRICE",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.39",
+      "name": "PRICEDISC",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.40",
+      "name": "PRICEMAT",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.41",
+      "name": "PV",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.42",
+      "name": "RATE",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.43",
+      "name": "RECEIVED",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.44",
+      "name": "RRI",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.45",
+      "name": "SLN",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.46",
+      "name": "SYD",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.47",
+      "name": "TBILLEQ",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.48",
+      "name": "TBILLPRICE",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.49",
+      "name": "TBILLYIELD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.50",
+      "name": "VDB",
+      "planning_group": "depreciation-and-fractions",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.51",
+      "name": "XIRR",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.52",
+      "name": "XNPV",
+      "planning_group": "cash-flow-and-annuity",
+      "contract_status": "draft"
+    },
+    {
+      "section": "6.12.53",
+      "name": "YIELD",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.54",
+      "name": "YIELDDISC",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    },
+    {
+      "section": "6.12.55",
+      "name": "YIELDMAT",
+      "planning_group": "security-and-coupon",
+      "contract_status": "not drafted"
+    }
+  ]
+}
