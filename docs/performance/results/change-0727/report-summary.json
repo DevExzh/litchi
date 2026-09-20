@@ -1,0 +1,810 @@
+{
+  "summary": {
+    "processes": 324,
+    "owners": 32400,
+    "queries": 259200,
+    "failed_central_checks": 60,
+    "failed_focus_checks": 14,
+    "paired_tail_flags": 313
+  },
+  "rows": [
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "open",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -5.059094529719488,
+        1.4829763488205083
+      ],
+      "mean_percent_range": [
+        -5.5443896759238225,
+        1.5962213124754543
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "q1",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 3,
+      "failed_mean": 2,
+      "p50_percent_range": [
+        0.6861659268792009,
+        9.585831790900068
+      ],
+      "mean_percent_range": [
+        0.49086290063964366,
+        9.49577665751633
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "q2",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -16.900536287038026,
+        -10.06343509493447
+      ],
+      "mean_percent_range": [
+        -17.380548398551955,
+        -10.28260464177173
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "q3",
+      "role": "failed",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 3,
+      "p50_percent_range": [
+        1.4851485148514865,
+        4.0000000000000036
+      ],
+      "mean_percent_range": [
+        -6.542586929973204,
+        8.468793899257477
+      ],
+      "aa_mean_flags": 2,
+      "within_mean_flags": 3
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "q8",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 3,
+      "failed_mean": 1,
+      "p50_percent_range": [
+        0.0,
+        6.000000000000005
+      ],
+      "mean_percent_range": [
+        -10.79796264855688,
+        18.41100076394193
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 3
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "q3-to-q8-mean",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 2,
+      "p50_percent_range": [
+        0.6887052341598032,
+        4.908835904628317
+      ],
+      "mean_percent_range": [
+        -0.11211985639929534,
+        6.039255992838433
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-owned",
+      "metric": "open-plus-eight",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -8.656055431416764,
+        -3.052918759200285
+      ],
+      "mean_percent_range": [
+        -8.838547076108338,
+        -3.0612194162448647
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "open",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -1.0449485117482116,
+        1.0386259525293262
+      ],
+      "mean_percent_range": [
+        -1.2357547433948235,
+        1.0550952639861721
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "q1",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        0.6293100825156994,
+        3.7262477725781507
+      ],
+      "mean_percent_range": [
+        0.3741508730599197,
+        3.3831143630974836
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "q2",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -15.658033495503021,
+        -11.146109041569352
+      ],
+      "mean_percent_range": [
+        -15.867631255974079,
+        -11.567718149609718
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "q3",
+      "role": "failed",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 2,
+      "p50_percent_range": [
+        0.0,
+        2.777777777777768
+      ],
+      "mean_percent_range": [
+        -6.70841538759449,
+        7.841535394597954
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 2
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "q8",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -0.5022721836881128,
+        3.6231884057970953
+      ],
+      "mean_percent_range": [
+        -3.181129926236692,
+        3.634685741857213
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "q3-to-q8-mean",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -0.6125574272587864,
+        3.4762456546929332
+      ],
+      "mean_percent_range": [
+        -1.6603003913575831,
+        4.746849466621228
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-stored-2097152-file",
+      "metric": "open-plus-eight",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -8.392901530357866,
+        -5.238336545850086
+      ],
+      "mean_percent_range": [
+        -8.431637450072149,
+        -5.462025155281324
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "open",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -3.9640375970576236,
+        -1.6143016390735343
+      ],
+      "mean_percent_range": [
+        -5.223958863137601,
+        -1.2901587658674885
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "q1",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -1.82962931807078,
+        0.7714029779894105
+      ],
+      "mean_percent_range": [
+        -1.4668993968142807,
+        0.8331994686890054
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "q2",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -26.59089545222688,
+        -16.420005274802072
+      ],
+      "mean_percent_range": [
+        -26.65132928741262,
+        -16.41123200193829
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 8
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "q3",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 6,
+      "failed_mean": 6,
+      "p50_percent_range": [
+        1.1627906976744207,
+        9.63855421686748
+      ],
+      "mean_percent_range": [
+        -0.8951228029333125,
+        10.3076550387597
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 2
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "q8",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 5,
+      "failed_mean": 4,
+      "p50_percent_range": [
+        2.083333333333326,
+        6.382978723404253
+      ],
+      "mean_percent_range": [
+        -10.397665085735142,
+        15.689938398357285
+      ],
+      "aa_mean_flags": 2,
+      "within_mean_flags": 2
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "q3-to-q8-mean",
+      "role": "failed",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 4,
+      "failed_mean": 5,
+      "p50_percent_range": [
+        2.1341463414634276,
+        6.305031446540887
+      ],
+      "mean_percent_range": [
+        0.27661928674780345,
+        6.346503001534343
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "synthetic-70000-default-owned",
+      "metric": "open-plus-eight",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -17.946612738597068,
+        -11.114091706070683
+      ],
+      "mean_percent_range": [
+        -17.917704855109072,
+        -11.130046143188876
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 3
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "open",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -1.4897994171095497,
+        2.0429544264012556
+      ],
+      "mean_percent_range": [
+        -1.8299878388152169,
+        2.067919989258815
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "q1",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 1,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        0.3837187414025278,
+        5.31019749749313
+      ],
+      "mean_percent_range": [
+        0.7393982473373972,
+        4.644696361066392
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "q2",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -4.235307231068319,
+        3.111075157913179
+      ],
+      "mean_percent_range": [
+        -4.321943459435951,
+        2.96811548644198
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "q3",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 2,
+      "p50_percent_range": [
+        -1.5789473684210575,
+        3.2432432432432323
+      ],
+      "mean_percent_range": [
+        -4.9666950468272635,
+        13.013436719953253
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 3
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "q8",
+      "role": "failed",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -2.3391812865497075,
+        3.571428571428581
+      ],
+      "mean_percent_range": [
+        -4.343354874964877,
+        4.735744413114906
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "q3-to-q8-mean",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -2.1438780371605404,
+        3.0009680542110173
+      ],
+      "mean_percent_range": [
+        -2.852184145815706,
+        3.1599772480874533
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-late-file",
+      "metric": "open-plus-eight",
+      "role": "failed",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -2.088412468661338,
+        2.4086634215362945
+      ],
+      "mean_percent_range": [
+        -2.0187138539345506,
+        2.0843619950525527
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "open",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -1.1571596064637868,
+        2.697651883511276
+      ],
+      "mean_percent_range": [
+        -0.7590497240017591,
+        2.8250320527869466
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "q1",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        1.5638226137358213,
+        4.558474095663345
+      ],
+      "mean_percent_range": [
+        1.7291296723959793,
+        4.564372668590155
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "q2",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -3.37185443966721,
+        3.2050937797886814
+      ],
+      "mean_percent_range": [
+        -3.0806774241501467,
+        3.354230373592615
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "q3",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 1,
+      "failed_mean": 6,
+      "p50_percent_range": [
+        0.0,
+        6.074766355140193
+      ],
+      "mean_percent_range": [
+        -0.018539117538007854,
+        9.295875918031937
+      ],
+      "aa_mean_flags": 1,
+      "within_mean_flags": 2
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "q8",
+      "role": "matched-control",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -1.2135922330097082,
+        3.5074626865671643
+      ],
+      "mean_percent_range": [
+        -4.277110419423358,
+        4.668075278856065
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "q3-to-q8-mean",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -0.7223113964687,
+        4.054774301996633
+      ],
+      "mean_percent_range": [
+        -0.5947333869890881,
+        4.359348991294665
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "45365-first-file",
+      "metric": "open-plus-eight",
+      "role": "matched-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -0.7516992002880807,
+        2.9315829510615288
+      ],
+      "mean_percent_range": [
+        -0.9167004313496485,
+        2.851777772318864
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 0
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "open",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 1,
+      "failed_mean": 1,
+      "p50_percent_range": [
+        -4.732684744755966,
+        7.754496367173536
+      ],
+      "mean_percent_range": [
+        -4.299382959244735,
+        7.447634081249688
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "q1",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 1,
+      "failed_mean": 1,
+      "p50_percent_range": [
+        1.2022360933830578,
+        12.03185609831452
+      ],
+      "mean_percent_range": [
+        1.1964374594008342,
+        11.635320479537059
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "q2",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -19.781418954106034,
+        -8.658252452179283
+      ],
+      "mean_percent_range": [
+        -19.20803394525269,
+        -8.473922304315007
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "q3",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -29.032258064516125,
+        -7.9999999999999964
+      ],
+      "mean_percent_range": [
+        -29.214559386973182,
+        -7.032793362307377
+      ],
+      "aa_mean_flags": 3,
+      "within_mean_flags": 7
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "q8",
+      "role": "benefit-control",
+      "focus": true,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -30.76923076923077,
+        -16.666666666666664
+      ],
+      "mean_percent_range": [
+        -40.29255319148937,
+        -20.783828382838276
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 3
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "q3-to-q8-mean",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -27.956989247311824,
+        -17.816091954022994
+      ],
+      "mean_percent_range": [
+        -30.578926282051288,
+        -18.077266636891476
+      ],
+      "aa_mean_flags": 2,
+      "within_mean_flags": 4
+    },
+    {
+      "case": "54016-missing-1048576-owned",
+      "metric": "open-plus-eight",
+      "role": "benefit-control",
+      "focus": false,
+      "pairs": 18,
+      "failed_p50": 0,
+      "failed_mean": 0,
+      "p50_percent_range": [
+        -9.902071915699695,
+        -0.9780717005721584
+      ],
+      "mean_percent_range": [
+        -9.694567924488629,
+        -1.040861530659476
+      ],
+      "aa_mean_flags": 0,
+      "within_mean_flags": 1
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "change": "0727-xls-warm-tail-replication",
+  "baseline_revision": "959daa11e5c5e9d0efdb13fff814bbcc66284740",
+  "candidate_origin": "change-0726",
+  "cpu": 12,
+  "cycles": 3,
+  "legs": [
+    "aa1",
+    "aa2",
+    "a1",
+    "b1",
+    "b2",
+    "a2"
+  ],
+  "processes_per_cell_leg": 3,
+  "samples": 100,
+  "warmups": 3,
+  "queries": 8,
+  "timing_metrics": [
+    "open",
+    "q1",
+    "q2",
+    "q3",
+    "q8",
+    "q3-to-q8-mean",
+    "open-plus-eight"
+  ],
+  "hard_gates": {
+    "timing_percent": 5.0,
+    "timing_absolute_ns": 10.0,
+    "absolute_exception_metrics": [
+      "q3",
+      "q8",
+      "q3-to-q8-mean"
+    ],
+    "outcomes_exact": true,
+    "allocator_fixed_field": true,
+    "zero_budget_and_refusal_parity": true,
+    "budget_fence_metrics_exact": true
+  },
+  "cases": [
+    {
+      "case": "54016-stored-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value",
+      "mode": "owned",
+      "focus_metric": "q3",
+      "role": "failed",
+      "id": "54016-stored-2097152-owned"
+    },
+    {
+      "case": "54016-stored-2097152",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value",
+      "mode": "file",
+      "focus_metric": "q3",
+      "role": "failed",
+      "id": "54016-stored-2097152-file"
+    },
+    {
+      "case": "synthetic-70000-default",
+      "path": "docs/performance/results/change-0686/fixtures/numeric-70000.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value",
+      "mode": "owned",
+      "focus_metric": "q3-to-q8-mean",
+      "role": "failed",
+      "id": "synthetic-70000-default-owned"
+    },
+    {
+      "case": "45365-late",
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sheet": 0,
+      "row": 664,
+      "column": 24,
+      "budget": 2097152,
+      "expected_status": "value",
+      "mode": "file",
+      "focus_metric": "q8",
+      "role": "failed",
+      "id": "45365-late-file"
+    },
+    {
+      "case": "45365-first",
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 0,
+      "budget": 2097152,
+      "expected_status": "value",
+      "mode": "file",
+      "focus_metric": "q8",
+      "role": "matched-control",
+      "id": "45365-first-file"
+    },
+    {
+      "case": "54016-missing-1048576",
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sheet": 0,
+      "row": 0,
+      "column": 108,
+      "budget": 1048576,
+      "expected_status": "missing",
+      "mode": "owned",
+      "focus_metric": "q8",
+      "role": "benefit-control",
+      "id": "54016-missing-1048576-owned"
+    }
+  ],
+  "total_processes": 324,
+  "disposition": "diagnostic-only; no retention or retroactive acceptance"
+}

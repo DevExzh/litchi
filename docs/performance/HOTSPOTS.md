@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0727 — XLS warm-tail recurrence; next qualify DOC/PPT saves
+
+[0727](0727-xls-warm-tail-replication.md) retains 324 processes over three fixed
+cycles. The original four focus metrics fail 14 central checks, including four
+new median failures on the generated stored-query case; all seven metrics
+produce 60 failures. Missing-query benefits recur but do not clear 0726's rejection.
+Exact custody and independent statistics pass; production remains unchanged.
+The corrected queue next requires fresh DOC/PPT length-changing-save attribution
+under 0663's implemented Reuse policy. Old 0617 fractions are not a current
+baseline, and 0667's shared-string admission must not be proposed again.
+[Evidence](results/change-0727/README.md). The non-iWork goal remains active.
+
 ## 0726 — empty-slot-only XLS candidate rejected
 
 [0726](0726-xls-empty-slot-setup-pilot.md) isolates unused missing-query setup

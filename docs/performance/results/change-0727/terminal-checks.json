@@ -1,0 +1,104 @@
+{
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0727/source-guard.py"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-0.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0727/analyze.py"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-1.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0727/report-tables.py"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-2.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0727/audit.py",
+        "--allow-rejected"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "log": "terminal-3.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0727/negative-checks.py"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-4.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--registry",
+        "docs/performance/report-claim-classification-v1.json",
+        "--repo-root",
+        "."
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-5.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--mode",
+        "structural"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-6.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/non_iwork_gate.py",
+        "verify"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "log": "terminal-7.log"
+    }
+  ],
+  "exact_replay_sha256": {
+    "analysis.json": "7d16b30e6401c810a08d8a8f33c89f815dff1c4ddd8ec53ac5edfa66d4a13647",
+    "analysis.md": "93406a891766bc61bf27f147341d2648fb16013ba36f50a52115161d5491f486",
+    "report-summary.json": "cef90ac300dbc0b784f7b5a4735ccdb369b771e7f6f218ca7d3fb985f7dd68f6",
+    "audit.json": "0c6c635043f469a47be6f09cf922051deafaa15ff5cb526467cc982dd676067a",
+    "negative-checks.json": "b36b2fe446eab8b4b995eaab892d93665dd3d214bd7503130d8be861fd2f9c17"
+  },
+  "cleanup_verified": true
+}

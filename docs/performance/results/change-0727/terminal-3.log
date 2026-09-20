@@ -1,0 +1,1 @@
+REJECTED {"comparisons": 1890, "failed_central_checks": 60, "hard_gates": {"bindings": true, "negative_controls": true, "per_process_statistics": true, "raw_custody": true, "semantic_outcomes": true, "timing": false}, "packet": "0727-xls-warm-tail-replication", "processes": 324}

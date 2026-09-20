@@ -1,0 +1,40 @@
+[
+  {
+    "phase": "baseline",
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "docs/performance/results/change-0686/probe/Cargo.toml",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 87.1023688960122,
+    "source_manifest": "source-baseline.json",
+    "log": "baseline.build.log",
+    "binary": "/home/zhuhe/code/litchi-0727-bin/baseline/xls-index-retry-probe-0686",
+    "binary_sha256": "cf7c6d4df5989f8457173a4f60530f42eea8007ddb7585f11d97934b44508a72",
+    "bytes": 136764800
+  },
+  {
+    "phase": "candidate",
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "docs/performance/results/change-0686/probe/Cargo.toml",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 38.590903374017216,
+    "source_manifest": "source-candidate.json",
+    "log": "candidate.build.log",
+    "binary": "/home/zhuhe/code/litchi-0727-bin/candidate/xls-index-retry-probe-0686",
+    "binary_sha256": "614dbcdf9fdf55661435ccbd8517d7c9560d30391b313e68dc843d0ccf68dc36",
+    "bytes": 136706672
+  }
+]

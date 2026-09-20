@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0727 — prospective XLS warm-tail replication
+
+[0727](0727-xls-warm-tail-replication.md) rebuilds the exact 0726 candidate and
+restored 959daa11e5 baseline, then restores source before measurement. Three
+A/A + ABBA cycles cover six cells with three processes per cell/leg: 32,400 owners
+and 259,200 queries. All per-process statistics, failed comparisons, controls and
+raw samples remain in the [packet](results/change-0727/README.md). This is
+diagnostic evidence, with no retention authority or production baseline change.
+
 ## 0726 — isolated XLS missing-query comparison
 
 [0726](0726-xls-empty-slot-setup-pilot.md) compares baseline `3ad29e42da` with
