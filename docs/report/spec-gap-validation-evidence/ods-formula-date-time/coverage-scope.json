@@ -24,7 +24,7 @@
       "fixed ISO/en_US/month-name/datetime parser forms",
       "combined datetime returns its integer date component",
       "two-digit year pivot and profile date bounds",
-      "full VALUE numeric grammar fallback without date/clock dispatch",
+      "full VALUE numeric-only fallback, including decimal, exponent, percent, currency, valid grouping, and simple and mixed-fraction forms, without date/clock dispatch",
       "numeric fallback is floored to an integer date serial"
     ],
     "DAY": [
@@ -124,7 +124,7 @@
       "fixed clock and combined-datetime parser forms",
       "combined datetime returns fractional day component",
       "two-digit-free clock validation, 24:00 and leap-second rejection",
-      "full VALUE numeric grammar fallback without date/clock dispatch",
+      "full VALUE numeric-only fallback, including decimal, exponent, percent, currency, valid grouping, and simple and mixed-fraction forms, without date/clock dispatch",
       "raw finite numeric fallback is preserved as the Time result"
     ],
     "TODAY": [
@@ -176,7 +176,7 @@
     "formula errors propagate in source order while typed failures remain evaluation failures",
     "deterministic Gregorian profile, epoch, serial domain, and no implicit host state",
     "validated explicit calculation timestamp for NOW/TODAY/EASTERSUNDAY",
-    "fixed-profile borrowed-text parsing, full VALUE numeric grammar fallback without date/clock dispatch, and bounded scratch",
+    "fixed-profile borrowed-text parsing, full VALUE numeric-only fallback, including decimal, exponent, percent, currency, valid grouping, and simple and mixed-fraction forms, without date/clock dispatch, and bounded scratch",
     "scalar conversion, single-cell references, ReferenceList refusal, and zero-read shape gates",
     "matrix broadcasting/intersection and typed scalar-reference refusal",
     "complete DateSequence and LogicalSequence consumption for NETWORKDAYS and WORKDAY",
