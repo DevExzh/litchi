@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "elapsed-mean",
+      "rejected": true,
+      "error": "candidate_B1-native-generated-counting_publish.elapsed_ns.mean: 251229.63 != 251228.63"
+    },
+    {
+      "name": "command-cpu",
+      "rejected": true,
+      "error": "baseline_A1-native-generated-counting_publish: command binding changed"
+    },
+    {
+      "name": "decoded-target-size",
+      "rejected": true,
+      "error": "candidate_B1-native-numbered-list-counting_publish decoded target manifest identity changed"
+    },
+    {
+      "name": "failed-allocation",
+      "rejected": true,
+      "error": "candidate_B1-allocator-generated-counting_publish has failed allocation calls"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "positive_exact_replay": true,
+  "analysis_sha256": "a9cee8658af008553c7054df95b63ae1ffcedbbbda2915a8e953fe329c19776a",
+  "analyzer_sha256": "70a1fd98f9984e0a881d95455d7a4ae5ba77f2a81e60595a5eba75d0d25d7854"
+}

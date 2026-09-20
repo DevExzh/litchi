@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "packet": "change-0715-docx-publication-collection-pilot",
+  "name": "baseline_A2-native-generated-lifecycle",
+  "stage": "baseline-A2",
+  "source_label": "baseline",
+  "build_label": "baseline",
+  "pair": "pair-2",
+  "repeat": 2,
+  "lane": "native",
+  "stage_order": "reverse",
+  "stage_order_index": 1,
+  "corpus_id": "generated",
+  "corpus_label": "generated-medium",
+  "corpus_origin": "generated-harness-corpus",
+  "phase": "lifecycle",
+  "case": "docx_ordinary_save_lifecycle",
+  "samples": 100,
+  "warmup": 10,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0715-bin/baseline-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--case",
+    "docx_ordinary_save_lifecycle",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0715/baseline_A2-native-generated-lifecycle.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0715-fs"
+  ],
+  "start_utc": "2026-09-20T10:53:21.316620+00:00",
+  "end_utc": "2026-09-20T10:53:22.555315+00:00",
+  "seconds": 0.9521500469418243,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0715-bin/baseline-native",
+  "binary_sha256": "447b42d2d128a200643de137f5064f574f3e70a85e41f4f5ce40d0e19e17c3d8",
+  "binary_bytes": 62887448,
+  "build_record": "build-baseline.json",
+  "build_record_sha256": "d700e69066e56a5161eeae90e9d10115cbb2c77cdbdf00bf5f331faa8b93f379",
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+    "source_census_sha256": "534081a835655800de2e4e4c152430aa33ee24bccac9184089fa8d15db6e23e2",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338",
+    "before_artifact": "baseline_A2-native-generated-lifecycle.source-before.json",
+    "after_artifact": "baseline_A2-native-generated-lifecycle.source-after.json",
+    "before_sha256": "1ab1048f6f6c580f65e344be3b67df715e8df5af1b631d2cb3856101af081ab1",
+    "after_sha256": "1ab1048f6f6c580f65e344be3b67df715e8df5af1b631d2cb3856101af081ab1",
+    "before_file_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338",
+    "after_file_sha256": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "unchanged_during_child": true
+  },
+  "source_delta": {
+    "baseline_manifest": "source-baseline.json",
+    "candidate_manifest": "source-candidate.json",
+    "allowed_paths": [
+      "crates/litchi-docx/src/package/codec.rs",
+      "crates/litchi-docx/src/writer/doc/model.rs",
+      "crates/litchi-docx/src/writer/doc/package.rs"
+    ],
+    "changed_paths": [
+      "crates/litchi-docx/src/package/codec.rs",
+      "crates/litchi-docx/src/writer/doc/model.rs",
+      "crates/litchi-docx/src/writer/doc/package.rs"
+    ],
+    "candidate_available": true,
+    "within_allowlist": true
+  },
+  "fixture": {
+    "plan_path": null,
+    "plan_sha256": null,
+    "before": null,
+    "after": null
+  },
+  "pilot_plan_sha256": "25fb818f001b670ba9f052323610dd0923bbda7661784da6a202ca3eb0216a40",
+  "script_sha256": "613ea3b7672fe2a510c6154a375665dba2320858d533ab8e3f059b1ed707eeda",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "baseline_A2-native-generated-lifecycle.json": "04ada49f7e45ab444a850bae541dbc0e14261f155fa2e8b46aa79c747c504f18",
+    "baseline_A2-native-generated-lifecycle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline_A2-native-generated-lifecycle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline_A2-native-generated-lifecycle.source-before.json": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338",
+    "baseline_A2-native-generated-lifecycle.source-after.json": "5de4c226103dd2b68efa74b941ad113c7eb731bc4acc7315f78def178ad3a338"
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "b1_samples_above_a1_thresholds": {
+    "max_ns": 98,
+    "p50_ns": 100,
+    "p95_ns": 99,
+    "p99_ns": 98
+  },
+  "decision": "rejected; sustained B1 child shift retained",
+  "limits": [
+    "Execution order reconstructed from the retained sample_order permutation.",
+    "No hardware, allocator, frequency, scheduling or implementation cause identified.",
+    "No samples or children discarded; no rerun performed."
+  ],
+  "pilot_analysis_sha256": "a9cee8658af008553c7054df95b63ae1ffcedbbbda2915a8e953fe329c19776a",
+  "rows": {
+    "baseline-A1": {
+      "blocks_of_25_mean_ns": [
+        129402.24,
+        124693.4,
+        123791.44,
+        123147.76
+      ],
+      "half_mean_ns": [
+        127047.82,
+        123469.6
+      ],
+      "max_ns": 152160,
+      "mean_ns": 125258.71,
+      "min_ns": 119111,
+      "p50_ns": 123345,
+      "p95_ns": 136431,
+      "p99_ns": 143411,
+      "report_sha256": "27fc819217f642007a90f1c619a143bfd66a0b2303f58bd72ed92fb586f05a09"
+    },
+    "baseline-A2": {
+      "blocks_of_25_mean_ns": [
+        129744.24,
+        124794.24,
+        124303.8,
+        123544.64
+      ],
+      "half_mean_ns": [
+        127269.24,
+        123924.22
+      ],
+      "max_ns": 145780,
+      "mean_ns": 125596.73,
+      "min_ns": 118921,
+      "p50_ns": 123345,
+      "p95_ns": 137681,
+      "p99_ns": 144091,
+      "report_sha256": "3ddc45ec25a5a7c67c33d10426fd5f3254c9a22dd779affbd5a77d7f648a1ff9"
+    },
+    "candidate-B1": {
+      "blocks_of_25_mean_ns": [
+        175346.88,
+        178529.76,
+        175981.32,
+        178192.4
+      ],
+      "half_mean_ns": [
+        176938.32,
+        177086.86
+      ],
+      "max_ns": 196501,
+      "mean_ns": 177012.59,
+      "min_ns": 132741,
+      "p50_ns": 175516,
+      "p95_ns": 192681,
+      "p99_ns": 196181,
+      "report_sha256": "fff62b1fd0da4a36180913ec59e2520ad4c16ee02690e771196691e230173fc9"
+    },
+    "candidate-B2": {
+      "blocks_of_25_mean_ns": [
+        127469.44,
+        125179.04,
+        124451.8,
+        122637
+      ],
+      "half_mean_ns": [
+        126324.24,
+        123544.4
+      ],
+      "max_ns": 146501,
+      "mean_ns": 124934.32,
+      "min_ns": 118241,
+      "p50_ns": 122975,
+      "p95_ns": 139441,
+      "p99_ns": 146491,
+      "report_sha256": "796094ae0249fc6466d491b9dac329881605dad3d2fc9b75ee9278a68bb1ea10"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+==2461099== Callgrind, a call-graph generating cache profiler
+==2461099== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==2461099== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2461099== Command: /home/zhuhe/code/litchi-0715-bin/current-native --warmup 0 --samples 1 --case docx_ordinary_save_counting_publish --json /home/zhuhe/code/litchi/docs/performance/results/change-0715/profile-r2-generated-counting_publish.json --filesystem-root /home/zhuhe/code/litchi-0715-fs
+==2461099== 
+==2461099== For interactive control, run 'callgrind_control -h'.
+==2461099== 
+==2461099== Events    : Ir
+==2461099== Collected : 47464704
+==2461099== 
+==2461099== I   refs:      47,464,704

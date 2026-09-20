@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0715 — rejected DOCX section-collection fusion
+
+[0715](0715-docx-section-publication-collection.md) profiles duplicate section
+collection and tests one validated traversal in a frozen 32-child ABBA pilot.
+The candidate passes 46/48 hard gates: generated serialization p50 improves
+23.81–33.69%, but the first NumberedList serialization pair regresses 42.30%
+(p50) and 41.32% (mean). The second real-file pair is flat. Three native tail
+and 16 repeat flags remain explicit; no rerun or averaging overrides rejection.
+All allocation gates, exact output parity, 1,461 candidate DOCX tests, scoped
+Clippy and rustdoc pass. All three source files are restored byte-exactly;
+post-acceptance profiles/RSS are deferred. No production speedup is retained.
+[Evidence packet](results/change-0715/README.md). The non-iWork goal remains active.
+
 ## 0714 — DOCX atomic publication attribution
 
 [0714](0714-docx-atomic-publication-attribution.md) records 16 fresh native

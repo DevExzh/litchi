@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "missing-setup-part",
+      "rejected": true,
+      "error": "numbered Callgrind parts are not contiguous: [1, 3, 4, 5, 6]"
+    },
+    {
+      "name": "wrong-measured-parent",
+      "rejected": true,
+      "error": "expected one measured run_case owner edge, got 0"
+    },
+    {
+      "name": "changed-summary",
+      "rejected": true,
+      "error": "/tmp/litchi-0715-profile-negative-c_adifmu/profile-r1-generated-counting_publish.callgrind.6: owner incoming Ir 7262870 != summary 7262871"
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "temporary_inputs_removed": true,
+  "positive_exact_replay": true,
+  "analysis_sha256": "7298398116db02ff0164bf80c42053b15b763a59399fe573a8453f8e2c4a3f66",
+  "parser_sha256": "707804931445504688ed5688c6ff157db3f3a3d41fd0746b3fd0e4b8f96182eb"
+}

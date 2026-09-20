@@ -1,0 +1,12 @@
+{
+  "reviewer": "/root/profile_adapter_0715",
+  "scope": "Final report and README against pilot-analysis.json and child-shift.json",
+  "result": "No substantive evidence errors; clarify that RSS lane was deferred, not captured.",
+  "resolution": "Report now explicitly identifies initial profiles and deferred RSS lane.",
+  "files": {
+    "docs/performance/0715-docx-section-publication-collection.md": "fa940e34974acc299743c5674dbe09f519c962e726d70f8e37e4ce7cdfd10dac",
+    "docs/performance/results/change-0715/README.md": "2f47f7185b9e9db95668fd2a4fc927263fb069d8716002f8b430a0ec574df8b3",
+    "docs/performance/results/change-0715/pilot-analysis.json": "a9cee8658af008553c7054df95b63ae1ffcedbbbda2915a8e953fe329c19776a",
+    "docs/performance/results/change-0715/child-shift.json": "d8e1a0d005ca0b9bce4457759cd27452f0a299f87dc1ef4841e65e14374e2fa9"
+  }
+}

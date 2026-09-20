@@ -1,0 +1,2486 @@
+{
+  "schema_version": 1,
+  "status": "rejected",
+  "packet": "change-0715-docx-publication-collection-pilot",
+  "revision": "653a87ffefdb223fadbf2a25427e92159d15cf75",
+  "performance_claim": "paired pilot decision only; no hardware, RSS, cold-cache, throughput, or scaling claim",
+  "scope": {
+    "corpora": [
+      "generated",
+      "numbered-list"
+    ],
+    "phases": [
+      "counting_publish",
+      "lifecycle"
+    ],
+    "stages": [
+      "baseline-A1",
+      "candidate-B1",
+      "candidate-B2",
+      "baseline-A2"
+    ],
+    "children": 32,
+    "native_samples": 100,
+    "allocator_samples": 3
+  },
+  "source_delta": {
+    "changed_paths": [
+      "crates/litchi-docx/src/package/codec.rs",
+      "crates/litchi-docx/src/writer/doc/model.rs",
+      "crates/litchi-docx/src/writer/doc/package.rs"
+    ],
+    "allowlist": [
+      "crates/litchi-docx/src/package/codec.rs",
+      "crates/litchi-docx/src/writer/doc/model.rs",
+      "crates/litchi-docx/src/writer/doc/package.rs"
+    ],
+    "within_allowlist": true
+  },
+  "rows": [
+    {
+      "stage": "baseline-A1",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 503022,
+        "p50": 508763,
+        "p95": 531673,
+        "p99": 531673,
+        "max": 531673,
+        "mean": 514486,
+        "standard_deviation": 15158.644299540774,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 476826.80078027386,
+          "upper": 552145.1992197261
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 6522,
+          "p50": 6522,
+          "p95": 6522,
+          "p99": 6522,
+          "max": 6522,
+          "mean": 6522
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 801740,
+          "p50": 801740,
+          "p95": 801740,
+          "p99": 801740,
+          "max": 801740,
+          "mean": 801740
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 21575,
+          "p50": 21575,
+          "p95": 21575,
+          "p99": 21575,
+          "max": 21575,
+          "mean": 21575
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 544147,
+          "p50": 544147,
+          "p95": 544147,
+          "p99": 544147,
+          "max": 544147,
+          "mean": 544147
+        }
+      },
+      "report_sha256": "2d5b849e7eb80397464f75e9e5bd3bb6535e3d090219cf9a59c3d57631164181",
+      "receipt_sha256": "03985e79712cbc9f9861d61be33c8179e2084352924dba804a799a5f89cf8578"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 6009469,
+        "p50": 6034809,
+        "p95": 6080829,
+        "p99": 6080829,
+        "max": 6080829,
+        "mean": 6041702.333333333,
+        "standard_deviation": 36175.971767643416,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5951828.984447764,
+          "upper": 6131575.682218902
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 15616,
+          "p50": 15616,
+          "p95": 15616,
+          "p99": 15616,
+          "max": 15616,
+          "mean": 15616
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 3199408,
+          "p50": 3199408,
+          "p95": 3199408,
+          "p99": 3199408,
+          "max": 3199408,
+          "mean": 3199408
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 461654,
+          "p50": 461654,
+          "p95": 461654,
+          "p99": 461654,
+          "max": 461654,
+          "mean": 461654
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 1049866,
+          "p50": 1049866,
+          "p95": 1049866,
+          "p99": 1049866,
+          "max": 1049866,
+          "mean": 1049866
+        }
+      },
+      "report_sha256": "91ec98b6f621805ca8f3d7d30d3064b252b380883d38ead835b378f0e6e04d67",
+      "receipt_sha256": "54f91439f015f8f6cf689d7447f1aef5e9586122a9a4f173d690923b69dea0b1"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 153850,
+        "p50": 157701,
+        "p95": 240781,
+        "p99": 240781,
+        "max": 240781,
+        "mean": 184110.66666666666,
+        "standard_deviation": 49115.70584175018,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 62090.64201525548,
+          "upper": 306130.69131807785
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 752,
+          "p50": 752,
+          "p95": 752,
+          "p99": 752,
+          "max": 752,
+          "mean": 752
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 1113016,
+          "p50": 1113016,
+          "p95": 1113016,
+          "p99": 1113016,
+          "max": 1113016,
+          "mean": 1113016
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 6487,
+          "p50": 6487,
+          "p95": 6487,
+          "p99": 6487,
+          "max": 6487,
+          "mean": 6487
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 529073,
+          "p50": 529073,
+          "p95": 529073,
+          "p99": 529073,
+          "max": 529073,
+          "mean": 529073
+        }
+      },
+      "report_sha256": "07c980c2fe612c0363d63bbbf9bfccfba359777c3a44fc9fec12eca2712f2de8",
+      "receipt_sha256": "54685d7d24c8c6d9d9607148ca645ff4f1d16e771fa903ddee648c9483f8132a"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 5816488,
+        "p50": 5825328,
+        "p95": 5963189,
+        "p99": 5963189,
+        "max": 5963189,
+        "mean": 5868335,
+        "standard_deviation": 82264.80041305638,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5663961.413133781,
+          "upper": 6072708.586866219
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 4674,
+          "p50": 4674,
+          "p95": 4674,
+          "p99": 4674,
+          "max": 4674,
+          "mean": 4674
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 2661485,
+          "p50": 2661485,
+          "p95": 2661485,
+          "p99": 2661485,
+          "max": 2661485,
+          "mean": 2661485
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 122437,
+          "p50": 122437,
+          "p95": 122437,
+          "p99": 122437,
+          "max": 122437,
+          "mean": 122437
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 710663,
+          "p50": 710663,
+          "p95": 710663,
+          "p99": 710663,
+          "max": 710663,
+          "mean": 710663
+        }
+      },
+      "report_sha256": "a7efb0cc37c707f3650152b3ce64c70c8102cd9224f3db2e96945a1fe6e2438d",
+      "receipt_sha256": "b0ee67353169458c27743c9ba1a55f4e07e0518721a9c66f2675f1602858002e"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 312831,
+        "p50": 319611,
+        "p95": 332591,
+        "p99": 338922,
+        "max": 340362,
+        "mean": 321556.68,
+        "standard_deviation": 6349.14742686613,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 320296.8714153046,
+          "upper": 322816.4885846954
+        }
+      },
+      "allocation": null,
+      "report_sha256": "4b1ac9b4e89bf29aeeea46f2ad9ef1129cf2e895e1c17ea76ef395cfb522f8eb",
+      "receipt_sha256": "f774faeaef739fb2e11d74611aebc6dbe260d04a7a972a0a78c0237f5c4a8525"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5064385,
+        "p50": 5765883,
+        "p95": 6212101,
+        "p99": 6816713,
+        "max": 7807928,
+        "mean": 5816820.24,
+        "standard_deviation": 305024.8128430899,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5756296.7000773335,
+          "upper": 5877343.779922667
+        }
+      },
+      "allocation": null,
+      "report_sha256": "1967f43c02071ddda69c394a118508a7f82ddf75711c5e5ec152671e1efd92f3",
+      "receipt_sha256": "3b5a898a7e47b80e67b61b34104e51c4e188b284c1129187d25ef8acc4ff04b9"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 119111,
+        "p50": 123345,
+        "p95": 136431,
+        "p99": 143411,
+        "max": 152160,
+        "mean": 125258.71,
+        "standard_deviation": 5752.751027968965,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 124117.2393987688,
+          "upper": 126400.18060123122
+        }
+      },
+      "allocation": null,
+      "report_sha256": "27fc819217f642007a90f1c619a143bfd66a0b2303f58bd72ed92fb586f05a09",
+      "receipt_sha256": "6d1775694502b90464b513192f489a370cc06401e19c94d4cb7cb1ffc70b338e"
+    },
+    {
+      "stage": "baseline-A1",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5558527,
+        "p50": 5761508,
+        "p95": 5849458,
+        "p99": 5894009,
+        "max": 5911798,
+        "mean": 5751548.04,
+        "standard_deviation": 74967.89239898544,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5736672.783832357,
+          "upper": 5766423.296167643
+        }
+      },
+      "allocation": null,
+      "report_sha256": "b987a224cef99c810f93fd46b79c9363bfd32ce07aac60f419544fd258468a78",
+      "receipt_sha256": "3736876047e8265ae5a66ccc77d78033b59c9bf38e354664edb9e27fca9591c2"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 504052,
+        "p50": 511763,
+        "p95": 528752,
+        "p99": 528752,
+        "max": 528752,
+        "mean": 514855.6666666667,
+        "standard_deviation": 12637.085911448625,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 483460.8712949951,
+          "upper": 546250.4620383383
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 6522,
+          "p50": 6522,
+          "p95": 6522,
+          "p99": 6522,
+          "max": 6522,
+          "mean": 6522
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 801740,
+          "p50": 801740,
+          "p95": 801740,
+          "p99": 801740,
+          "max": 801740,
+          "mean": 801740
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 21575,
+          "p50": 21575,
+          "p95": 21575,
+          "p99": 21575,
+          "max": 21575,
+          "mean": 21575
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 544147,
+          "p50": 544147,
+          "p95": 544147,
+          "p99": 544147,
+          "max": 544147,
+          "mean": 544147
+        }
+      },
+      "report_sha256": "69fcdaba14471fa9b86713c9ffb238028f2a47d130a1853b3d59361d5d85b0c4",
+      "receipt_sha256": "9057ef121924ea245472278f88d3b44906ff7a4e7572de6ff779fadd7af2ef89"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 6124259,
+        "p50": 6125099,
+        "p95": 6227720,
+        "p99": 6227720,
+        "max": 6227720,
+        "mean": 6159026,
+        "standard_deviation": 59492.23165254435,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 6011227.175807184,
+          "upper": 6306824.824192816
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 15616,
+          "p50": 15616,
+          "p95": 15616,
+          "p99": 15616,
+          "max": 15616,
+          "mean": 15616
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 3199408,
+          "p50": 3199408,
+          "p95": 3199408,
+          "p99": 3199408,
+          "max": 3199408,
+          "mean": 3199408
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 461654,
+          "p50": 461654,
+          "p95": 461654,
+          "p99": 461654,
+          "max": 461654,
+          "mean": 461654
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 1049866,
+          "p50": 1049866,
+          "p95": 1049866,
+          "p99": 1049866,
+          "max": 1049866,
+          "mean": 1049866
+        }
+      },
+      "report_sha256": "d1d7cf3e7796a5f632fda14b61718a62ea79f7f8c0d4a97995a70847bf5226e9",
+      "receipt_sha256": "be1b4d590c11b1ddd99653b68ae2d18ceb7766ee4d66cf21d5dd5073c201dd86"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 149221,
+        "p50": 174441,
+        "p95": 225611,
+        "p99": 225611,
+        "max": 225611,
+        "mean": 183091,
+        "standard_deviation": 38922.67847926193,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 86393.9026836998,
+          "upper": 279788.0973163002
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 752,
+          "p50": 752,
+          "p95": 752,
+          "p99": 752,
+          "max": 752,
+          "mean": 752
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 1113016,
+          "p50": 1113016,
+          "p95": 1113016,
+          "p99": 1113016,
+          "max": 1113016,
+          "mean": 1113016
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 6487,
+          "p50": 6487,
+          "p95": 6487,
+          "p99": 6487,
+          "max": 6487,
+          "mean": 6487
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 529073,
+          "p50": 529073,
+          "p95": 529073,
+          "p99": 529073,
+          "max": 529073,
+          "mean": 529073
+        }
+      },
+      "report_sha256": "11b5b18671731d9d27352b6cbbd5c27b85c9f8df12f829bc38c70d049a3f4229",
+      "receipt_sha256": "18fd4959d375fec25116b332f2fa1ec5eaf0f9f50ac28fab7cb5508662a48b69"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 5770848,
+        "p50": 5799258,
+        "p95": 5925228,
+        "p99": 5925228,
+        "max": 5925228,
+        "mean": 5831778,
+        "standard_deviation": 82167.2617287445,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5627646.7322140075,
+          "upper": 6035909.2677859925
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 4674,
+          "p50": 4674,
+          "p95": 4674,
+          "p99": 4674,
+          "max": 4674,
+          "mean": 4674
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 2661485,
+          "p50": 2661485,
+          "p95": 2661485,
+          "p99": 2661485,
+          "max": 2661485,
+          "mean": 2661485
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 122437,
+          "p50": 122437,
+          "p95": 122437,
+          "p99": 122437,
+          "max": 122437,
+          "mean": 122437
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 710663,
+          "p50": 710663,
+          "p95": 710663,
+          "p99": 710663,
+          "max": 710663,
+          "mean": 710663
+        }
+      },
+      "report_sha256": "9da9096bd2a99a77b24e9da50685553366a364c590f80f986c2575ee5cda868a",
+      "receipt_sha256": "cc3a42786cacd72a3e1b2eee692e53617698df62835b802981dfc29b01cd9c8e"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 316841,
+        "p50": 374196,
+        "p95": 388132,
+        "p99": 391492,
+        "max": 397222,
+        "mean": 374895.81,
+        "standard_deviation": 13754.428417231575,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 372166.6330203816,
+          "upper": 377624.9869796184
+        }
+      },
+      "allocation": null,
+      "report_sha256": "2f27dc7be1e41a39f9bc03d4bfa5723b99e494d00052bc0e5242d5178742b60f",
+      "receipt_sha256": "772c71a544f278833be023b6de9e77de5a4e5a09ab7fea2ece636604c35e65d4"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5518897,
+        "p50": 5696768,
+        "p95": 5786619,
+        "p99": 5793868,
+        "max": 5824539,
+        "mean": 5690697.16,
+        "standard_deviation": 69090.65071876091,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5676988.076079634,
+          "upper": 5704406.243920366
+        }
+      },
+      "allocation": null,
+      "report_sha256": "04ada49f7e45ab444a850bae541dbc0e14261f155fa2e8b46aa79c747c504f18",
+      "receipt_sha256": "76c7519bcd0cc07e5a1a02e949f0c07477fcd4126f19bc86216195aa5dd8520f"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 118921,
+        "p50": 123345,
+        "p95": 137681,
+        "p99": 144091,
+        "max": 145780,
+        "mean": 125596.73,
+        "standard_deviation": 6047.541644045508,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 124396.76654550011,
+          "upper": 126796.69345449988
+        }
+      },
+      "allocation": null,
+      "report_sha256": "3ddc45ec25a5a7c67c33d10426fd5f3254c9a22dd779affbd5a77d7f648a1ff9",
+      "receipt_sha256": "024be094376b7196880dfc7d5f5f463c8a67f6e507d0677ef0b1c5ae872dd0f7"
+    },
+    {
+      "stage": "baseline-A2",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5588288,
+        "p50": 5729348,
+        "p95": 5839769,
+        "p99": 5956380,
+        "max": 7337236,
+        "mean": 5744002.74,
+        "standard_deviation": 176669.77390335628,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5708947.624272518,
+          "upper": 5779057.855727483
+        }
+      },
+      "allocation": null,
+      "report_sha256": "d2dfa9ae1d59e89ab151babb0e81e8648f950eecb2ae6a34bcc440fe06b4d4c9",
+      "receipt_sha256": "8cb169df41d201f9d2973a626447cf5117591a52ac4290cb085cea9bf75990a1"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 362732,
+        "p50": 365382,
+        "p95": 392112,
+        "p99": 392112,
+        "max": 392112,
+        "mean": 373408.6666666667,
+        "standard_deviation": 16251.665555669466,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 333034.03297783085,
+          "upper": 413783.3003555025
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 3722,
+          "p50": 3722,
+          "p95": 3722,
+          "p99": 3722,
+          "max": 3722,
+          "mean": 3722
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 738540,
+          "p50": 738540,
+          "p95": 738540,
+          "p99": 738540,
+          "max": 738540,
+          "mean": 738540
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 21575,
+          "p50": 21575,
+          "p95": 21575,
+          "p99": 21575,
+          "max": 21575,
+          "mean": 21575
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 544147,
+          "p50": 544147,
+          "p95": 544147,
+          "p99": 544147,
+          "max": 544147,
+          "mean": 544147
+        }
+      },
+      "report_sha256": "a034f5e35866c99e746320c1550c33779064a862dfa7fa956a810941a420301c",
+      "receipt_sha256": "72cdef6595b986f29c66283d9e80e83dbb403801dab453b7367d3838b01d6b6a"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 6013290,
+        "p50": 6109690,
+        "p95": 6168090,
+        "p99": 6168090,
+        "max": 6168090,
+        "mean": 6097023.333333333,
+        "standard_deviation": 78173.48228992574,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5902813.9644028125,
+          "upper": 6291232.7022638535
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 12816,
+          "p50": 12816,
+          "p95": 12816,
+          "p99": 12816,
+          "max": 12816,
+          "mean": 12816
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 3136208,
+          "p50": 3136208,
+          "p95": 3136208,
+          "p99": 3136208,
+          "max": 3136208,
+          "mean": 3136208
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 461654,
+          "p50": 461654,
+          "p95": 461654,
+          "p99": 461654,
+          "max": 461654,
+          "mean": 461654
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 1049866,
+          "p50": 1049866,
+          "p95": 1049866,
+          "p99": 1049866,
+          "max": 1049866,
+          "mean": 1049866
+        }
+      },
+      "report_sha256": "aee0319c60bb39b265db5b36ab70059913af0dea172dd97a7106b9025a787797",
+      "receipt_sha256": "22ec9a0e93bf6c8e5cdf15acf19120475c0ea1ed2ab96c0f5349ffa7d0dbf83d"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 149751,
+        "p50": 160291,
+        "p95": 223221,
+        "p99": 223221,
+        "max": 223221,
+        "mean": 177754.33333333334,
+        "standard_deviation": 39726.39215097859,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 79060.53943383592,
+          "upper": 276448.12723283074
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 712,
+          "p50": 712,
+          "p95": 712,
+          "p99": 712,
+          "max": 712,
+          "mean": 712
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 1111866,
+          "p50": 1111866,
+          "p95": 1111866,
+          "p99": 1111866,
+          "max": 1111866,
+          "mean": 1111866
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 6487,
+          "p50": 6487,
+          "p95": 6487,
+          "p99": 6487,
+          "max": 6487,
+          "mean": 6487
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 529073,
+          "p50": 529073,
+          "p95": 529073,
+          "p99": 529073,
+          "max": 529073,
+          "mean": 529073
+        }
+      },
+      "report_sha256": "5949ec90fc3132de6ab1ee0b1eab45ece3b2fe9ec0d7125c5929c08868a8b9be",
+      "receipt_sha256": "96fb6e96dbd953136e82eed0e7d522787a1cfaebf468acfd5b57a7f5972d1263"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 5843109,
+        "p50": 5869608,
+        "p95": 5967029,
+        "p99": 5967029,
+        "max": 5967029,
+        "mean": 5893248.666666667,
+        "standard_deviation": 65254.90357309045,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5731133.416439608,
+          "upper": 6055363.916893726
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 4634,
+          "p50": 4634,
+          "p95": 4634,
+          "p99": 4634,
+          "max": 4634,
+          "mean": 4634
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 2660335,
+          "p50": 2660335,
+          "p95": 2660335,
+          "p99": 2660335,
+          "max": 2660335,
+          "mean": 2660335
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 122437,
+          "p50": 122437,
+          "p95": 122437,
+          "p99": 122437,
+          "max": 122437,
+          "mean": 122437
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 710663,
+          "p50": 710663,
+          "p95": 710663,
+          "p99": 710663,
+          "max": 710663,
+          "mean": 710663
+        }
+      },
+      "report_sha256": "d883d6b2769766a3dafe84dba6c82aeaf99fbe1dbdb486a0af4ecca5253f0103",
+      "receipt_sha256": "8dbae2bb1176688f5c31bcd91879a1d4139188748c4afc463e08800595d54597"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 230692,
+        "p50": 243521,
+        "p95": 283231,
+        "p99": 293571,
+        "max": 294621,
+        "mean": 251228.63,
+        "standard_deviation": 18194.586208154324,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 247618.42939211667,
+          "upper": 254838.83060788334
+        }
+      },
+      "allocation": null,
+      "report_sha256": "59a1e469a3c2ad66684a1eb8b4f690ac3ec055f104d1798cd921b9c2ca33c69d",
+      "receipt_sha256": "dfed560eaf601810b4d0f5954ed92d51988a9b525748b88f625b76c5b1a50869"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5357117,
+        "p50": 5583648,
+        "p95": 5688318,
+        "p99": 5704278,
+        "max": 5712329,
+        "mean": 5580495.62,
+        "standard_deviation": 71730.54018792916,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5566262.724740519,
+          "upper": 5594728.515259481
+        }
+      },
+      "allocation": null,
+      "report_sha256": "175d8073a296571564d1573a7dcc93c3d01701e0645004e261f6e55de72776b3",
+      "receipt_sha256": "f9e37eeb382843794fd623fb9aa5d20113c29d919a44b1c04561174bd2aeff7c"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 132741,
+        "p50": 175516,
+        "p95": 192681,
+        "p99": 196181,
+        "max": 196501,
+        "mean": 177012.59,
+        "standard_deviation": 9124.8154585961,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 175202.02866386567,
+          "upper": 178823.15133613432
+        }
+      },
+      "allocation": null,
+      "report_sha256": "fff62b1fd0da4a36180913ec59e2520ad4c16ee02690e771196691e230173fc9",
+      "receipt_sha256": "b740752932c4664fb4723fa4cf481e54c11b9246f2b38770df8ae28968d04250"
+    },
+    {
+      "stage": "candidate-B1",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 1,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5565407,
+        "p50": 5731844,
+        "p95": 5843309,
+        "p99": 6909374,
+        "max": 7322396,
+        "mean": 5756789.11,
+        "standard_deviation": 208692.56994222096,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5715379.976852005,
+          "upper": 5798198.243147995
+        }
+      },
+      "allocation": null,
+      "report_sha256": "20388d4ceb8cc48add08c0ee51ead1326ed15586d4ced19afd186d29b323bfed",
+      "receipt_sha256": "db7a2890375a53dac01bf2675e89b57510cb159d7c7b1dece64db634c45c85b9"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 361392,
+        "p50": 364971,
+        "p95": 391742,
+        "p99": 391742,
+        "max": 391742,
+        "mean": 372701.6666666667,
+        "standard_deviation": 16586.230142299766,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 331495.86139211344,
+          "upper": 413907.47194121993
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 3722,
+          "p50": 3722,
+          "p95": 3722,
+          "p99": 3722,
+          "max": 3722,
+          "mean": 3722
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 738540,
+          "p50": 738540,
+          "p95": 738540,
+          "p99": 738540,
+          "max": 738540,
+          "mean": 738540
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 21575,
+          "p50": 21575,
+          "p95": 21575,
+          "p99": 21575,
+          "max": 21575,
+          "mean": 21575
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 544147,
+          "p50": 544147,
+          "p95": 544147,
+          "p99": 544147,
+          "max": 544147,
+          "mean": 544147
+        }
+      },
+      "report_sha256": "e7580b47d3c6f2dd2cc3261dd2190a57ca746635e9b7bf1c3818ba3566ba624e",
+      "receipt_sha256": "b2a90f7386fa91d49d5887b9118b57e80e59892701a75dbfb3d34b60fd172e3e"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "allocator",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 5866679,
+        "p50": 5933329,
+        "p95": 6018250,
+        "p99": 6018250,
+        "max": 6018250,
+        "mean": 5939419.333333333,
+        "standard_deviation": 75968.81682857337,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5750687.09904502,
+          "upper": 6128151.567621646
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 12816,
+          "p50": 12816,
+          "p95": 12816,
+          "p99": 12816,
+          "max": 12816,
+          "mean": 12816
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 3136208,
+          "p50": 3136208,
+          "p95": 3136208,
+          "p99": 3136208,
+          "max": 3136208,
+          "mean": 3136208
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 461654,
+          "p50": 461654,
+          "p95": 461654,
+          "p99": 461654,
+          "max": 461654,
+          "mean": 461654
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 1049866,
+          "p50": 1049866,
+          "p95": 1049866,
+          "p99": 1049866,
+          "max": 1049866,
+          "mean": 1049866
+        }
+      },
+      "report_sha256": "fb44666b47e6e084b4f8331c5caaaffda31327f1d51c5f6459d3fb9fa3888a0b",
+      "receipt_sha256": "1141fcc40ade0f669ddd12056543fd3074c5a4e1c2d7e1e544d8819116f84341"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 151230,
+        "p50": 205231,
+        "p95": 222161,
+        "p99": 222161,
+        "max": 222161,
+        "mean": 192874,
+        "standard_deviation": 37044.88192719745,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 100841.98440545068,
+          "upper": 284906.0155945493
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 712,
+          "p50": 712,
+          "p95": 712,
+          "p99": 712,
+          "max": 712,
+          "mean": 712
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 1111866,
+          "p50": 1111866,
+          "p95": 1111866,
+          "p99": 1111866,
+          "max": 1111866,
+          "mean": 1111866
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 6487,
+          "p50": 6487,
+          "p95": 6487,
+          "p99": 6487,
+          "max": 6487,
+          "mean": 6487
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 529073,
+          "p50": 529073,
+          "p95": 529073,
+          "p99": 529073,
+          "max": 529073,
+          "mean": 529073
+        }
+      },
+      "report_sha256": "3db2aca6af7cd984b1974b7678c899ec41bfefc3a1dc630521a4c7709de1882a",
+      "receipt_sha256": "5fefbc74d35e4ec2d466a40598b23792ab3469297d64df1ad2aeeab896ba44b9"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "allocator",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 3,
+        "min": 5659318,
+        "p50": 5704688,
+        "p95": 5715588,
+        "p99": 5715588,
+        "max": 5715588,
+        "mean": 5693198,
+        "standard_deviation": 29842.809854301588,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5619058.367235241,
+          "upper": 5767337.632764759
+        }
+      },
+      "allocation": {
+        "allocation_calls": {
+          "count": 3,
+          "min": 4634,
+          "p50": 4634,
+          "p95": 4634,
+          "p99": 4634,
+          "max": 4634,
+          "mean": 4634
+        },
+        "allocated_bytes": {
+          "count": 3,
+          "min": 2660335,
+          "p50": 2660335,
+          "p95": 2660335,
+          "p99": 2660335,
+          "max": 2660335,
+          "mean": 2660335
+        },
+        "net_live_bytes": {
+          "count": 3,
+          "min": 122437,
+          "p50": 122437,
+          "p95": 122437,
+          "p99": 122437,
+          "max": 122437,
+          "mean": 122437
+        },
+        "peak_above_start_bytes": {
+          "count": 3,
+          "min": 710663,
+          "p50": 710663,
+          "p95": 710663,
+          "p99": 710663,
+          "max": 710663,
+          "mean": 710663
+        }
+      },
+      "report_sha256": "4ca3782e0efd8865358ba96138bbd75a46bb0abc01cac8ef68824979db105a5d",
+      "receipt_sha256": "64745a9fb5ad01002af7ae20c89c65a863ff1b4231a44abeda40e316a0084f01"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 232401,
+        "p50": 248131,
+        "p95": 283942,
+        "p99": 298411,
+        "max": 309782,
+        "mean": 256444.65,
+        "standard_deviation": 19411.47368006402,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 252592.99251914612,
+          "upper": 260296.30748085387
+        }
+      },
+      "allocation": null,
+      "report_sha256": "7cabb09549b559303ef08d7b638795ba55ea92f05d2e10c285acb3c339606eea",
+      "receipt_sha256": "84a5e7a5c3670f4fe5bd5aaecf3b32d006e375f517997b148361c63711293463"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "native",
+      "corpus_id": "generated",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5395256,
+        "p50": 5597852,
+        "p95": 5707498,
+        "p99": 5717688,
+        "max": 5732248,
+        "mean": 5593285.26,
+        "standard_deviation": 68692.77260126344,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5579655.123729512,
+          "upper": 5606915.396270487
+        }
+      },
+      "allocation": null,
+      "report_sha256": "e56bcfd3249a2f689d21c95d68e739424aa0410eb9903ef9a259b6dda903cacb",
+      "receipt_sha256": "c1e4b989ab20f097ac91d1490610eb80b8613649344e559de9afe520f0922d5c"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "counting_publish",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 118241,
+        "p50": 122975,
+        "p95": 139441,
+        "p99": 146491,
+        "max": 146501,
+        "mean": 124934.32,
+        "standard_deviation": 6323.927525763646,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 123679.51559079118,
+          "upper": 126189.12440920883
+        }
+      },
+      "allocation": null,
+      "report_sha256": "796094ae0249fc6466d491b9dac329881605dad3d2fc9b75ee9278a68bb1ea10",
+      "receipt_sha256": "f55580524fce7b4e564285f617c89f0bb74caf779aa36d6cddff14236994681d"
+    },
+    {
+      "stage": "candidate-B2",
+      "lane": "native",
+      "corpus_id": "numbered-list",
+      "phase": "lifecycle",
+      "repeat": 2,
+      "elapsed_ns": {
+        "count": 100,
+        "min": 5551598,
+        "p50": 5737818,
+        "p95": 5853369,
+        "p99": 5892859,
+        "max": 5917700,
+        "mean": 5729561.96,
+        "standard_deviation": 82581.02833904249,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 5713176.092506316,
+          "upper": 5745947.827493684
+        }
+      },
+      "allocation": null,
+      "report_sha256": "5860d10ef4e05d6d0474ad695f82604537dc7ab64d8c62a325930fce7e95bb58",
+      "receipt_sha256": "24f226c864cdd7606de7ee7f2fe0bae97464bc5e416790c57f3bd843ff984474"
+    }
+  ],
+  "normalized_output_parity": {
+    "verified": true,
+    "reference": "baseline-A1/native",
+    "keys": {
+      "generated/counting_publish": "fc028ac0f41a4d1615217eb7c753e8937cd909076dd0a9667f4f2556d9d02e12",
+      "generated/lifecycle": "4d9e3f64818d32745b2c6307a8fb27af5ef0f45158ccf2e4cc57e9d7ade97bdf",
+      "numbered-list/counting_publish": "bc1a3aa7909a3cdcb5b07126964aad9559521cba19f9e7c17dcd89e4e457db11",
+      "numbered-list/lifecycle": "bf94219354d56e9b284135d0ed71f9743df088ad18092f668a3e0a1cd19b27f4"
+    },
+    "excluded_fields": [
+      "result.elapsed_ns",
+      "result.operation_metrics",
+      "result.source.ordinary_save.published_sha256",
+      "result.source.ordinary_save.edit_outcome_sha256"
+    ]
+  },
+  "paired_comparisons": {
+    "pair-1": {
+      "baseline_stage": "baseline-A1",
+      "candidate_stage": "candidate-B1",
+      "corpora": {
+        "generated": {
+          "counting_publish": {
+            "native": {
+              "p50": {
+                "baseline": 319611.0,
+                "candidate": 243521.0,
+                "delta_percent": -23.80706546395462,
+                "improvement_percent": 23.80706546395462
+              },
+              "mean": {
+                "baseline": 321556.68,
+                "candidate": 251228.63,
+                "delta_percent": -21.871120823862217,
+                "improvement_percent": 21.871120823862217
+              },
+              "p95": {
+                "baseline": 332591.0,
+                "candidate": 283231.0,
+                "delta_percent": -14.841051020622928,
+                "improvement_percent": 14.841051020622928
+              },
+              "p99": {
+                "baseline": 338922.0,
+                "candidate": 293571.0,
+                "delta_percent": -13.380954909979287,
+                "improvement_percent": 13.380954909979287
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 6522.0,
+                    "candidate": 3722.0,
+                    "delta_percent": -42.93161606869059,
+                    "improvement_percent": 42.93161606869059
+                  },
+                  "mean": {
+                    "baseline": 6522.0,
+                    "candidate": 3722.0,
+                    "delta_percent": -42.93161606869059,
+                    "improvement_percent": 42.93161606869059
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 801740.0,
+                    "candidate": 738540.0,
+                    "delta_percent": -7.882854790829945,
+                    "improvement_percent": 7.882854790829945
+                  },
+                  "mean": {
+                    "baseline": 801740.0,
+                    "candidate": 738540.0,
+                    "delta_percent": -7.882854790829945,
+                    "improvement_percent": 7.882854790829945
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "native": {
+              "p50": {
+                "baseline": 5765883.0,
+                "candidate": 5583648.0,
+                "delta_percent": -3.160574017891102,
+                "improvement_percent": 3.160574017891102
+              },
+              "mean": {
+                "baseline": 5816820.24,
+                "candidate": 5580495.62,
+                "delta_percent": -4.062780183146937,
+                "improvement_percent": 4.062780183146937
+              },
+              "p95": {
+                "baseline": 6212101.0,
+                "candidate": 5688318.0,
+                "delta_percent": -8.431656214218023,
+                "improvement_percent": 8.431656214218023
+              },
+              "p99": {
+                "baseline": 6816713.0,
+                "candidate": 5704278.0,
+                "delta_percent": -16.319228930424384,
+                "improvement_percent": 16.319228930424384
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 15616.0,
+                    "candidate": 12816.0,
+                    "delta_percent": -17.93032786885246,
+                    "improvement_percent": 17.93032786885246
+                  },
+                  "mean": {
+                    "baseline": 15616.0,
+                    "candidate": 12816.0,
+                    "delta_percent": -17.93032786885246,
+                    "improvement_percent": 17.93032786885246
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 3199408.0,
+                    "candidate": 3136208.0,
+                    "delta_percent": -1.9753654426068823,
+                    "improvement_percent": 1.9753654426068823
+                  },
+                  "mean": {
+                    "baseline": 3199408.0,
+                    "candidate": 3136208.0,
+                    "delta_percent": -1.9753654426068823,
+                    "improvement_percent": 1.9753654426068823
+                  }
+                }
+              }
+            }
+          }
+        },
+        "numbered-list": {
+          "counting_publish": {
+            "native": {
+              "p50": {
+                "baseline": 123345.0,
+                "candidate": 175516.0,
+                "delta_percent": 42.296809761238805,
+                "improvement_percent": -42.296809761238805
+              },
+              "mean": {
+                "baseline": 125258.71,
+                "candidate": 177012.59,
+                "delta_percent": 41.31758981072054,
+                "improvement_percent": -41.31758981072054
+              },
+              "p95": {
+                "baseline": 136431.0,
+                "candidate": 192681.0,
+                "delta_percent": 41.22963256151461,
+                "improvement_percent": -41.22963256151461
+              },
+              "p99": {
+                "baseline": 143411.0,
+                "candidate": 196181.0,
+                "delta_percent": 36.7963405875421,
+                "improvement_percent": -36.7963405875421
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 752.0,
+                    "candidate": 712.0,
+                    "delta_percent": -5.319148936170213,
+                    "improvement_percent": 5.319148936170213
+                  },
+                  "mean": {
+                    "baseline": 752.0,
+                    "candidate": 712.0,
+                    "delta_percent": -5.319148936170213,
+                    "improvement_percent": 5.319148936170213
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 1113016.0,
+                    "candidate": 1111866.0,
+                    "delta_percent": -0.10332286328318731,
+                    "improvement_percent": 0.10332286328318731
+                  },
+                  "mean": {
+                    "baseline": 1113016.0,
+                    "candidate": 1111866.0,
+                    "delta_percent": -0.10332286328318731,
+                    "improvement_percent": 0.10332286328318731
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "native": {
+              "p50": {
+                "baseline": 5761508.0,
+                "candidate": 5731844.0,
+                "delta_percent": -0.5148652054288565,
+                "improvement_percent": 0.5148652054288565
+              },
+              "mean": {
+                "baseline": 5751548.04,
+                "candidate": 5756789.11,
+                "delta_percent": 0.09112451054134459,
+                "improvement_percent": -0.09112451054134459
+              },
+              "p95": {
+                "baseline": 5849458.0,
+                "candidate": 5843309.0,
+                "delta_percent": -0.1051208505129877,
+                "improvement_percent": 0.1051208505129877
+              },
+              "p99": {
+                "baseline": 5894009.0,
+                "candidate": 6909374.0,
+                "delta_percent": 17.22706904587353,
+                "improvement_percent": -17.22706904587353
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 4674.0,
+                    "candidate": 4634.0,
+                    "delta_percent": -0.8557980316645272,
+                    "improvement_percent": 0.8557980316645272
+                  },
+                  "mean": {
+                    "baseline": 4674.0,
+                    "candidate": 4634.0,
+                    "delta_percent": -0.8557980316645272,
+                    "improvement_percent": 0.8557980316645272
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 2661485.0,
+                    "candidate": 2660335.0,
+                    "delta_percent": -0.04320896041119901,
+                    "improvement_percent": 0.04320896041119901
+                  },
+                  "mean": {
+                    "baseline": 2661485.0,
+                    "candidate": 2660335.0,
+                    "delta_percent": -0.04320896041119901,
+                    "improvement_percent": 0.04320896041119901
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pair-2": {
+      "baseline_stage": "baseline-A2",
+      "candidate_stage": "candidate-B2",
+      "corpora": {
+        "generated": {
+          "counting_publish": {
+            "native": {
+              "p50": {
+                "baseline": 374196.0,
+                "candidate": 248131.0,
+                "delta_percent": -33.68956375803055,
+                "improvement_percent": 33.68956375803055
+              },
+              "mean": {
+                "baseline": 374895.81,
+                "candidate": 256444.65,
+                "delta_percent": -31.595754564448185,
+                "improvement_percent": 31.595754564448185
+              },
+              "p95": {
+                "baseline": 388132.0,
+                "candidate": 283942.0,
+                "delta_percent": -26.843960302165243,
+                "improvement_percent": 26.843960302165243
+              },
+              "p99": {
+                "baseline": 391492.0,
+                "candidate": 298411.0,
+                "delta_percent": -23.775964770672196,
+                "improvement_percent": 23.775964770672196
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 6522.0,
+                    "candidate": 3722.0,
+                    "delta_percent": -42.93161606869059,
+                    "improvement_percent": 42.93161606869059
+                  },
+                  "mean": {
+                    "baseline": 6522.0,
+                    "candidate": 3722.0,
+                    "delta_percent": -42.93161606869059,
+                    "improvement_percent": 42.93161606869059
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 801740.0,
+                    "candidate": 738540.0,
+                    "delta_percent": -7.882854790829945,
+                    "improvement_percent": 7.882854790829945
+                  },
+                  "mean": {
+                    "baseline": 801740.0,
+                    "candidate": 738540.0,
+                    "delta_percent": -7.882854790829945,
+                    "improvement_percent": 7.882854790829945
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "native": {
+              "p50": {
+                "baseline": 5696768.0,
+                "candidate": 5597852.0,
+                "delta_percent": -1.7363529636453512,
+                "improvement_percent": 1.7363529636453512
+              },
+              "mean": {
+                "baseline": 5690697.16,
+                "candidate": 5593285.26,
+                "delta_percent": -1.7117744497934304,
+                "improvement_percent": 1.7117744497934304
+              },
+              "p95": {
+                "baseline": 5786619.0,
+                "candidate": 5707498.0,
+                "delta_percent": -1.3673096500737305,
+                "improvement_percent": 1.3673096500737305
+              },
+              "p99": {
+                "baseline": 5793868.0,
+                "candidate": 5717688.0,
+                "delta_percent": -1.3148383774017633,
+                "improvement_percent": 1.3148383774017633
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 15616.0,
+                    "candidate": 12816.0,
+                    "delta_percent": -17.93032786885246,
+                    "improvement_percent": 17.93032786885246
+                  },
+                  "mean": {
+                    "baseline": 15616.0,
+                    "candidate": 12816.0,
+                    "delta_percent": -17.93032786885246,
+                    "improvement_percent": 17.93032786885246
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 3199408.0,
+                    "candidate": 3136208.0,
+                    "delta_percent": -1.9753654426068823,
+                    "improvement_percent": 1.9753654426068823
+                  },
+                  "mean": {
+                    "baseline": 3199408.0,
+                    "candidate": 3136208.0,
+                    "delta_percent": -1.9753654426068823,
+                    "improvement_percent": 1.9753654426068823
+                  }
+                }
+              }
+            }
+          }
+        },
+        "numbered-list": {
+          "counting_publish": {
+            "native": {
+              "p50": {
+                "baseline": 123345.0,
+                "candidate": 122975.0,
+                "delta_percent": -0.2999716243058089,
+                "improvement_percent": 0.2999716243058089
+              },
+              "mean": {
+                "baseline": 125596.73,
+                "candidate": 124934.32,
+                "delta_percent": -0.5274102279573593,
+                "improvement_percent": 0.5274102279573593
+              },
+              "p95": {
+                "baseline": 137681.0,
+                "candidate": 139441.0,
+                "delta_percent": 1.2783172696305227,
+                "improvement_percent": -1.2783172696305227
+              },
+              "p99": {
+                "baseline": 144091.0,
+                "candidate": 146491.0,
+                "delta_percent": 1.6656140910952106,
+                "improvement_percent": -1.6656140910952106
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 752.0,
+                    "candidate": 712.0,
+                    "delta_percent": -5.319148936170213,
+                    "improvement_percent": 5.319148936170213
+                  },
+                  "mean": {
+                    "baseline": 752.0,
+                    "candidate": 712.0,
+                    "delta_percent": -5.319148936170213,
+                    "improvement_percent": 5.319148936170213
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 1113016.0,
+                    "candidate": 1111866.0,
+                    "delta_percent": -0.10332286328318731,
+                    "improvement_percent": 0.10332286328318731
+                  },
+                  "mean": {
+                    "baseline": 1113016.0,
+                    "candidate": 1111866.0,
+                    "delta_percent": -0.10332286328318731,
+                    "improvement_percent": 0.10332286328318731
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "native": {
+              "p50": {
+                "baseline": 5729348.0,
+                "candidate": 5737818.0,
+                "delta_percent": 0.14783532087769846,
+                "improvement_percent": -0.14783532087769846
+              },
+              "mean": {
+                "baseline": 5744002.74,
+                "candidate": 5729561.96,
+                "delta_percent": -0.25140621712169064,
+                "improvement_percent": 0.25140621712169064
+              },
+              "p95": {
+                "baseline": 5839769.0,
+                "candidate": 5853369.0,
+                "delta_percent": 0.23288592408364098,
+                "improvement_percent": -0.23288592408364098
+              },
+              "p99": {
+                "baseline": 5956380.0,
+                "candidate": 5892859.0,
+                "delta_percent": -1.0664363254191305,
+                "improvement_percent": 1.0664363254191305
+              }
+            },
+            "allocator": {
+              "allocation": {
+                "allocation_calls": {
+                  "p50": {
+                    "baseline": 4674.0,
+                    "candidate": 4634.0,
+                    "delta_percent": -0.8557980316645272,
+                    "improvement_percent": 0.8557980316645272
+                  },
+                  "mean": {
+                    "baseline": 4674.0,
+                    "candidate": 4634.0,
+                    "delta_percent": -0.8557980316645272,
+                    "improvement_percent": 0.8557980316645272
+                  }
+                },
+                "allocated_bytes": {
+                  "p50": {
+                    "baseline": 2661485.0,
+                    "candidate": 2660335.0,
+                    "delta_percent": -0.04320896041119901,
+                    "improvement_percent": 0.04320896041119901
+                  },
+                  "mean": {
+                    "baseline": 2661485.0,
+                    "candidate": 2660335.0,
+                    "delta_percent": -0.04320896041119901,
+                    "improvement_percent": 0.04320896041119901
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "review_flags": {
+    "native_tail_regressions_over_5_percent": [
+      {
+        "pair": "pair-1",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p95",
+        "delta_percent": 41.22963256151461,
+        "flag_over_5_percent": true
+      },
+      {
+        "pair": "pair-1",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p99",
+        "delta_percent": 36.7963405875421,
+        "flag_over_5_percent": true
+      },
+      {
+        "pair": "pair-1",
+        "corpus_id": "numbered-list",
+        "phase": "lifecycle",
+        "metric": "p99",
+        "delta_percent": 17.22706904587353,
+        "flag_over_5_percent": true
+      }
+    ],
+    "repeat_drift_over_5_percent": [
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "counting_publish",
+        "metric": "p50",
+        "spread_percent": 17.07857364108244,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "counting_publish",
+        "metric": "mean",
+        "spread_percent": 16.587784772501074,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "counting_publish",
+        "metric": "p95",
+        "spread_percent": 16.699489763703767,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "counting_publish",
+        "metric": "p99",
+        "spread_percent": 15.51094352092812,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "lifecycle",
+        "metric": "p95",
+        "spread_percent": 7.352860107084983,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "baseline",
+        "corpus_id": "generated",
+        "phase": "lifecycle",
+        "metric": "p99",
+        "spread_percent": 17.653923078675593,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p50",
+        "spread_percent": 42.724944094328116,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "mean",
+        "spread_percent": 41.684518713512816,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p95",
+        "spread_percent": 38.181022798172705,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p99",
+        "spread_percent": 33.92017257032855,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "native",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "lifecycle",
+        "metric": "p99",
+        "spread_percent": 17.24994607880487,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "allocator",
+        "source": "baseline",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p50",
+        "spread_percent": 10.615024635227424,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "allocator",
+        "source": "baseline",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p95",
+        "spread_percent": 6.723962927339536,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "allocator",
+        "source": "baseline",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p99",
+        "spread_percent": 6.723962927339536,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "allocator",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "p50",
+        "spread_percent": 28.03650859998378,
+        "flag_over_5_percent": true
+      },
+      {
+        "lane": "allocator",
+        "source": "candidate",
+        "corpus_id": "numbered-list",
+        "phase": "counting_publish",
+        "metric": "mean",
+        "spread_percent": 8.505934220075266,
+        "flag_over_5_percent": true
+      }
+    ],
+    "tail_metrics": [
+      "p95",
+      "p99"
+    ],
+    "note": "Repeat and tail flags are retained separately from hard gates."
+  },
+  "decision": {
+    "hard_gates": [
+      {
+        "name": "pair-1/generated/counting_publish/p50/improvement",
+        "pass": true,
+        "threshold_percent": 10,
+        "observed_improvement_percent": 23.80706546395462
+      },
+      {
+        "name": "pair-1/generated/counting_publish/mean/improvement",
+        "pass": true,
+        "threshold_percent": 10,
+        "observed_improvement_percent": 21.871120823862217
+      },
+      {
+        "name": "pair-1/generated/counting_publish/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -42.93161606869059
+      },
+      {
+        "name": "pair-1/generated/counting_publish/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -42.93161606869059
+      },
+      {
+        "name": "pair-1/generated/counting_publish/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -7.882854790829945
+      },
+      {
+        "name": "pair-1/generated/counting_publish/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -7.882854790829945
+      },
+      {
+        "name": "pair-1/generated/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -3.160574017891102
+      },
+      {
+        "name": "pair-1/generated/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -4.062780183146937
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -17.93032786885246
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -17.93032786885246
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.9753654426068823
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.9753654426068823
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/p50/nonregression",
+        "pass": false,
+        "threshold_percent": 3,
+        "observed_delta_percent": 42.296809761238805
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/mean/nonregression",
+        "pass": false,
+        "threshold_percent": 3,
+        "observed_delta_percent": 41.31758981072054
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -5.319148936170213
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -5.319148936170213
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.10332286328318731
+      },
+      {
+        "name": "pair-1/numbered-list/counting_publish/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.10332286328318731
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.5148652054288565
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.09112451054134459
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.8557980316645272
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.8557980316645272
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.04320896041119901
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.04320896041119901
+      },
+      {
+        "name": "pair-2/generated/counting_publish/p50/improvement",
+        "pass": true,
+        "threshold_percent": 10,
+        "observed_improvement_percent": 33.68956375803055
+      },
+      {
+        "name": "pair-2/generated/counting_publish/mean/improvement",
+        "pass": true,
+        "threshold_percent": 10,
+        "observed_improvement_percent": 31.595754564448185
+      },
+      {
+        "name": "pair-2/generated/counting_publish/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -42.93161606869059
+      },
+      {
+        "name": "pair-2/generated/counting_publish/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -42.93161606869059
+      },
+      {
+        "name": "pair-2/generated/counting_publish/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -7.882854790829945
+      },
+      {
+        "name": "pair-2/generated/counting_publish/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -7.882854790829945
+      },
+      {
+        "name": "pair-2/generated/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.7363529636453512
+      },
+      {
+        "name": "pair-2/generated/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.7117744497934304
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -17.93032786885246
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -17.93032786885246
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.9753654426068823
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -1.9753654426068823
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.2999716243058089
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.5274102279573593
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -5.319148936170213
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -5.319148936170213
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.10332286328318731
+      },
+      {
+        "name": "pair-2/numbered-list/counting_publish/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.10332286328318731
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.14783532087769846
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.25140621712169064
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.8557980316645272
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.8557980316645272
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.04320896041119901
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.04320896041119901
+      }
+    ],
+    "all_hard_gates_pass": false,
+    "deterministic_output_parity_pass": true,
+    "accepted": false,
+    "acceptance_rule": "Accept only when output parity and every timing/allocation hard gate pass."
+  },
+  "verification": {
+    "child_receipts_verified": 32,
+    "strict_0709_validators_used": true,
+    "raw_elapsed_statistics_recomputed": true,
+    "allocation_request_and_bytes_gated": true,
+    "phase_values_additive": false
+  },
+  "binary_custody": {
+    "baseline-A1/native": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/baseline-native",
+      "sha256": "447b42d2d128a200643de137f5064f574f3e70a85e41f4f5ce40d0e19e17c3d8",
+      "bytes": 62887448,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "baseline-A1/allocator": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/baseline-alloc",
+      "sha256": "f29f46d087741a55deeda538ac0281bba22fb783f8de34c66df6067f25fba0b9",
+      "bytes": 62987184,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "candidate-B1/native": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/candidate-native",
+      "sha256": "4970e05f89f256fc8a5fe1970c3887b32661213ccdd59613f35c3efdf55e6a62",
+      "bytes": 62883824,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "candidate-B1/allocator": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/candidate-alloc",
+      "sha256": "c91e414ed3abb714d13e58cb4eda2c9c15d1fd1148def6c520541f79113c668e",
+      "bytes": 62985872,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "candidate-B2/native": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/candidate-native",
+      "sha256": "4970e05f89f256fc8a5fe1970c3887b32661213ccdd59613f35c3efdf55e6a62",
+      "bytes": 62883824,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "candidate-B2/allocator": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/candidate-alloc",
+      "sha256": "c91e414ed3abb714d13e58cb4eda2c9c15d1fd1148def6c520541f79113c668e",
+      "bytes": 62985872,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "baseline-A2/native": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/baseline-native",
+      "sha256": "447b42d2d128a200643de137f5064f574f3e70a85e41f4f5ce40d0e19e17c3d8",
+      "bytes": 62887448,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    },
+    "baseline-A2/allocator": {
+      "binary": "/home/zhuhe/code/litchi-0715-bin/baseline-alloc",
+      "sha256": "f29f46d087741a55deeda538ac0281bba22fb783f8de34c66df6067f25fba0b9",
+      "bytes": 62987184,
+      "validation": "exact-live-binary-or-exact-cleanup-witness"
+    }
+  },
+  "pilot_plan_sha256": "25fb818f001b670ba9f052323610dd0923bbda7661784da6a202ca3eb0216a40",
+  "capture_script_sha256": "613ea3b7672fe2a510c6154a375665dba2320858d533ab8e3f059b1ed707eeda",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65"
+}

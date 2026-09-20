@@ -1,0 +1,81 @@
+{
+  "job": {
+    "lane": "profile",
+    "repeat": 1,
+    "phase": "counting_publish",
+    "corpus": {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    "name": "profile-r1-generated-counting_publish",
+    "case": "docx_ordinary_save_counting_publish",
+    "samples": 1,
+    "warmup": 0,
+    "order_index": 0
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--zero-before=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--dump-after=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0715/profile-r1-generated-counting_publish.callgrind",
+    "/home/zhuhe/code/litchi-0715-bin/current-native",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0715/profile-r1-generated-counting_publish.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0715-fs"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T10:30:09.225685+00:00",
+  "seconds": 2.811998408054933,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0715-bin/current-native",
+    "sha256": "447b42d2d128a200643de137f5064f574f3e70a85e41f4f5ce40d0e19e17c3d8",
+    "bytes": 62887448
+  },
+  "source_before": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "source_after": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "source_manifest_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+  "build_sha256": "624881bdc59a278833f88fb88aec22ec6e21c2fa73d87a22ea8dd2fdc6f46af8",
+  "plan_sha256": "ca8bac2115fec1a2785632620e169dc32a8dcc2c5dcca0f786357bb63f0554bf",
+  "script_sha256": "f9f7bb370b67ff0181382ed1260a0676939eb7d1b687c855a2e1e2c1e4d9af46",
+  "fixture_before": null,
+  "fixture_after": null,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "profile-r1-generated-counting_publish.callgrind": "9717d9ff2c89cbaf030249b50ba35452feaf4ad43a7fe020d55bec6075a22c11",
+    "profile-r1-generated-counting_publish.callgrind.1": "b58f1cf87ced4b12de19e72e5c256ff9efd9f62a96e3f6c8a4f9032854fc5d6c",
+    "profile-r1-generated-counting_publish.callgrind.2": "9d8f3a0b44bf5b6cc1b6a9554f2bcc339da7e62dde4a5d9f4fe2acd7821a24fb",
+    "profile-r1-generated-counting_publish.callgrind.3": "b459e6557e51182c7517a6c6bdcb7cef26fc164c9da3029a77b36d4046a6f468",
+    "profile-r1-generated-counting_publish.callgrind.4": "8f5bf126276d955128ebc079b20a0d9d94dbccd21f4059033f4b8c71fe8ff997",
+    "profile-r1-generated-counting_publish.callgrind.5": "005130d026e4bfe8ffd9e84db00d545e99d1f3cebc5554dc6914c8caf03585cd",
+    "profile-r1-generated-counting_publish.callgrind.6": "675468f8fde4d33cef465b4706b9d6b15ca98d3b4ad6371cc465980909f60050",
+    "profile-r1-generated-counting_publish.json": "5576d80b6a0f35f39851f5bc19666f037456288d31b3a2d981aaa719bd40594a",
+    "profile-r1-generated-counting_publish.stderr": "f5ed3cdeecb60e09518ab6dd28fb8133c0d35eec194100995231d5c59b044d66",
+    "profile-r1-generated-counting_publish.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

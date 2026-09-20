@@ -1,0 +1,13 @@
+{
+  "profile_candidate_children": 4,
+  "baseline_profiles": "profile-analysis.json",
+  "rss_children": 16,
+  "rss_samples": 10,
+  "rss_warmup": 2,
+  "review_spread_percent": 5,
+  "admission": "All pilot hard gates and exact parity must pass before these captures",
+  "claims": [
+    "Guest instruction attribution only; no hardware-counter equivalence",
+    "RSS per child, never summed across phases/repeats; flag each regression/repeat spread above5%"
+  ]
+}
