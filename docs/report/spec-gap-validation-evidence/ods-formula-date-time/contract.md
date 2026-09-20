@@ -275,12 +275,13 @@ has the permitted leading width and every later group has exactly three
 digits; malformed grouping is #VALUE!. A leading parenthesized numeric or
 currency form is the existing negative form. A decimal fraction requires
 digits after the decimal point, so 123.5 and .5 are accepted while 123. is
-malformed. It also accepts the existing mixed-fraction form: an optional
-sign, an integer part, one required space, a numerator, and a one- or
-two-digit nonzero denominator. Slashes are admitted only in that valid
-mixed-fraction form, and date-like forms with two date separators are not
-admitted by this fallback. Long grouped inputs use the same bounded
-normalization scratch and charging as VALUE.
+malformed. It also accepts the existing fraction forms: an optional sign, a
+numerator, and a one- or two-digit nonzero denominator, with an optional
+integer part followed by one required space for a mixed fraction. Slashes are
+admitted only in those valid simple or mixed-fraction forms, and date-like
+forms with two date separators are not admitted by this fallback. Long
+grouped inputs use the same bounded normalization scratch and charging as
+VALUE.
 
 ASCII surrounding whitespace is accepted. Month/day fields are validated
 against the proleptic Gregorian calendar. Two-digit years use the fixed
@@ -297,7 +298,8 @@ passed to TIMEVALUE is not a clock; after the permitted fallback it either
 yields a numeric time serial or returns #VALUE!. A clock-only string passed to
 DATEVALUE is handled analogously. For executable profile cases,
 DATEVALUE("123") returns 123, DATEVALUE("123.5") returns 123,
-TIMEVALUE("0.5") returns 0.5, TIMEVALUE("2.5") returns 2.5,
+DATEVALUE("1/4") returns 0, TIMEVALUE("0.5") returns 0.5,
+TIMEVALUE("2.5") returns 2.5, and TIMEVALUE("1/4") returns 0.25;
 DATEVALUE("12:00") returns #VALUE!, and TIMEVALUE("2020-01-01") returns
 #VALUE!. This records the implementation-defined fallback permitted by
 §6.10.4 and §6.10.19 without letting the full VALUE date/time grammar bypass
