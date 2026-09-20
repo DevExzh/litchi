@@ -509,6 +509,7 @@ def validate_source_review_receipt(
     if not isinstance(proofs, list) or not proofs:
         raise VerificationError(f"{label} source-review proofs are absent")
     proof_ids: set[str] = set()
+    selected_ids = set(identifiers)
     mapped: set[str] = set()
     for index, proof in enumerate(proofs):
         proof_label = f"{label} source-review proof {index}"
@@ -528,6 +529,12 @@ def validate_source_review_receipt(
         proof_requirement_values = strings(proof.get("requirements"), f"{proof_label} requirements")
         if len(proof_requirement_values) != len(set(proof_requirement_values)):
             raise VerificationError(f"{proof_label} requirements are duplicated")
+        # A receipt may contain several independently reviewed proofs.  A
+        # binding selects the proof IDs it uses; unrelated proofs remain part
+        # of the same immutable receipt but must not be compared with this
+        # binding's narrower requirement set.
+        if proof_id not in selected_ids:
+            continue
         proof_requirements = set(proof_requirement_values)
         if not proof_requirements <= expected_requirements:
             raise VerificationError(
@@ -535,10 +542,11 @@ def validate_source_review_receipt(
                 f"{sorted(proof_requirements - expected_requirements)}"
             )
         mapped.update(proof_requirements)
-    if proof_ids != set(identifiers):
+    missing_proofs = selected_ids - proof_ids
+    if missing_proofs:
         raise VerificationError(
-            f"{label} source-review proof identifiers do not match binding identifiers: "
-            f"expected={sorted(identifiers)}, observed={sorted(proof_ids)}"
+            f"{label} source-review proof identifiers are absent from receipt: "
+            f"{sorted(missing_proofs)}"
         )
     if mapped != expected_requirements:
         raise VerificationError(
