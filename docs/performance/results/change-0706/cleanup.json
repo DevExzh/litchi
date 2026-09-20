@@ -1,0 +1,41 @@
+{
+  "owned_paths_absent": true,
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-0706-candidate",
+    "/home/zhuhe/code/litchi-0706-bin",
+    "/home/zhuhe/code/litchi-target-0706"
+  ],
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/baseline-alloc",
+      "sha256": "1f3a68ffddaeb273539b48cc1bb21da42437d39865dad96c2af7a397c6f0da41",
+      "bytes": 62980896
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/baseline-native",
+      "sha256": "bda34d12ffe9289d6ef9f722c2880247a2ba27faf160772b5e37e31a82d6dddd",
+      "bytes": 63339376
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/baseline-oracle",
+      "sha256": "7156a35352bae24dc2444d68505b31d23fe4036fecb3bb2d8b12f58563b627f4",
+      "bytes": 634504
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/candidate-alloc",
+      "sha256": "ace9272f4d687542c88369d7c64da2aff571ad3cba6523bbc8c62cd716125a5c",
+      "bytes": 62980464
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/candidate-native",
+      "sha256": "14d07d6f044e6adfb0305f9ea88f60e1c67a2dabff47bc6d0e2280e04b352c74",
+      "bytes": 63324016
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0706-bin/candidate-oracle",
+      "sha256": "ac71e5e51ddba9ce84fdeb4bc6c8c3aa2ee2480cd0b145d3b33944309aada47b",
+      "bytes": 635008
+    }
+  ],
+  "scope": "Only scratch created for 0706; other worktrees and build directories preserved"
+}

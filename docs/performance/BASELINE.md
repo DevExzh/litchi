@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0706 — rejected XML attribute-cardinality pilot
+
+[0706](0706-xml-attribute-cardinality-pilot.md) measures a source-compatible
+`xml-minifier` candidate that reuses its existing lexical attribute-layout scan
+to skip duplicate-key bookkeeping only for proven zero/one-attribute starts.
+The matched XLSX edit/save pilot rejects the candidate: seven of eight primary
+shape/repeat rows miss the joint 2% total / 5% publication gate, although
+publication allocation calls fall 98.10% on medium and 99.00% on
+dense-sparse. Public differential coverage is 4,148 cases / 29,036 calls with
+identical outcomes and zero panics. Production is restored; eight public
+attribute-cardinality tests are retained. No latency, RSS, native-Office,
+cold-storage, cross-platform, or universal performance claim is admitted. The
+full non-iWork goal remains active. [Evidence packet](results/change-0706/README.md).
+
 ## 0705 — current XLSX edit/save phases and allocations
 
 [0705](0705-xlsx-edit-save-baseline-refresh.md) refreshes source-backed

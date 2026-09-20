@@ -1,0 +1,11 @@
+[package]
+name = "xml-minifier-oracle-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+sha2 = "0.11"
+xml-minifier = { path = "../../../../../crates/xml-minifier" }

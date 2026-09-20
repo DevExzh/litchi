@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0706/audit.py"
+  ],
+  "exit_code": 0,
+  "observed_tool_session": 72790,
+  "stdout": "PASS source, constraints, focused tests, exact receipts, oracle equality, microbench analysis, analyzer replay, and final gates (candidate rejected)\n",
+  "audit_script_sha256": "200d0623b4790ea66d1552677639c279dd6d7657e2e17a2d49f963434ecd5867",
+  "analysis_sha256": "09768d94e9822595474ce81a274ba54c20ba009d905e737860b73d34f664bce2",
+  "microguard_analysis_sha256": "c081920345c475d661378f2371df8c6edaa8e189cce59843b326c8f7b86dca21"
+}

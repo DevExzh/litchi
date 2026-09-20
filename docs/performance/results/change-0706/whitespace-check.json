@@ -1,0 +1,24 @@
+{
+  "authored_exit_code": 0,
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude)docs/performance/results/change-0706/candidate.patch",
+    ":(exclude)docs/performance/results/change-0706/focused-baseline.log",
+    ":(exclude)docs/performance/results/change-0706/focused-candidate.log",
+    ":(exclude)docs/performance/results/change-0706/focused-restored.log",
+    ":(exclude)docs/performance/results/change-0706/whitespace-preflight.log"
+  ],
+  "raw_exceptions": {
+    "candidate.patch": "cc51afef4d4bebfaa082ecbda5d7d04c909707766943199e2a64d4826fd275c2",
+    "focused-baseline.log": "89c7a50385665227b0f646c511b92bf174cae91102c76a1b8d6bd98c24076ca8",
+    "focused-candidate.log": "bdf19c5b0daa6373586c52806b680d3ccb2cb3e9ce37eb6d995ee7f7ed63f516",
+    "focused-restored.log": "bf69687162fe62917e42abea84b3ee9e7897ab3dc436a323c812e99f023025f3",
+    "whitespace-preflight.log": "916558654fc58f139d1a0782a7d2906ab4f9c4181b6b39c4e0088aedb7a8cb42"
+  },
+  "reason": "Preserve exact candidate patch context and raw test/diagnostic output, including trailing context spaces and final blank lines"
+}

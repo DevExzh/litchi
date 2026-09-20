@@ -1,0 +1,16 @@
+{
+  "scope": "Independent static production review before application",
+  "reviewer": "/root/audit_review_0706",
+  "verdict": "no blocking correctness issue",
+  "checks": [
+    "same four XML whitespace bytes and first-whitespace boundary as quick-xml 0.41",
+    "successful lexical proof implies zero/one cannot duplicate",
+    "Many keeps duplicate checks",
+    "lexical failures precede iteration",
+    "limits and xml:space preserved",
+    "slice and stream raw token boundaries unchanged",
+    "declaration proof discarded",
+    "no extra allocation or retained state"
+  ],
+  "executed_tests": false
+}

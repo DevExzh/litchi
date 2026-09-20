@@ -1,0 +1,12 @@
+{
+  "decision": "rejected",
+  "reason": "Seven of eight primary comparisons fail the frozen joint total p50/mean and publication p50 gates",
+  "production_restored": true,
+  "retained_tests": [
+    "crates/xml-minifier/tests/attribute_cardinality.rs"
+  ],
+  "performance_claim": "none",
+  "profile_gate": "not run because native pilot failed",
+  "consumer_quality_scope": "Final retained test-only change: focused XML tests plus fmt/check/clippy; broad candidate consumer gates were conditional on pilot success",
+  "rss": "not acquired; no RSS claim"
+}

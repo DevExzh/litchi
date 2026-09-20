@@ -1,0 +1,10 @@
+{
+  "scope": "New integration assertions against unchanged baseline production",
+  "first_preflight": "Aggregate fixture expected five attributes but contains four; unterminated-attribute fixture assumed equal slice/stream offsets",
+  "second_preflight": "Initial correction expected an unterminated detail; baseline actually reports attribute value not closed in both routes",
+  "final_assertions": "Four aggregate attributes; exact slice offset 23, streaming offset 0, attribute value not closed in both routes",
+  "baseline_pass": "focused-baseline.json",
+  "candidate_pass": "focused-candidate.json",
+  "production_changed_to_satisfy_tests": false,
+  "test_functions": 8
+}

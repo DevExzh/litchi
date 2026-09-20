@@ -1,0 +1,105 @@
+{
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "Publication including returned MultiSnapshot drop; commit allocations separately retained as diagnostics."
+  },
+  "gates": {
+    "total_p50_reduction_percent": 2.0,
+    "total_mean_reduction_percent": 2.0,
+    "allocation_calls_reduction_percent": 8.0,
+    "require_every_shape_repeat": true,
+    "publication_p50_reduction_percent": 5.0,
+    "publication_ir_reduction_percent": 3.0
+  },
+  "revision": "cfd2aa4f3fb051f3914503fce597ef70593a26dd",
+  "created_utc": "2026-09-20T04:48:42.723868+00:00",
+  "cpu": 12,
+  "hypothesis": "Reuse successful lexical layout scan cardinality to skip duplicate-key bookkeeping only for zero/one attribute; no extra attribute probe.",
+  "order": [
+    "baseline-noise-1",
+    "baseline-noise-2",
+    "baseline-A1",
+    "candidate-B1",
+    "candidate-B2",
+    "baseline-A2"
+  ],
+  "scope": "Matched current-source experiment, all original and replacement XML audits retained.",
+  "candidate_roots": [
+    "crates/xml-minifier/"
+  ],
+  "admission": "Require each primary paired total p50 and mean reduction >=2%, publication p50 reduction >=5%, publication allocation-call reduction >=8%; flag all >5% timing/RSS/peak regressions and repeat drift. Reject if primary gate fails. Full correctness and consumer gates required for retention. Profile publication Ir must improve >=3% if pilot passes.",
+  "producer": "xlsx_producer_medium_source_one_edit_save",
+  "audit_microguards": {
+    "scope": "Separate public auditor guard batches, not primary speedup evidence",
+    "families": [
+      "zero",
+      "one",
+      "two",
+      "many-64",
+      "xml-space",
+      "source-noncompact"
+    ],
+    "order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "warmup": 5,
+    "samples": 100,
+    "calls_per_sample": 100,
+    "review_threshold_percent": 5
+  }
+}
