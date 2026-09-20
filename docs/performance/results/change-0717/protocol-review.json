@@ -1,0 +1,13 @@
+{
+  "review": "Independent review of opt-in procfs placement and the fixed diagnostic matrix",
+  "decision": "proceed with diagnostic captures after final source builds and fresh harness checks",
+  "resolutions": [
+    "Scope explicitly states same-process counters, not owner-exclusive measurements.",
+    "The 32 adjacent empty snapshot controls measure counter deltas only; no duration or latency overhead estimate is available.",
+    "Native and procfs lane identities are validated independently and instrumented results cannot enter latency ABBA acceptance.",
+    "Raw acquisition-order process deltas are validated against every sorted operation-metric vector using retained sample identities.",
+    "The phase-ending snapshot precedes owner drop, byte digest, and readback verification."
+  ],
+  "capture_rule": "64 fixed children; retain all results and diagnostic flags; no native versus instrumented speedup claim",
+  "production_status": "No production optimization in this batch; 0715 remains rejected."
+}

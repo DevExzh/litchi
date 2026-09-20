@@ -12264,7 +12264,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             profile,
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
-            instrumentation: allocation_metrics::instrumentation_identity(),
+            instrumentation: ordinary_save::instrumentation_identity(),
             allocator_counter_revision: allocation_metrics::counter_revision(),
         },
         binary_identity,

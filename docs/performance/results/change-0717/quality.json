@@ -1,0 +1,145 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "environment_overrides": {},
+    "exit_code": 0,
+    "seconds": 1.122304150951095,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "tests-native",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2",
+      "--lib"
+    ],
+    "environment_overrides": {},
+    "exit_code": 0,
+    "seconds": 174.0562876330223,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-tests-native.log",
+    "log_sha256": "7f933a3def14a742e7dce895b6d92d396b54b8f10ea9ba782df68b65b8eb4d8f"
+  },
+  {
+    "name": "tests-procfs",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2",
+      "--lib",
+      "--features",
+      "ordinary-save-process-metrics"
+    ],
+    "environment_overrides": {},
+    "exit_code": 0,
+    "seconds": 172.79315953911282,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-tests-procfs.log",
+    "log_sha256": "67bb59cb26e69ee6b29a16a29ad78dde800a47e1d7bc2db2256b3a02fc4af40a"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2",
+      "--all-targets",
+      "--features",
+      "ordinary-save-process-metrics,allocator-metrics",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "environment_overrides": {},
+    "exit_code": 0,
+    "seconds": 60.35621747595724,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-clippy.log",
+    "log_sha256": "385a6d0d3491e0b0a4d027aaca7a55b75753961b3ae8f3dcb14e2897d6579bc0"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0717",
+      "-j",
+      "2",
+      "--no-deps",
+      "--lib",
+      "--features",
+      "ordinary-save-process-metrics"
+    ],
+    "environment_overrides": {
+      "RUSTDOCFLAGS": "-D warnings"
+    },
+    "exit_code": 0,
+    "seconds": 3.5872769999550655,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-rustdoc.log",
+    "log_sha256": "a2bc0f21570f4d1b3899246d7b12da96895949913a2da81e701edd013b9ea407"
+  },
+  {
+    "name": "latency-guard",
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_perf_abba_summary.py"
+    ],
+    "environment_overrides": {},
+    "exit_code": 0,
+    "seconds": 1.9186670320341364,
+    "source_manifest_sha256": "2839897f14e6372cf4ff2ca5dcb876adc2f88d9b99e1c01a9ba5ae38c2ffcdac",
+    "support_manifest_sha256": "1b8c000ecec2f9bbf90f35752eacc2d5d052836ebc0ae38cbcc33136baf0c7e1",
+    "log": "quality-latency-guard.log",
+    "log_sha256": "9f57be8303f60a77981506848b825e9706b46948f159e7045f928579d6e32900"
+  }
+]

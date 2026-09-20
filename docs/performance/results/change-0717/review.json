@@ -1,0 +1,20 @@
+{
+  "decision": "retain opt-in diagnostic harness feature; no production optimization or native speedup claim",
+  "independent_review": [
+    "Probe placement and fixed matrix approved with same-process scope and counter-only controls.",
+    "Source/analyzer integration checked against existing operation vector scopes and helper validators.",
+    "Generated 2463 exact-78-fault, 662 zero-fault, 75 other-count samples verified; all five selected mixed-child bucket medians verified.",
+    "NumberedList 3129 zero-fault samples and absence of a sustained slow child verified; prior0716 outlier is not explained.",
+    "All within-child flags and 1024 control totals independently verified."
+  ],
+  "wording_resolution": "Mixed-child table explicitly names selected 0/78-fault buckets; other buckets remain retained in analysis.",
+  "analyzer_corrections": [
+    "Child inventory glob no longer matches source-baseline.json.",
+    "Binary identity validation has stable derived output for live and cleanup-witness routes."
+  ],
+  "limits": [
+    "Instrumented elapsed is not native latency.",
+    "No control subtraction, native/procfs speedup ratio, owner-exclusive counter attribution or causal fault cost.",
+    "0715 remains rejected; non-iWork goal remains active."
+  ]
+}

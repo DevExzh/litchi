@@ -3156,15 +3156,21 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(arbitrary_hash)
 
-    def test_allocator_instrumentation_is_not_accepted_for_latency_abba(self):
-        legs = four_legs()
-        for leg in legs:
-            leg["tool"]["instrumentation"] = "system_allocator"
-        with self.assertRaisesRegex(
-            perf_abba_summary.AbbaSummaryInputError,
-            "instrumentation.*latency ABBA",
+    def test_instrumentation_is_not_accepted_for_latency_abba(self):
+        for instrumentation in (
+            "system_allocator",
+            "ordinary_save_procfs_operation_scoped",
+            "ordinary_save_procfs_and_system_allocator_operation_scoped",
         ):
-            perf_abba_summary.summarize_reports(legs)
+            with self.subTest(instrumentation=instrumentation):
+                legs = four_legs()
+                for leg in legs:
+                    leg["tool"]["instrumentation"] = instrumentation
+                with self.assertRaisesRegex(
+                    perf_abba_summary.AbbaSummaryInputError,
+                    "instrumentation.*latency ABBA",
+                ):
+                    perf_abba_summary.summarize_reports(legs)
 
     def test_opc_source_overlay_nested_schema_projection_and_sample_binding(self):
         identity = copy.deepcopy(

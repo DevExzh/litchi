@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.05224173201713711,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0717-docx-phase-process-probe.md": "002e4b145cd1d3ff0a2ad81af73ecd378e3f7aeb64bdb06012def7a952157203",
+    "docs/performance/BASELINE.md": "7750f1dcd574a8877a0b4049880db6488485ce3f7e78d1b4f24ae0f1476ea9c1",
+    "docs/performance/HOTSPOTS.md": "a540c5b6869d8f1964071537e13f33b8ea6bfba3d6b5bbdb83751ccadb737fad",
+    "docs/performance/GOAL_AUDIT.md": "61aab35a42b721a03b763b2287dd08372b3e77f9e0ff469fcd851ac3fbebf11a",
+    "docs/performance/REPORT.md": "8d85730e144b7eeefbfc197af675886016a3bf635e2770674b37df5610e37863",
+    "docs/performance/results/change-0717/README.md": "a1c64ce5564372c686bf0363c0b4925e6215d98310c3039e072c2947a460244c"
+  }
+}

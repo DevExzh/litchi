@@ -1,0 +1,10 @@
+{
+  "packet": "docs/performance/results/change-0716",
+  "files": {
+    "analysis.json": "99f9ebf15bd8b052b4239e6c838db707bf853539a5ed7689a986f33caffb3c7d",
+    "metadata-scope-review.json": "4c6739742d2d6b64eb76f0e389bfaa288f84cf17a181c12c6413ba92fd7052f1",
+    "artifact-manifest.json": "eb4e1980db97500f310a8f55979455cdc67a9536ab7b41c63651bb54bd85e643"
+  },
+  "question": "Do process-counter deltas bracketing serialization vary with diagnostic elapsed observations, beyond retained empty probe controls?",
+  "limits": "The prior whole-process minor-fault association is not a causal result. New procfs timings remain instrumentation-bearing;0715rejection remains unchanged."
+}
