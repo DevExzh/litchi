@@ -38,6 +38,10 @@
 //! inputs omit Text, Logical, and Empty pairs. `FORECAST` converts its query
 //! separately to Number. This profile resolves INTERCEPT's contradictory
 //! LINEST cross-reference as the fitted intercept with an included constant.
+//! The section 6.20 text family uses Unicode scalar positions, pinned Unicode
+//! case and category data, literal searches, and bounded owned output. Its
+//! formatting functions use an invariant profile rather than ambient locale
+//! services. The section 6.7 byte-position family is not included.
 //! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
@@ -171,6 +175,7 @@ mod radix;
 mod roman;
 mod rounding;
 mod statistical;
+mod text;
 mod trigonometry;
 pub mod value;
 
@@ -700,6 +705,11 @@ fn copy_string_segment(
         let chunk = &segment[offset..end];
         evaluator.charge_bytes(chunk.len())?;
         output.push_str(chunk);
+        evaluator
+            .context
+            .execution
+            .check()
+            .map_err(map_execution_error)?;
         offset = end;
     }
     Ok(())
@@ -968,6 +978,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if text::is_text_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -1081,6 +1095,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if discrete::is_discrete_function(name) {
             return discrete::apply(self, node, name);
+        }
+        if text::is_text_function(name) {
+            return text::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
@@ -1902,7 +1919,7 @@ fn concatenate<'a>(
     left: WorkingValue<'a>,
     right: WorkingValue<'a>,
 ) -> EvaluationResult<WorkingValue<'a>> {
-    let left = to_text(left, evaluator)?;
+    let mut left = to_text(left, evaluator)?;
     let right = to_text(right, evaluator)?;
     let left_len = left.text.len();
     let right_len = right.text.len();
@@ -1933,10 +1950,9 @@ fn concatenate<'a>(
     };
     evaluator.charge_bytes(work)?;
 
-    match left.text {
-        Cow::Owned(mut output) => {
+    match &mut left.text {
+        Cow::Owned(output) => {
             let current_capacity = output.capacity();
-            let mut output_reservation = left.reservation;
             if current_capacity < total {
                 let target_capacity = current_capacity
                     .max(1)
@@ -1951,15 +1967,15 @@ fn concatenate<'a>(
                         resource: "formula scalar concatenation",
                         source,
                     })?;
-                drop(output_reservation.take());
-                output_reservation = Some(reservation);
+                left.reservation = Some(reservation);
             }
             output.push_str(right.text.as_ref());
-            drop(right.reservation);
-            Ok(WorkingValue::Text(TextValue {
-                text: Cow::Owned(output),
-                reservation: output_reservation,
-            }))
+            evaluator
+                .context
+                .execution
+                .check()
+                .map_err(map_execution_error)?;
+            Ok(WorkingValue::Text(left))
         },
         Cow::Borrowed(left_text) => {
             let reservation = evaluator.reserve_storage(total, "formula scalar concatenation")?;
@@ -1973,8 +1989,17 @@ fn concatenate<'a>(
                 })?;
             }
             output.push_str(left_text);
+            evaluator
+                .context
+                .execution
+                .check()
+                .map_err(map_execution_error)?;
             output.push_str(right.text.as_ref());
-            drop(right.reservation);
+            evaluator
+                .context
+                .execution
+                .check()
+                .map_err(map_execution_error)?;
             Ok(WorkingValue::Text(TextValue::owned(output, reservation)))
         },
     }

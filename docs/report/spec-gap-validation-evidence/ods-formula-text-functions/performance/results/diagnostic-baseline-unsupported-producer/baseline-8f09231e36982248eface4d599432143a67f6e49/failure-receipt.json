@@ -1,0 +1,29 @@
+{
+  "baseline_commit": "8f09231e36982248eface4d599432143a67f6e49",
+  "baseline_preflight": {
+    "build_log_sha256": "c90e97a4f31621011cf1c60df5bdbc6f70514a7d1d8faf12413e34a56f222595",
+    "error": "Error: \"concat-owned-left scalar preflight failed: ODS formula evaluation profile does not implement this function\"",
+    "failed_case": "concat-owned-left",
+    "passed_cases": 25,
+    "status": "failed",
+    "stdout_sha256": "b35ff4ad21ac39c3529859967bf4487ba541b202f3e20e2e7d7f572b8ca51b4a",
+    "target_cleanup": {
+      "removed": true,
+      "target_dir": "/var/tmp/litchi-ods-text-functions-baseline-8f09231e36982248eface4d599432143a67f6e49-jjnvyg99"
+    }
+  },
+  "candidate_preflight": {
+    "cases": 161,
+    "preflight_json_sha256": "a9ec13697fdfcb38d41ebb59bd92be6e3484762b30307882351f0bc3c1894ec7",
+    "status": "ok",
+    "stdout_sha256": "b8ec6451f8b0e986592d33034c04876c4efd98e2c602335823b32e87abdf40ba"
+  },
+  "candidate_root": "/tmp/litchi-ods-text-gates-qga93bo_",
+  "contract_sha256": "b0b7f6ffd8a33c93f98c9728c938eb2d55476680e11797a9b87dcf49223312e7",
+  "kind": "capture-attempt-receipt",
+  "note": "Baseline commit does not support the text function used by concat-owned-left; attempt ended before any timed capture. Preserve this diagnostic for fixture/control compatibility review.",
+  "runner_command": "python3 docs/report/spec-gap-validation-evidence/ods-formula-text-functions/performance/run_profile.py --candidate-root /tmp/litchi-ods-text-gates-qga93bo_ --candidate-freeze docs/report/spec-gap-validation-evidence/ods-formula-text-functions/gates/freeze.json --warmups 3 --samples 15",
+  "source_edits_during_attempt": false,
+  "status": "stopped-before-timing",
+  "timed_records": 0
+}

@@ -114,7 +114,9 @@ pub(super) fn argument<'a>(name: &str, index: usize, slot: Slot<'a>) -> WorkingV
         ]
         .iter()
         .any(|function| name.eq_ignore_ascii_case(function));
-    let target = if text_first {
+    let text_empty =
+        matches!(slot, Slot::Empty) && super::super::text::argument_is_text(name, index);
+    let target = if text_first || text_empty {
         EmptyTarget::Text
     } else if name.eq_ignore_ascii_case("NOT") || name.eq_ignore_ascii_case("XOR") {
         EmptyTarget::Logical
@@ -122,6 +124,19 @@ pub(super) fn argument<'a>(name: &str, index: usize, slot: Slot<'a>) -> WorkingV
         EmptyTarget::Number
     };
     slot.coerce_empty(target)
+}
+
+/// Apply TEXT's Scalar type gate after every argument has been read. A source
+/// formula error takes precedence over the generated Empty type refusal.
+pub(super) fn refuse_empty_text_value(arguments: &mut [WorkingValue<'_>], first_empty: bool) {
+    if first_empty
+        && !arguments
+            .iter()
+            .any(|value| matches!(value, WorkingValue::Error(_)))
+        && let Some(first) = arguments.first_mut()
+    {
+        *first = WorkingValue::Error(ScalarError::Value);
+    }
 }
 
 /// Execute an eager scalar function using the scalar VM's existing stack.
@@ -188,6 +203,7 @@ pub(super) fn eager<'a>(
         .iter()
         .any(|function| name.eq_ignore_ascii_case(function))
         && !super::super::is_conditional_aggregate_function(name)
+        && !super::super::text::is_text_function(name)
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }

@@ -73,6 +73,11 @@
 //! Reference lists retain their distinct
 //! type: they cannot be converted to a scalar or rectangular array. `AND` and `OR`
 //! accept reference sequences and omit referenced text, logical, and empty cells.
+//! Ordinary section 6.20 text functions apply scalar kernels at each broadcast
+//! coordinate. They retain reference descriptors and borrow selected cell text
+//! without materializing an input range; output arrays and constructed strings
+//! remain subject to the caller's storage limits. Character positions count
+//! Unicode scalars. Formatting uses the documented invariant profile.
 //!
 //! Matrix arithmetic broadcasts singleton dimensions. Lazy `IF`, `IFERROR`, and
 //! `IFNA` evaluate selected cells only; unselected branches do not resolve missing
@@ -6491,8 +6496,8 @@ where
 
     fn apply_function(&mut self, node: super::Node<'expr>, name: &str) -> EvaluationResult<()> {
         let count = node.child_count();
-        let mut arguments = Vec::new();
         let mut reservation = None;
+        let mut arguments = Vec::new();
         ensure_capacity(
             &mut arguments,
             &mut reservation,
@@ -7078,6 +7083,9 @@ where
         name: &str,
         arguments: Vec<RuntimeValue<'expr>>,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
+        if super::text::is_text_function(name) {
+            return self.map_text_function(node, name, arguments);
+        }
         let mut arguments = arguments;
         for argument in &mut arguments {
             if matches!(argument, RuntimeValue::Areas(_)) {
@@ -7118,6 +7126,69 @@ where
             output.push(self.runtime_to_element(value)?);
         }
         self.make_array(shape, output, reservation, None)
+    }
+
+    /// Map ordinary text functions without materializing reference inputs.
+    /// One argument buffer is reused across output cells; its lease outlives
+    /// both the buffer and any owned text still in it on a failure path.
+    fn map_text_function(
+        &mut self,
+        node: super::Node<'expr>,
+        name: &str,
+        arguments: Vec<RuntimeValue<'expr>>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let mut shape = Shape::new(1, 1)?;
+        for argument in &arguments {
+            shape = broadcast_shape(shape, self.runtime_shape(argument)?).ok_or(
+                EvaluationFailure::InvalidExpression("incompatible function array shapes"),
+            )?;
+        }
+        let cells = shape
+            .cell_count()
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "text function array cell count overflow",
+            ))?;
+        // Declare leases before their buffers so error unwinding frees the
+        // allocation before returning its budget to the caller.
+        let output_reservation;
+        let mut output;
+        (output, output_reservation) = self.new_element_vec(cells)?;
+        let mut argument_reservation = None;
+        let mut scalar_arguments = Vec::new();
+        ensure_capacity(
+            &mut scalar_arguments,
+            &mut argument_reservation,
+            arguments.len(),
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula text function cell arguments",
+        )?;
+        let rejects_empty = name.eq_ignore_ascii_case("TEXT");
+        for index in 0..cells {
+            self.charge_cell_work(index)?;
+            let mut first_empty = false;
+            for (argument_index, argument) in arguments.iter().enumerate() {
+                let element = self.select_matrix_value(argument, shape, index)?;
+                first_empty |= rejects_empty
+                    && argument_index == 0
+                    && matches!(element, RuntimeElement::Empty);
+                scalar_arguments.push(scalar::argument(
+                    name,
+                    argument_index,
+                    element_to_slot(element),
+                ));
+            }
+            scalar::refuse_empty_text_value(&mut scalar_arguments, first_empty);
+            let value = scalar::eager(
+                &mut self.scalar,
+                node,
+                name,
+                scalar_arguments.drain(..).map(Ok),
+            )?;
+            output.push(RuntimeElement::Present(value));
+        }
+        self.make_array(shape, output, output_reservation, None)
     }
 
     fn push_frame(&mut self, frame: ValueFrame<'expr>) -> EvaluationResult<()> {
@@ -7339,8 +7410,8 @@ where
         name: &str,
         arguments: Vec<RuntimeValue<'expr>>,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
-        let mut scalar_arguments = Vec::new();
         let mut reservation = None;
+        let mut scalar_arguments = Vec::new();
         ensure_capacity(
             &mut scalar_arguments,
             &mut reservation,
@@ -7350,10 +7421,15 @@ where
             &self.storage_budget,
             "formula value scalar arguments",
         )?;
+        let mut first_empty = false;
         for (index, argument) in arguments.into_iter().enumerate() {
             let slot = self.value_to_slot(argument)?;
+            first_empty |= index == 0
+                && matches!(slot, scalar::Slot::Empty)
+                && name.eq_ignore_ascii_case("TEXT");
             scalar_arguments.push(scalar::argument(name, index, slot));
         }
+        scalar::refuse_empty_text_value(&mut scalar_arguments, first_empty);
         scalar::eager(
             &mut self.scalar,
             node,
