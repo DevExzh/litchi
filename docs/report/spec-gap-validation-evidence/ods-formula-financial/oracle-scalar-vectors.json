@@ -801,20 +801,20 @@
     {
       "id": "nper.zero_denominator_divzero",
       "function": "NPER",
-      "formula": "=NPER(0.1;-10;100)",
+      "formula": "=NPER(0.125;-12.5;100)",
       "args": [
-        "0.1",
-        "-10",
+        "0.125",
+        "-12.5",
         "100"
       ],
       "expected": {
         "kind": "error",
-        "value": "#NUM!"
+        "value": "#DIV/0!"
       },
       "tags": [
         "domain-error"
       ],
-      "oracle_basis": "balance-equation denominator is zero"
+      "oracle_basis": "exactly representable binary64 Rate and Payment make the balance-equation denominator zero"
     },
     {
       "id": "nper.invalid_pay_type_num",
