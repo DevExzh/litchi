@@ -1,5 +1,5 @@
 {
-  "status": "requirements; evidence pending",
+  "status": "PASS",
   "normative": "OpenDocument 1.4 Part 4 section 6.14",
   "functions": {
     "ADDRESS": {
@@ -12,7 +12,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -210,7 +210,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -402,7 +402,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -593,7 +593,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -822,7 +822,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -1087,7 +1087,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -1311,7 +1311,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -1542,7 +1542,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -1818,7 +1818,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2024,7 +2024,7 @@
       "requirement": "formula errors versus typed provider failures",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2087,7 +2087,7 @@
       "requirement": "cancellation before and after resolver calls",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2114,7 +2114,7 @@
       "requirement": "source-version fence before and after evaluation",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2141,7 +2141,7 @@
       "requirement": "all memory reservations released on failure",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2169,7 +2169,7 @@
       "requirement": "projection-sensitive MUNIT descendants",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2197,7 +2197,7 @@
       "requirement": "reference lists never implicitly materialized as arrays",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2226,7 +2226,7 @@
       "requirement": "no package or formula-cache mutation",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2253,7 +2253,7 @@
       "requirement": "independent oracle and native compatibility record",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2301,7 +2301,7 @@
       "requirement": "frozen seven-gate receipts",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2334,7 +2334,7 @@
       "requirement": "matched performance controls and scaling with retained raw attempts",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2353,7 +2353,7 @@
             "receipt": {
               "root": "evidence",
               "path": "performance/results/performance-report.json",
-              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+              "sha256": "de3e92c17d9df32378f99aaa18f297b277a390082630d54be041db7f23bc9952"
             }
           }
         ]
@@ -2363,7 +2363,7 @@
       "requirement": "invalid lookup selectors precede reference-key reads",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2390,7 +2390,7 @@
       "requirement": "sequential computed CHOOSE probe depth and memory release",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {
@@ -2417,7 +2417,7 @@
       "requirement": "position-sensitive computed CHOOSE selector cache exclusion",
       "evidence": {
         "schema": "ods-formula-lookups-coverage-v1",
-        "status": "pending",
+        "status": "PASS",
         "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
         "bindings": [
           {

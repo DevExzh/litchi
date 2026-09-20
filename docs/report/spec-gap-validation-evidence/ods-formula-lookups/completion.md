@@ -1,6 +1,6 @@
 # ODS lookup and reference-function disposition
 
-The nine-function batch implements ADDRESS, CHOOSE, HLOOKUP, INDEX, INDIRECT,
+Commit `6fa3b8af6a` implements ADDRESS, CHOOSE, HLOOKUP, INDEX, INDIRECT,
 LOOKUP, MATCH, OFFSET, and VLOOKUP in the explicit, read-only ODS evaluator.
 Semantic and resource review pass. The disposition accepts the implementation
 with the measured performance limitations below; it does not claim an overall
@@ -87,8 +87,14 @@ Every matched comparison is retained, including all 37 latency/RSS review
 flags. Measurements use a shared host and do not claim isolated-host timing or
 end-to-end Office-document performance.
 
-## Remaining publication work
+## Cleanup and final verification
 
-The final aggregate verifier, production commit, and removal of the owned gate
-checkout/target are required before closing this batch. The broad spec-gap
-implementation goal remains active after those steps.
+The owned gate checkout and build target have been removed after verifying all
+62 archived source inputs. [cleanup.json](cleanup.json) records this removal;
+the profile retains its own target and baseline-worktree cleanup receipts.
+Unrelated files and temporary directories remain untouched. The final
+[aggregate verifier receipt](verification.json) reports `verified: true` from
+retained files alone: nine function coverage groups, thirteen cross-cutting
+requirements, source closure, reviews, oracle/native evidence, seven gates, and
+all 4,620 performance samples. The broad spec-gap implementation goal remains
+active after this batch.

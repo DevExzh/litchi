@@ -1,7 +1,8 @@
 # ODS lookup and reference functions
 
-Status: frozen implementation passes semantic/resource review and all seven
-isolated gates. Performance acceptance and final batch publication remain pending.
+Status: implemented in `6fa3b8af6a`. Semantic/resource review, all seven isolated
+gates, and retained evidence verification pass. See the
+[disposition](completion.md) for the accepted measured performance limitations.
 
 The batch covers ADDRESS, CHOOSE, HLOOKUP, INDEX, INDIRECT, LOOKUP, MATCH,
 OFFSET, and VLOOKUP in the existing explicit, read-only formula evaluator.
@@ -22,8 +23,8 @@ ignored tests, strict Clippy/rustdoc, formatting, boundaries, and source stabili
 The focused suites contain 34 semantic tests and 9 resource tests; independent
 evidence contains 127 oracle observations and 32 native rows.
 [coverage-requirements.json](coverage-requirements.json) binds the executed
-evidence to the immutable requirements; its overall acceptance remains pending
-until the performance receipt is available.
+evidence to the immutable requirements. [verification.json](verification.json)
+records the complete retained-only verification after temporary checkout cleanup.
 GETPIVOTDATA, MULTIPLE.OPERATIONS, dependency recalculation, pivot calculation,
 external-source execution and formula-cache publication remain open work in the
 broader audit.
