@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/var/tmp/litchi-ods-value-inspection-baseline-zv9kdsnp/docs/report/spec-gap-validation-evidence/ods-formula-value-inspection/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/var/tmp/litchi-ods-value-inspection-baseline-zv9kdsnp",
+  "target": "/var/tmp/litchi-ods-value-inspection-baseline-d623f3c2ecc0c837017f700174656f0e443759a5-zz0_kmie"
+}
