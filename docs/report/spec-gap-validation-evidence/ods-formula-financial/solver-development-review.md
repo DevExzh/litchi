@@ -84,3 +84,12 @@ This clears the two reproduced boundary regressions for that snapshot.
 It does not clear the remaining source-review findings: a genuine cross-bin
 compensation regression and targeted bracket tie/probe-order evidence are
 still required, along with final resource and public-evaluator validation.
+
+## Compensation and probe-order follow-up
+
+Root reran `python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/probe_solver.py .codex-tmp/ods-financial-development` against solver SHA256
+`3b39b8a270f3b5eb4aef4fd1df9d0f67b981e7078d681b8d340f1ca65dccc98d`.
+All **18 tests passed**, including the added cross-bucket compensation and
+endpoint tie/probe-order regressions. The temporary standalone harness was
+removed automatically. This is kernel evidence only; independent source
+re-review and public evaluator/resource validation remain open.
