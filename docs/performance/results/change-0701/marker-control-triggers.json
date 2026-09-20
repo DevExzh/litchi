@@ -1,0 +1,18 @@
+[
+  {
+    "case": "tiny-marker-free",
+    "profile": "baseline",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 5.238095238095242,
+    "delta_ns": 1.466666666666665
+  },
+  {
+    "case": "tiny-marker-free",
+    "profile": "baseline",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 6.272617611580222,
+    "delta_ns": 1.7333333333333343
+  }
+]

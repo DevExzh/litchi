@@ -1,0 +1,31 @@
+{
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0701",
+      "existed": true,
+      "kind": "directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0701-bin",
+      "existed": true,
+      "kind": "directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0701-profile",
+      "existed": true,
+      "kind": "directory",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0701/marker-control.pptx",
+      "existed": true,
+      "kind": "file",
+      "sha256": "af1ad50964720dcf8a64fd9138ad466888666c4fdb2e4489a4333bd721ab8e2a",
+      "removed": true
+    }
+  ],
+  "workspace_cargo_lock_preserved_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "scope": "Exact batch-owned scratch only; shared targets and unrelated work preserved."
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "name": "audit",
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0701/audit.py"
+    ],
+    "exit_code": 0,
+    "log_sha256": "08aeeca15af9bf9d9e90c3129f7cfdd1229816e0b83649b6c565ea4ee1c7da3a"
+  },
+  {
+    "name": "final-claims-structural",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "exit_code": 0,
+    "log_sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+  },
+  {
+    "name": "final-report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+  },
+  {
+    "name": "final-coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "log_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d"
+  },
+  {
+    "name": "final-non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "exit_code": 0,
+    "log_sha256": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2"
+  }
+]

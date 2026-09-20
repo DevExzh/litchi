@@ -1,0 +1,127 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/tests.rs b/crates/litchi-ooxml-common/src/mce/tests.rs
+--- a/crates/litchi-ooxml-common/src/mce/tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/tests.rs
+@@ -816,3 +816,101 @@
+         ));
+    }
++
++    fn assert_windows_dispatch(source: &[u8]) {
++        let marker = super::super::model::NAMESPACE.as_bytes();
++        let contains_marker = source
++            .windows(marker.len())
++            .any(|window| window == marker);
++        let result =
++            process_markup_compatibility(source, &Capabilities::new(), &Limits::default());
++
++        match (contains_marker, result) {
++            (false, Ok(output)) => {
++                match output.xml {
++                    Cow::Borrowed(actual) => assert_eq!(actual, source),
++                    Cow::Owned(_) => panic!("a windows-negative source must remain borrowed"),
++                }
++                assert_eq!(output.report, Report::default());
++            },
++            (false, Err(error)) => {
++                panic!("the windows predicate rejected an absent-marker source: {error:?}")
++            },
++            (true, Ok(output)) => match output.xml {
++                Cow::Owned(_) => {},
++                Cow::Borrowed(_) => panic!("a windows-positive source must enter the parser"),
++            },
++            (true, Err(_)) => {},
++        }
++    }
++
++    #[test]
++    fn marker_search_dispatches_every_offset_and_final_text_window() {
++        let marker = super::super::model::NAMESPACE.as_bytes();
++        for offset in 0..=marker.len() {
++            let mut source = vec![0xff; offset];
++            source.extend_from_slice(marker);
++            source.extend_from_slice(&[0x00, 0xfe, 0x80]);
++            assert_eq!(
++                source
++                    .windows(marker.len())
++                    .position(|window| window == marker),
++                Some(offset)
++            );
++            assert_windows_dispatch(&source);
++        }
++
++        let mut source = b"<r>prefix".to_vec();
++        source.extend_from_slice(marker);
++        source.extend_from_slice(b"</r>");
++        let final_text_start = source.len() - b"</r>".len() - marker.len();
++        assert_eq!(
++            source
++                .windows(marker.len())
++                .position(|window| window == marker),
++            Some(final_text_start)
++        );
++        let output = process_markup_compatibility(
++            &source,
++            &Capabilities::new(),
++            &Limits::default(),
++        )
++        .expect("a final text-window marker must remain parser-valid");
++        match output.xml {
++            Cow::Owned(bytes) => assert_eq!(bytes, source),
++            Cow::Borrowed(_) => panic!("a marked text source must be owned"),
++        }
++        assert_eq!(output.report, Report::default());
++    }
++
++    #[test]
++    fn marker_search_keeps_first_middle_near_misses_and_repeated_prefixes_borrowed() {
++        let marker = super::super::model::NAMESPACE.as_bytes();
++        for mismatch in [0, marker.len() / 2] {
++            let mut source = b"<r>\xff".to_vec();
++            let marker_start = source.len();
++            source.extend_from_slice(marker);
++            source[marker_start + mismatch] = source[marker_start + mismatch].wrapping_add(1);
++            source.extend_from_slice(b"\x00</r>");
++            assert_windows_dispatch(&source);
++        }
++
++        let mut repeated = b"<r>\xfe".to_vec();
++        for index in 0..8u8 {
++            repeated.extend_from_slice(&marker[..marker.len() - 1]);
++            repeated.push(b'A' + index);
++        }
++        repeated.extend_from_slice(b"\x80</r>");
++        assert_windows_dispatch(&repeated);
++    }
++
++    #[test]
++    fn marker_search_keeps_non_utf8_marked_attributes_on_exact_xml_errors() {
++        let marker = super::super::model::NAMESPACE.as_bytes();
++        let cases: &[(&[u8], &[u8])] = &[
++            (b"\xff", b"\x80"),
++            (b"\x00\xfe", b"\xff\x01"),
++            (b"\x80\x00\xff", b"\xfe\x02"),
++        ];
++
++        for (prefix, suffix) in cases {
++            let mut source = b"<r value=\"".to_vec();
++            source.extend_from_slice(prefix);
++            let marker_start = source.len();
++            source.extend_from_slice(marker);
++            source.extend_from_slice(suffix);
++            source.extend_from_slice(b"\"/>");
++            assert_eq!(
++                source
++                    .windows(marker.len())
++                    .position(|window| window == marker),
++                Some(marker_start)
++            );
++            match process_markup_compatibility(
++                &source,
++                &Capabilities::new(),
++                &Limits::default(),
++            ) {
++                Err(Error::Xml(message)) => assert!(!message.is_empty()),
++                Ok(output) => panic!("marked invalid UTF-8 unexpectedly parsed: {output:?}"),
++                Err(error) => panic!("marked invalid UTF-8 changed error type: {error:?}"),
++            }
++        }
++    }

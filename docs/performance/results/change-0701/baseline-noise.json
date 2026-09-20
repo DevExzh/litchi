@@ -1,0 +1,226 @@
+{
+  "total_ns": {
+    "p50_ns": {
+      "min_pct": -2.662147352211587,
+      "max_pct": 2.048705261169069,
+      "flags": []
+    },
+    "mean_ns": {
+      "min_pct": -2.783620687490012,
+      "max_pct": 2.01166255033685,
+      "flags": []
+    },
+    "p95_ns": {
+      "min_pct": -3.0599432536792155,
+      "max_pct": 1.8813209988975699,
+      "flags": []
+    },
+    "p99_ns": {
+      "min_pct": -4.115876139388622,
+      "max_pct": 3.2692449737226448,
+      "flags": []
+    }
+  },
+  "capture_ns": {
+    "p50_ns": {
+      "min_pct": -2.693270063890261,
+      "max_pct": 2.180818511214944,
+      "flags": []
+    },
+    "mean_ns": {
+      "min_pct": -2.740882864067555,
+      "max_pct": 2.049963769424565,
+      "flags": []
+    },
+    "p95_ns": {
+      "min_pct": -2.816912576592864,
+      "max_pct": 1.812937005160261,
+      "flags": []
+    },
+    "p99_ns": {
+      "min_pct": -4.1932773433133805,
+      "max_pct": 3.58903398771945,
+      "flags": []
+    }
+  },
+  "clone_ns": {
+    "p50_ns": {
+      "min_pct": -3.693853427895981,
+      "max_pct": 1.7088800732377174,
+      "flags": []
+    },
+    "mean_ns": {
+      "min_pct": -3.877131981337983,
+      "max_pct": 3.5845685172732673,
+      "flags": []
+    },
+    "p95_ns": {
+      "min_pct": -3.0422535211267605,
+      "max_pct": 9.121546961325967,
+      "flags": [
+        {
+          "case": "two-control",
+          "delta_pct": 9.121546961325967
+        }
+      ]
+    },
+    "p99_ns": {
+      "min_pct": -13.140866102538576,
+      "max_pct": 51.04445634708088,
+      "flags": [
+        {
+          "case": "one-real",
+          "delta_pct": 7.9191698525395955
+        },
+        {
+          "case": "one-generated",
+          "delta_pct": 50.0
+        },
+        {
+          "case": "one-notes-lo",
+          "delta_pct": 51.04445634708088
+        },
+        {
+          "case": "noop-real",
+          "delta_pct": -13.140866102538576
+        },
+        {
+          "case": "noop-control",
+          "delta_pct": 41.26647564469914
+        },
+        {
+          "case": "two-generated",
+          "delta_pct": 30.269413629160063
+        }
+      ]
+    }
+  },
+  "settext_ns": {
+    "p50_ns": {
+      "min_pct": -2.5998030791263873,
+      "max_pct": 2.46010986136542,
+      "flags": []
+    },
+    "mean_ns": {
+      "min_pct": -2.5295979075760737,
+      "max_pct": 1.8829241556185312,
+      "flags": []
+    },
+    "p95_ns": {
+      "min_pct": -2.6870007262164126,
+      "max_pct": 1.9751622130747226,
+      "flags": []
+    },
+    "p99_ns": {
+      "min_pct": -2.0617181920749306,
+      "max_pct": 34.00608351893264,
+      "flags": [
+        {
+          "case": "two-control",
+          "delta_pct": 34.00608351893264
+        }
+      ]
+    }
+  },
+  "commit_ns": {
+    "p50_ns": {
+      "min_pct": -2.105057549601659,
+      "max_pct": 1.0113800500021595,
+      "flags": []
+    },
+    "mean_ns": {
+      "min_pct": -1.976887219877581,
+      "max_pct": 1.0163528318592772,
+      "flags": []
+    },
+    "p95_ns": {
+      "min_pct": -4.287182177914781,
+      "max_pct": 1.143287236627112,
+      "flags": []
+    },
+    "p99_ns": {
+      "min_pct": -2.6243634939287115,
+      "max_pct": 23.519014461703268,
+      "flags": [
+        {
+          "case": "noop-control",
+          "delta_pct": 12.531765144157209
+        },
+        {
+          "case": "noop-generated",
+          "delta_pct": 6.011163589523401
+        },
+        {
+          "case": "noop-notes-poi",
+          "delta_pct": 23.519014461703268
+        }
+      ]
+    }
+  },
+  "apply_ns": {
+    "p50_ns": {
+      "min_pct": -7.6268524599526,
+      "max_pct": 5.278497409326425,
+      "flags": [
+        {
+          "case": "noop-notes-poi",
+          "delta_pct": 5.278497409326425
+        },
+        {
+          "case": "noop-notes-lo",
+          "delta_pct": -7.6268524599526
+        }
+      ]
+    },
+    "mean_ns": {
+      "min_pct": -7.7397057146116115,
+      "max_pct": 4.2451053010633935,
+      "flags": [
+        {
+          "case": "noop-notes-lo",
+          "delta_pct": -7.7397057146116115
+        }
+      ]
+    },
+    "p95_ns": {
+      "min_pct": -7.631874298540965,
+      "max_pct": 8.008032128514056,
+      "flags": [
+        {
+          "case": "noop-real",
+          "delta_pct": -5.7709812488621886
+        },
+        {
+          "case": "noop-control",
+          "delta_pct": 8.008032128514056
+        },
+        {
+          "case": "noop-notes-poi",
+          "delta_pct": 5.505689001264223
+        },
+        {
+          "case": "noop-notes-lo",
+          "delta_pct": -7.631874298540965
+        }
+      ]
+    },
+    "p99_ns": {
+      "min_pct": -25.18813634351483,
+      "max_pct": 11.666317584752102,
+      "flags": [
+        {
+          "case": "one-notes-poi",
+          "delta_pct": 11.666317584752102
+        },
+        {
+          "case": "noop-notes-poi",
+          "delta_pct": -25.18813634351483
+        },
+        {
+          "case": "noop-notes-lo",
+          "delta_pct": -8.617886178861788
+        }
+      ]
+    }
+  }
+}

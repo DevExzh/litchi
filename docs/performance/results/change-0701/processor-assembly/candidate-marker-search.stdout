@@ -1,0 +1,62 @@
+
+/home/zhuhe/code/litchi-0701-bin/candidate-native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000170580 <litchi_ooxml_common::mce::codec::contains_mce_namespace>:
+  170580:	cmp    $0x3b,%rsi
+  170584:	jb     170616 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x96>
+  17058a:	push   %rbp
+  17058b:	push   %r15
+  17058d:	push   %r14
+  17058f:	push   %r13
+  170591:	push   %r12
+  170593:	push   %rbx
+  170594:	push   %rax
+  170595:	mov    %rsi,%rbx
+  170598:	mov    %rdi,%r14
+  17059b:	mov    0x1194ae(%rip),%r13        # 289a50 <_DYNAMIC+0xad0>
+  1705a2:	lea    -0xe2a48(%rip),%r15        # 8db61 <anon.4305f7c61447813efd671f5ce5afb5fa.106.llvm.16900921509896645770+0x38b>
+  1705a9:	mov    0x118d68(%rip),%rbp        # 289318 <bcmp@GLIBC_2.2.5>
+  1705b0:	jmp    1705d4 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x54>
+  1705b2:	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  1705c0:	lea    0x1(%r12),%rax
+  1705c5:	sub    %rax,%rbx
+  1705c8:	add    %r12,%r14
+  1705cb:	inc    %r14
+  1705ce:	cmp    $0x3a,%rbx
+  1705d2:	jbe    170619 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x99>
+  1705d4:	lea    (%rbx,%r14,1),%rdx
+  1705d8:	add    $0xffffffffffffffc6,%rdx
+  1705dc:	mov    0x0(%r13),%rax
+  1705e0:	mov    $0x68,%edi
+  1705e5:	mov    %r14,%rsi
+  1705e8:	call   *%rax
+  1705ea:	test   $0x1,%al
+  1705ec:	je     170619 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x99>
+  1705ee:	mov    %rdx,%r12
+  1705f1:	sub    %r14,%r12
+  1705f4:	mov    %rbx,%rax
+  1705f7:	sub    %r12,%rax
+  1705fa:	cmp    $0x3b,%rax
+  1705fe:	jb     1705c0 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x40>
+  170600:	lea    (%r14,%r12,1),%rsi
+  170604:	mov    $0x3b,%edx
+  170609:	mov    %r15,%rdi
+  17060c:	call   *%rbp
+  17060e:	test   %eax,%eax
+  170610:	jne    1705c0 <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x40>
+  170612:	mov    $0x1,%al
+  170614:	jmp    17061b <litchi_ooxml_common::mce::codec::contains_mce_namespace+0x9b>
+  170616:	xor    %eax,%eax
+  170618:	ret
+  170619:	xor    %eax,%eax
+  17061b:	add    $0x8,%rsp
+  17061f:	pop    %rbx
+  170620:	pop    %r12
+  170622:	pop    %r13
+  170624:	pop    %r14
+  170626:	pop    %r15
+  170628:	pop    %rbp
+  170629:	ret

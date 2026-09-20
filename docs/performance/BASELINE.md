@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0701 — retained first-byte MCE marker search
+
+[0701](0701-mce-first-byte-marker-search.md) retains a private outlined
+first-byte search plus exact URI comparison. Longer marker-free/generated/notes
+controls improve 11–15%, while real edit medians remain within ±0.7%. Tiny
+marked inputs improve 7–9%, avoiding 0700's setup penalty. Initial real-deck
+medians cost 1.1–2.8%; those results and all tails remain explicit. One follow-up
+no-op baseline drifts −6.87%, so no real no-op speedup is claimed. Allocation
+metrics are unchanged; caller reservation shrinks 16 bytes but the helper
+adds a nested frame, with no peak-stack saving claim. All 1,920 oracle
+comparisons match, both 104-test focused runs and all integration gates pass.
+
 ## 0700 — rejected direct MCE substring search
 
 [0700](0700-mce-marker-substring-search.md) replaces the marker window scan

@@ -726,6 +726,68 @@ mod codec_tests {
         ))
     }
 
+    fn assert_marker_dispatch_matches_windows(xml: &[u8]) {
+        let marker = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let present = xml.windows(marker.len()).any(|window| window == marker);
+        match process_markup_compatibility(xml, &Capabilities::new(), &Limits::default()) {
+            Ok(output) if !present => {
+                assert!(matches!(output.xml, Cow::Borrowed(_)));
+                assert_eq!(output.xml.as_ref(), xml);
+                assert_eq!(output.report, Report::default());
+            },
+            Ok(output) => assert!(matches!(output.xml, Cow::Owned(_))),
+            Err(error) => assert!(present, "marker-free input reached parser: {error:?}"),
+        }
+    }
+
+    #[test]
+    fn marker_search_matches_every_start_with_arbitrary_byte_surroundings() {
+        let marker = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+        for offset in 0..=128 {
+            for tail in 0..=3 {
+                let mut xml = vec![0xff; offset + marker.len() + tail];
+                assert_marker_dispatch_matches_windows(&xml);
+                xml[offset..offset + marker.len()].copy_from_slice(marker);
+                assert_marker_dispatch_matches_windows(&xml);
+            }
+        }
+        // A text-only marker at offset zero also occupies the final full window.
+        assert_marker_dispatch_matches_windows(marker);
+    }
+
+    #[test]
+    fn marker_search_matches_each_single_byte_substitution() {
+        let marker = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+        for position in 0..marker.len() {
+            for byte in u8::MIN..=u8::MAX {
+                let mut xml = *marker;
+                xml[position] = byte;
+                assert_marker_dispatch_matches_windows(&xml);
+            }
+        }
+    }
+
+    #[test]
+    fn marker_search_advances_past_repeated_candidates_and_trailing_prefixes() {
+        let marker = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+        for repeats in [0, 1, 2, 31, 64] {
+            let mut xml = vec![b'h'; repeats];
+            for _ in 0..repeats {
+                xml.extend_from_slice(&marker[..marker.len() - 1]);
+                xml.push(b'7');
+            }
+            for trailing in 0..marker.len() {
+                let mut without_match = xml.clone();
+                without_match.extend_from_slice(&marker[..trailing]);
+                assert_marker_dispatch_matches_windows(&without_match);
+            }
+            xml.extend_from_slice(marker);
+            assert_marker_dispatch_matches_windows(&xml);
+            xml.extend_from_slice(marker);
+            assert_marker_dispatch_matches_windows(&xml);
+        }
+    }
+
     #[test]
     fn marker_search_keeps_short_near_matches_and_arbitrary_bytes_borrowed() {
         let cases: &[&[u8]] = &[

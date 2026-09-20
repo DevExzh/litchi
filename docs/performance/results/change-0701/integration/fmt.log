@@ -1,0 +1,4 @@
+HEAD 7e4c245673a21433c7c400c170b0b097e47fce40
+$ cargo fmt --all --check
+
+exit 0
