@@ -1,0 +1,50 @@
+   Compiling num-traits v0.2.19
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking chrono v0.4.45
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking lazy_static v1.5.0
+    Checking allsorts v0.17.0
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking font-kit v0.14.3
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:464:14
+    |
+464 |               .err()
+    |  ______________^
+465 | |             .expect("exact invalid proofs must refuse the notes graph");
+    | |___________________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+    = note: `-D clippy::err-expect` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::err_expect)]`
+
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:538:10
+    |
+538 |           .err()
+    |  __________^
+539 | |         .expect("the 16 MiB slide root limit must refuse capture");
+    | |_______________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:557:10
+    |
+557 |           .err()
+    |  __________^
+558 | |         .expect("the 64 MiB part limit must refuse capture");
+    | |_______________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

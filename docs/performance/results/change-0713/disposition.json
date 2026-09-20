@@ -1,0 +1,13 @@
+{
+  "decision": "accepted",
+  "failed_gates": [],
+  "production": "candidate retained",
+  "basis": "All 48 frozen native/allocator gates and parity pass. Three focused guards, 4995 tests, 92 doctests and source-bound production-library quality pass. Guest-Ir reductions support the hypothesis; RSS flags do not trigger.",
+  "limitations": [
+    "Two native lifecycle p99 regressions and fourteen repeat-drift flags remain explicit.",
+    "Full all-target Clippy remains failing in seven baseline-proven PPTX/XLSB test lint locations; production-library Clippy is warning-denied and passes.",
+    "46 existing doctests are ignored.",
+    "First diagnostic attempt lacked a receipt due to driver NameError; all raw artifacts retained separately. Full corrected diagnostic matrix is admitted.",
+    "No lifecycle-speedup, hardware, cold-cache, throughput, scaling, cross-architecture or other-format timing claim."
+  ]
+}

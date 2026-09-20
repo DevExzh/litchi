@@ -1,0 +1,76 @@
+    Checking getrandom v0.2.17
+   Compiling num-traits v0.2.19
+    Checking rand_core v0.6.4
+    Checking ff v0.13.1
+    Checking group v0.13.0
+    Checking crypto-bigint v0.5.5
+    Checking chrono v0.4.45
+    Checking elliptic-curve v0.13.8
+    Checking num-integer v0.1.47
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rand_chacha v0.3.1
+    Checking signature v2.2.0
+    Checking rand v0.8.8
+    Checking num-iter v0.1.46
+    Checking num-bigint-dig v0.8.6
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking rsa v0.9.10
+    Checking p256 v0.13.2
+    Checking tempfile v3.27.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:271:21
+    |
+271 |         .map(|part| part.expect("part payload decodes"))
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#expect_used
+    = note: ordinary and newly authored workbook paths require checked wire conversions, typed error propagation, and explicit variants
+note: the lint level is defined here
+   --> crates/litchi-xlsb/src/lib.rs:14:5
+    |
+ 14 |     clippy::expect_used,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:276:21
+    |
+276 |         .map(|part| part.expect("part payload decodes"))
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#expect_used
+    = note: ordinary and newly authored workbook paths require checked wire conversions, typed error propagation, and explicit variants
+
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:384:21
+    |
+384 |         .map(|part| part.expect("part payload decodes"))
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#expect_used
+    = note: ordinary and newly authored workbook paths require checked wire conversions, typed error propagation, and explicit variants
+
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/shared_workbook/tests.rs:180:21
+    |
+180 |         .map(|part| part.expect("part payload decodes"))
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#expect_used
+    = note: ordinary and newly authored workbook paths require checked wire conversions, typed error propagation, and explicit variants
+
+error: could not compile `litchi-xlsb` (lib test) due to 4 previous errors

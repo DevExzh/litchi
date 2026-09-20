@@ -1,0 +1,15 @@
+{
+  "reason": "Capture bookkeeping failure before first receipt; failed raw artifacts archived, no native rerun.",
+  "changes": [
+    "Bind before census alias used by validation and receipt.",
+    "Record actual child locale/environment overrides.",
+    "Accept leading whitespace in GNU time maximum RSS line."
+  ],
+  "incomplete_attempt": "mechanism-incomplete-attempt/failure.json",
+  "fresh_freeze": {
+    "mechanism-plan.json": "fa46c9f3985f51659a7a299fc30d3fb11bec6a7cf57191e09dc7a2012d3d2c2d",
+    "mechanism.py": "06b06592c2f38f9fbf711c53b308379bb20a139892871d133d86d98a42e2c862",
+    "analyze_mechanism.py": "5a0d8f08294787eac4663a7618d79b039353884fa1499e36f6d58b693d7b1b83"
+  },
+  "native_plan_capture_unchanged": true
+}

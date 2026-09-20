@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "review": "0713 find_bytes memmem preflight",
+  "verdict": "Semantics are equivalent for the proposed private helper; production acceptance remains gated on exact parity, complete dependent-crate quality coverage, and the frozen paired pilot.",
+  "localproof": {
+    "revision": "1d65a12dfa17c417632bd1d5c1b29d0bc7bc76ee",
+    "dependency": {
+      "workspace_declaration": "memchr = \"2.7\"",
+      "root_lock_version": "2.8.3",
+      "oracle_lock_version": "2.8.3",
+      "features": ["default", "std", "alloc"],
+      "direct_common_dependency": true,
+      "existing_common_memchr_use": "crates/litchi-ooxml-common/src/mce/codec.rs:627"
+    },
+    "memmem_semantics_from_local_2_8_3_source": [
+      "empty needle returns Some(0), including an empty haystack",
+      "needle longer than haystack returns None without panic",
+      "non-empty search returns the first exact byte match, including overlapping patterns",
+      "search operates on arbitrary bytes and does not require UTF-8",
+      "find uses borrowed search state; no heap allocation is required by the direct API"
+    ],
+    "call_sites": [
+      "active_offsets namespace dispatch",
+      "active marker scanning",
+      "active marker close-delimiter scanning",
+      "active marker collision/salt selection"
+    ],
+    "tests": {
+      "command_result": "294 common unit tests and all common integration suites passed",
+      "focused_search_guards": "The existing cfg(test) differential guards cover empty, long, binary, repeated, namespace, marker, and near-match inputs",
+      "existing_order_collision_guards": "Common tests cover caller order/duplicates, branch selection, and one collision salt advance",
+      "remaining_recommended_guard": "Add candidate-only all-256-salts collision exhaustion/refusal coverage"
+    },
+    "quality_scope_finding": "The planned quality.py package list omits litchi-spreadsheet-drawing, whose chart codec directly calls litchi_ooxml_common::mce::process_ooxml; add that crate to tests, Clippy, doctests, and rustdoc.",
+    "constraints": [
+      "ADR 0005 requires representative measured evidence and explicit resource observations",
+      "ADR 0006 requires exact preservation, deterministic reports, refusal boundaries, and error ordering",
+      "GOAL.md requires review of individual regressions above approximately 5 percent rather than hiding them in aggregates"
+    ]
+  },
+  "executiondisclosure": {
+    "unexpected_cargo_commands": [
+      {
+        "command": "cargo tree -p litchi-ooxml-common -e features --locked",
+        "cwd": "/home/zhuhe/code/litchi",
+        "target_dir": "/home/zhuhe/code/litchi/target (Cargo default; no build was requested)",
+        "logs": "functions.exec response only; no log file persisted",
+        "temp_paths": [],
+        "result": "dependency graph inspection only"
+      },
+      {
+        "command": "cargo test -p litchi-ooxml-common --locked --all-features --all-targets",
+        "cwd": "/home/zhuhe/code/litchi",
+        "target_dir": "/home/zhuhe/code/litchi/target (Cargo default; no CARGO_TARGET_DIR override was set)",
+        "logs": "functions.exec response only; no log file persisted",
+        "temp_paths": [],
+        "result": "passed: 294 unit tests plus common integration suites"
+      }
+    ],
+    "native_commands": [],
+    "timing_impact": "The test/tree commands ran before this disclosure request and did not run native timing or profiling workloads; the root-owned live baseline lane uses a separate target directory.",
+    "workspace_mutations_by_review": [],
+    "preexisting_workspace_paths_left_untouched": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs (preexisting 142-line cfg(test) differential addition)",
+      "docs/UNIFIED_OPS_API_DESIGN.md",
+      "docs/performance/results/change-0713/"
+    ],
+    "cleanup": {
+      "explicit_logs_removed": [],
+      "explicit_temp_paths_removed": [],
+      "target_cleanup": "No broad target deletion was performed; /home/zhuhe/code/litchi/target was left intact because it is shared/preexisting and the review did not establish exclusive ownership.",
+      "review_artifact": "This file is the only file written for the requested preflight disclosure."
+    },
+    "stop_condition": "No further Cargo or native commands will be run by this review lane."
+  }
+}

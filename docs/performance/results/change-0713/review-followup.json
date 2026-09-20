@@ -1,0 +1,16 @@
+{
+  "review": "0713 source and pilot read-only review",
+  "source_reconstruction": "Candidate exactly equals baseline plus private replacement and all-salt test fragment; patch exactly matches.",
+  "results": "Native/allocator tables, 2 tail flags, 14 repeat flags, 48 gates and 32-child parity match retained JSON.",
+  "resolved_preflight_findings": [
+    "All-256 salt refusal guard added and root-tested.",
+    "Seven-crate quality includes litchi-spreadsheet-drawing."
+  ],
+  "audit_followups": [
+    "Bind patch hashes and reconstruct candidate from baseline.",
+    "Validate focused command/count and quality package scope.",
+    "Bind build source and log hashes."
+  ],
+  "warmup_clarification": "Native 10; allocator 0. Preflight review is historical, with its recommendations resolved here.",
+  "execution": "Read-only and Python review; no Cargo or native commands."
+}

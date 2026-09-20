@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0713 — retained exact MCE substring search
+
+[0713](0713-mce-substring-search.md) replaces the private scalar byte-window
+helper with the existing `memchr::memmem::find` dependency. All 48 frozen
+pilot gates pass across 32 source-bound children: DOCX edit p50 improves
+7.19–7.46% on generated-medium and 8.15–9.78% on NumberedList, with unchanged
+allocation requests/bytes and exact 11-case oracle parity. Eight fresh
+edit-owner profiles show lower guest Ir; 16 RSS children remain within the
+5% review envelope. Two lifecycle p99 regressions and 14 repeat-drift flags
+remain explicit; no lifecycle speedup or broader timing claim follows.
+All 4,995 tests, 92 doctests, production-library Clippy and rustdoc pass;
+46 doctests are ignored, and seven baseline-proven PPTX/XLSB test Clippy
+violations remain documented. The incomplete first diagnostic capture is
+retained separately, with the corrected full matrix and exact replay.
+[Evidence packet](results/change-0713/README.md). The non-iWork goal remains active.
+
 ## 0712 — active-offset shortcut counterexamples and search attribution
 
 [0712](0712-docx-active-offset-validation.md) records an 11-case current-source

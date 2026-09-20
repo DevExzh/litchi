@@ -1,0 +1,7 @@
+{
+  "revision": "1d65a12dfa17c417632bd1d5c1b29d0bc7bc76ee",
+  "previous_turn": "progress:0712 public refusal counterexamples and measured search attribution committed",
+  "scope": "shared MCE exact substring search; DOCX ordinary edit/lifecycle paired pilot",
+  "hypothesis": "Replace repeated scalar window comparisons with existing memchr substring search while retaining all validation and offset selection.",
+  "candidate_path": "crates/litchi-ooxml-common/src/mce/codec.rs"
+}

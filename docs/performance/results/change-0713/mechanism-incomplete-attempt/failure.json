@@ -1,0 +1,7 @@
+{
+  "status": "inadmissible incomplete capture; excluded from all mechanism comparisons",
+  "error": "NameError: name before is not defined",
+  "location": "mechanism.py run_child, after subprocess and before receipt",
+  "retained_artifacts": 13,
+  "recovery": "Preserve entire incomplete attempt. Correct capture bookkeeping and start full planned diagnostic matrix; native pilot is unchanged. No result selection or threshold change."
+}

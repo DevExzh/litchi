@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.05199310998432338,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0713-mce-substring-search.md": "079c7aada5e16b32bac894793498e83e8d60ba3d85842de13e5571c7d3096544",
+    "docs/performance/REPORT.md": "046442d12aa27fadb4b063eaa5e4b7b8069dae21dcfb722cc41ade19ed4b2c92",
+    "docs/performance/BASELINE.md": "a55c9819dd6518b404396222363dffcebfe6e32dc7b3538d39da65023e5dd124",
+    "docs/performance/HOTSPOTS.md": "4c1f78eac41cce948d0dd07d29a28320e1cdae70e534380392176ee9422be21e",
+    "docs/performance/GOAL_AUDIT.md": "6d82b0b66a1a0f0a8cea3cdf0da6ed5ec4ea56e9d9cb203d384bf2cf773a4ffe",
+    "docs/performance/results/change-0713/README.md": "81d86dd4c2a0bb8492230957482586d549e800d9244f109fa3ea13e5a29708f2"
+  }
+}

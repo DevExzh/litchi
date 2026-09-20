@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "pass",
+  "analyzer_sha256": "32cb7fec49d3c3479595b4536ab82f38ebd476f9e7b4344cb8aafe1a3e7fe024",
+  "analysis_sha256": "34b3435d81c2dd5ae8756d9f371bc123fd4c0c67d2458edefb8a6b7a48419ba6",
+  "original_rerun": {
+    "return_code": 0,
+    "byte_equal_to_analysis": true,
+    "temporary_output_cleaned": true
+  },
+  "checks": [
+    {
+      "name": "wrong-raw-elapsed-statistics",
+      "rejected": true,
+      "return_code": 1,
+      "message": "analysis failed: baseline-A1-native-generated-edit.elapsed_ns.mean: 380476.98000000004 != 380475.98",
+      "target": "baseline-A1-native-generated-edit.json",
+      "retained_target_sha256": "dbeb55e3e6d55195a1d354bf9f027b36ad12d0e5e65c70c1ebb67ede9ec3c0a3",
+      "reference_analysis_unchanged": true
+    },
+    {
+      "name": "wrong-receipt-command-argv",
+      "rejected": true,
+      "return_code": 1,
+      "message": "analysis failed: baseline-A1-native-numbered-list-edit command argv changed",
+      "target": "baseline-A1-native-numbered-list-edit.receipt.json",
+      "retained_target_sha256": "7bab5d30667fb568116d054fa15cbef58ccd94fa547ab2a1f69f6a3fb4cec258",
+      "reference_analysis_unchanged": true
+    },
+    {
+      "name": "wrong-decoded-manifest-quantity",
+      "rejected": true,
+      "return_code": 1,
+      "message": "analysis failed: baseline-A1-native-numbered-list-edit decoded target manifest identity changed",
+      "target": "baseline-A1-native-numbered-list-edit.json",
+      "retained_target_sha256": "d05d9a199939998b4a9eb51f58aedd7dcd46fce26b27639d3458675462b36a5b",
+      "reference_analysis_unchanged": true
+    },
+    {
+      "name": "wrong-deterministic-parity-output",
+      "rejected": true,
+      "return_code": 1,
+      "message": "analysis failed: deterministic output parity failed: [{'key': 'numbered-list/edit', 'stage': 'candidate-B1', 'lane': 'native'}]",
+      "target": "candidate-B1-native-numbered-list-edit.json",
+      "retained_target_sha256": "228fff5a52f17c87ef9e204d81d785791f3fdea46f6a5b2de97354736ae28576",
+      "reference_analysis_unchanged": true
+    }
+  ],
+  "retained_inputs_unchanged": true
+}

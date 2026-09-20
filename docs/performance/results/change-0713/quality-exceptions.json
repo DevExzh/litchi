@@ -1,0 +1,32 @@
+{
+  "status": "baseline-proven test-only Clippy exceptions",
+  "candidate_source": "source-candidate.json",
+  "baseline_source": "source-baseline.json",
+  "exceptions": [
+    {
+      "crate": "litchi-xlsb",
+      "lint": "clippy::expect_used",
+      "locations": [
+        "crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:271",
+        "crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:276",
+        "crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:384",
+        "crates/litchi-xlsb/src/shared_workbook/tests.rs:180"
+      ],
+      "candidate_log": "quality-clippy.log",
+      "baseline_log": "baseline-xlsb-clippy.log"
+    },
+    {
+      "crate": "litchi-pptx",
+      "lint": "clippy::err_expect",
+      "locations": [
+        "crates/litchi-pptx/src/opened/tests.rs:464",
+        "crates/litchi-pptx/src/opened/tests.rs:538",
+        "crates/litchi-pptx/src/opened/tests.rs:557"
+      ],
+      "candidate_log": "quality-clippy-direct.log",
+      "baseline_log": "baseline-pptx-clippy.log"
+    }
+  ],
+  "policy": "No warning allowances or unrelated source edits. Keep both failed attempts and baseline reproduction. Run all-seven all-feature library Clippy with warnings denied; all-target Clippy for other five crates; all-seven unit/integration/doc tests and rustdoc.",
+  "limitation": "Full all-target warning-denied Clippy remains failing in preexisting PPTX/XLSB test code. No clean all-target claim for these two crates."
+}

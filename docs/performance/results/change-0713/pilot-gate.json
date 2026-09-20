@@ -1,0 +1,301 @@
+{
+  "status": "accepted",
+  "analysis_sha256": "34b3435d81c2dd5ae8756d9f371bc123fd4c0c67d2458edefb8a6b7a48419ba6",
+  "decision": {
+    "hard_gates": [
+      {
+        "name": "pair-1/generated/edit/p50/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 7.193834839830881
+      },
+      {
+        "name": "pair-1/generated/edit/mean/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 7.3771095878378485
+      },
+      {
+        "name": "pair-1/generated/edit/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/edit/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/edit/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/edit/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.22904430008032772
+      },
+      {
+        "name": "pair-1/generated/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.3829864610680911
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/generated/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/edit/p50/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 9.776474945232906
+      },
+      {
+        "name": "pair-1/numbered-list/edit/mean/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 9.922708917107293
+      },
+      {
+        "name": "pair-1/numbered-list/edit/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/edit/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/edit/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/edit/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.8711046178427662
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 1.6566976712829362
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-1/numbered-list/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/edit/p50/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 7.456379752430298
+      },
+      {
+        "name": "pair-2/generated/edit/mean/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 6.327363960597554
+      },
+      {
+        "name": "pair-2/generated/edit/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/edit/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/edit/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/edit/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.6189889823194239
+      },
+      {
+        "name": "pair-2/generated/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.7246714986131941
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/generated/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/edit/p50/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 8.151742446856481
+      },
+      {
+        "name": "pair-2/numbered-list/edit/mean/improvement",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_improvement_percent": 7.844462621153713
+      },
+      {
+        "name": "pair-2/numbered-list/edit/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/edit/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/edit/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/edit/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.035453279062280796
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": -0.164804679327879
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocation_calls/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocation_calls/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocated_bytes/p50/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      },
+      {
+        "name": "pair-2/numbered-list/lifecycle/allocation/allocated_bytes/mean/nonregression",
+        "pass": true,
+        "threshold_percent": 3,
+        "observed_delta_percent": 0.0
+      }
+    ],
+    "all_hard_gates_pass": true,
+    "deterministic_output_parity_pass": true,
+    "accepted": true,
+    "acceptance_rule": "accept only when deterministic output parity and every native edit, lifecycle, and allocator hard gate pass"
+  },
+  "note": "Pilot accepted; final quality and mechanism review pending."
+}

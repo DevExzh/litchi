@@ -1,0 +1,5 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+   Compiling docx-active-offset-oracle-0712 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0713/oracle)
+    Finished `release` profile [optimized] target(s) in 55.19s

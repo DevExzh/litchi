@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 2360976
+cmd:  /home/zhuhe/code/litchi-0713-bin/candidate-native --warmup 0 --samples 1 --case docx_ordinary_save_edit --json /home/zhuhe/code/litchi/docs/performance/results/change-0713/mechanism-profile-candidate-B1-generated-edit.json --filesystem-root /home/zhuhe/code/litchi-0713-fs
+part: 6
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 26107239 - 81537644
+desc: Trigger: Program termination
+
+positions: line
+events: Ir
+summary: 0
+
+
+totals: 0
