@@ -35,3 +35,18 @@ Independent source/resource review identified outstanding issues:
 The implementation owner is correcting those issues. Numerical accumulator
 semantics remain under separate review. No production, native-parity, resource,
 or performance PASS is claimed by these standalone numerical results.
+
+## Resource-fix numerical follow-up
+
+Root reran the probes against solver snapshot
+`6624fce0af61ed0b6d7dddcad0e7bf0623fe17821e53e236a6d741bc3eb8d4b3`:
+**11 passed, 0 failed** (eight embedded tests and three independent tests).
+The retained harness is reproducible with:
+
+```sh
+python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/probe_solver.py CHECKOUT
+```
+
+It snapshots the selected source and removes its temporary files on exit.
+This follow-up confirms numerical probes still pass after work-accounting
+changes; independent resource review and adapter reservations remain pending.
