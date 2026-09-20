@@ -1,10 +1,10 @@
 # Date/time isolated gate preparation
 
 This directory contains isolated gate tooling for the ODF 1.4 §6.10 date/time
-batch. The current freeze is pending after measurement-harness corrections;
-previous runs are archived under the history directories. The replacement
-`freeze.json` will bind the selected source closure using the retained isolated
-lock. Execution receipts are recorded
+batch. `freeze.json` binds 103 selected inputs at candidate `d16039ce48`,
+using the retained isolated lock. All seven gates are verified, with 1,745
+passing tests and no failures or ignored tests. Superseded runs are retained
+under the history directories with their original dispositions. Execution receipts are recorded
 by `run.py` and checked by `verify.py`; only a successful verifier establishes
 that all gates finished and the selected source remained unchanged.
 
@@ -70,3 +70,8 @@ missing-source, malformed-hash, and closure-category refusal without Cargo.
 The date/time evidence verifier one directory above remains the owner of
 contract/coverage bindings. These gate scripts only custody the isolated source
 and execution receipts; they do not turn pending coverage into a PASS.
+
+The owned isolated checkouts and target have been removed after validation.
+The retained receipts verify against the root source and baseline Git objects;
+no live build directory is required. To repeat staging and gates, use a separate
+checkout and preserve its existing evidence bundle before creating a new freeze.
