@@ -1,0 +1,14 @@
+{
+  "reason": "Terminal audit expected obsolete dictionary metadata for derived allocation gate source_field; frozen analyzer emits explicit formula strings. Measurements, analyzer scripts and outputs unchanged.",
+  "observed_initial_command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0722/audit.py"
+  ],
+  "observed_initial_exit_code": 1,
+  "observed_initial_error": "audit failed: primary allocator peak-above-start source changed",
+  "initial_audit_sha256": "fea17b05a3e4a316104c6798abf7cab4261ff2e903cdc2b59e089227205f9f35",
+  "final_audit_sha256": "708fe179dfbc5e7f8382c7a8949a0924633d141ce1a9db17853070661bcb7e7f",
+  "initial_negative_checks_sha256": "37deeb81dd112268c760b2446b2d64def88324b71874b10387950a6137d6a25b",
+  "audit_diff_sha256": "794cca390ecacb43f818480a404d3898d7a5237eddbd76e6da5548041f52a35d"
+}

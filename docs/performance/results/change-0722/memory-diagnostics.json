@@ -1,0 +1,268 @@
+{
+  "scope": "Aligned per-operation region counters; owner destruction outside region, not RSS or leak evidence; phases not additive",
+  "formulas": {
+    "net_live_bytes": "live_bytes_after - live_bytes_before",
+    "peak_above_start_bytes": "region_peak_live_bytes - live_bytes_before"
+  },
+  "inputs": {
+    "baseline-A1-allocator-generated-edit.json": "615d5691b9f2cc3f3dd2be4b8e032fe98eeb71751f9ebe2221ac03201af6b881",
+    "baseline-A1-allocator-generated-lifecycle.json": "9367d77e45ea091339a74fa6ed19cfbb520e948a67a0631a527a4529ceda209e",
+    "baseline-A1-allocator-numbered-list-edit.json": "9d807800f65880af63e69ca4c49048ef7629af2c2f151cb94540ec42066db1de",
+    "baseline-A1-allocator-numbered-list-lifecycle.json": "ac2411748e1aeba1e7b1b81de76697c1b98dc39ed53be6cca5c2266dcf9e147e",
+    "candidate-B1-allocator-generated-edit.json": "6adc9632f0441070be9c66b51ac19ae8cdf719c25be3ffcd28cb5c0ea5276554",
+    "candidate-B1-allocator-generated-lifecycle.json": "7780bd1274c4bec338f98d23b76e34a30c2bef197f82853bff4f245201d2caa9",
+    "candidate-B1-allocator-numbered-list-edit.json": "6916b9fa87224495107608cf5cece188548ee348c5638cbcd50dcdeb16452f3f",
+    "candidate-B1-allocator-numbered-list-lifecycle.json": "33cfe9799d8140ad01365d81c9e6eec1c58ecc8b8d3c7c337991157c28df0b7a",
+    "candidate-B2-allocator-generated-edit.json": "cdf39049e33301f56c51c1ebd32714c5850e1774b90fd1a680c405ee1807904d",
+    "candidate-B2-allocator-generated-lifecycle.json": "7c258b8ff84d28eff69e5cf44c89bcd414610d2f5ceb6d1e1ae20caad4b9b47d",
+    "candidate-B2-allocator-numbered-list-edit.json": "fa5412bd5c1f1385ef25183585d6efb0d125e0d7b6921da34cee84d2b0dca867",
+    "candidate-B2-allocator-numbered-list-lifecycle.json": "8996e7caf050f2e716287d054009c86ba19c87368d3aa06d9dad20a77a791716",
+    "baseline-A2-allocator-generated-edit.json": "5ba05c99a0f27f35885d7b6bb8386a7dbebb87582cd0b996a061741ebc4e1226",
+    "baseline-A2-allocator-generated-lifecycle.json": "f296e3e6d0100f658b66685756c57aca58232a2f70026c2aa86cd5c1b17e8052",
+    "baseline-A2-allocator-numbered-list-edit.json": "73bbd899451432af956d944f0f0186dc4bddeb02d33cf233d5927cfb4f83ea69",
+    "baseline-A2-allocator-numbered-list-lifecycle.json": "a341e3cced0a1f72f39a40a102f29ab9b0e9cc70bd0553a64bafdfcfd649d2ed"
+  },
+  "script_sha256": "97747989af58147452ad845c1d25153af286bf5ade739c95b2f1e152ad1f36ee",
+  "rows": [
+    {
+      "stage": "baseline-A1",
+      "corpus": "generated",
+      "phase": "edit",
+      "net_live_bytes": [
+        388061,
+        388061,
+        388061
+      ],
+      "peak_above_start_bytes": [
+        390629,
+        390629,
+        390629
+      ]
+    },
+    {
+      "stage": "baseline-A1",
+      "corpus": "generated",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        461654,
+        461654,
+        461654
+      ],
+      "peak_above_start_bytes": [
+        1049866,
+        1049866,
+        1049866
+      ]
+    },
+    {
+      "stage": "baseline-A1",
+      "corpus": "numbered-list",
+      "phase": "edit",
+      "net_live_bytes": [
+        18976,
+        18976,
+        18976
+      ],
+      "peak_above_start_bytes": [
+        21310,
+        21310,
+        21310
+      ]
+    },
+    {
+      "stage": "baseline-A1",
+      "corpus": "numbered-list",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        122437,
+        122437,
+        122437
+      ],
+      "peak_above_start_bytes": [
+        710663,
+        710663,
+        710663
+      ]
+    },
+    {
+      "stage": "candidate-B1",
+      "corpus": "generated",
+      "phase": "edit",
+      "net_live_bytes": [
+        388061,
+        388061,
+        388061
+      ],
+      "peak_above_start_bytes": [
+        390629,
+        390629,
+        390629
+      ]
+    },
+    {
+      "stage": "candidate-B1",
+      "corpus": "generated",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        461654,
+        461654,
+        461654
+      ],
+      "peak_above_start_bytes": [
+        1049866,
+        1049866,
+        1049866
+      ]
+    },
+    {
+      "stage": "candidate-B1",
+      "corpus": "numbered-list",
+      "phase": "edit",
+      "net_live_bytes": [
+        18976,
+        18976,
+        18976
+      ],
+      "peak_above_start_bytes": [
+        21310,
+        21310,
+        21310
+      ]
+    },
+    {
+      "stage": "candidate-B1",
+      "corpus": "numbered-list",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        122437,
+        122437,
+        122437
+      ],
+      "peak_above_start_bytes": [
+        710663,
+        710663,
+        710663
+      ]
+    },
+    {
+      "stage": "candidate-B2",
+      "corpus": "generated",
+      "phase": "edit",
+      "net_live_bytes": [
+        388061,
+        388061,
+        388061
+      ],
+      "peak_above_start_bytes": [
+        390629,
+        390629,
+        390629
+      ]
+    },
+    {
+      "stage": "candidate-B2",
+      "corpus": "generated",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        461654,
+        461654,
+        461654
+      ],
+      "peak_above_start_bytes": [
+        1049866,
+        1049866,
+        1049866
+      ]
+    },
+    {
+      "stage": "candidate-B2",
+      "corpus": "numbered-list",
+      "phase": "edit",
+      "net_live_bytes": [
+        18976,
+        18976,
+        18976
+      ],
+      "peak_above_start_bytes": [
+        21310,
+        21310,
+        21310
+      ]
+    },
+    {
+      "stage": "candidate-B2",
+      "corpus": "numbered-list",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        122437,
+        122437,
+        122437
+      ],
+      "peak_above_start_bytes": [
+        710663,
+        710663,
+        710663
+      ]
+    },
+    {
+      "stage": "baseline-A2",
+      "corpus": "generated",
+      "phase": "edit",
+      "net_live_bytes": [
+        388061,
+        388061,
+        388061
+      ],
+      "peak_above_start_bytes": [
+        390629,
+        390629,
+        390629
+      ]
+    },
+    {
+      "stage": "baseline-A2",
+      "corpus": "generated",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        461654,
+        461654,
+        461654
+      ],
+      "peak_above_start_bytes": [
+        1049866,
+        1049866,
+        1049866
+      ]
+    },
+    {
+      "stage": "baseline-A2",
+      "corpus": "numbered-list",
+      "phase": "edit",
+      "net_live_bytes": [
+        18976,
+        18976,
+        18976
+      ],
+      "peak_above_start_bytes": [
+        21310,
+        21310,
+        21310
+      ]
+    },
+    {
+      "stage": "baseline-A2",
+      "corpus": "numbered-list",
+      "phase": "lifecycle",
+      "net_live_bytes": [
+        122437,
+        122437,
+        122437
+      ],
+      "peak_above_start_bytes": [
+        710663,
+        710663,
+        710663
+      ]
+    }
+  ]
+}

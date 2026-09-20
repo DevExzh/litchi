@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0722 — retained writer-local DOCX fusion
+
+[0722](0722-docx-writer-local-fusion-pilot.md) retains one structural reader
+for the mutable writer while preserving the existing public codec and shared
+read-only scanner implementations. Across two ABBA cycles, edit p50 improves
+16.16–19.32% on generated-medium and 6.23–6.80% on NumberedList. All 96 primary
+and 16 read-control hard gates pass; allocation-region peak and net live bytes
+are unchanged. Three read tail/max regressions remain visible, including one
+p99 increase of 18.58%; no universal tail non-regression is claimed. Exact
+output/MCE parity, source guards and differential tests pass. The broader
+performance program remains active. [Evidence packet](results/change-0722/README.md).
+
 ## 0721 — rejected DOCX structural scan fusion
 
 [0721](0721-docx-structural-scan-fusion-pilot.md) removes one structural walk

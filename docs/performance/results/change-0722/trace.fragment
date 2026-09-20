@@ -1,0 +1,476 @@
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::missing_const_for_fn,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines
+)]
+
+//! Temporary, source-bound observation hooks for the 0722 DOCX differential.
+//!
+//! `trace.py` copies this module outside the checkout and includes it only in
+//! a controlled debug build.  Reader calls and range-state callbacks are
+//! recorded independently.  A callback therefore cannot make a fused reader
+//! look cheaper or more expensive by changing the reader-call count.
+
+use serde_json::{Value, json};
+use sha2::{Digest as _, Sha256};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::io::Write as _;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const TRACE_PREFIX: &str = "TRACE0722 ";
+
+static NEXT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+thread_local! {
+    static ACTIVE_TRACE: RefCell<Option<TraceState>> = const { RefCell::new(None) };
+}
+
+struct TraceState {
+    sequence: u64,
+    xml_bytes: usize,
+    xml_sha256: String,
+    reader_reads: Vec<ReaderRead>,
+    active_calls: Vec<ActiveCall>,
+    alt_scans: Vec<AltScan>,
+    range_scans: Vec<RangeScan>,
+    alt_stack: Vec<usize>,
+    range_stack: Vec<usize>,
+}
+
+struct ReaderRead {
+    owner: String,
+    start: u64,
+    end: Option<u64>,
+}
+
+struct ActiveCall {
+    stage: String,
+    xml_bytes: usize,
+    xml_sha256: String,
+    input_offsets: Vec<u32>,
+    output_offsets: Option<Vec<u32>>,
+    result_kind: String,
+    result_debug: String,
+}
+
+struct AltScan {
+    xml_bytes: usize,
+    xml_sha256: String,
+    stage: String,
+    completed: bool,
+    raw_chunks: Option<Vec<Value>>,
+    selected_chunks: Option<Vec<Value>>,
+}
+
+struct RangeScan {
+    xml_bytes: usize,
+    xml_sha256: String,
+    stage: String,
+    completed: bool,
+    observer_events: u64,
+    raw_ranges: Option<Vec<[u64; 3]>>,
+    selected_ranges: Option<Vec<[u64; 3]>>,
+}
+
+pub(crate) struct DocumentScope {
+    previous: Option<TraceState>,
+}
+
+pub(crate) struct AltScanScope {
+    active: bool,
+    index: usize,
+}
+
+pub(crate) struct RangeScanScope {
+    active: bool,
+    index: usize,
+}
+
+pub(crate) fn document_scope(xml: &[u8]) -> DocumentScope {
+    let sequence = NEXT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let xml_sha256 = sha256_hex(xml);
+    let state = TraceState {
+        sequence,
+        xml_bytes: xml.len(),
+        xml_sha256: xml_sha256.clone(),
+        reader_reads: Vec::new(),
+        active_calls: Vec::new(),
+        alt_scans: Vec::new(),
+        range_scans: Vec::new(),
+        alt_stack: Vec::new(),
+        range_stack: Vec::new(),
+    };
+    let previous = ACTIVE_TRACE.with(|cell| cell.replace(Some(state)));
+    emit(json!({
+        "kind": "document_start",
+        "sequence": sequence,
+        "xml_bytes": xml.len(),
+        "xml_sha256": xml_sha256,
+    }));
+    DocumentScope { previous }
+}
+
+pub(crate) fn alt_scan_scope(xml: &[u8]) -> AltScanScope {
+    let mut scope = AltScanScope {
+        active: false,
+        index: 0,
+    };
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        scope.index = state.alt_scans.len();
+        state.alt_scans.push(AltScan {
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            stage: "events".to_owned(),
+            completed: false,
+            raw_chunks: None,
+            selected_chunks: None,
+        });
+        state.alt_stack.push(scope.index);
+        scope.active = true;
+    });
+    scope
+}
+
+pub(crate) fn range_scan_scope(xml: &[u8]) -> RangeScanScope {
+    let mut scope = RangeScanScope {
+        active: false,
+        index: 0,
+    };
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        scope.index = state.range_scans.len();
+        state.range_scans.push(RangeScan {
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            stage: "events".to_owned(),
+            completed: false,
+            observer_events: 0,
+            raw_ranges: None,
+            selected_ranges: None,
+        });
+        state.range_stack.push(scope.index);
+        scope.active = true;
+    });
+    scope
+}
+
+/// Record one successful source-reader call.
+///
+/// `end` is optional because a refusal can occur after a successful read but
+/// before an offset conversion is available.  The tracer never invents an
+/// end position for that case.
+pub(crate) fn reader_read(owner: &str, start: u64, end: Option<u64>) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        state.reader_reads.push(ReaderRead {
+            owner: owner.to_owned(),
+            start,
+            end,
+        });
+    });
+}
+
+/// Record a range-state callback without adding a source-reader call.
+pub(crate) fn range_observer(start: u64, end: Option<u64>) {
+    let _ = (start, end);
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_scans[index].observer_events =
+            state.range_scans[index].observer_events.saturating_add(1);
+    });
+}
+
+pub(crate) fn alt_stage(stage: &str) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].stage = stage.to_owned();
+    });
+}
+
+pub(crate) fn range_stage(stage: &str) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_scans[index].stage = stage.to_owned();
+    });
+}
+
+pub(crate) fn alt_raw_chunks(chunks: &BTreeMap<u32, crate::alt::Chunk>) {
+    let values = chunks
+        .iter()
+        .map(|(offset, chunk)| {
+            json!({
+                "offset": offset,
+                "relationship": chunk.relationship().as_str(),
+                "match_source": chunk.match_source(),
+            })
+        })
+        .collect::<Vec<_>>();
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].raw_chunks = Some(values);
+    });
+}
+
+pub(crate) fn alt_selected_chunks(chunks: &BTreeMap<u32, crate::alt::Chunk>) {
+    let values = chunks
+        .iter()
+        .map(|(offset, chunk)| {
+            json!({
+                "offset": offset,
+                "relationship": chunk.relationship().as_str(),
+                "match_source": chunk.match_source(),
+            })
+        })
+        .collect::<Vec<_>>();
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].selected_chunks = Some(values);
+    });
+}
+
+pub(crate) fn alt_complete() {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].completed = true;
+        state.alt_scans[index].stage = "complete".to_owned();
+    });
+}
+
+pub(crate) fn range_raw_ranges(ranges: &[(usize, u32, u32)]) {
+    let values = ranges
+        .iter()
+        .map(|&(target, start, length)| [target as u64, u64::from(start), u64::from(length)])
+        .collect::<Vec<_>>();
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_scans[index].raw_ranges = Some(values);
+    });
+}
+
+pub(crate) fn range_selected_ranges(ranges: &[(usize, u32, u32)]) {
+    let values = ranges
+        .iter()
+        .map(|&(target, start, length)| [target as u64, u64::from(start), u64::from(length)])
+        .collect::<Vec<_>>();
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_scans[index].selected_ranges = Some(values);
+    });
+}
+
+pub(crate) fn range_complete() {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_scans[index].completed = true;
+        state.range_scans[index].stage = "complete".to_owned();
+    });
+}
+
+pub(crate) fn active_result(
+    xml: &[u8],
+    offsets: &[u32],
+    result: &crate::Result<Vec<u32>>,
+    stage: &str,
+) {
+    let (result_kind, output_offsets) = match result {
+        Ok(values) => ("ok".to_owned(), Some(values.clone())),
+        Err(_) => ("error".to_owned(), None),
+    };
+    let result_debug = format!("{result:?}");
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        state.active_calls.push(ActiveCall {
+            stage: stage.to_owned(),
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            input_offsets: offsets.to_vec(),
+            output_offsets,
+            result_kind,
+            result_debug,
+        });
+    });
+}
+
+pub(crate) fn active_error<T: Debug>(xml: &[u8], offsets: &[u32], error: &T, stage: &str) {
+    let result_debug = format!("Err({error:?})");
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        state.active_calls.push(ActiveCall {
+            stage: stage.to_owned(),
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            input_offsets: offsets.to_vec(),
+            output_offsets: None,
+            result_kind: "error".to_owned(),
+            result_debug,
+        });
+    });
+}
+
+impl Drop for AltScanScope {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        ACTIVE_TRACE.with(|cell| {
+            let mut slot = cell.borrow_mut();
+            if let Some(state) = slot.as_mut()
+                && state.alt_stack.last() == Some(&self.index)
+            {
+                state.alt_stack.pop();
+            }
+        });
+    }
+}
+
+impl Drop for RangeScanScope {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        ACTIVE_TRACE.with(|cell| {
+            let mut slot = cell.borrow_mut();
+            if let Some(state) = slot.as_mut()
+                && state.range_stack.last() == Some(&self.index)
+            {
+                state.range_stack.pop();
+            }
+        });
+    }
+}
+
+impl Drop for DocumentScope {
+    fn drop(&mut self) {
+        let state = ACTIVE_TRACE.with(|cell| cell.replace(self.previous.take()));
+        let Some(state) = state else {
+            return;
+        };
+        emit(json!({
+            "kind": "document_end",
+            "sequence": state.sequence,
+            "xml_bytes": state.xml_bytes,
+            "xml_sha256": state.xml_sha256,
+            "reader_reads": state.reader_reads.into_iter().map(|read| json!({
+                "owner": read.owner,
+                "start": read.start,
+                "end": read.end,
+            })).collect::<Vec<_>>(),
+            "active_calls": state.active_calls.into_iter().map(|call| json!({
+                "stage": call.stage,
+                "xml_bytes": call.xml_bytes,
+                "xml_sha256": call.xml_sha256,
+                "input_offsets": call.input_offsets,
+                "output_offsets": call.output_offsets,
+                "result_kind": call.result_kind,
+                "result_debug": call.result_debug,
+            })).collect::<Vec<_>>(),
+            "alt_scans": state.alt_scans.into_iter().map(|scan| json!({
+                "xml_bytes": scan.xml_bytes,
+                "xml_sha256": scan.xml_sha256,
+                "stage": scan.stage,
+                "completed": scan.completed,
+                "raw_chunks": scan.raw_chunks,
+                "selected_chunks": scan.selected_chunks,
+            })).collect::<Vec<_>>(),
+            "range_scans": state.range_scans.into_iter().map(|scan| json!({
+                "xml_bytes": scan.xml_bytes,
+                "xml_sha256": scan.xml_sha256,
+                "stage": scan.stage,
+                "completed": scan.completed,
+                "observer_events": scan.observer_events,
+                "raw_ranges": scan.raw_ranges,
+                "selected_ranges": scan.selected_ranges,
+            })).collect::<Vec<_>>(),
+        }));
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn emit(value: Value) {
+    let Ok(serialized) = serde_json::to_string(&value) else {
+        return;
+    };
+    let mut stderr = std::io::stderr().lock();
+    let _ = writeln!(stderr, "{TRACE_PREFIX}{serialized}");
+}

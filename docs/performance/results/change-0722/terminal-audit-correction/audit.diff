@@ -1,0 +1,22 @@
+--- initial/audit.py
++++ final/audit.py
+@@ -970,17 +970,11 @@
+         require(all(item.get("threshold_percent") == threshold for item in rows),
+                 f"primary allocator {field} threshold changed")
+         if field == "peak_above_start":
+-            require(all(item.get("source_field") == {
+-                            "candidate": "region_peak_live_bytes",
+-                            "baseline": "live_bytes_before",
+-                        }
++            require(all(item.get("source_field") == "region_peak_live_bytes - live_bytes_before"
+                         for item in rows),
+                     "primary allocator peak-above-start source changed")
+         if field == "net_live":
+-            require(all(item.get("source_field") == {
+-                            "candidate": "live_bytes_after",
+-                            "baseline": "live_bytes_before",
+-                        }
++            require(all(item.get("source_field") == "live_bytes_after - live_bytes_before"
+                         for item in rows),
+                     "primary allocator net-live source changed")
+     require(len(p_gates) == 96,

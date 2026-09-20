@@ -1,0 +1,262 @@
+[
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "baseline-A1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A1",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "baseline-A1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "baseline-A1"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "candidate-B1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B1",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "candidate-B1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "candidate-B1"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "candidate-B2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B2",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "candidate-B2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "candidate-B2"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "baseline-A2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A2",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "baseline-A2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "baseline-A2"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "baseline-A3"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A3",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "baseline-A3"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "baseline-A3"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "candidate-B3"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B3",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "candidate-B3"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "candidate-B3"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "candidate-B4"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B4",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "candidate-B4"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "candidate-B4"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-native",
+      "stage": "baseline-A4"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A4",
+      "native"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "read-controls",
+      "stage": "baseline-A4"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/read-controls.py",
+      "capture",
+      "baseline-A4"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-allocator",
+      "stage": "baseline-A1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A1",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-allocator",
+      "stage": "candidate-B1"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B1",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-allocator",
+      "stage": "candidate-B2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "candidate-B2",
+      "allocator"
+    ],
+    "exit_code": 0
+  },
+  {
+    "job": {
+      "kind": "primary-allocator",
+      "stage": "baseline-A2"
+    },
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0722/pilot.py",
+      "baseline-A2",
+      "allocator"
+    ],
+    "exit_code": 0
+  }
+]

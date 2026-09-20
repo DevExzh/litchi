@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "packet": "change-0722-docx-structural-scan-fusion-pilot",
+  "name": "baseline-A1-native-numbered-list-lifecycle",
+  "stage": "baseline-A1",
+  "source_label": "baseline",
+  "build_label": "baseline",
+  "pair": "pair-1",
+  "cycle": 1,
+  "lane": "native",
+  "stage_order": "forward",
+  "stage_order_index": 3,
+  "corpus_id": "numbered-list",
+  "corpus_label": "NumberedList.docx",
+  "corpus_origin": "caller-named-real-file",
+  "phase": "lifecycle",
+  "case": "docx_real_file_ordinary_save_lifecycle",
+  "samples": 200,
+  "warmup": 100,
+  "fresh_child_process": true,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0722-bin/baseline-native",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_real_file_ordinary_save_lifecycle",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0722/baseline-A1-native-numbered-list-lifecycle.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0722-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "start_utc": "2026-09-20T15:48:16.681017+00:00",
+  "end_utc": "2026-09-20T15:48:19.043457+00:00",
+  "seconds": 2.0479964350815862,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0722-bin/baseline-native",
+  "binary_sha256": "d13f6ef21e9c6188551d9f80dc66292c9ced3d249dcc2b7182a6c7391f7086e2",
+  "binary_bytes": 62885536,
+  "build_record": "build-baseline.json",
+  "build_record_sha256": "6486774985205410b0fb96dbf4e8837ff01fe5c529a2759afeb0abf272769595",
+  "build_source_manifest": "source-baseline.json",
+  "build_source_manifest_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+  "binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+    "source_census_sha256": "1bd4e18eb3a334dcb328764c7de3a6d179b6be12c05548008c759e7e836729e4",
+    "source_entry_count": 7282
+  },
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+    "source_census_sha256": "1bd4e18eb3a334dcb328764c7de3a6d179b6be12c05548008c759e7e836729e4",
+    "source_entry_count": 7282
+  },
+  "live_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+    "source_census_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "source_entry_count": 7284,
+    "before_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "after_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "recensus_before": true,
+    "recensus_after": true,
+    "unchanged_during_child": true,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7284,
+      "current_entry_count": 7284,
+      "expected_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+      "current_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb"
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7284,
+      "current_entry_count": 7284,
+      "expected_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+      "current_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb"
+    }
+  },
+  "current_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+    "source_census_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "source_entry_count": 7284,
+    "before_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "after_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "recensus_before": true,
+    "recensus_after": true,
+    "unchanged_during_child": true,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7284,
+      "current_entry_count": 7284,
+      "expected_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+      "current_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb"
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7284,
+      "current_entry_count": 7284,
+      "expected_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+      "current_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb"
+    }
+  },
+  "fixture": {
+    "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "plan_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+    "before": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    },
+    "after": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  },
+  "plan_sha256": "e5aa1dbdb0c4c3b0367569f4d296646193d73c2832d486b746b60af94698bb2c",
+  "script_sha256": "7fb90721e171341f4e755184e2c63450522acce750b639978e6dc5d952b9b173",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "baseline-A1-native-numbered-list-lifecycle.json": "e2509c7634acdbbd9ce50020f54bcc0cfd2fd7f9fafeae119bb40935abbabde7",
+    "baseline-A1-native-numbered-list-lifecycle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-A1-native-numbered-list-lifecycle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

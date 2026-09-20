@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "script_sha256": "0a61186594ff7e52e7505e4235286341a2c8a8d8898e9720eefcda0374a2c8f8",
+  "namespace_whole_file_unchanged": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+  "codec_unchanged_except_private_child_declarations": "4c60069945e369657a0fd3bcf968f317bf3c0d42fb7dce3795321c41a1aa9725",
+  "document_part_unchanged_except_dead_writer_helper_and_import_removal": "847caf3dba89a7bf948d07c3b70a4729b4e6d742dcc48dae2fdcd25ac26f65a9",
+  "removed_writer_helper_sha256": "d2e797799ae80cf9d2f895941ccf0abf850c5037e7852a601e9b4c8d1e33fa1e",
+  "candidate_files": {
+    "crates/litchi-docx/src/alt/codec/document_scan.rs": "48fdc33689fec252247376779580232c9f51105eca4c67dc02b94645f8173b76",
+    "crates/litchi-docx/src/alt/codec.rs": "b6be75f3ec8f14192fbd1f2faa0327b08c865ebbda87b9d48ac09299ae0b2336",
+    "crates/litchi-docx/src/alt/mod.rs": "36356c6318b37f03a19fcf0e49fc6a3352b7467447f7c26a0b927fd165e99ea0",
+    "crates/litchi-docx/src/namespace.rs": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+    "crates/litchi-docx/src/parts/document_part.rs": "7f0f4645011e5db597486da4ce6fde1b8fa6a941b604124d9ab8d07f938257f6",
+    "crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs": "cd05b403e294fe6359c65725faf7639db91b1e4e324064ea298f02a0bfb13cdd",
+    "crates/litchi-docx/src/writer/doc/package.rs": "2fb9dcfb155aaf2e4ff2146a651adbeb07cc49251cead80cccc7c57af34ead83"
+  },
+  "parser_drops_precede_first_mce": true,
+  "scope": "Exact source transformation guard; release code generation and resource outcomes require measurement."
+}

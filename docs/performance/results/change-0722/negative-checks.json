@@ -1,0 +1,296 @@
+{
+  "checks": [
+    {
+      "error": "baseline-A1-native-generated-edit.elapsed_ns.samples length changed",
+      "error_type": "AssertionError",
+      "name": "primary-raw-elapsed-vector-length",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-native-generated-edit.json",
+        "results[0].elapsed_ns.samples"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-edit.elapsed_ns.mean: 351192.445 != 351191.445",
+      "error_type": "AssertionError",
+      "name": "primary-raw-elapsed-summary",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-native-generated-edit.json",
+        "results[0].elapsed_ns.mean"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-lifecycle result/source archive size mismatch",
+      "error_type": "AssertionError",
+      "name": "primary-semantic-corpus-identity",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-native-generated-lifecycle.json",
+        "results[0].corpus.archive_bytes"
+      ]
+    },
+    {
+      "error": "peak_above_start corruption was rejected by the 3 percent gate",
+      "error_type": "NegativeCheckError",
+      "name": "allocator-peak-above-start-gate",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-allocator-generated-edit.json",
+        "results[0].operation_metrics.allocation.region_peak_live_bytes.values"
+      ]
+    },
+    {
+      "error": "net_live corruption was rejected by the nonincreasing gate",
+      "error_type": "NegativeCheckError",
+      "name": "allocator-net-live-gate",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-allocator-generated-edit.json",
+        "results[0].operation_metrics.allocation.live_bytes_after.values"
+      ]
+    },
+    {
+      "error": "baseline-A1-read-generated-medium-list-paragraphs.json: report summary does not match its raw vector",
+      "error_type": "RuntimeError",
+      "name": "read-control-raw-elapsed-summary",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-read-generated-medium-list-paragraphs.json",
+        "results[0].elapsed_ns.p50"
+      ]
+    },
+    {
+      "error": "baseline-A1-read-generated-medium-list-paragraphs.json: generated medium corpus scope changed",
+      "error_type": "RuntimeError",
+      "name": "read-control-semantic-corpus-identity",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-read-generated-medium-list-paragraphs.json",
+        "results[0].corpus.shape"
+      ]
+    },
+    {
+      "error": "('generated-medium', 0): active_calls differs\nbaseline=[{'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [], 'output_offsets': [], 'result_kind': 'ok', 'result_debug': None}, {'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'output_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'result_kind': 'ok', 'result_debug': None}]\ncandidate=[{'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [], 'output_offsets': [], 'result_kind': 'ok', 'result_debug': None}, {'stage': 'mce', 'xml_bytes': 21517, 'xml_sha256': 'c524f3f2ae139d8e79c50cab82fe043ae390200e11134b08d91ee3a5a746f47d', 'input_offsets': [440, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'output_offsets': [439, 543, 647, 751, 855, 959, 1063, 1167, 1271, 1375, 1479, 1583, 1687, 1791, 1895, 1999, 2103, 2207, 2311, 2415, 2519, 2623, 2727, 2831, 2935, 3039, 3143, 3247, 3351, 3455, 3559, 3663, 3767, 3871, 3975, 4079, 4183, 4287, 4391, 4495, 4599, 4703, 4807, 4911, 5015, 5119, 5223, 5327, 5431, 5535, 5639, 5743, 5847, 5951, 6055, 6159, 6263, 6367, 6471, 6575, 6679, 6783, 6887, 6991, 7095, 7199, 7303, 7407, 7511, 7615, 7719, 7823, 7927, 8031, 8135, 8239, 8343, 8447, 8551, 8655, 8759, 8863, 8967, 9071, 9175, 9279, 9383, 9487, 9591, 9695, 9799, 9903, 10007, 10111, 10215, 10319, 10423, 10527, 10631, 10735, 10839, 10943, 11047, 11151, 11255, 11359, 11463, 11567, 11671, 11775, 11879, 11983, 12087, 12191, 12295, 12399, 12503, 12607, 12711, 12815, 12919, 13023, 13127, 13231, 13335, 13439, 13543, 13647, 13751, 13855, 13959, 14063, 14167, 14271, 14375, 14479, 14583, 14687, 14791, 14895, 14999, 15103, 15207, 15311, 15415, 15519, 15623, 15727, 15831, 15935, 16039, 16143, 16247, 16351, 16455, 16559, 16663, 16767, 16871, 16975, 17079, 17183, 17287, 17391, 17495, 17599, 17703, 17807, 17911, 18015, 18119, 18223, 18327, 18431, 18535, 18639, 18743, 18847, 18951, 19055, 19159, 19263, 19367, 19471, 19575, 19679, 19783, 19887, 19991, 20095, 20199, 20303, 20407, 20511, 20615, 20719, 20823, 20927, 21031, 21135], 'result_kind': 'ok', 'result_debug': None}]",
+      "error_type": "TraceError",
+      "name": "trace-mce-input-vector",
+      "rejected": true,
+      "target": [
+        "trace/candidate/stderr",
+        "document_end.active_calls.input_offsets[0]"
+      ]
+    },
+    {
+      "error": "('generated-medium', 0): candidate performed 1 range reader calls",
+      "error_type": "TraceError",
+      "name": "trace-reader-proof-fake-range-owner",
+      "rejected": true,
+      "target": [
+        "trace/candidate/stderr",
+        "document_end.reader_reads"
+      ]
+    },
+    {
+      "error": "missing exact cleanup witness for candidate/native binary: /home/zhuhe/code/litchi-0722-bin/candidate-native",
+      "error_type": "AuditError",
+      "name": "binary-receipt-sha256",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/build-candidate.json",
+        "native.binary_sha256"
+      ]
+    },
+    {
+      "error": "baseline-A1-native-generated-edit: binary source manifest binding changed",
+      "error_type": "AssertionError",
+      "name": "primary-receipt-source-manifest-sha256",
+      "rejected": true,
+      "target": [
+        "docs/performance/results/change-0722/baseline-A1-native-generated-edit.receipt.json",
+        "build_source_manifest_sha256"
+      ]
+    }
+  ],
+  "inputs": {
+    "docs/performance/results/change-0722/analysis.json": {
+      "bytes": 4050723,
+      "path": "docs/performance/results/change-0722/analysis.json",
+      "sha256": "046b6e11475012ef775bf0cb1dc68800431666e2507524b73682bbf67996a6f8"
+    },
+    "docs/performance/results/change-0722/analyze.py": {
+      "bytes": 53883,
+      "path": "docs/performance/results/change-0722/analyze.py",
+      "sha256": "70d3ab892d7e8cd4cff3d1aace3ecc1ae18699cbab9cbd555aa6a4b8ab13f018"
+    },
+    "docs/performance/results/change-0722/audit.py": {
+      "bytes": 60576,
+      "path": "docs/performance/results/change-0722/audit.py",
+      "sha256": "708fe179dfbc5e7f8382c7a8949a0924633d141ce1a9db17853070661bcb7e7f"
+    },
+    "docs/performance/results/change-0722/baseline-A1-allocator-generated-edit.json": {
+      "bytes": 20900,
+      "path": "docs/performance/results/change-0722/baseline-A1-allocator-generated-edit.json",
+      "sha256": "615d5691b9f2cc3f3dd2be4b8e032fe98eeb71751f9ebe2221ac03201af6b881"
+    },
+    "docs/performance/results/change-0722/baseline-A1-native-generated-edit.json": {
+      "bytes": 44716,
+      "path": "docs/performance/results/change-0722/baseline-A1-native-generated-edit.json",
+      "sha256": "05f88fc2b390d28e17ccc8616376e7407ba67579b201250a4f5dc0a119c5b0af"
+    },
+    "docs/performance/results/change-0722/baseline-A1-native-generated-lifecycle.json": {
+      "bytes": 61110,
+      "path": "docs/performance/results/change-0722/baseline-A1-native-generated-lifecycle.json",
+      "sha256": "151c1024fd18121509f79775868df437c7eba5d18554c6e9d1f76e83a49479fb"
+    },
+    "docs/performance/results/change-0722/baseline-A1-read-generated-medium-list-paragraphs.json": {
+      "bytes": 11863,
+      "path": "docs/performance/results/change-0722/baseline-A1-read-generated-medium-list-paragraphs.json",
+      "sha256": "1e6f75fb4e110c0ac9209ad9ca7a35152358ca416f163e6d62194fd248c2f9d9"
+    },
+    "docs/performance/results/change-0722/build-baseline.json": {
+      "bytes": 1540,
+      "path": "docs/performance/results/change-0722/build-baseline.json",
+      "sha256": "6486774985205410b0fb96dbf4e8837ff01fe5c529a2759afeb0abf272769595"
+    },
+    "docs/performance/results/change-0722/build-candidate.json": {
+      "bytes": 1542,
+      "path": "docs/performance/results/change-0722/build-candidate.json",
+      "sha256": "79239ffd6adc9955763b86c4035503b99b9a4e206c39fa79e1b3dc48a37f9212"
+    },
+    "docs/performance/results/change-0722/cleanup.json": {
+      "bytes": 1832,
+      "path": "docs/performance/results/change-0722/cleanup.json",
+      "sha256": "4eab311ccf74ba5929f344d2079e2863eee2869c052999581ba97c453af7a2eb"
+    },
+    "docs/performance/results/change-0722/disposition.json": {
+      "bytes": 54,
+      "path": "docs/performance/results/change-0722/disposition.json",
+      "sha256": "dd39a7c17daf48372200015197f0cea2c9861c1367552cd53c13bcb38c4bd97a"
+    },
+    "docs/performance/results/change-0722/negative-checks.py": {
+      "bytes": 25770,
+      "path": "docs/performance/results/change-0722/negative-checks.py",
+      "sha256": "8427db2a8b8dae969de73988d9c804a61e00852157df3d69cb1929a07edbb6eb"
+    },
+    "docs/performance/results/change-0722/pilot.py": {
+      "bytes": 22703,
+      "path": "docs/performance/results/change-0722/pilot.py",
+      "sha256": "7fb90721e171341f4e755184e2c63450522acce750b639978e6dc5d952b9b173"
+    },
+    "docs/performance/results/change-0722/plan.json": {
+      "bytes": 4540,
+      "path": "docs/performance/results/change-0722/plan.json",
+      "sha256": "e5aa1dbdb0c4c3b0367569f4d296646193d73c2832d486b746b60af94698bb2c"
+    },
+    "docs/performance/results/change-0722/read-controls-analysis.json": {
+      "bytes": 24882,
+      "path": "docs/performance/results/change-0722/read-controls-analysis.json",
+      "sha256": "e4812d95a9ea45879e0df57969bd0952beb188d9936e68e205573ba35b525ce7"
+    },
+    "docs/performance/results/change-0722/read-controls-analyze.py": {
+      "bytes": 48458,
+      "path": "docs/performance/results/change-0722/read-controls-analyze.py",
+      "sha256": "85f220fe874e9a24400a07825badf90377b699c8b59bea84e33ef6639189a50b"
+    },
+    "docs/performance/results/change-0722/read-controls-plan.json": {
+      "bytes": 7681,
+      "path": "docs/performance/results/change-0722/read-controls-plan.json",
+      "sha256": "145b0dc1b32c231adbc5e4c91e4a37156e20f32ef39a69b431d2aeb6a0f65a87"
+    },
+    "docs/performance/results/change-0722/read-controls.py": {
+      "bytes": 48795,
+      "path": "docs/performance/results/change-0722/read-controls.py",
+      "sha256": "e628cf06c36259f6f6a8bd57414aaf68a10b772d061dc4f2ca7e741c4aae3ca6"
+    },
+    "docs/performance/results/change-0722/source-baseline.json": {
+      "bytes": 887523,
+      "path": "docs/performance/results/change-0722/source-baseline.json",
+      "sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7"
+    },
+    "docs/performance/results/change-0722/source-candidate.json": {
+      "bytes": 887774,
+      "path": "docs/performance/results/change-0722/source-candidate.json",
+      "sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641"
+    },
+    "docs/performance/results/change-0722/source-final.json": {
+      "bytes": 887774,
+      "path": "docs/performance/results/change-0722/source-final.json",
+      "sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641"
+    },
+    "docs/performance/results/change-0722/trace-analyze.py": {
+      "bytes": 16786,
+      "path": "docs/performance/results/change-0722/trace-analyze.py",
+      "sha256": "63d74f745a2e8902347f26627a5cde877101d6253d2ca6fc38698b3e82250c74"
+    },
+    "docs/performance/results/change-0722/trace.fragment": {
+      "bytes": 13945,
+      "path": "docs/performance/results/change-0722/trace.fragment",
+      "sha256": "8564d288153045bd6c505b6247238ae6d466befeb650ac8503ecb0d6004dbc52"
+    },
+    "docs/performance/results/change-0722/trace.py": {
+      "bytes": 24173,
+      "path": "docs/performance/results/change-0722/trace.py",
+      "sha256": "399035bbcf79b12783d997aea65cbabf74ea686ad4ad373043cdd66f9364ab98"
+    },
+    "docs/performance/results/change-0722/trace/baseline/stderr": {
+      "bytes": 214275,
+      "path": "docs/performance/results/change-0722/trace/baseline/stderr",
+      "sha256": "3b47fdb6718d11769227bbabba5213fdb382e1b6b30802173a7176e5744d7614"
+    },
+    "docs/performance/results/change-0722/trace/candidate/stderr": {
+      "bytes": 135606,
+      "path": "docs/performance/results/change-0722/trace/candidate/stderr",
+      "sha256": "37d5b18d0e53029dc325f9a4f1dcd578a40c9509c55383de11486de020dd48f1"
+    }
+  },
+  "packet": "change-0722-docx-negative-checks",
+  "positive_replays": [
+    {
+      "name": "primary-elapsed-vector-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-semantic-identity-retained",
+      "passed": true
+    },
+    {
+      "name": "allocator-derived-gates-retained",
+      "passed": true
+    },
+    {
+      "name": "read-control-report-retained",
+      "passed": true
+    },
+    {
+      "name": "trace-differential-retained",
+      "passed": true
+    },
+    {
+      "name": "binary-custody-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-receipt-source-binding-retained",
+      "passed": true
+    },
+    {
+      "name": "primary-analysis-exact-replay",
+      "output": "docs/performance/results/change-0722/analysis.json",
+      "passed": true
+    },
+    {
+      "name": "read-control-analysis-exact-replay",
+      "output": "docs/performance/results/change-0722/read-controls-analysis.json",
+      "passed": true
+    }
+  ],
+  "retained_inputs_unchanged": true,
+  "schema_version": 1,
+  "scope": {
+    "check_count": 11,
+    "mutated_retained_artifacts": false,
+    "native_or_profiler_invocations": 0,
+    "temporary_mutation_files": true
+  },
+  "status": "pass"
+}

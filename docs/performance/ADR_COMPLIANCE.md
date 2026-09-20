@@ -1,5 +1,22 @@
 # Performance optimization ADR-compliance matrix
 
+## 0722 — retained writer-local DOCX fusion
+
+[0722](0722-docx-writer-local-fusion-pilot.md) keeps all 33 constraint hashes
+unchanged and confines fusion to a private DOCX writer path (ADRs 0001/0002/0024).
+Existing public scanner and read-consumer bodies are mechanically checked
+against the baseline. Publication and immutable-source contracts remain in
+place, with exact edited-package oracle parity (ADR 0003). Independent bounded
+scan states preserve namespace rules, capture suppression, limits, fallible
+reservation labels and refusal precedence; the two ordered MCE calls remain
+distinct (ADRs 0005/0006). Parser scratch is released before MCE. Allocation
+peak and net live bytes are unchanged in matched regions; identical host OOM
+scheduling is not proven. Source-bound native, allocator and debug evidence
+remain separate, and all frozen hard gates pass (ADR 0008). Read-tail flags
+are disclosed and reviewed, not excluded. No unsafe code, cache, new public
+API, runtime dependency, parallel execution, ambient library I/O or coverage
+promotion is introduced.
+
 ## 0721 — private DOCX structural scan fusion pilot
 
 [0721](0721-docx-structural-scan-fusion-pilot.md) rejects the candidate on its
