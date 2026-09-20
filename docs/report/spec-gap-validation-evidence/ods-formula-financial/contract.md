@@ -260,8 +260,17 @@ The expected pseudotype controls conversion before the function operates:
   under the common error precedence below and is never coerced to a number.
 - `XIRR` uses the complete `NumberSequence` and `DateSequence` in source
   order. Text, Empty, and distinguished Logical cells follow the existing
-  NumberSequence admission rules; admitted numeric values and dates retain
-  their shared positions for the solver. The first admitted numeric cash flow
+  sequence admission rules. This profile requires equal original flattened
+  slot counts and retains each slot's original index through admission.
+  Pair only matching original indices: when both sides skip a slot, drop that
+  pair; when exactly one side skips it, retain a generated `#VALUE!` and
+  complete both scans. Do not independently compact the arguments and assign
+  a later date to an earlier cash flow. Formula Errors occupy admitted slots
+  and keep their precedence over a generated mask-mismatch error. Scalar
+  sequence inputs have synthetic slot index zero. Different rectangular
+  geometries are allowed when the original flattened counts and admission
+  masks match. This strict positional rule is a documented profile of the
+  source's requirement that dates correspond to values. The first admitted numeric cash flow
   must be negative and at least one admitted numeric cash flow must be
   positive; otherwise the result is `#NUM!`.
 - `MIRR` names `Array`, and §6.12.27 explicitly ignores Text and Empty cells.
