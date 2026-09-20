@@ -107,7 +107,15 @@ pub(super) fn cacheable_branch<'expr, R: Resolver + ?Sized>(
             | super::super::Kind::Error
             | super::super::Kind::Missing => true,
             super::super::Kind::Reference(reference) => {
-                ValueEvaluator::<R>::cacheable_reference(reference)
+                if sequence_argument(function_name(function), index) {
+                    ValueEvaluator::<R>::cacheable_reference(reference)
+                } else {
+                    // Date/Offset parameters are scalar-demand inputs. A
+                    // rectangular reference must be read at each projected
+                    // coordinate so a later provider failure cannot be hidden
+                    // by the first cached cell.
+                    ValueEvaluator::<R>::cacheable_condition_reference(reference)
+                }
             },
             // Sequence descriptors are stable under the source fence, but
             // an array-valued Date/Offset argument is position-sensitive.

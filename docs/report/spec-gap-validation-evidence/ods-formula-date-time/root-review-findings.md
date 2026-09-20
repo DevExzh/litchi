@@ -148,3 +148,25 @@ precedence, WORKDAY reference sequence failures, and matrix failure cleanup.
 These were assigned for focused test additions before freezing source.
 Architectural properties such as absence of ambient I/O require source-review
 evidence alongside tests; they must not be claimed from a fabricated mock.
+
+## Projected scalar reference regression and preparation replay
+
+The corrected performance harness passed all 120 candidate preflight cases
+and all 34 baseline controls, including exact formula, evaluation path,
+output assertions, and resolver-read counts. The retained development receipt
+is `performance/development-preflight.json`; it predates the cache fix below
+and is not a frozen gate or a timing result.
+
+Strengthening the matrix failure test exposed a production cache defect:
+`IF({TRUE()|TRUE()};DATEVALUE([.A1:.A2]);0)` reused the first projected cell
+and suppressed the second resolver read. Date/Offset reference arguments now
+use position-sensitive scalar reference classification. Complete holiday and
+workweek sequence descriptors retain full-reference cache classification.
+The success regression requires two distinct dates and exactly two reads;
+the failure regression requires a typed provider failure on the second read,
+ordered reads of A1 then A2, and zero retained memory after refusal.
+
+After the fix, isolated locked/offline validation passed 19 semantic tests,
+10 resource tests, and the 132-vector oracle target. All-target strict Clippy,
+Rust 2024 formatting, and diff checks passed. These remain development
+checks; final frozen gates and performance capture are still outstanding.
