@@ -10,6 +10,7 @@ evidence root.
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 from pathlib import Path
 import tempfile
@@ -34,10 +35,13 @@ def rejected(
     label: str,
     action: Callable[[], object],
     error_fragment: str | None = None,
+    include_pending: bool = False,
 ) -> None:
     try:
         action()
-    except module.VerificationError as error:
+    except (module.VerificationError, module.PendingReceipt) as error:
+        if isinstance(error, module.PendingReceipt) and not include_pending:
+            raise AssertionError(f"{label} raised pending instead of a verification error: {error}") from error
         if error_fragment is not None and error_fragment not in str(error):
             raise AssertionError(f"{label} failed for an unexpected reason: {error}") from error
         return
@@ -47,6 +51,42 @@ def rejected(
 def main() -> int:
     verifier = load_verifier()
     contract_hash = verifier.digest(verifier.CONTRACT)
+    coverage_manifest = verifier.read_json(verifier.COVERAGE_REQUIREMENTS)
+    coverage_scope = verifier.coverage_scope_projection(coverage_manifest)
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        missing_scope = root / "coverage-scope.json"
+        rejected(
+            verifier,
+            "missing immutable coverage scope",
+            lambda: verifier.verify_coverage_scope(coverage_manifest, missing_scope),
+            include_pending=True,
+        )
+
+        stale_scope = root / "stale-coverage-scope.json"
+        stale = copy.deepcopy(coverage_scope)
+        stale["schema"] = "ods-formula-lookups-coverage-scope-old"
+        stale_scope.write_text(json.dumps(stale), encoding="utf-8")
+        rejected(
+            verifier,
+            "stale immutable coverage scope",
+            lambda: verifier.validate_coverage_scope(stale, coverage_scope, "stale coverage scope"),
+        )
+
+        changed_manifest = copy.deepcopy(coverage_manifest)
+        changed_manifest["functions"]["ADDRESS"]["requirements"].append(
+            "requirement introduced after source freeze"
+        )
+        rejected(
+            verifier,
+            "changed coverage requirement",
+            lambda: verifier.validate_coverage_scope(
+                coverage_scope,
+                verifier.coverage_scope_projection(changed_manifest),
+                "changed coverage scope",
+            ),
+        )
 
     rejected(
         verifier,

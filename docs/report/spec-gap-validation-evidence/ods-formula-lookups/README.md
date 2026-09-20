@@ -33,3 +33,15 @@ selector inputs while preserving position-sensitive computation. The direct
 INDIRECT width-growth test fixes its own read count; it does not establish a
 single-read guarantee for every computed CHOOSE/reference composition. Final
 performance claims must retain this distinction.
+
+The immutable [coverage scope](coverage-scope.json) is frozen alongside the
+implementation inputs. The separate [coverage bindings](coverage-requirements.json)
+are completed after execution because they contain hashes of gate and performance
+receipts. Verification compares their requirement lists exactly and checks the
+frozen scope hash; completing receipts cannot remove or weaken requirements.
+
+Search key-array lifting starts only after ForceArray data admission. Invalid
+data can therefore produce one global `#VALUE!` before any key-cell reads.
+An already-known scalar formula-error key keeps its original error identity on
+that refusal path. Once data is admitted, lifted controls and keys retain their
+per-coordinate results and errors.
