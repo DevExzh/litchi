@@ -1,0 +1,450 @@
+use serde_json::{Value, json};
+use sha2::{Digest as _, Sha256};
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::io::Write as _;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const TRACE_PREFIX: &str = "TRACE0720 ";
+
+static NEXT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+thread_local! {
+    static ACTIVE_TRACE: RefCell<Option<TraceState>> = const { RefCell::new(None) };
+}
+
+struct TraceState {
+    sequence: u64,
+    xml_bytes: usize,
+    xml_sha256: String,
+    alt_scans: Vec<AltScanRecord>,
+    active_calls: Vec<ActiveRecord>,
+    range_passes: Vec<RangePassRecord>,
+    alt_stack: Vec<usize>,
+    range_stack: Vec<usize>,
+}
+
+struct AltScanRecord {
+    xml_bytes: usize,
+    xml_sha256: String,
+    event_count: u64,
+    consumed_reader_bytes: u64,
+    last_event_start: Option<u64>,
+    last_event_end: Option<u64>,
+    stage: String,
+    completed: bool,
+    raw_chunks_debug: Option<String>,
+    selected_chunks_debug: Option<String>,
+}
+
+struct ActiveRecord {
+    xml_bytes: usize,
+    xml_sha256: String,
+    input_offsets: Vec<u32>,
+    stage: String,
+    result_debug: String,
+}
+
+struct RangePassRecord {
+    xml_bytes: usize,
+    xml_sha256: String,
+    event_count: u64,
+    consumed_reader_bytes: u64,
+    last_event_start: Option<u64>,
+    last_event_end: Option<u64>,
+    stage: String,
+    completed: bool,
+    raw_ranges: Option<Vec<[u64; 3]>>,
+    selected_ranges: Option<Vec<[u64; 3]>>,
+}
+
+pub(crate) struct DocumentScope {
+    previous: Option<TraceState>,
+}
+
+pub(crate) struct AltScanScope {
+    active: bool,
+    index: usize,
+}
+
+pub(crate) struct RangePassScope {
+    active: bool,
+    index: usize,
+}
+
+pub(crate) fn document_scope(xml: &[u8]) -> DocumentScope {
+    let sequence = NEXT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let xml_sha256 = sha256_hex(xml);
+    let state = TraceState {
+        sequence,
+        xml_bytes: xml.len(),
+        xml_sha256: xml_sha256.clone(),
+        alt_scans: Vec::new(),
+        active_calls: Vec::new(),
+        range_passes: Vec::new(),
+        alt_stack: Vec::new(),
+        range_stack: Vec::new(),
+    };
+    let previous = ACTIVE_TRACE.with(|cell| cell.replace(Some(state)));
+    emit(json!({
+        "kind": "document_start",
+        "sequence": sequence,
+        "xml_bytes": xml.len(),
+        "xml_sha256": xml_sha256,
+    }));
+    DocumentScope { previous }
+}
+
+pub(crate) fn alt_scan_scope(xml: &[u8]) -> AltScanScope {
+    let mut guard = AltScanScope {
+        active: false,
+        index: 0,
+    };
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        guard.index = state.alt_scans.len();
+        state.alt_scans.push(AltScanRecord {
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            event_count: 0,
+            consumed_reader_bytes: 0,
+            last_event_start: None,
+            last_event_end: None,
+            stage: "validate".to_owned(),
+            completed: false,
+            raw_chunks_debug: None,
+            selected_chunks_debug: None,
+        });
+        state.alt_stack.push(guard.index);
+        guard.active = true;
+    });
+    guard
+}
+
+pub(crate) fn range_pass_scope(xml: &[u8]) -> RangePassScope {
+    let mut guard = RangePassScope {
+        active: false,
+        index: 0,
+    };
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        guard.index = state.range_passes.len();
+        state.range_passes.push(RangePassRecord {
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            event_count: 0,
+            consumed_reader_bytes: 0,
+            last_event_start: None,
+            last_event_end: None,
+            stage: "scan".to_owned(),
+            completed: false,
+            raw_ranges: None,
+            selected_ranges: None,
+        });
+        state.range_stack.push(guard.index);
+        guard.active = true;
+    });
+    guard
+}
+
+pub(crate) fn alt_scan_stage(stage: &str) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].stage = stage.to_owned();
+    });
+}
+
+pub(crate) fn range_pass_stage(stage: &str) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_passes[index].stage = stage.to_owned();
+    });
+}
+
+pub(crate) fn record_alt_scan_event(event_start: u32, event_end: u64) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        let record = &mut state.alt_scans[index];
+        record.event_count = record.event_count.saturating_add(1);
+        record.consumed_reader_bytes = event_end;
+        record.last_event_start = Some(u64::from(event_start));
+        record.last_event_end = Some(event_end);
+    });
+}
+
+pub(crate) fn record_range_event(event_start: usize, event_end: usize) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        let record = &mut state.range_passes[index];
+        record.event_count = record.event_count.saturating_add(1);
+        record.consumed_reader_bytes = event_end as u64;
+        record.last_event_start = Some(event_start as u64);
+        record.last_event_end = Some(event_end as u64);
+    });
+}
+
+pub(crate) fn record_alt_scan_raw_chunks<T: Debug>(chunks: &T) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].raw_chunks_debug = Some(format!("{chunks:?}"));
+    });
+}
+
+pub(crate) fn record_alt_scan_selected_chunks<T: Debug>(chunks: &T) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].selected_chunks_debug = Some(format!("{chunks:?}"));
+    });
+}
+
+pub(crate) fn alt_scan_complete() {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.alt_stack.last() else {
+            return;
+        };
+        state.alt_scans[index].completed = true;
+        state.alt_scans[index].stage = "complete".to_owned();
+    });
+}
+
+pub(crate) fn range_pass_complete() {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_passes[index].completed = true;
+        state.range_passes[index].stage = "complete".to_owned();
+    });
+}
+
+pub(crate) fn record_active_result<T: Debug>(xml: &[u8], offsets: &[u32], result: &T, stage: &str) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        state.active_calls.push(ActiveRecord {
+            xml_bytes: xml.len(),
+            xml_sha256: sha256_hex(xml),
+            input_offsets: offsets.to_vec(),
+            stage: stage.to_owned(),
+            result_debug: format!("{result:?}"),
+        });
+    });
+}
+
+pub(crate) fn record_active_error<T: Debug>(xml: &[u8], offsets: &[u32], error: &T, stage: &str) {
+    record_active_result(xml, offsets, &format_args!("Err({error:?})"), stage);
+}
+
+pub(crate) fn record_raw_ranges(ranges: &[(usize, u32, u32)]) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_passes[index].raw_ranges = Some(
+            ranges
+                .iter()
+                .map(|&(target, start, length)| {
+                    [target as u64, u64::from(start), u64::from(length)]
+                })
+                .collect(),
+        );
+    });
+}
+
+pub(crate) fn record_selected_ranges(ranges: &[(usize, u32, u32)]) {
+    ACTIVE_TRACE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some(state) = slot.as_mut() else {
+            return;
+        };
+        let Some(&index) = state.range_stack.last() else {
+            return;
+        };
+        state.range_passes[index].selected_ranges = Some(
+            ranges
+                .iter()
+                .map(|&(target, start, length)| {
+                    [target as u64, u64::from(start), u64::from(length)]
+                })
+                .collect(),
+        );
+    });
+}
+
+impl Drop for DocumentScope {
+    fn drop(&mut self) {
+        let state = ACTIVE_TRACE.with(|cell| cell.replace(self.previous.take()));
+        let Some(state) = state else {
+            return;
+        };
+        emit(json!({
+            "kind": "document_end",
+            "sequence": state.sequence,
+            "xml_bytes": state.xml_bytes,
+            "xml_sha256": state.xml_sha256,
+            "alt_scans": state.alt_scans.into_iter().map(AltScanRecord::json).collect::<Vec<_>>(),
+            "active_calls": state.active_calls.into_iter().map(ActiveRecord::json).collect::<Vec<_>>(),
+            "range_passes": state.range_passes.into_iter().map(RangePassRecord::json).collect::<Vec<_>>(),
+        }));
+    }
+}
+
+impl Drop for AltScanScope {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        ACTIVE_TRACE.with(|cell| {
+            let mut slot = cell.borrow_mut();
+            if let Some(state) = slot.as_mut()
+                && state.alt_stack.last() == Some(&self.index)
+            {
+                state.alt_stack.pop();
+            }
+        });
+    }
+}
+
+impl Drop for RangePassScope {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        ACTIVE_TRACE.with(|cell| {
+            let mut slot = cell.borrow_mut();
+            if let Some(state) = slot.as_mut()
+                && state.range_stack.last() == Some(&self.index)
+            {
+                state.range_stack.pop();
+            }
+        });
+    }
+}
+
+impl AltScanRecord {
+    fn json(self) -> Value {
+        let stage = self.stage;
+        let error_stage = if self.completed {
+            Value::Null
+        } else {
+            json!(stage.clone())
+        };
+        json!({
+            "xml_bytes": self.xml_bytes,
+            "xml_sha256": self.xml_sha256,
+            "event_count": self.event_count,
+            "consumed_reader_bytes": self.consumed_reader_bytes,
+            "last_event_start": self.last_event_start,
+            "last_event_end": self.last_event_end,
+            "stage": stage,
+            "error_stage": error_stage,
+            "completed": self.completed,
+            "raw_chunks_debug": self.raw_chunks_debug,
+            "selected_chunks_debug": self.selected_chunks_debug,
+        })
+    }
+}
+
+impl ActiveRecord {
+    fn json(self) -> Value {
+        json!({
+            "xml_bytes": self.xml_bytes,
+            "xml_sha256": self.xml_sha256,
+            "input_offsets": self.input_offsets,
+            "stage": self.stage,
+            "result_debug": self.result_debug,
+        })
+    }
+}
+
+impl RangePassRecord {
+    fn json(self) -> Value {
+        let stage = self.stage;
+        let error_stage = if self.completed {
+            Value::Null
+        } else {
+            json!(stage.clone())
+        };
+        json!({
+            "xml_bytes": self.xml_bytes,
+            "xml_sha256": self.xml_sha256,
+            "event_count": self.event_count,
+            "consumed_reader_bytes": self.consumed_reader_bytes,
+            "last_event_start": self.last_event_start,
+            "last_event_end": self.last_event_end,
+            "stage": stage,
+            "error_stage": error_stage,
+            "completed": self.completed,
+            "raw_ranges": self.raw_ranges,
+            "selected_ranges": self.selected_ranges,
+        })
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn emit(value: Value) {
+    let Ok(serialized) = serde_json::to_string(&value) else {
+        return;
+    };
+    let mut stderr = std::io::stderr().lock();
+    let _ = writeln!(stderr, "{TRACE_PREFIX}{serialized}");
+}

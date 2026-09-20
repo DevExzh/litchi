@@ -1,0 +1,8 @@
+{
+  "docs/performance/results/change-0712/oracle/src/main.rs": "8dc8d0847066c91f286de8190618e32dd5392112b7b12aed31b510fed50aa85c",
+  "docs/performance/results/change-0719/next-experiment.md": "9d315ee2a5719c23376aeffc0db72859438cb8f2edb16c26a6bb75aaa97ac29f",
+  "tools/perf-baseline/src/lib.rs": "972376832a5ef2a96b735b335820c945429b5ffcca326dbeca59d4b75ee04567",
+  "tools/perf-baseline/src/ordinary_save.rs": "b6bea8d3f9252d3bfa60795b1f5f08d886877190e510f6676ca65bbc64285393",
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+  "docs/performance/results/change-0717/evidence/results.json": "3dc7c1cbdb6ecbedf55ff84e378f73ac6e0866c25056c4b8d4c08d5d8e491f20"
+}

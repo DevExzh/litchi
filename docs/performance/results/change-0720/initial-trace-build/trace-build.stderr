@@ -1,0 +1,24 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+   --> /home/zhuhe/code/litchi-scratch-0720/scan_trace_0720.rs:441:21
+    |
+441 |     format!("{:x}", Sha256::digest(bytes))
+    |              ----   ^^^^^^^^^^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+    |              |
+    |              required by this formatting parameter
+    |
+    = help: the following other types implement trait `LowerHex`:
+              &T
+              &mut T
+              Insert
+              Saturating<T>
+              Wrapping<T>
+              either::Either<L, R>
+              generic_array::GenericArray<u8, T>
+              glossary::model::Kind
+            and 70 others
+    = note: the full name for the type has been written to '/home/zhuhe/code/litchi-target-0720/debug/deps/litchi_docx-17657ccaf4a3cf68.long-type-12562693142883598750.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (lib) due to 1 previous error
