@@ -1,0 +1,665 @@
+{
+  "budget": 2097152,
+  "input_path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "input_sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+  "open_io": {
+    "len_calls": 1,
+    "reads": [
+      {
+        "error": null,
+        "offset": 0,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 512,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 50688,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 116736,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 182784,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 248832,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 314880,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 380928,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 446976,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 513024,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 579072,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 645120,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 711168,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 777216,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 843264,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 909312,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 983552,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 1024,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 984064,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 935936,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 1536,
+        "requested": 4,
+        "returned": 4
+      },
+      {
+        "error": null,
+        "offset": 1540,
+        "requested": 20,
+        "returned": 20
+      },
+      {
+        "error": null,
+        "offset": 1560,
+        "requested": 6,
+        "returned": 6
+      },
+      {
+        "error": null,
+        "offset": 1566,
+        "requested": 6,
+        "returned": 6
+      },
+      {
+        "error": null,
+        "offset": 1572,
+        "requested": 4,
+        "returned": 4
+      },
+      {
+        "error": null,
+        "offset": 1576,
+        "requested": 512,
+        "returned": 512
+      },
+      {
+        "error": null,
+        "offset": 2088,
+        "requested": 1024,
+        "returned": 1024
+      },
+      {
+        "error": null,
+        "offset": 3112,
+        "requested": 2048,
+        "returned": 2048
+      },
+      {
+        "error": null,
+        "offset": 5160,
+        "requested": 4096,
+        "returned": 4096
+      },
+      {
+        "error": null,
+        "offset": 9256,
+        "requested": 8192,
+        "returned": 8192
+      },
+      {
+        "error": null,
+        "offset": 17448,
+        "requested": 16384,
+        "returned": 16384
+      },
+      {
+        "error": null,
+        "offset": 33832,
+        "requested": 16856,
+        "returned": 16856
+      },
+      {
+        "error": null,
+        "offset": 51200,
+        "requested": 15912,
+        "returned": 15912
+      },
+      {
+        "error": null,
+        "offset": 67112,
+        "requested": 49624,
+        "returned": 49624
+      },
+      {
+        "error": null,
+        "offset": 117248,
+        "requested": 15912,
+        "returned": 15912
+      },
+      {
+        "error": null,
+        "offset": 133160,
+        "requested": 49624,
+        "returned": 49624
+      },
+      {
+        "error": null,
+        "offset": 183296,
+        "requested": 15912,
+        "returned": 15912
+      },
+      {
+        "error": null,
+        "offset": 199208,
+        "requested": 49624,
+        "returned": 49624
+      },
+      {
+        "error": null,
+        "offset": 249344,
+        "requested": 15912,
+        "returned": 15912
+      },
+      {
+        "error": null,
+        "offset": 265256,
+        "requested": 45259,
+        "returned": 45259
+      }
+    ],
+    "version_calls": 22
+  },
+  "probe": "change-0725-xls-query-chain-sequence",
+  "queries": [
+    {
+      "column": 106,
+      "io": {
+        "len_calls": 0,
+        "reads": [
+          {
+            "error": null,
+            "offset": 310515,
+            "requested": 512,
+            "returned": 512
+          },
+          {
+            "error": null,
+            "offset": 311195,
+            "requested": 1024,
+            "returned": 1024
+          },
+          {
+            "error": null,
+            "offset": 316707,
+            "requested": 2048,
+            "returned": 2048
+          },
+          {
+            "error": null,
+            "offset": 318755,
+            "requested": 4096,
+            "returned": 4096
+          },
+          {
+            "error": null,
+            "offset": 322859,
+            "requested": 8192,
+            "returned": 8192
+          },
+          {
+            "error": null,
+            "offset": 331059,
+            "requested": 16384,
+            "returned": 16384
+          },
+          {
+            "error": null,
+            "offset": 347443,
+            "requested": 32768,
+            "returned": 32768
+          },
+          {
+            "error": null,
+            "offset": 380211,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 381440,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 446259,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 447488,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 512307,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 513536,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 578355,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 579584,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 644403,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 645632,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 710451,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 711680,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 776499,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 777728,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 842563,
+            "requested": 701,
+            "returned": 701
+          },
+          {
+            "error": null,
+            "offset": 843776,
+            "requested": 64835,
+            "returned": 64835
+          },
+          {
+            "error": null,
+            "offset": 908860,
+            "requested": 452,
+            "returned": 452
+          },
+          {
+            "error": null,
+            "offset": 909824,
+            "requested": 26058,
+            "returned": 26058
+          }
+        ],
+        "version_calls": 18
+      },
+      "label": "late-build",
+      "outcome": {
+        "error": null,
+        "kind": "value",
+        "value_debug": "Empty"
+      },
+      "row": 5095
+    },
+    {
+      "column": 106,
+      "io": {
+        "len_calls": 0,
+        "reads": [
+          {
+            "error": null,
+            "offset": 310515,
+            "requested": 512,
+            "returned": 512
+          },
+          {
+            "error": null,
+            "offset": 311195,
+            "requested": 1024,
+            "returned": 1024
+          },
+          {
+            "error": null,
+            "offset": 316707,
+            "requested": 2048,
+            "returned": 2048
+          },
+          {
+            "error": null,
+            "offset": 318755,
+            "requested": 4096,
+            "returned": 4096
+          },
+          {
+            "error": null,
+            "offset": 322859,
+            "requested": 8192,
+            "returned": 8192
+          },
+          {
+            "error": null,
+            "offset": 331059,
+            "requested": 16384,
+            "returned": 16384
+          },
+          {
+            "error": null,
+            "offset": 347443,
+            "requested": 32768,
+            "returned": 32768
+          },
+          {
+            "error": null,
+            "offset": 380211,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 381440,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 446259,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 447488,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 512307,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 513536,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 578355,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 579584,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 644403,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 645632,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 710451,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 711680,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 776499,
+            "requested": 717,
+            "returned": 717
+          },
+          {
+            "error": null,
+            "offset": 777728,
+            "requested": 64819,
+            "returned": 64819
+          },
+          {
+            "error": null,
+            "offset": 842563,
+            "requested": 701,
+            "returned": 701
+          },
+          {
+            "error": null,
+            "offset": 843776,
+            "requested": 64835,
+            "returned": 64835
+          },
+          {
+            "error": null,
+            "offset": 908860,
+            "requested": 452,
+            "returned": 452
+          },
+          {
+            "error": null,
+            "offset": 909824,
+            "requested": 26058,
+            "returned": 26058
+          }
+        ],
+        "version_calls": 18
+      },
+      "label": "late-publish",
+      "outcome": {
+        "error": null,
+        "kind": "value",
+        "value_debug": "Empty"
+      },
+      "row": 5095
+    },
+    {
+      "column": 0,
+      "io": {
+        "len_calls": 0,
+        "reads": [
+          {
+            "error": null,
+            "offset": 318019,
+            "requested": 4,
+            "returned": 4
+          },
+          {
+            "error": null,
+            "offset": 318023,
+            "requested": 10,
+            "returned": 10
+          },
+          {
+            "error": null,
+            "offset": 248021,
+            "requested": 7,
+            "returned": 7
+          }
+        ],
+        "version_calls": 5
+      },
+      "label": "first-earlier",
+      "outcome": {
+        "error": null,
+        "kind": "value",
+        "value_debug": "String(\"Code\")"
+      },
+      "row": 0
+    },
+    {
+      "column": 106,
+      "io": {
+        "len_calls": 0,
+        "reads": [
+          {
+            "error": null,
+            "offset": 849595,
+            "requested": 4,
+            "returned": 4
+          },
+          {
+            "error": null,
+            "offset": 849599,
+            "requested": 206,
+            "returned": 206
+          }
+        ],
+        "version_calls": 4
+      },
+      "label": "origin-late",
+      "outcome": {
+        "error": null,
+        "kind": "value",
+        "value_debug": "Empty"
+      },
+      "row": 5095
+    },
+    {
+      "column": 108,
+      "io": {
+        "len_calls": 0,
+        "reads": [],
+        "version_calls": 2
+      },
+      "label": "missing",
+      "outcome": {
+        "error": null,
+        "kind": "missing",
+        "value_debug": null
+      },
+      "row": 0
+    }
+  ],
+  "schema_version": 1,
+  "worksheet": 0
+}

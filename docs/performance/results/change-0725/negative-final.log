@@ -1,0 +1,62 @@
+{
+  "scope": "synthetic verifier checks, not performance evidence",
+  "analysis_sha256": "4f013975dfb8ec0300f309fdc11a3d61a6ea43ff06be41304bb57c9800cbcc66",
+  "checks": [
+    {
+      "name": "warm absolute allowance",
+      "pass": true
+    },
+    {
+      "name": "warm regression rejected",
+      "pass": true
+    },
+    {
+      "name": "build has no warm allowance",
+      "pass": true
+    },
+    {
+      "name": "workflow regression rejected",
+      "pass": true
+    },
+    {
+      "name": "native positive control",
+      "pass": true
+    },
+    {
+      "name": "actual outcome mutation rejected",
+      "pass": true
+    },
+    {
+      "name": "actual timing mutation rejected",
+      "pass": true
+    },
+    {
+      "name": "allocator positive control",
+      "pass": true
+    },
+    {
+      "name": "strict allocation delta 1 rejected",
+      "pass": true
+    },
+    {
+      "name": "strict allocation delta -1 rejected",
+      "pass": true
+    },
+    {
+      "name": "build allowance boundary 40",
+      "pass": true
+    },
+    {
+      "name": "build allowance boundary 41",
+      "pass": true
+    },
+    {
+      "name": "missing warm exact removal accepted",
+      "pass": true
+    },
+    {
+      "name": "missing warm unremoved allocation rejected",
+      "pass": true
+    }
+  ]
+}

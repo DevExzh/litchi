@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0725 — revised XLS checkpoint comparison
+
+[0725](0725-xls-revised-checkpoint-pilot.md) freezes fresh A/A + ABBA captures
+against `ee5e0b0650`: 24 native groups, 16 repeated groups, 96 allocator groups,
+12 counted-I/O cases and 34 budget fences. Native timing rejects retention;
+repeat, benefit, allocation, semantic and binding gates pass. Exact candidate
+sources, failed qualification history, traces, profiles and full comparisons
+are archived. Production remains baseline; offline replay and cleanup witnesses
+are retained in the [packet](results/change-0725/README.md).
+
 ## 0724 — four-variant XLS diagnostic
 
 [0724](0724-xls-checkpoint-cost-attribution.md) binds eight fresh release binaries

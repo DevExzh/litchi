@@ -1,0 +1,117 @@
+   Compiling zeroize v1.9.0
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.5
+   Compiling libc v0.2.189
+   Compiling syn v2.0.119
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling const-oid v0.9.6
+   Compiling syn v3.0.6
+   Compiling subtle v2.6.1
+   Compiling hybrid-array v0.4.15
+   Compiling autocfg v1.5.1
+   Compiling zerocopy v0.8.57
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling getrandom v0.2.17
+   Compiling serde_core v1.0.229
+   Compiling rand_core v0.6.4
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling base64ct v1.8.3
+   Compiling pem-rfc7468 v0.7.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling der_derive v0.7.3
+   Compiling crossbeam-utils v0.8.23
+   Compiling flagset v0.4.7
+   Compiling der v0.7.10
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.3.1
+   Compiling rustversion v1.0.23
+   Compiling const-oid v0.10.2
+   Compiling crossbeam-epoch v0.9.21
+   Compiling digest v0.11.3
+   Compiling spki v0.7.3
+   Compiling getrandom v0.4.3
+   Compiling zmij v1.0.23
+   Compiling crossbeam-deque v0.8.8
+   Compiling rand_core v0.10.1
+   Compiling thiserror v2.0.20
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling smallvec v1.16.1
+   Compiling serde_json v1.0.151
+   Compiling rayon-core v1.13.0
+   Compiling memchr v2.8.3
+   Compiling chacha20 v0.10.2
+   Compiling pkcs8 v0.10.2
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling zerocopy-derive v0.8.57
+   Compiling either v1.18.0
+   Compiling fast-float2 v0.2.4
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling rayon v1.12.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling multiversion-macros v0.9.0
+   Compiling encoding_rs v0.8.41
+   Compiling ff v0.13.1
+   Compiling base16ct v0.2.0
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling multiversion v0.9.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling crypto-bigint v0.5.5
+   Compiling core_detect v1.0.0
+   Compiling cpufeatures v0.2.17
+   Compiling simdutf8 v0.1.5
+   Compiling scopeguard v1.2.0
+   Compiling multiversion_no_op v1.0.0
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling hmac v0.12.1
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling spin v0.9.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling lazy_static v1.5.0
+   Compiling num-iter v0.1.46
+   Compiling rfc6979 v0.4.0
+   Compiling rand v0.8.8
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling sha2 v0.10.9
+   Compiling quick-xml v0.41.0
+   Compiling inout v0.2.2
+   Compiling cipher v0.5.2
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling sha1 v0.10.7
+   Compiling pkcs1 v0.7.5
+   Compiling bitflags v2.13.2
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling rc4 v0.2.0
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-biff v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-biff)
+   Compiling x509-cert v0.2.5
+   Compiling sha1 v0.11.0
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+   Compiling litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling md-5 v0.11.0
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+   Compiling xls0684-repeat v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0684/repeat-probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 26s

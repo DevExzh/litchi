@@ -1,0 +1,5 @@
+{
+  "reason": "Unused mut remained on consuming publication binding after helper removal; existing lint correctly rejected it. Remove mut without allowance. Add explicit two-observation assertion to focused trailing-fence test before successful builds.",
+  "exit_code": 101,
+  "native_captures": 0
+}

@@ -1,0 +1,394 @@
+HEAD ee5e0b0650eb5b68bf0ec7cc351290d5eb69e809
+$ cargo test -p litchi --locked --no-default-features --features xls,ods --lib --tests -- --test-threads=1
+   Compiling libc v0.2.189
+   Compiling cmov v0.5.4
+   Compiling ctutils v0.4.2
+   Compiling num-traits v0.2.19
+   Compiling block-padding v0.4.2
+   Compiling getrandom v0.4.3
+   Compiling getrandom v0.2.17
+   Compiling crypto-common v0.2.2
+   Compiling rand_core v0.6.4
+   Compiling chrono v0.4.45
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.0
+   Compiling rand v0.10.2
+   Compiling inout v0.2.2
+   Compiling cipher v0.5.2
+   Compiling ff v0.13.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling getrandom v0.3.4
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling crc32fast v1.5.1
+   Compiling siphasher v1.0.3
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling cpubits v0.1.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling ecdsa v0.16.9
+   Compiling phf_shared v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling universal-hash v0.6.1
+   Compiling zlib-rs v0.6.7
+   Compiling fastrand v2.5.0
+   Compiling phf_generator v0.14.0
+   Compiling polyval v0.7.3
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling sha1 v0.11.0
+   Compiling bergshamra-core v0.7.0
+   Compiling flate2 v1.1.10
+   Compiling inout v0.1.4
+   Compiling rustix v1.1.4
+   Compiling uppsala v0.9.0
+   Compiling cipher v0.4.4
+   Compiling ghash v0.6.0
+   Compiling phf_macros v0.14.0
+   Compiling aes v0.9.3
+   Compiling rand_core v0.9.5
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling bergshamra-xml v0.7.0
+   Compiling ctr v0.10.1
+   Compiling aead v0.6.1
+   Compiling hmac v0.13.0
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling lock_api v0.4.13
+   Compiling byteorder v1.5.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling parking_lot_core v0.9.11
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-parse v0.2.7
+   Compiling blowfish v0.9.1
+   Compiling argon2 v0.5.3
+   Compiling pbkdf2 v0.13.0
+   Compiling aes-gcm v0.11.1
+   Compiling bergshamra-c14n v0.7.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling phf v0.14.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling rc4 v0.2.0
+   Compiling cbc v0.2.1
+   Compiling colorchoice v1.0.5
+   Compiling anstyle v1.0.14
+   Compiling scopeguard v1.2.0
+   Compiling anstyle-query v1.1.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstream v0.6.21
+   Compiling tempfile v3.27.0
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling md-5 v0.11.0
+   Compiling wait-timeout v0.2.1
+   Compiling errno v0.3.14
+   Compiling quick-error v1.2.3
+   Compiling bit-vec v0.8.0
+   Compiling hashbrown v0.16.1
+   Compiling clap_lex v0.6.0
+   Compiling log v0.4.29
+   Compiling equivalent v1.0.2
+   Compiling fnv v1.0.7
+   Compiling strsim v0.10.0
+   Compiling simd-adler32 v0.3.10
+   Compiling heck v0.4.1
+   Compiling bumpalo v3.20.3
+   Compiling zopfli v0.8.3
+   Compiling clap_derive v4.4.7
+   Compiling clap_builder v4.4.18
+   Compiling rusty-fork v0.3.1
+   Compiling indexmap v2.11.4
+   Compiling bit-set v0.8.0
+   Compiling signal-hook-registry v1.4.8
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+   Compiling parking_lot v0.12.4
+   Compiling rand v0.9.5
+   Compiling rand_xorshift v0.4.0
+   Compiling rand_chacha v0.9.0
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling socket2 v0.6.5
+   Compiling mio v1.0.4
+   Compiling tokio-macros v2.5.0
+   Compiling regex-syntax v0.8.11
+   Compiling unarray v0.1.4
+   Compiling bytes v1.12.1
+   Compiling pin-project-lite v0.2.17
+   Compiling typed-path v0.12.3
+   Compiling zip v8.6.0
+   Compiling tokio v1.47.5
+   Compiling proptest v1.7.0
+   Compiling clap v4.4.18
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+warning: function `has_ooxml_extension` is never used
+    --> crates/litchi/src/detection_smart/detected.rs:3275:4
+     |
+3275 | fn has_ooxml_extension(path: &std::path::Path) -> bool {
+     |    ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+warning: function `fixture` is never used
+  --> crates/litchi/tests/unexpected_format.rs:15:4
+   |
+15 | fn fixture(relative: &str) -> PathBuf {
+   |    ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+   |
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+   |    ^^^^^^^^^^^^^^^^^
+
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+   |
+30 | fn assert_boxed_unexpected(
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+warning: `litchi` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 38.17s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/litchi-e0d4ebfc9b4b1ab5)
+
+running 60 tests
+test detection_smart::detected::short_signature_tests::internal_ods_handoff_transfers_one_prepared_index_to_semantic_open ... ok
+test detection_smart::detected::short_signature_tests::short_zip_candidate_is_rejected_without_short_read_failure ... ok
+test detection_smart::functions::tests::detects_flat_odf_bytes_and_reader ... ok
+test detection_smart::functions::tests::detects_short_rtf_reader_and_restores_cursor ... ok
+test detection_smart::functions::tests::test_detect_ole2_from_bytes ... ok
+test sheet::text::cell::tests::test_coordinate_conversion ... ok
+test sheet::text::formats::tests::test_all_bom_variants ... ok
+test sheet::text::formats::tests::test_delimited_csv ... ok
+test sheet::text::formats::tests::test_delimited_quoted_fields ... ok
+test sheet::text::formats::tests::test_delimited_tsv ... ok
+test sheet::text::formats::tests::test_delimited_write_with_bom ... ok
+test sheet::text::formats::tests::test_dif_basic_read_write ... ok
+test sheet::text::formats::tests::test_dif_booleans ... ok
+test sheet::text::formats::tests::test_dif_with_bom ... ok
+test sheet::text::formats::tests::test_empty_data ... ok
+test sheet::text::formats::tests::test_fixed_width_auto_detect ... ok
+test sheet::text::formats::tests::test_fixed_width_with_bom ... ok
+test sheet::text::formats::tests::test_fixed_width_with_specified_widths ... ok
+test sheet::text::formats::tests::test_fixed_width_write ... ok
+test sheet::text::formats::tests::test_sylk_basic_read_write ... ok
+test sheet::text::formats::tests::test_sylk_formulas ... ok
+test sheet::text::formats::tests::test_sylk_with_bom ... ok
+test sheet::text::parser::tests::test_quoted_fields ... ok
+test sheet::text::parser::tests::test_simple_csv_parsing ... ok
+test sheet::text::parser::tests::test_tsv_parsing ... ok
+test sheet::text::tests::test_csv_parsing ... ok
+test sheet::text::tests::test_empty_cells ... ok
+test sheet::text::tests::test_iterators ... ok
+test sheet::text::tests::test_quoted_fields ... ok
+test sheet::text::tests::test_tsv_parsing ... ok
+test sheet::text::tests::test_type_inference ... ok
+test sheet::workbook::flat_ods_dispatch_tests::flat_ods_detection_and_public_open_agree ... ok
+test sheet::workbook::source_ods_path_tests::filesystem_fallback_retains_bytes_from_the_open_source ... ok
+test sheet::workbook::source_ods_path_tests::filesystem_ods_uses_source_owner_and_matches_byte_projection ... ok
+test sheet::workbook::source_ods_path_tests::source_root_metadata_reports_source_change ... ok
+test sheet::workbook::source_ods_path_tests::source_root_preserves_repeated_text_semantics ... ok
+test sheet::workbook::source_ods_path_tests::source_root_rejects_malformed_ods_body ... ok
+test sheet::workbook::source_xls_path_tests::filesystem_open_retains_xls_source_until_text ... ok
+test sheet::workbook::source_xls_path_tests::from_bytes_remains_eager_xls_memory_variant ... ok
+test sheet::workbook::source_xls_path_tests::legacy_biff_path_matches_from_bytes_and_owner_error ... ok
+test sheet::workbook::source_xls_path_tests::metadata_ole_errors_use_source_owner_normalization ... ok
+test sheet::workbook::source_xls_path_tests::ole_host_stream_precedence_is_catalog_only_and_ordered ... ok
+test sheet::workbook::source_xls_path_tests::path_level_feature_elided_foreign_owners_intentionally_fall_back_to_eager_xls ... ok
+test sheet::workbook::source_xls_path_tests::source_probe_reuses_one_catalog_for_globals_and_metadata ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_matches_eager_names_text_and_metadata ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_materialization_limit_stays_typed ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_pins_open_file_across_atomic_path_replacement ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_refuses_encrypted_filepass_without_eager_fallback ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_refuses_malformed_biff_without_eager_fallback ... ok
+test sheet::workbook::source_xls_path_tests::source_xls_refuses_stale_path ... ok
+test sheet::workbook_types::tests::test_detect_workbook_format_from_signature_empty ... ok
+test sheet::workbook_types::tests::test_detect_workbook_format_from_signature_invalid ... ok
+test sheet::workbook_types::tests::test_detect_workbook_format_from_signature_xls ... ok
+test sheet::workbook_types::tests::test_detect_workbook_format_from_signature_xlsx ... ok
+test sheet::workbook_types::tests::test_detect_workbook_format_rejects_truncated_ole2_signature ... ok
+test sheet::workbook_types::tests::test_workbook_format_clone ... ok
+test sheet::workbook_types::tests::test_workbook_format_copy ... ok
+test sheet::workbook_types::tests::test_workbook_format_debug ... ok
+test sheet::workbook_types::tests::test_workbook_format_inequality ... ok
+test sheet::workbook_types::tests::test_workbook_format_variants ... ok
+
+test result: ok. 60 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/catalog_detection_arbitration.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/catalog_detection_arbitration-73c2480ad8365c31)
+
+running 1 test
+test ordinary_ods_detection::ordinary_ods_remains_detectable_without_an_opc_catalog ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/catalog_first_detection.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/catalog_first_detection-538c465754091a9e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/encryption_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/encryption_facade-bfa9c595a733df48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_xlsx_integration/main.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/eval_xlsx_integration-c77751c13775b4ea)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_error_model.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_error_model-f465e3347d59708d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_facade-451ff4ba70d8d597)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_merge_readers.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_merge_readers-f54848dfa728d128)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_merge_transactions.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_merge_transactions-5ce099151346636e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_numbers_compatibility.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_numbers_compatibility-bab8e7ff2ec4afb9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_pages_table_deletion.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_pages_table_deletion-59432bf9ca758b3b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_path.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_path-d6b24d96cb51da5c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iwork_source_errors.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/iwork_source_errors-99d58298faf7c414)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/keynote_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/keynote_facade-a2a589281a8ac59a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_docx_lists.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/markdown_docx_lists-5e75bc2d4b1ae892)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_docx_semantics.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/markdown_docx_semantics-48ef4b3ac0b2cefa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markdown_real_fixtures.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/markdown_real_fixtures-699bff6f10ecf139)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/numbers_facade-f1d8480e2e32a078)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_semantic_values.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/numbers_semantic_values-4bef5a92e1fe74e1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/numbers_semantic_view.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/numbers_semantic_view-599fe733e8935cf0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pages_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/pages_facade-5a7fd191a606d08c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/read_limits_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/read_limits_facade-188e8ae68a442230)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantic_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/semantic_facade-849c0fd5b72856dd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantic_reader_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/semantic_reader_facade-f602e6b5f63d9d5c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/unexpected_format.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/unexpected_format-ec90f14b22dc9be0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/unified_sheet_selectors.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/unified_sheet_selectors-32f057b6e53cc3dc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vba_inspection_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/vba_inspection_facade-d7d35b93a14ef74b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsb_facade.rs (/home/zhuhe/code/litchi-target-0725/debug/deps/xlsb_facade-0f51cc5dad0293e3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit 0

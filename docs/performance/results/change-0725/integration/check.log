@@ -1,0 +1,6 @@
+HEAD ee5e0b0650eb5b68bf0ec7cc351290d5eb69e809
+$ cargo check -p litchi-cfb -p litchi-xls --all-features --all-targets --locked
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+
+exit 0
