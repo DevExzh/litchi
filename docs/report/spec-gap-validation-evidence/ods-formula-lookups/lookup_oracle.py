@@ -1269,8 +1269,8 @@ def observations() -> list[dict[str, object]]:
             "=LOOKUP(4;[.A1:.A4];[.B16])",
             scalar_expected(error("#N/A")),
             expected_reads=None,
-            expected_reads_min=3,
-            expected_reads_max=5,
+            expected_reads_min=2,
+            expected_reads_max=4,
         ),
         case(
             "lookup.empty_key_and_empty_result",
