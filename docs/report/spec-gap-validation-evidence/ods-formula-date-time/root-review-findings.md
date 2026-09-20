@@ -227,3 +227,18 @@ HEAD, and capture checks source, harness and lock hashes before and after.
 The root candidate commit identifies injected source; it is intentionally
 different from the isolated checkout's preparation HEAD. Final freeze, full
 gates, uncertainty analysis and comparative capture remain outstanding.
+
+The follow-up analyzer binds timed geometry and read totals to the declared
+matrix and preflight, including sticky cancellation's one total successful
+read. All 308 retained measurement smoke rows pass these checks. Threshold
+flags now carry deterministic 10,000-resample bootstrap intervals and exact
+sample counts. Eleven portable evidence tests cover custody, typed outcomes,
+geometry, cancellation reads, missing evidence and bootstrap reproducibility.
+
+Review additionally required retaining the candidate freeze hash and full
+manifest in capture receipts and comparing baseline/candidate harness inputs
+before timing. The runner now enforces those checks, including the freeze
+hash after candidate capture. The seven commands for the preceding freeze
+all exited zero, but its final verifier correctly refused the changed root
+runner. That superseded run is retained under `gates/history-freeze-receipt/`;
+it is not a final verified gate bundle. A replacement freeze is required.
