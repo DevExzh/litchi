@@ -1,0 +1,157 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/statistical/fods/correl.fods": "da3d4bd9cbe70102582e493df3454c2849c586481d1b1944cdef0e82985698b1",
+    "sc/qa/unit/data/functions/statistical/fods/covar.fods": "b4946b2dcb1a1c2cb02ec5b846e42315073a380603825683da16987411ac5464",
+    "sc/qa/unit/data/functions/statistical/fods/forecast.fods": "736b262511b3bf777433f793b500085484560187fd7d5433ffab5a8766df0cd9",
+    "sc/qa/unit/data/functions/statistical/fods/intercept.fods": "2cbb6a45da480d3337ed661633fbbe05a4b99c03c1f34bb6bdd631c22a5e07f5",
+    "sc/qa/unit/data/functions/statistical/fods/pearson.fods": "e5710430b5be114b2a2991d5afbfaea0141ad7d760b2fab75b13b1735f36318b",
+    "sc/qa/unit/data/functions/statistical/fods/rsq.fods": "37a89592299569814d2bb1f79814635dcf749adbddee82105b14a16669a04fdc",
+    "sc/qa/unit/data/functions/statistical/fods/slope.fods": "77ac9db4eb6e3d50f59e2fa85c7a48f3019753f81fc20b924df2fe344373a6b2",
+    "sc/qa/unit/data/functions/statistical/fods/steyx.fods": "727c8c77615dff0bd8fc4da70ac9ba6bd7cfbf455e3b1a607edfc90d871871b0"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 42,
+  "selected_functions": [
+    "CORREL",
+    "COVAR",
+    "FORECAST",
+    "INTERCEPT",
+    "PEARSON",
+    "RSQ",
+    "SLOPE",
+    "STEYX"
+  ],
+  "selected_modes": [
+    "scalar",
+    "matrix"
+  ],
+  "host_numeric_deviations": [
+    {
+      "function": "STEYX",
+      "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+      "sheet": "Sheet2",
+      "row": 3,
+      "column": 1,
+      "formula": "of:=STEYX([.I2:.I101];[.J2:.J101])",
+      "cached": "1.60215046095659",
+      "kind": "pinned_host_numeric_deviation",
+      "reference": "1.6021504609570352",
+      "reference_hex": "0x1.9a26885914f04p+0",
+      "ulp_difference": 2005,
+      "reason": "Exact Fraction arithmetic over the 99 decoded binary64 pairs followed by a 300-digit Decimal square root yields the Rust reference value; the retained LibreOffice cache is 2005 ULP lower. The independent proof is steyx_deviation.py and steyx-deviation-proof.json."
+    }
+  ],
+  "normative_source": {
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": [
+      "6.18.38 INTERCEPT",
+      "6.18.41 LINEST"
+    ],
+    "intercept_text": "INTERCEPT returns the intercept (a) calculated as described in 6.18.41 for the function call LINEST(Data_Y, Data_X, FALSE()).",
+    "linest_const_text": "Const: If set to FALSE, the model constant a is equal to 0."
+  },
+  "excluded_profile_variances": [
+    {
+      "function": "CORREL",
+      "source": "sc/qa/unit/data/functions/statistical/fods/correl.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=CORREL([.Q2:.Q101];[.R2:.R101])",
+      "cached": "-0.99844495050475",
+      "kind": "formula_closure",
+      "reason": "The large paired closure contains formula-generated regression data; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "COVAR",
+      "source": "sc/qa/unit/data/functions/statistical/fods/covar.fods",
+      "sheet": "Sheet2",
+      "row": 8,
+      "column": 1,
+      "formula": "of:=COVAR([.I7:.I12];[.J7:.J12])",
+      "cached": "2.47222264607747",
+      "kind": "formula_closure",
+      "reason": "The paired range contains formula-generated values; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "PEARSON",
+      "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+      "sheet": "Sheet2",
+      "row": 3,
+      "column": 1,
+      "formula": "of:=PEARSON([.J12:.J17];[.I12:.I17])",
+      "cached": "1",
+      "kind": "formula_closure",
+      "reason": "The paired range contains formula-generated values; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "PEARSON",
+      "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+      "sheet": "Sheet2",
+      "row": 5,
+      "column": 1,
+      "formula": "of:=PEARSON([.O1:.O6];[.P1:.P6])",
+      "cached": "0.713771885812213",
+      "kind": "formula_closure",
+      "reason": "One paired range contains formula-generated values; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "INTERCEPT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+      "sheet": "Sheet2",
+      "row": 6,
+      "column": 1,
+      "formula": "of:=INTERCEPT(sl_j;sl_i)",
+      "cached": "6.75000000513889",
+      "kind": "named_range_unmaterialized",
+      "reason": "The named ranges have no bounded literal closure in the FODS table."
+    },
+    {
+      "function": "INTERCEPT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+      "sheet": "Sheet2",
+      "row": 8,
+      "column": 1,
+      "formula": "of:=INTERCEPT([.R2:.R101];[.Q2:.Q101])",
+      "cached": "1800130712.69176",
+      "kind": "formula_closure",
+      "reason": "The large paired closure contains formula-generated regression data; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "FORECAST",
+      "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=FORECAST([.S1:.S39];[.T1:.T39];[.S1:.S39])",
+      "cached": "112.723528625461",
+      "kind": "reference_argument",
+      "reason": "The first forecast value is a reference argument rather than a scalar literal; it remains outside this scalar-probe receipt."
+    },
+    {
+      "function": "FORECAST",
+      "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 10,
+      "formula": "of:=FORECAST([.J1:.J2];[.K1:.K2];[.J1:.J2])",
+      "cached": null,
+      "kind": "invalid_forecast",
+      "reason": "LibreOffice reports an error for this two-point forecast probe."
+    }
+  ],
+  "coverage_notes": {
+    "source_format": "All selected sources are upstream FODS fixtures; no conversion tool or recalculation step is used.",
+    "closure": "Each selected reference closure contains only literal number, logical, text, or empty cells. Formula cells, dates, named ranges, and nested formula dependencies remain explicit exclusions.",
+    "cache": "The retained cached value is used only as an upstream observation. The Rust test reconstructs the literal closure and evaluates the formula in both scalar and matrix modes. Forty-one rows use the ordinary 1e-13 relative comparison; the retained STEYX I2:I101/J2:J101 row is a declared host numeric deviation with an independent exact reference proof.",
+    "profile": "Host-specific date/error coercions and unsupported named-range or nested-expression behavior are not silently promoted to the evaluator contract.",
+    "intercept_normative_ambiguity": "ODF 1.4 \u00a76.18.38 literally describes INTERCEPT as LINEST(Data_Y, Data_X, FALSE()), while \u00a76.18.41 defines Const=FALSE as a zero intercept. The selected native caches show ordinary nonzero intercepts (for example 6.75000000513889 and -9). This receipt records LibreOffice observations only; the normative contract must choose and document the resolution."
+  }
+}

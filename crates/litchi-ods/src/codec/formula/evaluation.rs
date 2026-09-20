@@ -32,6 +32,12 @@
 //! admitted sequence, and uncertain harmonic cancellation uses a budgeted
 //! exact rational replay. Signed geometric and harmonic inputs follow their
 //! real-valued domains rather than a positive-only input restriction.
+//! Paired statistics (`CORREL`, `COVAR`, `PEARSON`, `RSQ`, `SLOPE`,
+//! `INTERCEPT`, `STEYX`, and `FORECAST`) accept scalar data as one-by-one
+//! forced arrays; the value VM streams rectangular paired ranges. Their data
+//! inputs omit Text, Logical, and Empty pairs. `FORECAST` converts its query
+//! separately to Number. This profile resolves INTERCEPT's contradictory
+//! LINEST cross-reference as the fitted intercept with an included constant.
 //! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
@@ -156,9 +162,11 @@ mod aggregate;
 pub mod complex;
 mod descriptive;
 mod discrete;
+mod dyadic;
 mod elementary;
 pub(super) mod numerics;
 mod order;
+mod paired;
 mod radix;
 mod roman;
 mod rounding;
@@ -928,6 +936,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if paired::is_paired_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if order::is_order_function(name) {
             return self.schedule_eager_function(node);
         }
@@ -1045,6 +1057,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         if descriptive::is_descriptive_function(name) {
             return descriptive::apply(self, node, name);
         }
+        if paired::is_paired_function(name) {
+            return paired::apply(self, node, name);
+        }
+
         if order::is_order_function(name) {
             return order::apply(self, node, name);
         }

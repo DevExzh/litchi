@@ -1,0 +1,29 @@
+{
+  "command": [
+    "python3",
+    "native/reproduce.py"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"commit\": \"d804d6aff49054bad1719ec3c2d136b545bbc7e7\", \"converter\": false, \"files\": 8, \"selected_observations\": 42, \"temporary_tree_cleaned\": true}\n",
+  "stderr": "",
+  "before": {
+    "native/provenance.json": "82ee3b3fba3f6f2762b56e64c4ed37c4982a9e5060cfb2516787684bb7e5aa49",
+    "native/steyx_deviation.py": "cf7667904cc4c861bb8e30bcc2b3562a646e063b1243b67b492803c96f4bf1bf",
+    "native/steyx-deviation-proof.json": "b573211f345abcde8f914ea134bfdfcaa50ad00cc38e0153ffc106fe764b9eac",
+    "native/cached-results.json": "6907eb0fde9145f256587a2aa4d07018221ffc407fd6192acee452446446876e",
+    "native/README.md": "45d6a47328694f6ed8d294aca8b11b31394a29bd81c86fa087f5c83f25840161",
+    "native/extract.py": "62d51008269b5da563b0702e669d1830cf3710afa0ce0dfe67ada4c3d0eed459",
+    "native/LICENSE-MPL-2.0.txt": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "native/reproduce.py": "a0740014d1ba36e047b2b87d35af5be96bc33cc5d97e82744028e7b3cf1c359c"
+  },
+  "after": {
+    "native/provenance.json": "82ee3b3fba3f6f2762b56e64c4ed37c4982a9e5060cfb2516787684bb7e5aa49",
+    "native/steyx_deviation.py": "cf7667904cc4c861bb8e30bcc2b3562a646e063b1243b67b492803c96f4bf1bf",
+    "native/steyx-deviation-proof.json": "b573211f345abcde8f914ea134bfdfcaa50ad00cc38e0153ffc106fe764b9eac",
+    "native/cached-results.json": "6907eb0fde9145f256587a2aa4d07018221ffc407fd6192acee452446446876e",
+    "native/README.md": "45d6a47328694f6ed8d294aca8b11b31394a29bd81c86fa087f5c83f25840161",
+    "native/extract.py": "62d51008269b5da563b0702e669d1830cf3710afa0ce0dfe67ada4c3d0eed459",
+    "native/LICENSE-MPL-2.0.txt": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "native/reproduce.py": "a0740014d1ba36e047b2b87d35af5be96bc33cc5d97e82744028e7b3cf1c359c"
+  }
+}

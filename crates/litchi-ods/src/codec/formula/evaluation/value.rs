@@ -39,6 +39,15 @@
 //! data sequences while scalar query parameters can determine the result's
 //! matrix shape. Selection retains only admitted numbers under the storage
 //! budget and uses a fallible, work-charged sort.
+//! Paired statistics (`CORREL`, `COVAR`, `PEARSON`, `RSQ`, `SLOPE`,
+//! `INTERCEPT`, `STEYX`, and `FORECAST`) consume equal-shaped rectangular
+//! data arrays without broadcasting or compacting each side independently.
+//! Reference cells stream in aligned pairs into bounded exact state. Text,
+//! Logical, and Empty members omit a pair; formula errors remain errors.
+//! `FORECAST` lifts its scalar query in matrix mode and reuses an invariant
+//! exact fit across query positions. Reference lists and 3-D data are refused
+//! before scanning. INTERCEPT uses the included-constant profile documented
+//! by the scalar evaluator.
 //!
 //! Both profiles support all 26 complex-number functions through
 //! [`Value::Complex`]. `IMSUM` and `IMPRODUCT` consume arrays and ordered
@@ -162,6 +171,7 @@ mod geometry;
 mod matrix;
 mod order;
 mod owned;
+mod paired;
 mod references;
 mod scalar;
 mod statistical;
@@ -1516,6 +1526,10 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     shape_mask_reservation: Option<Reservation>,
     demand_cache: Vec<DemandCacheEntry>,
     demand_cache_reservation: Option<Reservation>,
+    /// Exact invariant regression fits shared by projected FORECAST queries.
+    /// Drop the payload buffer before releasing its capacity reservation.
+    forecast_cache: Vec<paired::ForecastCacheEntry>,
+    forecast_cache_reservation: Option<Reservation>,
     /// One source shape per condition node.  Entries are keyed by source
     /// coordinates in this shape; callers with a later broadcast shape are
     /// projected back to it instead of creating one alias per output cell.
@@ -1550,6 +1564,8 @@ enum ValueFrame<'a> {
     /// Restore the context saved by one of the argument-entry frames.
     RestoreArgumentContext,
     Apply(super::Node<'a>),
+    /// Finish a query using an invariant paired-data fit already retained.
+    ApplyForecastQuery(super::Node<'a>),
     ApplyMatrix {
         node: super::Node<'a>,
         function: MatrixFunction,
@@ -1877,6 +1893,8 @@ where
             shape_mask_reservation: None,
             demand_cache: Vec::new(),
             demand_cache_reservation: None,
+            forecast_cache: Vec::new(),
+            forecast_cache_reservation: None,
             condition_cache_shapes: Vec::new(),
             condition_cache_shape_reservation: None,
             condition_cache: Vec::new(),
@@ -1926,6 +1944,10 @@ where
                 ValueFrame::VisitScalarArgument(node) => self.visit_scalar_argument(node)?,
                 ValueFrame::RestoreArgumentContext => self.restore_argument_context()?,
                 ValueFrame::Apply(node) => self.apply(node)?,
+                ValueFrame::ApplyForecastQuery(node) => {
+                    let value = paired::apply_cached_forecast(self, node)?;
+                    self.push_value(value)?;
+                },
                 ValueFrame::ApplyMatrix { node, function } => {
                     self.apply_matrix_function(node, function)?
                 },
@@ -2130,17 +2152,31 @@ where
         &mut self,
         areas: &RuntimeAreaSet<'expr>,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let (area, row, column) = match self.scalar_reference_cell(areas)? {
+            Ok(cell) => cell,
+            Err(error) => return Ok(RuntimeValue::Scalar(WorkingValue::Error(error))),
+        };
+        let read = self.read_reference_cell(area.sheet, row, column)?;
+        let element = self.read_to_element(read)?;
+        self.element_to_runtime(element)
+    }
+
+    /// Select an implicitly intersected cell without reading or converting it.
+    /// Consumers that distinguish source errors from generated conversion
+    /// errors can then inspect the provider value before scalar normalization.
+    fn scalar_reference_cell(
+        &mut self,
+        areas: &RuntimeAreaSet<'expr>,
+    ) -> EvaluationResult<Result<(RuntimeArea<'expr>, usize, usize), ScalarError>> {
         if areas.is_list {
             // A reference-list is a distinct formula value.  Implicit
             // intersection is defined for one reference, and selecting the
             // first surviving list entry would silently change the value's
             // type (especially for `NOT`, `XOR`, and scalar functions).
-            return Ok(RuntimeValue::Scalar(WorkingValue::Error(
-                ScalarError::Value,
-            )));
+            return Ok(Err(ScalarError::Value));
         }
         if areas.areas.is_empty() {
-            return Ok(RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Null)));
+            return Ok(Err(ScalarError::Null));
         }
         let current_sheet = self
             .resolver
@@ -2159,9 +2195,7 @@ where
             // The union of the caller's row and column cannot select exactly
             // one cell from a rectangle with both dimensions greater than one.
             if area.rect.rows() > 1 && area.rect.columns() > 1 {
-                return Ok(RuntimeValue::Scalar(WorkingValue::Error(
-                    ScalarError::NotAvailable,
-                )));
+                return Ok(Err(ScalarError::NotAvailable));
             }
             let row = if area.rect.rows() == 1 {
                 Some(area.rect.row_start)
@@ -2183,21 +2217,15 @@ where
             };
             if let (Some(row), Some(column)) = (row, column) {
                 if selected.is_some() {
-                    return Ok(RuntimeValue::Scalar(WorkingValue::Error(
-                        ScalarError::NotAvailable,
-                    )));
+                    return Ok(Err(ScalarError::NotAvailable));
                 }
-                selected = Some((area, row, column));
+                selected = Some((*area, row, column));
             }
         }
         let Some((area, row, column)) = selected else {
-            return Ok(RuntimeValue::Scalar(WorkingValue::Error(
-                ScalarError::NotAvailable,
-            )));
+            return Ok(Err(ScalarError::NotAvailable));
         };
-        let read = self.read_reference_cell(area.sheet, row, column)?;
-        let element = self.read_to_element(read)?;
-        self.element_to_runtime(element)
+        Ok(Ok((area, row, column)))
     }
 
     fn visit(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
@@ -2571,6 +2599,7 @@ where
             || aggregate::is_aggregate_function(name)
             || statistical::is_statistical_function(name)
             || descriptive::is_descriptive_function(name)
+            || paired::is_paired_function(name)
             || order::is_order_function(name)
             || conditional::is_conditional_function(name)
             || database::is_database_function(name);
@@ -2578,6 +2607,10 @@ where
             if let Some(value) = self.demand_cache_get(node)? {
                 return self.push_value(value);
             }
+        }
+
+        if paired::visit_cached_forecast(self, node, name)? {
+            return Ok(());
         }
 
         let count = node.child_count();
@@ -2599,6 +2632,10 @@ where
                 } else {
                     ValueFrame::VisitMatrixArgument(child)
                 }
+            } else if paired::is_paired_function(name)
+                && paired::matrix_argument(name, index, child)
+            {
+                ValueFrame::VisitMatrixArgument(child)
             } else if order::is_order_function(name) && order::matrix_argument(name, index, child) {
                 ValueFrame::VisitMatrixArgument(child)
             } else if (statistical::is_statistical_function(name)
@@ -3110,6 +3147,9 @@ where
             {
                 self.cacheable_matrix_branch(node)
             },
+            super::Kind::Function { name } if paired::is_paired_function(name) => {
+                self.cacheable_conditional_criterion(node)
+            },
             super::Kind::Function { name } if order::is_order_function(name) => {
                 self.cacheable_order_branch(node)
             },
@@ -3435,7 +3475,9 @@ where
                         let Some(child) = node.child(index) else {
                             return Ok(false);
                         };
-                        let child_full = if order::is_order_function(name) {
+                        let child_full = if paired::is_paired_function(name) {
+                            paired::criterion_full_argument(name, index, child)
+                        } else if order::is_order_function(name) {
                             order::criterion_full_argument(name, index, child)
                         } else {
                             full_arguments
@@ -4045,13 +4087,19 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
-                        if let Some(function) = super::order::OrderFunction::from_name(name) {
+                        let order_function = super::order::OrderFunction::from_name(name);
+                        let paired_function = super::paired::PairedFunction::from_name(name);
+                        if order_function.is_some() || paired_function.is_some() {
+                            let data_argument = |index| {
+                                order_function.is_some_and(|function| function.data_argument(index))
+                                    || paired_function
+                                        .is_some_and(|function| function.data_argument(index))
+                            };
                             let count = node.child_count();
                             self.scalar
                                 .charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
-                            let children = (0..count)
-                                .filter(|index| !function.data_argument(*index))
-                                .count();
+                            let children =
+                                (0..count).filter(|index| !data_argument(*index)).count();
                             self.push_shape_frame(ShapeFrame::Exit {
                                 node,
                                 children,
@@ -4062,12 +4110,12 @@ where
                             // planner, including references and matrix/lazy
                             // functions; data sequences remain whole inputs.
                             for index in (0..count).rev() {
-                                if function.data_argument(index) {
+                                if data_argument(index) {
                                     continue;
                                 }
                                 let child = node.child(index).ok_or(
                                     EvaluationFailure::InvalidExpression(
-                                        "order shape parameter is missing",
+                                        "reducer shape parameter is missing",
                                     ),
                                 )?;
                                 self.push_shape_frame(ShapeFrame::Enter {
@@ -4986,9 +5034,12 @@ where
                 ReferenceKindFrame::Function { node, name, count } => {
                     let mut kind = ReferenceOperandKind::Scalar;
                     let order_function = super::order::OrderFunction::from_name(name);
+                    let paired_function = super::paired::PairedFunction::from_name(name);
                     for index in (0..count).rev() {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
-                        if order_function.is_some_and(|function| function.data_argument(index)) {
+                        if order_function.is_some_and(|function| function.data_argument(index))
+                            || paired_function.is_some_and(|function| function.data_argument(index))
+                        {
                             continue;
                         }
                         if name.eq_ignore_ascii_case("AND")
@@ -6492,6 +6543,20 @@ where
                 }
             }
             let value = descriptive::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
+        if paired::is_paired_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = paired::apply(self, node, name, arguments)?;
             if cacheable {
                 self.demand_cache_put(node, &value)?;
             }

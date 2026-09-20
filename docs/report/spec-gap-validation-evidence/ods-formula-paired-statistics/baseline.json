@@ -1,0 +1,19 @@
+{
+  "commit": "aa48eee68cb6ee0904523394d4ff8015dce6e595",
+  "functions": [
+    "CORREL",
+    "COVAR",
+    "PEARSON",
+    "RSQ",
+    "SLOPE",
+    "INTERCEPT",
+    "STEYX",
+    "FORECAST"
+  ],
+  "unrelated_tracked_changes": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md"
+  ],
+  "gate_lock_source": "../ods-formula-descriptive-statistics/gates/Cargo.lock"
+}

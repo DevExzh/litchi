@@ -1,0 +1,25 @@
+{
+  "base_commit": "aa48eee68cb6ee0904523394d4ff8015dce6e595",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "5dd68e5e86192dfd7b0f1dae7d72a6dc2f1fcfe89178b3dc9f50c8605441fca4",
+    "crates/litchi-ods/src/codec/formula/evaluation/descriptive/moments.rs": "72c430fa07be48a5119bf2fbd70a2552d4500ae3c9e18cf72933b508da4d1b5d",
+    "crates/litchi-ods/src/codec/formula/evaluation/dyadic.rs": "9509ed7613b305ee6ae8f7e7aa6136ad88a5450081f0f231ff0079fafce9a411",
+    "crates/litchi-ods/src/codec/formula/evaluation/paired.rs": "37463db442f2e94cf7b590f8ce4c10e76f9a1e23a094cda2baa53c8a0878fe8f",
+    "crates/litchi-ods/src/codec/formula/evaluation/paired/kernel.rs": "ef17f203fa0aba0c93a6bc655aa722319a2b4590c94becffc66a406003d24257",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "54631be0e2dfc5bbbff6a32ecedff2c87f48bfa19412f2051e9c0dbb4df6ecf0",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/paired.rs": "3e884a1aa675e114f1f65b9e59d05b7b029a3a7fe67371d24893692dfa854fa7",
+    "crates/litchi-ods/tests/ods_formula_paired_evaluation.rs": "1c60294138922b59a6d3c68822e43b26d04c3f5ac5bf5f37bdde18f621e625a8",
+    "crates/litchi-ods/tests/ods_formula_paired_limits.rs": "2a15e5580346c0f633cb045103409f793c37989ee46e0ea518b78b587cfddb2e",
+    "crates/litchi-ods/tests/ods_formula_paired_native.rs": "ab3953ba42151c623319a563c03003c8e844cb0c01dba022c91e284d39486c17",
+    "crates/litchi-ods/tests/ods_formula_paired_oracle.rs": "8c5251970f36a94819baf5f714f756c0eb03e8f3d7ee5bd9f3feff09e1ba175a",
+    "crates/litchi-ods/docs/FEATURE_MATRIX.md": "d7afc0094a07b07342840baa3aa6d08aa98fecdd902d9e9567d12dd902976a11",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/contract.md": "9ce79b7b5014c6e29c1d30c61a77187d6dc4bce9be7810e1f5006e8ef147aadd",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/numeric_oracle.py": "03ea2bdff5ba6aca8d5d8ed8775dd479e517bd2a73c2d0c617b968d6360c164e",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/numeric-goldens.json": "038d8b16be3fcf8be2a6234a35ac91d5b5a819ba1b512a4dbcbcf7b802f92f2a",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/cached-results.json": "6907eb0fde9145f256587a2aa4d07018221ffc407fd6192acee452446446876e",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/provenance.json": "82ee3b3fba3f6f2762b56e64c4ed37c4982a9e5060cfb2516787684bb7e5aa49",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/steyx_deviation.py": "cf7667904cc4c861bb8e30bcc2b3562a646e063b1243b67b492803c96f4bf1bf",
+    "docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/steyx-deviation-proof.json": "b573211f345abcde8f914ea134bfdfcaa50ad00cc38e0153ffc106fe764b9eac",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

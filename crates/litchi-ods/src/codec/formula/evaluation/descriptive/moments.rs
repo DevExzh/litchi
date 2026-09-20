@@ -16,7 +16,11 @@
 //! With the binary64 bounds and the checked count this path does not exhaust
 //! the selected widths for a valid input sequence.
 
-use core::cmp::Ordering;
+use super::super::dyadic::{
+    self, ArithmeticError, Big, SignedBig, SignedDyadic, decompose,
+    normalize_mantissa as normalize_dyadic_mantissa, round_ratio, round_signed_ratio,
+    scale_power_of_two,
+};
 
 /// Raw sums and AVEDEV replay use this many 64-bit limbs.
 const STATE_LIMBS: usize = 160;
@@ -25,7 +29,13 @@ const STATE_LIMBS: usize = 160;
 const CALC_LIMBS: usize = 384;
 
 /// The fixed binary exponent of a represented binary64 significand.
-const MIN_BINARY_EXPONENT: i64 = -1074;
+const MIN_BINARY_EXPONENT: i64 = dyadic::MIN_BINARY_EXPONENT;
+
+impl From<ArithmeticError> for MomentError {
+    fn from(_: ArithmeticError) -> Self {
+        Self::Number
+    }
+}
 
 /// Failure classes understood by the resolver/scalar adapter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -136,7 +146,7 @@ impl ExactMoments {
             return Ok(0.0);
         }
         let denominator = Big::<CALC_LIMBS>::from_small(self.count);
-        round_ratio(&centered.second, &denominator, -2148, false)
+        Ok(round_ratio(&centered.second, &denominator, -2148, false)?)
     }
 
     /// Return population (`sample == false`) or sample (`sample == true`)
@@ -159,7 +169,7 @@ impl ExactMoments {
             let n = self.count as f64;
             let factor = (n * (n - 1.0)).sqrt() / (n - 2.0);
             result.mantissa *= factor;
-            normalize_mantissa(&mut result.mantissa, &mut result.exponent)?;
+            normalize_dyadic_mantissa(&mut result.mantissa, &mut result.exponent)?;
         }
         let result = result.value();
         if !result.is_finite() {
@@ -190,9 +200,9 @@ impl ExactMoments {
         let n_minus_three = n - 3;
 
         let c4 = centered.fourth.as_ref().ok_or(MomentError::Number)?;
-        let mut c4_term = c4.clone();
+        let mut c4_term = *c4;
         c4_term.mul_small(n_plus_one)?;
-        let mut c2_term = square.clone();
+        let mut c2_term = square;
         c2_term.mul_small(3)?;
         c2_term.mul_small(n_minus_one)?;
         let mut numerator = SignedBig::from_positive(&c4_term);
@@ -205,7 +215,7 @@ impl ExactMoments {
         if numerator.is_zero() {
             return Ok(0.0);
         }
-        round_signed_ratio(&numerator, &denominator, 0)
+        Ok(round_signed_ratio(&numerator, &denominator, 0)?)
     }
 
     fn centered(&self, need: MomentOrder) -> Result<CenteredNumerators, MomentError> {
@@ -218,7 +228,7 @@ impl ExactMoments {
 
         // C2 = n*S2 - S1².
         let first_square = multiply(&first.magnitude, &first.magnitude)?;
-        let mut second_term = second.magnitude.clone();
+        let mut second_term = second.magnitude;
         second_term.mul_small(n)?;
         let mut c2 = SignedBig::from_positive(&second_term);
         c2.sub_unsigned(&first_square)?;
@@ -230,7 +240,7 @@ impl ExactMoments {
             let third = to_calc_signed(&self.third);
             // C3 = n²*S3 - 3*n*S1*S2 + 2*S1³.
             let mut c3 = SignedBig::zero();
-            let mut term = third.magnitude.clone();
+            let mut term = third.magnitude;
             term.mul_small(n)?;
             term.mul_small(n)?;
             c3.add_unsigned(third.negative, &term)?;
@@ -255,7 +265,7 @@ impl ExactMoments {
             let fourth = to_calc_signed(&self.fourth);
             // C4 = n³*S4 - 4*n²*S1*S3 + 6*n*S1²*S2 - 3*S1⁴.
             let mut c4 = SignedBig::zero();
-            let mut term = fourth.magnitude.clone();
+            let mut term = fourth.magnitude;
             term.mul_small(n)?;
             term.mul_small(n)?;
             term.mul_small(n)?;
@@ -309,7 +319,7 @@ impl AveDevPlan {
             expected: self.count,
             seen: 0,
             sum: Big::zero(),
-            mean_sum: self.sum.clone(),
+            mean_sum: self.sum,
         }
     }
 }
@@ -352,7 +362,12 @@ impl AveDevReplay {
         let denominator = Big::<CALC_LIMBS>::from_small(self.expected);
         let mut denominator = denominator;
         denominator.mul_small(self.expected)?;
-        round_ratio(&self.sum, &denominator, MIN_BINARY_EXPONENT, false)
+        Ok(round_ratio(
+            &self.sum,
+            &denominator,
+            MIN_BINARY_EXPONENT,
+            false,
+        )?)
     }
 }
 
@@ -360,167 +375,6 @@ struct CenteredNumerators {
     second: Big<CALC_LIMBS>,
     third: Option<SignedBig<CALC_LIMBS>>,
     fourth: Option<Big<CALC_LIMBS>>,
-}
-
-#[derive(Clone)]
-struct SignedDyadic<const N: usize> {
-    negative: bool,
-    magnitude: Big<N>,
-}
-
-impl<const N: usize> SignedDyadic<N> {
-    fn zero() -> Self {
-        Self {
-            negative: false,
-            magnitude: Big::zero(),
-        }
-    }
-
-    fn add_power(
-        &mut self,
-        negative: bool,
-        mantissa: u64,
-        exponent: i64,
-        power: usize,
-    ) -> Result<(), MomentError> {
-        if mantissa == 0 {
-            return Ok(());
-        }
-        let mut term = Big::<N>::from_small(1);
-        for _ in 0..power {
-            term.mul_small(mantissa)?;
-        }
-        let shift = exponent
-            .checked_sub(MIN_BINARY_EXPONENT)
-            .and_then(|difference| difference.checked_mul(power as i64))
-            .and_then(|difference| usize::try_from(difference).ok())
-            .ok_or(MomentError::Number)?;
-        let term_negative = power % 2 == 1 && negative;
-
-        if self.magnitude.is_zero() {
-            self.magnitude.assign_shifted(&term, shift)?;
-            self.negative = term_negative;
-            return Ok(());
-        }
-        if self.negative == term_negative {
-            self.magnitude.add_shifted_assign(&term, shift)?;
-            return Ok(());
-        }
-        match cmp_shifted(&self.magnitude, &term, shift) {
-            Ordering::Greater => self.magnitude.sub_shifted_assign(&term, shift)?,
-            Ordering::Equal => {
-                self.magnitude.clear();
-                self.negative = false;
-            },
-            Ordering::Less => {
-                let old = self.magnitude.clone();
-                self.magnitude.assign_shifted(&term, shift)?;
-                self.magnitude.sub_assign(&old);
-                self.negative = term_negative;
-            },
-        }
-        Ok(())
-    }
-}
-
-fn decompose(value: f64) -> Option<(bool, u64, i64)> {
-    if !value.is_finite() {
-        return None;
-    }
-    let bits = value.to_bits();
-    let negative = (bits >> 63) != 0;
-    let exponent_bits = ((bits >> 52) & 0x7ff) as u16;
-    let fraction = bits & ((1_u64 << 52) - 1);
-    let (mantissa, exponent) = if exponent_bits == 0 {
-        if fraction == 0 {
-            return Some((negative, 0, MIN_BINARY_EXPONENT));
-        }
-        (fraction, MIN_BINARY_EXPONENT)
-    } else {
-        (
-            (1_u64 << 52) | fraction,
-            i64::from(exponent_bits) - 1023 - 52,
-        )
-    };
-    Some((negative, mantissa, exponent))
-}
-
-#[derive(Clone)]
-struct SignedBig<const N: usize> {
-    negative: bool,
-    magnitude: Big<N>,
-}
-
-impl<const N: usize> SignedBig<N> {
-    fn zero() -> Self {
-        Self {
-            negative: false,
-            magnitude: Big::zero(),
-        }
-    }
-
-    fn from_unsigned(negative: bool, magnitude: Big<N>) -> Self {
-        Self {
-            negative: negative && !magnitude.is_zero(),
-            magnitude,
-        }
-    }
-
-    fn from_positive(magnitude: &Big<N>) -> Self {
-        Self::from_unsigned(false, magnitude.clone())
-    }
-
-    fn is_zero(&self) -> bool {
-        self.magnitude.is_zero()
-    }
-
-    fn add_unsigned(&mut self, negative: bool, magnitude: &Big<N>) -> Result<(), MomentError> {
-        let incoming = Self::from_unsigned(negative, magnitude.clone());
-        self.add_signed(&incoming)
-    }
-
-    fn sub_unsigned(&mut self, magnitude: &Big<N>) -> Result<(), MomentError> {
-        let incoming = Self::from_unsigned(true, magnitude.clone());
-        self.add_signed(&incoming)
-    }
-
-    fn sub_signed(&mut self, other: &Self) -> Result<(), MomentError> {
-        let incoming = Self::from_unsigned(!other.negative, other.magnitude.clone());
-        self.add_signed(&incoming)
-    }
-
-    fn add_signed(&mut self, other: &Self) -> Result<(), MomentError> {
-        if other.is_zero() {
-            return Ok(());
-        }
-        if self.is_zero() {
-            self.negative = other.negative;
-            self.magnitude = other.magnitude.clone();
-            return Ok(());
-        }
-        if self.negative == other.negative {
-            self.magnitude.add_assign(&other.magnitude)?;
-            return Ok(());
-        }
-        match self.magnitude.cmp(&other.magnitude) {
-            Ordering::Greater => self.magnitude.sub_assign(&other.magnitude),
-            Ordering::Equal => {
-                self.magnitude.clear();
-                self.negative = false;
-            },
-            Ordering::Less => {
-                let mut difference = other.magnitude.clone();
-                difference.sub_assign(&self.magnitude);
-                self.magnitude = difference;
-                self.negative = other.negative;
-            },
-        }
-        Ok(())
-    }
-
-    fn mul_small(&mut self, factor: u64) -> Result<(), MomentError> {
-        self.magnitude.mul_small(factor)
-    }
 }
 
 fn to_calc_signed<const N: usize>(value: &SignedDyadic<N>) -> SignedBig<CALC_LIMBS> {
@@ -532,490 +386,8 @@ fn to_calc_signed<const N: usize>(value: &SignedDyadic<N>) -> SignedBig<CALC_LIM
     SignedBig::from_unsigned(value.negative, magnitude)
 }
 
-#[derive(Clone)]
-struct Big<const N: usize> {
-    limbs: [u64; N],
-    len: usize,
-}
-
-impl<const N: usize> Big<N> {
-    fn zero() -> Self {
-        Self {
-            limbs: [0; N],
-            len: 0,
-        }
-    }
-
-    fn from_small(value: u64) -> Self {
-        if value == 0 {
-            return Self::zero();
-        }
-        let mut result = Self::zero();
-        result.limbs[0] = value;
-        result.len = 1;
-        result
-    }
-
-    fn is_zero(&self) -> bool {
-        self.len == 0
-    }
-
-    fn clear(&mut self) {
-        self.len = 0;
-    }
-
-    fn bit_length(&self) -> usize {
-        self.len
-            .checked_mul(64)
-            .unwrap_or(usize::MAX)
-            .saturating_sub(
-                self.len
-                    .checked_sub(1)
-                    .and_then(|index| self.limbs.get(index))
-                    .map_or(64, |limb| limb.leading_zeros() as usize),
-            )
-    }
-
-    fn bit(&self, index: usize) -> bool {
-        let word = index / 64;
-        word < self.len && ((self.limbs[word] >> (index % 64)) & 1) != 0
-    }
-
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.len != other.len {
-            return self.len.cmp(&other.len);
-        }
-        for index in (0..self.len).rev() {
-            if self.limbs[index] != other.limbs[index] {
-                return self.limbs[index].cmp(&other.limbs[index]);
-            }
-        }
-        Ordering::Equal
-    }
-
-    fn normalize(&mut self) {
-        while self.len != 0 && self.limbs[self.len - 1] == 0 {
-            self.len -= 1;
-        }
-    }
-
-    fn mul_small(&mut self, factor: u64) -> Result<(), MomentError> {
-        if factor == 0 || self.is_zero() {
-            if factor == 0 {
-                self.clear();
-            }
-            return Ok(());
-        }
-        if factor == 1 {
-            return Ok(());
-        }
-        let mut carry = 0_u128;
-        for index in 0..self.len {
-            let product = (self.limbs[index] as u128) * (factor as u128) + carry;
-            self.limbs[index] = product as u64;
-            carry = product >> 64;
-        }
-        if carry != 0 {
-            if self.len == N {
-                return Err(MomentError::Number);
-            }
-            self.limbs[self.len] = carry as u64;
-            self.len += 1;
-        }
-        Ok(())
-    }
-
-    fn add_assign(&mut self, other: &Self) -> Result<(), MomentError> {
-        let length = self.len.max(other.len);
-        if length > N {
-            return Err(MomentError::Number);
-        }
-        let mut carry = 0_u64;
-        for index in 0..length {
-            let first = if index < self.len {
-                self.limbs[index]
-            } else {
-                0
-            };
-            let second = if index < other.len {
-                other.limbs[index]
-            } else {
-                0
-            };
-            let (sum, overflow_first) = first.overflowing_add(second);
-            let (sum, overflow_second) = sum.overflowing_add(carry);
-            self.limbs[index] = sum;
-            carry = u64::from(overflow_first || overflow_second);
-        }
-        self.len = length;
-        if carry != 0 {
-            if self.len == N {
-                return Err(MomentError::Number);
-            }
-            self.limbs[self.len] = carry;
-            self.len += 1;
-        }
-        Ok(())
-    }
-
-    fn sub_assign(&mut self, other: &Self) {
-        debug_assert!(self.cmp(other) != Ordering::Less);
-        let mut borrow = 0_u64;
-        for index in 0..self.len {
-            let first = self.limbs[index];
-            let second = if index < other.len {
-                other.limbs[index]
-            } else {
-                0
-            };
-            let (difference, borrow_first) = first.overflowing_sub(second);
-            let (difference, borrow_second) = difference.overflowing_sub(borrow);
-            self.limbs[index] = difference;
-            borrow = u64::from(borrow_first || borrow_second);
-        }
-        self.normalize();
-    }
-
-    fn assign_shifted(&mut self, other: &Self, bits: usize) -> Result<(), MomentError> {
-        if other.is_zero() {
-            self.clear();
-            return Ok(());
-        }
-        let word_shift = bits / 64;
-        let bit_shift = bits % 64;
-        let extra = usize::from(bit_shift != 0);
-        let new_len = other
-            .len
-            .checked_add(word_shift)
-            .and_then(|length| length.checked_add(extra))
-            .ok_or(MomentError::Number)?;
-        if new_len > N {
-            return Err(MomentError::Number);
-        }
-        for limb in &mut self.limbs[..new_len] {
-            *limb = 0;
-        }
-        if bit_shift == 0 {
-            for index in 0..other.len {
-                self.limbs[index + word_shift] = other.limbs[index];
-            }
-        } else {
-            let mut carry = 0_u64;
-            for index in 0..other.len {
-                let value = other.limbs[index];
-                self.limbs[index + word_shift] = (value << bit_shift) | carry;
-                carry = value >> (64 - bit_shift);
-            }
-            self.limbs[other.len + word_shift] = carry;
-        }
-        self.len = new_len;
-        self.normalize();
-        Ok(())
-    }
-
-    fn add_shifted_assign(&mut self, other: &Self, bits: usize) -> Result<(), MomentError> {
-        if other.is_zero() {
-            return Ok(());
-        }
-        let word_shift = bits / 64;
-        let bit_shift = bits % 64;
-        let mut carry = 0_u64;
-        for index in 0..other.len {
-            let value = other.limbs[index];
-            let chunk = if bit_shift == 0 {
-                value
-            } else {
-                let chunk = (value << bit_shift) | carry;
-                carry = value >> (64 - bit_shift);
-                chunk
-            };
-            self.add_limb_at(index + word_shift, chunk)?;
-        }
-        if bit_shift != 0 && carry != 0 {
-            self.add_limb_at(other.len + word_shift, carry)?;
-        }
-        Ok(())
-    }
-
-    fn sub_shifted_assign(&mut self, other: &Self, bits: usize) -> Result<(), MomentError> {
-        debug_assert!(cmp_shifted(self, other, bits) != Ordering::Less);
-        if other.is_zero() {
-            return Ok(());
-        }
-        let word_shift = bits / 64;
-        let bit_shift = bits % 64;
-        let mut borrow = 0_u64;
-        let mut carry = 0_u64;
-        for index in 0..other.len {
-            let value = other.limbs[index];
-            let chunk = if bit_shift == 0 {
-                value
-            } else {
-                let chunk = (value << bit_shift) | carry;
-                carry = value >> (64 - bit_shift);
-                chunk
-            };
-            self.sub_limb_at(index + word_shift, chunk, &mut borrow);
-        }
-        let mut next = other.len + word_shift;
-        if bit_shift != 0 && carry != 0 {
-            self.sub_limb_at(next, carry, &mut borrow);
-            next += 1;
-        }
-        // The shifted term may end below a nonzero high limb of `self`.  A
-        // borrow from its highest occupied limb must continue through those
-        // limbs; stopping at the term width silently corrupts a wide signed
-        // cancellation in release builds.
-        while borrow != 0 && next < self.len {
-            self.sub_limb_at(next, 0, &mut borrow);
-            next += 1;
-        }
-        if borrow != 0 {
-            return Err(MomentError::Number);
-        }
-        self.normalize();
-        Ok(())
-    }
-
-    fn add_limb_at(&mut self, index: usize, value: u64) -> Result<(), MomentError> {
-        if value == 0 {
-            return Ok(());
-        }
-        if index >= N {
-            return Err(MomentError::Number);
-        }
-        while self.len <= index {
-            self.limbs[self.len] = 0;
-            self.len += 1;
-        }
-        let mut carry = value;
-        let mut position = index;
-        while carry != 0 {
-            if position >= N {
-                return Err(MomentError::Number);
-            }
-            if position >= self.len {
-                self.limbs[position] = 0;
-                self.len = position + 1;
-            }
-            let (sum, overflow) = self.limbs[position].overflowing_add(carry);
-            self.limbs[position] = sum;
-            carry = u64::from(overflow);
-            position += 1;
-        }
-        Ok(())
-    }
-
-    fn sub_limb_at(&mut self, index: usize, value: u64, borrow: &mut u64) {
-        debug_assert!(index < self.len);
-        let (difference, borrow_first) = self.limbs[index].overflowing_sub(value);
-        let (difference, borrow_second) = difference.overflowing_sub(*borrow);
-        self.limbs[index] = difference;
-        *borrow = u64::from(borrow_first || borrow_second);
-    }
-
-    fn shift_left(&mut self, bits: usize) -> Result<(), MomentError> {
-        if bits == 0 || self.is_zero() {
-            return Ok(());
-        }
-        let word_shift = bits / 64;
-        let bit_shift = bits % 64;
-        let old_len = self.len;
-        let extra = usize::from(bit_shift != 0);
-        let new_len = old_len
-            .checked_add(word_shift)
-            .and_then(|length| length.checked_add(extra))
-            .ok_or(MomentError::Number)?;
-        if new_len > N {
-            return Err(MomentError::Number);
-        }
-        if word_shift != 0 {
-            for index in (0..old_len).rev() {
-                self.limbs[index + word_shift] = self.limbs[index];
-            }
-            for index in 0..word_shift {
-                self.limbs[index] = 0;
-            }
-        }
-        if bit_shift != 0 {
-            let mut carry = 0_u64;
-            for index in word_shift..(old_len + word_shift) {
-                let value = self.limbs[index];
-                self.limbs[index] = (value << bit_shift) | carry;
-                carry = value >> (64 - bit_shift);
-            }
-            self.limbs[old_len + word_shift] = carry;
-        }
-        self.len = new_len;
-        self.normalize();
-        Ok(())
-    }
-
-    fn mul(&self, other: &Self) -> Result<Self, MomentError> {
-        if self.is_zero() || other.is_zero() {
-            return Ok(Self::zero());
-        }
-        let mut result = Self::zero();
-        for i in 0..self.len {
-            let mut carry = 0_u128;
-            for j in 0..other.len {
-                let index = i + j;
-                if index >= N {
-                    return Err(MomentError::Number);
-                }
-                let product = (self.limbs[i] as u128) * (other.limbs[j] as u128)
-                    + (result.limbs[index] as u128)
-                    + carry;
-                result.limbs[index] = product as u64;
-                carry = product >> 64;
-            }
-            let mut index = i + other.len;
-            while carry != 0 {
-                if index >= N {
-                    return Err(MomentError::Number);
-                }
-                let (sum, overflow) = result.limbs[index].overflowing_add(carry as u64);
-                result.limbs[index] = sum;
-                carry = (carry >> 64) + u128::from(overflow);
-                index += 1;
-            }
-        }
-        result.len = (self.len + other.len).min(N);
-        result.normalize();
-        Ok(result)
-    }
-
-    fn normalized(&self) -> (f64, i64) {
-        debug_assert!(!self.is_zero());
-        let bits = self.bit_length();
-        let take = bits.min(53);
-        let shift = bits - take;
-        let mut top = 0_u64;
-        for offset in 0..take {
-            if self.bit(shift + offset) {
-                top |= 1_u64 << offset;
-            }
-        }
-        let mantissa = top as f64 / 2_f64.powi((take - 1) as i32);
-        (mantissa, bits as i64 - 1)
-    }
-}
-
 fn multiply<const N: usize>(left: &Big<N>, right: &Big<N>) -> Result<Big<N>, MomentError> {
-    left.mul(right)
-}
-
-fn cmp_shifted<const N: usize>(left: &Big<N>, right: &Big<N>, shift: usize) -> Ordering {
-    let left_bits = left.bit_length();
-    let right_bits = right.bit_length().saturating_add(shift);
-    if left_bits != right_bits {
-        return left_bits.cmp(&right_bits);
-    }
-    for index in (0..left_bits).rev() {
-        let left_bit = left.bit(index);
-        let right_bit = index >= shift && right.bit(index - shift);
-        if left_bit != right_bit {
-            return left_bit.cmp(&right_bit);
-        }
-    }
-    Ordering::Equal
-}
-
-fn round_signed_ratio(
-    numerator: &SignedBig<CALC_LIMBS>,
-    denominator: &Big<CALC_LIMBS>,
-    base: i64,
-) -> Result<f64, MomentError> {
-    if numerator.is_zero() {
-        return Ok(0.0);
-    }
-    round_ratio(&numerator.magnitude, denominator, base, numerator.negative)
-}
-
-fn round_ratio(
-    numerator: &Big<CALC_LIMBS>,
-    denominator: &Big<CALC_LIMBS>,
-    base: i64,
-    negative: bool,
-) -> Result<f64, MomentError> {
-    if numerator.is_zero() {
-        return Ok(0.0);
-    }
-    if denominator.is_zero() {
-        return Err(MomentError::Number);
-    }
-    let mut exponent = numerator.bit_length() as i64 - denominator.bit_length() as i64;
-    if exponent >= 0 {
-        let shift = usize::try_from(exponent).map_err(|_| MomentError::Number)?;
-        if cmp_shifted(numerator, denominator, shift) == Ordering::Less {
-            exponent -= 1;
-        }
-    } else {
-        let shift = usize::try_from(-exponent).map_err(|_| MomentError::Number)?;
-        if cmp_shifted(denominator, numerator, shift) == Ordering::Greater {
-            exponent -= 1;
-        }
-    }
-
-    let mut scaled_numerator = numerator.clone();
-    let mut scaled_denominator = denominator.clone();
-    if exponent >= 0 {
-        scaled_denominator
-            .shift_left(usize::try_from(exponent).map_err(|_| MomentError::Number)?)?;
-    } else {
-        scaled_numerator
-            .shift_left(usize::try_from(-exponent).map_err(|_| MomentError::Number)?)?;
-    }
-    if scaled_numerator.cmp(&scaled_denominator) == Ordering::Less {
-        return Err(MomentError::Number);
-    }
-    scaled_numerator.sub_assign(&scaled_denominator);
-
-    let mut mantissa = 1_u64 << 52;
-    for bit in (0..52).rev() {
-        scaled_numerator.shift_left(1)?;
-        if scaled_numerator.cmp(&scaled_denominator) != Ordering::Less {
-            scaled_numerator.sub_assign(&scaled_denominator);
-            mantissa |= 1_u64 << bit;
-        }
-    }
-    scaled_numerator.shift_left(1)?;
-    let guard = scaled_numerator.cmp(&scaled_denominator) != Ordering::Less;
-    if guard {
-        scaled_numerator.sub_assign(&scaled_denominator);
-    }
-    if guard && (!scaled_numerator.is_zero() || mantissa & 1 != 0) {
-        mantissa += 1;
-        if mantissa == 1_u64 << 53 {
-            mantissa = 1_u64 << 52;
-            exponent += 1;
-        }
-    }
-
-    let unbiased = base.checked_add(exponent).ok_or(MomentError::Number)?;
-    let sign = if negative { 1_u64 << 63 } else { 0 };
-    if unbiased > 1023 {
-        return Err(MomentError::Number);
-    }
-    if unbiased >= -1022 {
-        let exponent_bits = u64::try_from(unbiased + 1023).map_err(|_| MomentError::Number)?;
-        let fraction = mantissa - (1_u64 << 52);
-        return Ok(f64::from_bits(sign | (exponent_bits << 52) | fraction));
-    }
-
-    // A subnormal has units of 2^-1074. Round the 53-bit normalized
-    // significand after moving it down to that quantum.
-    let shift = usize::try_from(-(unbiased + 1022)).map_err(|_| MomentError::Number)?;
-    let mut subnormal = if shift >= 64 { 0 } else { mantissa >> shift };
-    let guard = shift != 0 && shift - 1 < 64 && ((mantissa >> (shift - 1)) & 1) != 0;
-    let sticky = shift > 1 && shift - 1 < 64 && (mantissa & ((1_u64 << (shift - 1)) - 1)) != 0;
-    if guard && (sticky || subnormal & 1 != 0) {
-        subnormal = subnormal.saturating_add(1);
-    }
-    if subnormal >= 1_u64 << 52 {
-        return Ok(f64::from_bits(sign | (1_u64 << 52)));
-    }
-    Ok(f64::from_bits(sign | subnormal))
+    dyadic::multiply(left, right).map_err(Into::into)
 }
 
 /// A normalized binary value retained before final scaling. Sample skew
@@ -1033,24 +405,6 @@ impl NormalizedBinary {
         let magnitude = scale_power_of_two(self.mantissa, self.exponent);
         if self.negative { -magnitude } else { magnitude }
     }
-}
-
-fn normalize_mantissa(value: &mut f64, exponent: &mut i64) -> Result<(), MomentError> {
-    if *value == 0.0 {
-        return Ok(());
-    }
-    if !value.is_finite() || *value < 0.0 {
-        return Err(MomentError::Number);
-    }
-    while *value >= 2.0 {
-        *value *= 0.5;
-        *exponent = exponent.checked_add(1).ok_or(MomentError::Number)?;
-    }
-    while *value < 1.0 {
-        *value *= 2.0;
-        *exponent = exponent.checked_sub(1).ok_or(MomentError::Number)?;
-    }
-    Ok(())
 }
 
 fn standardized_third(
@@ -1080,36 +434,12 @@ fn standardized_third(
     if exponent_twice.rem_euclid(2) != 0 {
         quotient *= 2.0_f64.sqrt();
     }
-    normalize_mantissa(&mut quotient, &mut exponent)?;
+    normalize_dyadic_mantissa(&mut quotient, &mut exponent)?;
     Ok(NormalizedBinary {
         negative: third.negative,
         mantissa: quotient,
         exponent,
     })
-}
-
-fn scale_power_of_two(mut value: f64, mut exponent: i64) -> f64 {
-    while exponent > 1023 {
-        value *= f64::from_bits(0x7fe0_0000_0000_0000);
-        if !value.is_finite() {
-            return value;
-        }
-        exponent -= 1023;
-    }
-    while exponent < -1074 {
-        value *= f64::from_bits(1);
-        if value == 0.0 {
-            return value;
-        }
-        exponent += 1074;
-    }
-    if exponent >= -1022 {
-        value * f64::from_bits(((exponent + 1023) as u64) << 52)
-    } else if exponent >= -1074 {
-        value * f64::from_bits(1_u64 << (exponent + 1074))
-    } else {
-        0.0
-    }
 }
 
 #[cfg(test)]
@@ -1158,6 +488,54 @@ mod tests {
         }
         assert_eq!(moments.finish_devsq().unwrap(), 2.0);
         assert_eq!(moments.finish_skew(false).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn direct_subnormal_rounding_keeps_both_sides_of_half_minimum() {
+        use super::super::super::dyadic::{Big, round_ratio};
+
+        let denominator = Big::<8>::from_small(1_u64 << 56);
+        let above = Big::<8>::from_small((1_u64 << 55) + 1);
+        let tie = Big::<8>::from_small(1_u64 << 55);
+        let below = Big::<8>::from_small((1_u64 << 55) - 1);
+        assert_eq!(
+            round_ratio(&above, &denominator, -1074, false)
+                .unwrap()
+                .to_bits(),
+            1
+        );
+        assert_eq!(
+            round_ratio(&tie, &denominator, -1074, false)
+                .unwrap()
+                .to_bits(),
+            0
+        );
+        assert_eq!(
+            round_ratio(&below, &denominator, -1074, false)
+                .unwrap()
+                .to_bits(),
+            0
+        );
+        assert_eq!(
+            round_ratio(&above, &denominator, -1074, true)
+                .unwrap()
+                .to_bits(),
+            1_u64 << 63 | 1
+        );
+    }
+
+    #[test]
+    fn direct_subnormal_rounding_preserves_low_remainder() {
+        use super::super::super::dyadic::{Big, round_ratio};
+
+        let numerator = Big::<8>::from_small((1_u64 << 54) + 11);
+        let denominator = Big::<8>::from_small(1);
+        assert_eq!(
+            round_ratio(&numerator, &denominator, -1077, false)
+                .unwrap()
+                .to_bits(),
+            0x0008_0000_0000_0001
+        );
     }
 
     #[test]

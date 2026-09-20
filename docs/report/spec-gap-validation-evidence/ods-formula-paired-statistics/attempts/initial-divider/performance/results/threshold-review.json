@@ -1,0 +1,1721 @@
+{
+  "candidate_only_note": "Candidate-only paired rows have no before/after baseline and are reported as absolute measurements.",
+  "capture_disposition": "retained-with-performance-review-triggers",
+  "flag_count": 10,
+  "flags": [
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 3780,
+      "baseline_raw_elapsed_ns": [
+        3770,
+        3680,
+        3800,
+        3780,
+        3940,
+        3750,
+        3810,
+        3740,
+        3751,
+        3820,
+        3770,
+        3750,
+        3870,
+        3860,
+        3860
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 5010,
+      "candidate_raw_elapsed_ns": [
+        4920,
+        5050,
+        4970,
+        4950,
+        5040,
+        4950,
+        4950,
+        5010,
+        5020,
+        5010,
+        5120,
+        5200,
+        4970,
+        5010,
+        4890
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-extreme-inline-avedev",
+      "delta_percent": 32.53968253968254,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "AVEDEV",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 4400,
+      "baseline_raw_elapsed_ns": [
+        4200,
+        4550,
+        4350,
+        4410,
+        4370,
+        4540,
+        4450,
+        4330,
+        4520,
+        4410,
+        4240,
+        4300,
+        4570,
+        4400,
+        4340
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 5650,
+      "candidate_raw_elapsed_ns": [
+        5740,
+        5620,
+        5710,
+        5650,
+        5760,
+        5570,
+        5610,
+        5610,
+        5550,
+        5690,
+        5860,
+        5730,
+        5740,
+        5580,
+        5640
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-avedev.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-extreme-inline-avedev",
+      "delta_percent": 28.40909090909091,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "AVEDEV",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 4110,
+      "baseline_raw_elapsed_ns": [
+        4120,
+        4050,
+        4090,
+        4110,
+        4060,
+        4110,
+        4200,
+        4070,
+        4240,
+        4120,
+        4090,
+        4060,
+        4130,
+        4310,
+        4160
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 6120,
+      "candidate_raw_elapsed_ns": [
+        6030,
+        6060,
+        6120,
+        19700,
+        6140,
+        6400,
+        6120,
+        5980,
+        6040,
+        6080,
+        6251,
+        6050,
+        6090,
+        6200,
+        6130
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-extreme-inline-devsq",
+      "delta_percent": 48.90510948905109,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 4810,
+      "baseline_raw_elapsed_ns": [
+        4810,
+        4850,
+        4960,
+        4840,
+        5050,
+        4770,
+        4670,
+        4790,
+        4910,
+        4690,
+        4770,
+        4680,
+        4820,
+        4780,
+        4810
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 6710,
+      "candidate_raw_elapsed_ns": [
+        6590,
+        6660,
+        6830,
+        6790,
+        6740,
+        6740,
+        6650,
+        6600,
+        6710,
+        6690,
+        6720,
+        6610,
+        6730,
+        6680,
+        6740
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-extreme-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-extreme-inline-devsq",
+      "delta_percent": 39.5010395010395,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 18242,
+      "baseline_raw_elapsed_ns": [
+        70160,
+        78551,
+        69770,
+        75031,
+        73091,
+        83681,
+        75311,
+        74150,
+        72101,
+        72740,
+        70711,
+        72970,
+        77201,
+        71971,
+        70520
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 20050,
+      "candidate_raw_elapsed_ns": [
+        80271,
+        79880,
+        80360,
+        103600,
+        80300,
+        77360,
+        80200,
+        80000,
+        80390,
+        80471,
+        92340,
+        79510,
+        79470,
+        79890,
+        77670
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-reference-devsq",
+      "delta_percent": 9.911193948032015,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 18632,
+      "baseline_raw_elapsed_ns": [
+        70401,
+        72820,
+        74690,
+        74710,
+        74081,
+        74630,
+        75290,
+        75480,
+        75230,
+        71410,
+        74201,
+        74240,
+        75410,
+        73940,
+        74530
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 20375,
+      "candidate_raw_elapsed_ns": [
+        81401,
+        88110,
+        79100,
+        81670,
+        92140,
+        81320,
+        81890,
+        79210,
+        81400,
+        81810,
+        79230,
+        81260,
+        81500,
+        82020,
+        89750
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-reference-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-reference-devsq",
+      "delta_percent": 9.354873336195793,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 3510,
+      "baseline_raw_elapsed_ns": [
+        3510,
+        3510,
+        3630,
+        3380,
+        3520,
+        3610,
+        3510,
+        3400,
+        3430,
+        3480,
+        3500,
+        3430,
+        3530,
+        3600,
+        3490
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 4850,
+      "candidate_raw_elapsed_ns": [
+        4720,
+        4790,
+        4871,
+        4830,
+        4790,
+        4860,
+        4760,
+        4910,
+        4870,
+        4850,
+        5010,
+        4780,
+        4850,
+        4920,
+        4810
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-avedev",
+      "delta_percent": 38.17663817663818,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "AVEDEV",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 4040,
+      "baseline_raw_elapsed_ns": [
+        4010,
+        4050,
+        4030,
+        4070,
+        4000,
+        3861,
+        4230,
+        4040,
+        4021,
+        3870,
+        4190,
+        4100,
+        4120,
+        4110,
+        3970
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 5450,
+      "candidate_raw_elapsed_ns": [
+        5470,
+        5480,
+        5491,
+        5490,
+        5511,
+        5300,
+        5370,
+        5300,
+        5310,
+        5350,
+        5520,
+        5450,
+        5430,
+        5440,
+        5460
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-avedev.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-avedev",
+      "delta_percent": 34.9009900990099,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "AVEDEV",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 3220,
+      "baseline_raw_elapsed_ns": [
+        3190,
+        3230,
+        3170,
+        3120,
+        3230,
+        3200,
+        3130,
+        16630,
+        3220,
+        3190,
+        3360,
+        3210,
+        3370,
+        3310,
+        3310
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 5460,
+      "candidate_raw_elapsed_ns": [
+        5530,
+        5490,
+        5330,
+        5440,
+        5380,
+        5500,
+        5400,
+        5400,
+        5380,
+        5430,
+        5520,
+        5460,
+        5480,
+        5480,
+        5540
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-devsq",
+      "delta_percent": 69.56521739130434,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "First frozen capture review trigger. Work, resolver reads, checksums, allocation counts, requested/released bytes, peak live state, and RSS remain matched for this control. The affected AVEDEV/DEVSQ rows share the dyadic centered-moment implementation; this observation does not establish causal attribution. No rerun or cherry-pick was made.",
+      "baseline_p50_ns_per_repeat": 3800,
+      "baseline_raw_elapsed_ns": [
+        3830,
+        3760,
+        3790,
+        3890,
+        3840,
+        3810,
+        3830,
+        3770,
+        3670,
+        3860,
+        3640,
+        3730,
+        3680,
+        3800,
+        3880
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "candidate_p50_ns_per_repeat": 6020,
+      "candidate_raw_elapsed_ns": [
+        6100,
+        6160,
+        10731,
+        6090,
+        6100,
+        6020,
+        6170,
+        6040,
+        5980,
+        5930,
+        6000,
+        5870,
+        5930,
+        5940,
+        5900
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-devsq",
+      "delta_percent": 58.421052631578945,
+      "disposition": "retained-for-investigation",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    }
+  ],
+  "metrics": [
+    "time_ns_per_repeat",
+    "allocator_calls",
+    "requested_bytes",
+    "released_bytes",
+    "peak_live_bytes",
+    "result_live_budget",
+    "work_per_repeat",
+    "reference_reads",
+    "rss_kib"
+  ],
+  "scope": "first frozen paired-statistics capture; matched controls only",
+  "threshold_percent": 5.0,
+  "uncertainty_note": "The first capture is retained before any shared-helper investigation or follow-up capture; no timing was discarded."
+}
