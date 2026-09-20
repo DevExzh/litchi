@@ -1,9 +1,57 @@
+use std::io::{self, Cursor, Write};
+
 use litchi_docx::Package;
 use litchi_ooxml_common::custom::Value;
 use litchi_opc::OpcPackage;
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
+
+const HEADER_FIXTURE: &[u8] = include_bytes!(
+    "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
+);
+
+fn custom_properties_xml(bytes: &[u8]) -> Vec<u8> {
+    let package = OpcPackage::from_bytes(bytes).expect("open DOCX OPC package");
+    let uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
+    package
+        .get_part(&uri)
+        .expect("real fixture has custom properties")
+        .blob()
+        .to_vec()
+}
+
+fn refused_document_edit(package: &mut Package) {
+    let error = match package.document_mut() {
+        Ok(_) => panic!("the alt-chunk-header fixture must refuse document editing"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("body-final section properties are not the final body child"),
+        "unexpected refusal: {error}"
+    );
+}
+
+struct FailingSink {
+    remaining: usize,
+}
+
+impl Write for FailingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.remaining == 0 {
+            return Err(io::Error::other("injected sink failure"));
+        }
+        let accepted = bytes.len().min(self.remaining);
+        self.remaining -= accepted;
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 #[test]
 fn custom_props_round_trip_and_clear_remove_the_package_graph() {
@@ -109,5 +157,153 @@ fn word_reserved_custom_properties_are_host_scoped_and_transactional() {
             .opc_package()
             .iter_parts()
             .all(|part| part.content_type() != ct::OFC_CUSTOM_PROPERTIES)
+    );
+}
+
+#[test]
+fn clean_real_fixture_preserves_custom_properties_for_stream_and_path_save() {
+    let expected = custom_properties_xml(HEADER_FIXTURE);
+
+    let mut streamed = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for stream save");
+    let mut stream_output = Vec::new();
+    streamed
+        .to_stream(&mut stream_output)
+        .expect("stream clean alt-chunk-header fixture");
+    assert_eq!(custom_properties_xml(&stream_output), expected);
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("clean-alt-chunk-header.docx");
+    let mut saved = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for path save");
+    saved
+        .save(&path)
+        .expect("save clean alt-chunk-header fixture");
+    let path_output = std::fs::read(path).expect("read path-saved fixture");
+    assert_eq!(custom_properties_xml(&path_output), expected);
+}
+
+#[test]
+fn refused_document_edit_preserves_custom_properties_for_stream_and_path_save() {
+    let expected = custom_properties_xml(HEADER_FIXTURE);
+
+    let mut streamed = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for refused stream save");
+    refused_document_edit(&mut streamed);
+    let mut stream_output = Vec::new();
+    streamed
+        .to_stream(&mut stream_output)
+        .expect("stream after refused document edit");
+    assert_eq!(custom_properties_xml(&stream_output), expected);
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("refused-alt-chunk-header.docx");
+    let mut saved = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for refused path save");
+    refused_document_edit(&mut saved);
+    saved
+        .save(&path)
+        .expect("path save after refused document edit");
+    let path_output = std::fs::read(path).expect("read refused path-saved fixture");
+    assert_eq!(custom_properties_xml(&path_output), expected);
+}
+
+#[test]
+fn dirty_custom_properties_survive_a_failed_stream_and_retry() {
+    let mut package = Package::new().expect("new DOCX package");
+    package
+        .custom_props_mut()
+        .insert("RetryMarker", "custom property retry")
+        .expect("valid retry property");
+    let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
+    assert!(package.opc_package().get_part(&custom_uri).is_err());
+
+    assert!(package.to_stream(FailingSink { remaining: 1 }).is_err());
+    assert!(
+        package.opc_package().get_part(&custom_uri).is_err(),
+        "failed publication must roll back the staged custom-properties part"
+    );
+
+    let mut output = Vec::new();
+    package
+        .to_stream(&mut output)
+        .expect("retry custom-property stream after sink failure");
+    let reopened = Package::from_reader(Cursor::new(output)).expect("reopen retried package");
+    assert_eq!(
+        reopened.custom_props().get("retrymarker"),
+        Some(&Value::Text("custom property retry".to_owned()))
+    );
+}
+
+#[test]
+fn raw_opc_custom_property_replacement_remains_byte_exact_after_save() {
+    let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
+    let mut replacement = custom_properties_xml(HEADER_FIXTURE);
+    replacement.push(b'\n');
+
+    let mut package = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for raw replacement");
+    package
+        .edit_opc(|candidate| {
+            candidate
+                .get_part_mut(&custom_uri)?
+                .set_blob(replacement.clone());
+            Ok(())
+        })
+        .expect("replace custom-properties bytes through raw OPC API");
+    assert_eq!(
+        package
+            .opc_package()
+            .get_part(&custom_uri)
+            .expect("replaced custom-properties part")
+            .blob(),
+        replacement.as_slice()
+    );
+
+    let mut output = Vec::new();
+    package
+        .to_stream(&mut output)
+        .expect("save raw OPC custom-properties replacement");
+    assert_eq!(custom_properties_xml(&output), replacement);
+}
+
+#[test]
+fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
+    let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
+    let replacement = br#"<?xml version="1.0"?><op:Properties xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" xmlns:op="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" />
+"#
+    .to_vec();
+
+    let mut package = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+        .expect("open alt-chunk-header fixture for empty replacement");
+    package
+        .edit_opc(|candidate| {
+            candidate
+                .get_part_mut(&custom_uri)?
+                .set_blob(replacement.clone());
+            Ok(())
+        })
+        .expect("replace custom-properties bytes with an empty root");
+    assert!(package.custom_props().is_empty());
+
+    let mut output = Vec::new();
+    package
+        .to_stream(&mut output)
+        .expect("save empty raw OPC custom-properties replacement");
+    assert_eq!(custom_properties_xml(&output), replacement);
+
+    let mut cleared = Package::from_reader(Cursor::new(output)).expect("reopen empty properties");
+    cleared.custom_props_mut().clear();
+    let mut cleared_output = Vec::new();
+    cleared
+        .to_stream(&mut cleared_output)
+        .expect("save explicitly cleared custom properties");
+    let cleared_graph = OpcPackage::from_bytes(&cleared_output).expect("open cleared OPC graph");
+    assert!(cleared_graph.get_part(&custom_uri).is_err());
+    assert!(
+        cleared_graph
+            .rels()
+            .iter()
+            .all(|relationship| relationship.reltype() != rt::CUSTOM_PROPERTIES)
     );
 }

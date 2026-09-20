@@ -1,0 +1,60 @@
+{
+  "status": "pass",
+  "rows": [
+    {
+      "fixture": "successful_fixture",
+      "route": "to_stream",
+      "artifact": "oracle/artifacts/success-to-stream.docx",
+      "sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+      "changed_decoded_members": [
+        "word/_rels/document.xml.rels",
+        "word/document.xml"
+      ],
+      "custom_properties_preserved": true
+    },
+    {
+      "fixture": "successful_fixture",
+      "route": "save",
+      "artifact": "oracle/artifacts/success-save.docx",
+      "sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+      "changed_decoded_members": [
+        "word/_rels/document.xml.rels",
+        "word/document.xml"
+      ],
+      "custom_properties_preserved": true
+    },
+    {
+      "fixture": "refusal_fixture",
+      "route": "to_stream",
+      "artifact": "oracle/artifacts/refusal-after-refused-edit-to-stream.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "changed_decoded_members": [],
+      "custom_properties_preserved": true
+    },
+    {
+      "fixture": "refusal_fixture",
+      "route": "save",
+      "artifact": "oracle/artifacts/refusal-after-refused-edit-save.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "changed_decoded_members": [],
+      "custom_properties_preserved": true
+    },
+    {
+      "fixture": "refusal_fixture",
+      "route": "to_stream",
+      "artifact": "oracle/artifacts/refusal-no-edit-to-stream.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "changed_decoded_members": [],
+      "custom_properties_preserved": true
+    },
+    {
+      "fixture": "refusal_fixture",
+      "route": "save",
+      "artifact": "oracle/artifacts/refusal-no-edit-save.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "changed_decoded_members": [],
+      "custom_properties_preserved": true
+    }
+  ],
+  "scope": "Independent Python ZIP decompression; refused and no-edit routes preserve every decoded member; admitted route changes listed without general preservation claim"
+}

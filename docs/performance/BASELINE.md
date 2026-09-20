@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0710 — DOCX untouched custom-properties preservation
+
+[0710](0710-docx-clean-custom-properties.md) addresses the exact-byte defect
+found in 0709: a normal save canonicalized clean custom XML. The writer gates
+custom-property serialization on existing edit intent, retaining the original
+part for clean and refused-edit saves. This correctness follow-up makes no
+performance claim. Four expected baseline failures become passing regressions;
+all 1,453 DOCX tests and the unchanged strict oracle pass. The four clean/refused
+save outputs match the original archive exactly.
+
 ## 0709 — current DOCX ordinary-save baseline exposes clean custom-property rewrite
 
 [0709](0709-docx-ordinary-save-baseline.md) refreshes the documented DOCX

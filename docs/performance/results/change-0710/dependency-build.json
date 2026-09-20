@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "-p",
+    "litchi-docx",
+    "--locked",
+    "--all-features",
+    "--target-dir",
+    "/home/zhuhe/code/litchi-target-0710",
+    "-j",
+    "2"
+  ],
+  "exit_code": 0,
+  "seconds": 51.215418767998926,
+  "codec_sha256": "d64815bf87ab50a3bee88af9a8296dbda6a693aff1f458a309fd82cac93f0bcb",
+  "scope": "Prepare baseline library dependencies while tests are authored; not a source-bound test result"
+}
