@@ -1,0 +1,1181 @@
+{
+  "schema": "ods-formula-financial-reducer-oracle-v1",
+  "status": "draft independent Decimal corpus; six reducer/sequence functions only",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "normative_source": {
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "part4_member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": "6.12.11-6.12.12, 6.12.21, 6.12.27, 6.12.30, 6.12.52 plus repository profiles"
+  },
+  "coverage": {
+    "covered_functions": [
+      "CUMIPMT",
+      "CUMPRINC",
+      "FVSCHEDULE",
+      "MIRR",
+      "NPV",
+      "XNPV"
+    ],
+    "pending_functions": [
+      "IRR",
+      "RATE",
+      "XIRR"
+    ],
+    "claim": "This corpus covers six reducer/sequence functions only; IRR, RATE, and XIRR remain pending and there is no all-twenty claim."
+  },
+  "precision": {
+    "decimal_digits": 100,
+    "rounding": "ROUND_HALF_EVEN during independent arithmetic",
+    "input_model": "formula literals are converted with IEEE-754 binary64 float() and Decimal.from_float before Decimal arithmetic",
+    "comparison": "per-vector absolute tolerance is zero; finite evaluator outputs use a 1e-12 relative tolerance without a unit-scale floor",
+    "cancellation": "rate-zero NPV/XNPV and MIRR mask sums use exact rational accumulation of the converted binary64 Decimal inputs before Decimal serialization"
+  },
+  "profile": {
+    "integer_conversion": "CUM Start/End/Type truncate toward zero; Type then requires exact 0 or 1",
+    "sequence_order": "NPV and FVSCHEDULE preserve argument/element order; NPV exponents begin at one",
+    "npv_negative_base": "integer exponents use checked signed powers below Rate=-1",
+    "mirr": "Text and Empty are removed, Logical maps to 0/1, retained positions share positive/negative masks and n; the final ratio uses the shared real POWER profile",
+    "xnpv": "Values and Dates pair by row-major slot index; equal counts permit differing rectangular geometry",
+    "typed_errors": "formula Errors are retained after complete scans and precede generated errors"
+  },
+  "vector_count": 41,
+  "vectors": [
+    {
+      "id": "cumipmt.basic",
+      "function": "CUMIPMT",
+      "formula": "=CUMIPMT(0.1;2;100;1;2;0)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "1",
+        "end": "2",
+        "type": "0"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-15.23809523809523895370986711378317591368126522378997638489279081198715557875344262494242321942928612",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "ordered-periods"
+      ],
+      "oracle_basis": "sum of the selected IPMT profile for Start through End"
+    },
+    {
+      "id": "cumipmt.beginning_payment",
+      "function": "CUMIPMT",
+      "formula": "=CUMIPMT(0.1;2;100;1;2;1)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "1",
+        "end": "2",
+        "type": "1"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-4.761904761904762156513157511373364509950402867030336115107209188012844421246557375057576780570713874",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "ordered-periods"
+      ],
+      "oracle_basis": "Type=1 uses zero first-period interest and the due divisor later"
+    },
+    {
+      "id": "cumipmt.integer_type_truncates",
+      "function": "CUMIPMT",
+      "formula": "=CUMIPMT(0.1;2;100;1;1;1.9)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "1",
+        "end": "1",
+        "type": "1.9"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "integer-profile",
+        "truncation"
+      ],
+      "oracle_basis": "declared Integer Type truncates toward zero before exact 0/1 validation"
+    },
+    {
+      "id": "cumipmt.invalid_outer_domain",
+      "function": "CUMIPMT",
+      "formula": "=CUMIPMT(0;2;100;1;1;0)",
+      "inputs": {
+        "rate": "0",
+        "periods": "2",
+        "value": "100",
+        "start": "1",
+        "end": "1",
+        "type": "0"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Rate > 0 outer constraint"
+    },
+    {
+      "id": "cumprinc.basic",
+      "function": "CUMPRINC",
+      "formula": "=CUMPRINC(0.1;2;100;1;1;0)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "1",
+        "end": "1",
+        "type": "0"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "delegated-ppmt"
+      ],
+      "oracle_basis": "sum of the selected PPMT profile"
+    },
+    {
+      "id": "cumprinc.period_equal_nper_num",
+      "function": "CUMPRINC",
+      "formula": "=CUMPRINC(0.1;2;100;2;2;0)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "2",
+        "end": "2",
+        "type": "0"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "period-boundary"
+      ],
+      "oracle_basis": "included PPMT term applies Period < Nper"
+    },
+    {
+      "id": "cumprinc.reversed_empty",
+      "function": "CUMPRINC",
+      "formula": "=CUMPRINC(-1;0;-100;2;1;0)",
+      "inputs": {
+        "rate": "-1",
+        "periods": "0",
+        "value": "-100",
+        "start": "2",
+        "end": "1",
+        "type": "0"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "reversed-empty",
+        "profile-boundary"
+      ],
+      "oracle_basis": "Type passes, then reversed integer interval has an empty zero sum"
+    },
+    {
+      "id": "cumprinc.invalid_type_on_empty",
+      "function": "CUMPRINC",
+      "formula": "=CUMPRINC(0.1;2;100;2;1;2)",
+      "inputs": {
+        "rate": "0.1",
+        "periods": "2",
+        "value": "100",
+        "start": "2",
+        "end": "1",
+        "type": "2"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "reversed-empty",
+        "control-error"
+      ],
+      "oracle_basis": "Type is validated even when the integer interval is empty"
+    },
+    {
+      "id": "fvschedule.basic",
+      "function": "FVSCHEDULE",
+      "formula": "=FVSCHEDULE(100;{0.1|0.2})",
+      "inputs": {
+        "principal": "100",
+        "schedule": [
+          "0.1",
+          "0.2"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "132.0000000000000018873791418627661248831496577935492610291294162717674193219252742892422247678041458",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "ordered-sequence"
+      ],
+      "oracle_basis": "Principal times product of one plus schedule elements in source order"
+    },
+    {
+      "id": "fvschedule.negative_factor",
+      "function": "FVSCHEDULE",
+      "formula": "=FVSCHEDULE(100;{-2})",
+      "inputs": {
+        "principal": "100",
+        "schedule": [
+          "-2"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-factor"
+      ],
+      "oracle_basis": "source has no positivity constraint on schedule entries"
+    },
+    {
+      "id": "fvschedule.zero_factor_continues",
+      "function": "FVSCHEDULE",
+      "formula": "=FVSCHEDULE(100;{-1|0.5})",
+      "inputs": {
+        "principal": "100",
+        "schedule": [
+          "-1",
+          "0.5"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-factor",
+        "complete-scan"
+      ],
+      "oracle_basis": "zero product remains zero while later factors remain admitted"
+    },
+    {
+      "id": "fvschedule.formula_error_retained",
+      "function": "FVSCHEDULE",
+      "formula": "=FVSCHEDULE(100;{0.1|NA()|0.2})",
+      "inputs": {
+        "principal": "100",
+        "schedule": [
+          "0.1",
+          {
+            "kind": "error",
+            "value": "#N/A"
+          },
+          "0.2"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "formula-error",
+        "complete-scan"
+      ],
+      "oracle_basis": "formula Error is retained while the admitted sequence continues"
+    },
+    {
+      "id": "npv.basic",
+      "function": "NPV",
+      "formula": "=NPV(0.1;{-100|110})",
+      "inputs": {
+        "rate": "0.1",
+        "sequences": [
+          [
+            "-100",
+            "110"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "one-based"
+      ],
+      "oracle_basis": "sum(Value[i] / (1 + Rate)^i), with i beginning at one"
+    },
+    {
+      "id": "npv.split_argument_order",
+      "function": "NPV",
+      "formula": "=NPV(0.1;{-100};{110})",
+      "inputs": {
+        "rate": "0.1",
+        "sequences": [
+          [
+            "-100"
+          ],
+          [
+            "110"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "argument-order",
+        "exact"
+      ],
+      "oracle_basis": "separate NumberSequenceList arguments continue one-based exponents"
+    },
+    {
+      "id": "npv.one_based_with_middle_zero",
+      "function": "NPV",
+      "formula": "=NPV(0.1;{-100|0|110})",
+      "inputs": {
+        "rate": "0.1",
+        "sequences": [
+          [
+            "-100",
+            "0",
+            "110"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-8.26446280991735616432146761374808390369805966735761013882193218238297756480795727653389346309572639",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "one-based",
+        "zero-term"
+      ],
+      "oracle_basis": "the zero occupies its source position and the 110 term is exponent three"
+    },
+    {
+      "id": "npv.rate_zero_cancellation",
+      "function": "NPV",
+      "formula": "=NPV(0;{-1e300|1|1e300})",
+      "inputs": {
+        "rate": "0",
+        "sequences": [
+          [
+            "-1e300",
+            "1",
+            "1e300"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "cancellation",
+        "exact-rate-zero",
+        "large-magnitude"
+      ],
+      "oracle_basis": "rate-zero terms sum in source order but exact rational accumulation preserves the unit cancellation residue"
+    },
+    {
+      "id": "npv.negative_base_integer_path",
+      "function": "NPV",
+      "formula": "=NPV(-2;{100|20})",
+      "inputs": {
+        "rate": "-2",
+        "sequences": [
+          [
+            "100",
+            "20"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-80",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-base",
+        "integer-power"
+      ],
+      "oracle_basis": "checked signed integer powers preserve a finite real result below Rate=-1"
+    },
+    {
+      "id": "npv.scaled_underflow_rescue",
+      "function": "NPV",
+      "formula": "=NPV(0.5;{0 repeated 2000 times;1e300})",
+      "inputs": {
+        "rate": "0.5",
+        "sequences": [
+          {
+            "repeat": {
+              "value": "0",
+              "count": 2000
+            },
+            "tail": [
+              "1e300"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0.00000000000000000000000000000000000000000000000000004379158148872769316384027994379803999803475295951235107179923935767640271734061287474325287983943748",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "regression",
+        "underflow-rescue",
+        "compact-sequence"
+      ],
+      "oracle_basis": "the exponent-2001 tail term remains observable with scaled high-precision arithmetic"
+    },
+    {
+      "id": "npv.rate_minus_one_divzero",
+      "function": "NPV",
+      "formula": "=NPV(-1;{100})",
+      "inputs": {
+        "rate": "-1",
+        "sequences": [
+          [
+            "100"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#DIV/0!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "zero-denominator"
+      ],
+      "oracle_basis": "Rate=-1 gives a zero first discount denominator"
+    },
+    {
+      "id": "npv.rate_minus_one_formula_error",
+      "function": "NPV",
+      "formula": "=NPV(-1;{100|NA()})",
+      "inputs": {
+        "rate": "-1",
+        "sequences": [
+          [
+            "100",
+            {
+              "kind": "error",
+              "value": "#N/A"
+            }
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "domain-error",
+        "formula-error",
+        "precedence"
+      ],
+      "oracle_basis": "the later retained formula Error supersedes the earlier generated zero-denominator error"
+    },
+    {
+      "id": "npv.formula_error_retained",
+      "function": "NPV",
+      "formula": "=NPV(0.1;{100|NA()|110})",
+      "inputs": {
+        "rate": "0.1",
+        "sequences": [
+          [
+            "100",
+            {
+              "kind": "error",
+              "value": "#N/A"
+            },
+            "110"
+          ]
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "formula-error",
+        "complete-scan"
+      ],
+      "oracle_basis": "formula Error wins after the complete sequence admission scan"
+    },
+    {
+      "id": "mirr.basic",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|110};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "-100",
+          "110"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "mathml-equation"
+      ],
+      "oracle_basis": "shared-position MathML masks give the corrected result 0.1"
+    },
+    {
+      "id": "mirr.shared_masks",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|110|20};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "-100",
+          "110",
+          "20"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0.187434208703791726038477005792198930693466399187886888244738318693145143804162152057257100116418975",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "shared-mask",
+        "position-sensitive"
+      ],
+      "oracle_basis": "positive and negative masks retain the same admitted positions and n"
+    },
+    {
+      "id": "mirr.negative_ratio_integer_power",
+      "function": "MIRR",
+      "formula": "=MIRR({110|-100};0;-2)",
+      "inputs": {
+        "values": [
+          "110",
+          "-100"
+        ],
+        "investment": "0",
+        "reinvest_rate": "-2"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-2.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-base",
+        "integer-power",
+        "shared-power-profile"
+      ],
+      "oracle_basis": "the final ratio is negative but the retained count is two, so POWER uses its exact integer exponent"
+    },
+    {
+      "id": "mirr.zero_ratio_power",
+      "function": "MIRR",
+      "formula": "=MIRR({110|110|-100};0;-2)",
+      "inputs": {
+        "values": [
+          "110",
+          "110",
+          "-100"
+        ],
+        "investment": "0",
+        "reinvest_rate": "-2"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-base",
+        "power-profile",
+        "shared-mask"
+      ],
+      "oracle_basis": "the signed positive mask cancels to zero and POWER(0;1/(n-1)) remains zero"
+    },
+    {
+      "id": "mirr.negative_ratio_noninteger_num",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|110|0};-2;-2)",
+      "inputs": {
+        "values": [
+          "-100",
+          "110",
+          "0"
+        ],
+        "investment": "-2",
+        "reinvest_rate": "-2"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "negative-base",
+        "noninteger-power",
+        "domain-error"
+      ],
+      "oracle_basis": "a negative final ratio with exponent 1/2 is outside the shared real POWER profile"
+    },
+    {
+      "id": "mirr.text_empty_logical_compact",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|\"ignored\"|EMPTY|TRUE()|110};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "-100",
+          {
+            "kind": "text",
+            "value": "110"
+          },
+          {
+            "kind": "empty"
+          },
+          {
+            "kind": "logical",
+            "value": true
+          },
+          "110"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "number",
+        "value": "0.054039847444108727731181584629527318038494794235039140769636491451089195593268334145698588719816624",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "text-empty",
+        "logical",
+        "shared-mask"
+      ],
+      "oracle_basis": "Text and Empty are removed; Logical TRUE remains as a retained one"
+    },
+    {
+      "id": "mirr.no_positive_num",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|0};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "-100",
+          "0"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "sign"
+      ],
+      "oracle_basis": "at least one retained positive value is required"
+    },
+    {
+      "id": "mirr.no_negative_num",
+      "function": "MIRR",
+      "formula": "=MIRR({0|110};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "0",
+          "110"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "sign"
+      ],
+      "oracle_basis": "at least one retained negative value is required"
+    },
+    {
+      "id": "mirr.formula_error_retained",
+      "function": "MIRR",
+      "formula": "=MIRR({-100|NA()|110};0.1;0.1)",
+      "inputs": {
+        "values": [
+          "-100",
+          {
+            "kind": "error",
+            "value": "#N/A"
+          },
+          "110"
+        ],
+        "investment": "0.1",
+        "reinvest_rate": "0.1"
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "formula-error",
+        "complete-scan"
+      ],
+      "oracle_basis": "formula Error is retained while the Array scan continues"
+    },
+    {
+      "id": "xnpv.basic",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|110};{43831|44196})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "-100",
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "-0.00000000000000050464682937507115219133017060361472936864986148803904458980566915064127131538654019",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "date-weighted"
+      ],
+      "oracle_basis": "sum(Value / (1 + Rate)^((Date - first_date) / 365))"
+    },
+    {
+      "id": "xnpv.nonannual_interval",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|110};{43831|43861})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "-100",
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "43861"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "9.1416579174873467464236770910409686615310872033514841662167899194356519352541640325783695019661792",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "date-weighted",
+        "fractional-exponent"
+      ],
+      "oracle_basis": "30-day date difference uses the days/365 exponent"
+    },
+    {
+      "id": "xnpv.rate_zero_cancellation",
+      "function": "XNPV",
+      "formula": "=XNPV(0;{-1e300|1|1e300};{43831|43831|43831})",
+      "inputs": {
+        "rate": "0",
+        "values": [
+          "-1e300",
+          "1",
+          "1e300"
+        ],
+        "dates": [
+          "43831",
+          "43831",
+          "43831"
+        ]
+      },
+      "expected": {
+        "kind": "number",
+        "value": "1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "cancellation",
+        "exact-rate-zero",
+        "large-magnitude"
+      ],
+      "oracle_basis": "equal dates make every discount factor one; exact rational accumulation preserves the unit cancellation residue"
+    },
+    {
+      "id": "xnpv.equal_count_different_geometry",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|110|20|30};{43831;43832;43833;43834})",
+      "inputs": {
+        "rate": "0.1",
+        "values": {
+          "elements": [
+            "-100",
+            "110",
+            "20",
+            "30"
+          ],
+          "rows": 2,
+          "columns": 2
+        },
+        "dates": {
+          "elements": [
+            "43831",
+            "43832",
+            "43833",
+            "43834"
+          ],
+          "rows": 1,
+          "columns": 4
+        }
+      },
+      "expected": {
+        "kind": "number",
+        "value": "59.93734597222166182097794183257972411123061579143737416721697196785281818235798189058145742991109539",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "shape",
+        "equal-count",
+        "row-major"
+      ],
+      "oracle_basis": "equal flattened element counts are pairable despite differing rectangular geometry"
+    },
+    {
+      "id": "xnpv.rate_minus_one_num",
+      "function": "XNPV",
+      "formula": "=XNPV(-1;{-100|110};{43831|44196})",
+      "inputs": {
+        "rate": "-1",
+        "values": [
+          "-100",
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "XNPV requires Rate > -1"
+    },
+    {
+      "id": "xnpv.rate_minus_one_formula_error",
+      "function": "XNPV",
+      "formula": "=XNPV(-1;{NA()|110};{43831|44196})",
+      "inputs": {
+        "rate": "-1",
+        "values": [
+          {
+            "kind": "error",
+            "value": "#N/A"
+          },
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "domain-error",
+        "formula-error",
+        "precedence"
+      ],
+      "oracle_basis": "the retained Values formula Error supersedes the earlier generated Rate-domain error"
+    },
+    {
+      "id": "xnpv.count_mismatch_value",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|110};{43831})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "-100",
+          "110"
+        ],
+        "dates": [
+          "43831"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "shape-error"
+      ],
+      "oracle_basis": "Values and Dates must have equal element counts"
+    },
+    {
+      "id": "xnpv.non_number_value",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|\"110\"};{43831|44196})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "-100",
+          {
+            "kind": "text",
+            "value": "110"
+          }
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#VALUE!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "value-error",
+        "element-type"
+      ],
+      "oracle_basis": "XNPV does not convert Text elements to cash flows"
+    },
+    {
+      "id": "xnpv_date_before_first_num",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{-100|110};{43831|43830})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "-100",
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "43830"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "date-order"
+      ],
+      "oracle_basis": "every date must be at least the first date"
+    },
+    {
+      "id": "xnpv_sign_num",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{100|110};{43831|44196})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          "100",
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "tags": [
+        "domain-error",
+        "sign"
+      ],
+      "oracle_basis": "first admitted cash flow must be negative and a positive flow must exist"
+    },
+    {
+      "id": "xnpv.formula_error_retained",
+      "function": "XNPV",
+      "formula": "=XNPV(0.1;{NA()|110};{43831|44196})",
+      "inputs": {
+        "rate": "0.1",
+        "values": [
+          {
+            "kind": "error",
+            "value": "#N/A"
+          },
+          "110"
+        ],
+        "dates": [
+          "43831",
+          "44196"
+        ]
+      },
+      "expected": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "tags": [
+        "formula-error",
+        "values-first"
+      ],
+      "oracle_basis": "Values formula Error is retained before the complete Dates scan"
+    }
+  ]
+}
