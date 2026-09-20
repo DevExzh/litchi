@@ -1,0 +1,73 @@
+{
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "freeze_sha256": "461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561",
+  "proofs": [
+    {
+      "id": "adapter.borrowed_text",
+      "requirements": [
+        "fixed-profile borrowed-text parsing, full VALUE numeric-only fallback, including decimal, exponent, percent, currency, valid grouping, and simple and mixed-fraction forms, without date/clock dispatch, and bounded scratch"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs",
+        "root": "repo",
+        "sha256": "1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159"
+      }
+    },
+    {
+      "id": "adapter.scalar_conversion",
+      "requirements": [
+        "scalar conversion, single-cell references, ReferenceList refusal, and zero-read shape gates"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs",
+        "root": "repo",
+        "sha256": "1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159"
+      }
+    },
+    {
+      "id": "adapter.complete_sequences",
+      "requirements": [
+        "complete DateSequence and LogicalSequence consumption for NETWORKDAYS and WORKDAY"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs",
+        "root": "repo",
+        "sha256": "1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159"
+      }
+    },
+    {
+      "id": "adapter.reservations",
+      "requirements": [
+        "bounded parser, sequence, holiday, matrix, and output reservations with explicit drop order"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs",
+        "root": "repo",
+        "sha256": "1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159"
+      }
+    },
+    {
+      "id": "adapter.volatile_cache",
+      "requirements": [
+        "timestamp-backed volatile cache hits require the same explicit timestamp and fences"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value/date_time.rs",
+        "root": "repo",
+        "sha256": "1da16aae011dd8c94fafc39fdf81cc5d9f8019024ab3860bdc00b4d28962e159"
+      }
+    }
+  ],
+  "report": {
+    "path": "contract-resource-review.md",
+    "root": "evidence",
+    "sha256": "0df60bf7a2933924db6449e4e2d5ba1cb850213f26c399cee32258c9bda0b32e"
+  },
+  "review_receipt": {
+    "path": "review-receipt.json",
+    "root": "evidence",
+    "sha256": "af38cc90788e881cc36032c1bd7462f395441e698f02d064d0c7e4e04adbf4e5"
+  },
+  "reviewer": "independent_date_time_resource_review",
+  "schema": "ods-formula-date-time-source-review-v1"
+}

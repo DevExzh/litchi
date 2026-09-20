@@ -1,0 +1,676 @@
+{
+  "accounting_fields": [
+    "alloc_calls",
+    "requested_bytes",
+    "released_bytes",
+    "live_before",
+    "live_after",
+    "peak_live_delta",
+    "work",
+    "memory_retained",
+    "reference_reads",
+    "output_bytes"
+  ],
+  "accounting_sets_unchanged": true,
+  "analysis_sha256": "6c73af987164a71f50757b40f302fb699dbd972b7a71f69a1a2b5f104d77fe88",
+  "differences": [],
+  "disposition": [
+    "Accepted with disclosed threshold flags for this function-support batch; no overall speedup or causal regression claim.",
+    "Latency includes cached expected-value comparisons, complete checksumming and result drop; independent oracle generation is outside timing.",
+    "Baseline precedes candidate; CPU affinity is not pinned and system load is recorded without a rejection threshold.",
+    "Bootstrap intervals are descriptive independent resamples of fifteen child samples, not proof of a causal effect.",
+    "RSS is a process observation; equal allocation counters do not establish a cause for RSS differences.",
+    "Hardware-counter and concurrency scaling improvements are not claimed by this synchronous evaluator capture."
+  ],
+  "matched_groups": 68,
+  "median_flags": [
+    {
+      "absolute_threshold": true,
+      "baseline": 4348.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 288.0,
+          "low": 100.0
+        },
+        "relative_ci95": {
+          "high": 0.0670391061452514,
+          "low": 0.022999080036798528
+        },
+        "replicates": 10000,
+        "seed": 2785088173801286060
+      },
+      "candidate": 4584.0,
+      "difference": 236.0,
+      "group": "array-control-16x16-sin/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05427782888684453,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 11033.8125,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 1262.5,
+          "low": 0.0
+        },
+        "relative_ci95": {
+          "high": 0.10908835616808248,
+          "low": 0.0
+        },
+        "replicates": 10000,
+        "seed": 1117387994688747601
+      },
+      "candidate": 11610.6875,
+      "difference": 576.875,
+      "group": "array-control-4x4-sin/parse-evaluate",
+      "metric": "elapsed_ns_per_repeat",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.052282472626755255,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3812.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 240.0,
+          "low": 132.0
+        },
+        "relative_ci95": {
+          "high": 0.06322444678609063,
+          "low": 0.03455497382198953
+        },
+        "replicates": 10000,
+        "seed": 5946129108216701229
+      },
+      "candidate": 4020.0,
+      "difference": 208.0,
+      "group": "database-control-dstdev/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05456453305351522,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3804.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 244.0,
+          "low": 120.0
+        },
+        "relative_ci95": {
+          "high": 0.06448202959830866,
+          "low": 0.031315240083507306
+        },
+        "replicates": 10000,
+        "seed": 4458958039078371655
+      },
+      "candidate": 3996.0,
+      "difference": 192.0,
+      "group": "database-control-dstdev/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.050473186119873815,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3800.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 268.0,
+          "low": 112.0
+        },
+        "relative_ci95": {
+          "high": 0.07089947089947089,
+          "low": 0.029136316337148804
+        },
+        "replicates": 10000,
+        "seed": 2233329201081209436
+      },
+      "candidate": 4016.0,
+      "difference": 216.0,
+      "group": "database-control-dsum/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.056842105263157895,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3820.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 236.0,
+          "low": 68.0
+        },
+        "relative_ci95": {
+          "high": 0.06184486373165619,
+          "low": 0.017634854771784232
+        },
+        "replicates": 10000,
+        "seed": 7443938635959086310
+      },
+      "candidate": 4012.0,
+      "difference": 192.0,
+      "group": "database-control-dvar/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.050261780104712044,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3848.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 252.0,
+          "low": 28.0
+        },
+        "relative_ci95": {
+          "high": 0.0661764705882353,
+          "low": 0.007268951194184839
+        },
+        "replicates": 10000,
+        "seed": 3549298694189722040
+      },
+      "candidate": 4048.0,
+      "difference": 200.0,
+      "group": "database-control-dvar/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05197505197505198,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3828.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 284.0,
+          "low": 148.0
+        },
+        "relative_ci95": {
+          "high": 0.07553191489361702,
+          "low": 0.038262668045501554
+        },
+        "replicates": 10000,
+        "seed": 700187506497011965
+      },
+      "candidate": 4028.0,
+      "difference": 200.0,
+      "group": "lazy-if-cache-isblank/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.0522466039707419,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3796.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 280.0,
+          "low": 132.0
+        },
+        "relative_ci95": {
+          "high": 0.07383966244725738,
+          "low": 0.03412616339193381
+        },
+        "replicates": 10000,
+        "seed": 5248154835319885815
+      },
+      "candidate": 3988.0,
+      "difference": 192.0,
+      "group": "lazy-if-cache-isblank/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.0505795574288725,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3800.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 268.0,
+          "low": 128.0
+        },
+        "relative_ci95": {
+          "high": 0.07074973600844774,
+          "low": 0.03255340793489318
+        },
+        "replicates": 10000,
+        "seed": 6229829862058901590
+      },
+      "candidate": 4028.0,
+      "difference": 228.0,
+      "group": "lazy-if-cache-isnumber/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.06,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3800.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 260.0,
+          "low": 112.0
+        },
+        "relative_ci95": {
+          "high": 0.06842105263157895,
+          "low": 0.029473684210526315
+        },
+        "replicates": 10000,
+        "seed": 1803125780602050952
+      },
+      "candidate": 4040.0,
+      "difference": 240.0,
+      "group": "lazy-if-cache-isnumber/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.06315789473684211,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3812.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 268.0,
+          "low": 64.0
+        },
+        "relative_ci95": {
+          "high": 0.07052631578947369,
+          "low": 0.016753926701570682
+        },
+        "replicates": 10000,
+        "seed": 6707474001247345352
+      },
+      "candidate": 4024.0,
+      "difference": 212.0,
+      "group": "lazy-if-cache-istext/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.055613850996852045,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3788.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 268.0,
+          "low": 172.0
+        },
+        "relative_ci95": {
+          "high": 0.07097457627118645,
+          "low": 0.04535864978902954
+        },
+        "replicates": 10000,
+        "seed": 7786272060793297714
+      },
+      "candidate": 4000.0,
+      "difference": 212.0,
+      "group": "lazy-if-cache-istext/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.0559662090813094,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3772.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 296.0,
+          "low": 160.0
+        },
+        "relative_ci95": {
+          "high": 0.07991360691144708,
+          "low": 0.04214963119072708
+        },
+        "replicates": 10000,
+        "seed": 8400945205413549666
+      },
+      "candidate": 4000.0,
+      "difference": 228.0,
+      "group": "literal-aggregate-4x1-sum/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.060445387062566275,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3788.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 276.0,
+          "low": 104.0
+        },
+        "relative_ci95": {
+          "high": 0.07286166842661035,
+          "low": 0.027455121436114043
+        },
+        "replicates": 10000,
+        "seed": 9132524141386892852
+      },
+      "candidate": 3996.0,
+      "difference": 208.0,
+      "group": "reference-control-average/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.054910242872228086,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3584.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 232.0,
+          "low": 12.0
+        },
+        "relative_ci95": {
+          "high": 0.06487695749440715,
+          "low": 0.003205128205128205
+        },
+        "replicates": 10000,
+        "seed": 2691859242338687428
+      },
+      "candidate": 3772.0,
+      "difference": 188.0,
+      "group": "representative-percentrank/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.052455357142857144,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3596.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 288.0,
+          "low": 68.0
+        },
+        "relative_ci95": {
+          "high": 0.08071748878923767,
+          "low": 0.018240343347639486
+        },
+        "replicates": 10000,
+        "seed": 8304340264595054549
+      },
+      "candidate": 3804.0,
+      "difference": 208.0,
+      "group": "representative-rank/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05784204671857619,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3596.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 236.0,
+          "low": 0.0
+        },
+        "relative_ci95": {
+          "high": 0.06636670416197975,
+          "low": 0.0
+        },
+        "replicates": 10000,
+        "seed": 3760192008923773279
+      },
+      "candidate": 3784.0,
+      "difference": 188.0,
+      "group": "representative-rank/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05228031145717464,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3556.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 252.0,
+          "low": 0.0
+        },
+        "relative_ci95": {
+          "high": 0.0711864406779661,
+          "low": 0.0
+        },
+        "replicates": 10000,
+        "seed": 5654523061523024030
+      },
+      "candidate": 3744.0,
+      "difference": 188.0,
+      "group": "scalar-control-arithmetic/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.052868391451068614,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3556.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 240.0,
+          "low": -12.0
+        },
+        "relative_ci95": {
+          "high": 0.06756756756756757,
+          "low": -0.0031982942430703624
+        },
+        "replicates": 10000,
+        "seed": 8031620157880584049
+      },
+      "candidate": 3768.0,
+      "difference": 212.0,
+      "group": "scalar-control-var/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05961754780652419,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3576.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 268.0,
+          "low": -36.0
+        },
+        "relative_ci95": {
+          "high": 0.07545045045045046,
+          "low": -0.009656652360515022
+        },
+        "replicates": 10000,
+        "seed": 2757850128656435347
+      },
+      "candidate": 3772.0,
+      "difference": 196.0,
+      "group": "value-date-fraction-value-date/evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05480984340044743,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3596.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 240.0,
+          "low": 96.0
+        },
+        "relative_ci95": {
+          "high": 0.066815144766147,
+          "low": 0.026696329254727477
+        },
+        "replicates": 10000,
+        "seed": 3642496711370881429
+      },
+      "candidate": 3784.0,
+      "difference": 188.0,
+      "group": "value-date-fraction-value-mixed-fraction/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05228031145717464,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    },
+    {
+      "absolute_threshold": true,
+      "baseline": 3580.0,
+      "bootstrap": {
+        "confidence": 0.95,
+        "difference_ci95": {
+          "high": 248.0,
+          "low": -20.0
+        },
+        "relative_ci95": {
+          "high": 0.06935123042505593,
+          "low": -0.005330490405117271
+        },
+        "replicates": 10000,
+        "seed": 1962827462328234220
+      },
+      "candidate": 3764.0,
+      "difference": 184.0,
+      "group": "value-date-fraction-value-time/parse-evaluate",
+      "metric": "rss_kib",
+      "positive_regression": true,
+      "quantile": "median",
+      "relative": 0.05139664804469274,
+      "sample_count": {
+        "baseline": 15,
+        "candidate": 15
+      }
+    }
+  ],
+  "report_sha256": "6a2876f11ea81206ceadab02d886cfa675ebbd9d0e3fc24df290e2b9497bd3fe",
+  "rows": 4620,
+  "status": "verified",
+  "summarizer_sha256": "05058f7464c0414203bceef7e7afd9bdc34324591ef54b242940baf72e9ecb1d"
+}

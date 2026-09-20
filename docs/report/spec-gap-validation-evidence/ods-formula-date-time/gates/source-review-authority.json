@@ -1,0 +1,106 @@
+{
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "freeze_sha256": "461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561",
+  "proofs": [
+    {
+      "id": "authority.resolver_read_only",
+      "requirements": [
+        "no package, workbook, formula-cache, locale, filesystem, or process mutation"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.source_fences",
+      "requirements": [
+        "source-version and final-cancellation fences surround value evaluation and publication"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.streamed_cells",
+      "requirements": [
+        "every inspected reference cell is streamed in descriptor order with work/read/cancellation checks"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.cache_payload",
+      "requirements": [
+        "demand-cache entries retain payload/error, position, projected-shape, source, cancellation, and timestamp identity"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.matrix_context",
+      "requirements": [
+        "matrix broadcasting/intersection and typed scalar-reference refusal"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.typed_precedence",
+      "requirements": [
+        "typed resolver/provider/resource failures supersede retained formula errors and are not caught by IFERROR"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.matrix_publication",
+      "requirements": [
+        "matrix typed failures publish no partial result while formula errors remain result values"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    },
+    {
+      "id": "authority.munit_position",
+      "requirements": [
+        "existing position-sensitive scalar MUNIT criterion cache exclusion remains unchanged"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "root": "repo",
+        "sha256": "e2f9e5511e27e4a165dbeb7b0fba4ea8721231c610773a98f54b846c232c61f3"
+      }
+    }
+  ],
+  "report": {
+    "path": "contract-resource-review.md",
+    "root": "evidence",
+    "sha256": "0df60bf7a2933924db6449e4e2d5ba1cb850213f26c399cee32258c9bda0b32e"
+  },
+  "review_receipt": {
+    "path": "review-receipt.json",
+    "root": "evidence",
+    "sha256": "af38cc90788e881cc36032c1bd7462f395441e698f02d064d0c7e4e04adbf4e5"
+  },
+  "reviewer": "independent_date_time_resource_review",
+  "schema": "ods-formula-date-time-source-review-v1"
+}
