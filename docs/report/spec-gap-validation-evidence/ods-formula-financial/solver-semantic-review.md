@@ -102,3 +102,79 @@ The current blanket `ratio <= 0` refusal incorrectly returns `#NUM!`.
 These findings keep the implementation review at **HOLD** until the solver and
 reducer owners land fixes and add focused regressions. No validation result is
 claimed for the reviewed snapshot.
+
+## Corrected-handoff re-review
+
+The implementation owners supplied a corrected handoff. The reviewed source
+hashes are now:
+
+| Input | SHA-256 |
+| --- | --- |
+| `evaluation/financial/solver.rs` | `3b39b8a270f3b5eb4aef4fd1df9d0f67b981e7078d681b8d340f1ca65dccc98d` |
+| `evaluation/financial/reducers.rs` | `7c0f57f24322dc244dec09763a1f4c057adb63e6e76bc9260ba25e3331127ebe` |
+| `evaluation/financial/kernel.rs` | `142ab9fb8d4b6200ebbe31ba1177354cfba2dc116835e492645aa035014a85d2` |
+| `ods-formula-financial/contract.md` | `fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b` |
+| `ods-formula-financial/numerical-design.md` | `fe91e17caae719784653fce7f74e0bcbd892e2c5749b06abc5bfc4e7d71f8bbe` |
+
+The previous six solver findings are resolved in this handoff:
+
+- `LogSum::finish` retains each bin's `sum` and `correction` separately while
+  rescaling lower bins (lines 152–196). The focused
+  `scaled_sum_preserves_compensation_across_buckets` regression constructs a
+  lower-bucket cancellation and checks that the retained residue remains
+  visible.
+- Equal-distance bracket selection compares the lower-rate endpoint for the
+  active branch (lines 498–505), and `probe_left_first` orders endpoints by
+  distance with the lower-rate equal-distance tie (lines 508–519).
+- `find_bracket` now uses that ordering for endpoint evaluation (lines
+  812–832), rather than unconditionally evaluating the left side first.
+- `IRR` rejects an exact `guess == -1` before branch selection (lines
+  1047–1049).
+- `RATE` rejects a nonintegral `Nper` at the exact boundary, evaluates the
+  guarded boundary, and searches both adjacent integral branches when the
+  boundary is not a root (lines 1104–1139).
+- `signed_ratio` rejects an underflowed zero step, and the solve loop falls
+  back to the bracket midpoint after an unchanged Newton candidate (lines
+  414–425 and 905–932).
+
+The MIRR reducer now follows the selected signed-power profile. It returns
+`-1` for a zero ratio with a positive exponent and admits a negative ratio only
+when `1 / (n - 1)` is an exact integer (reducers lines 483–510). The focused
+`mirr_allows_negative_ratio_for_exact_integral_root` and
+`mirr_zero_ratio_power_returns_minus_one` regressions cover the prior defect,
+including the `-2.1` example from the original finding.
+
+This re-review is **PASS for the six prior solver findings and the MIRR source
+defect**, pending ordinary integration/gate evidence. The exact-boundary RATE
+implementation chooses the positive side first because its nearest
+representable rate is `2^-53` above `-1`, versus `2^-52` below it; this is the
+source's explicit rate-space interpretation of the contract's deterministic
+distance order, with the negative branch reserved for the equal-distance tie.
+If the contract is later interpreted as transformed-coordinate distance across
+the disconnected branches, that profile choice must be made explicit before
+acceptance. The absolute-magnitude `scale()` still combines its positive
+compensation pair before `log_add_exp`; because that state has no signed
+cross-bucket cancellation, I record it as a low-order accuracy note rather
+than a blocker to the signed residual finding.
+
+No Cargo command, production edit, or final performance/gate claim was made in
+this re-review.
+
+## Reducer wrapper-only follow-up
+
+The reducer handoff then removed the obsolete lossy scalar wrappers. The
+current hashes are:
+
+| Input | SHA-256 |
+| --- | --- |
+| `evaluation/financial/solver.rs` | `3b39b8a270f3b5eb4aef4fd1df9d0f67b981e7078d681b8d340f1ca65dccc98d` |
+| `evaluation/financial/reducers.rs` | `ecda9ba493af93ac7fb8f7da24048b3dd6888a52e18ae8b2d45ee3bc8a6c9e27` |
+| `ods-formula-financial/contract.md` | `fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b` |
+| `ods-formula-financial/numerical-design.md` | `fe91e17caae719784653fce7f74e0bcbd892e2c5749b06abc5bfc4e7d71f8bbe` |
+
+The delta is wrapper/API hygiene only: the scalar `npv`, `fvschedule`, and
+`mirr` convenience functions and `test_scalar_result` are test-only, while
+production call sites use the rich `push_rich`/`finish_rich` API. The reducer
+state, signed-power MIRR path, formula-error behavior, and typed accumulator
+boundary are unchanged. This follow-up remains **PASS** for the reviewed
+semantic findings; no new source blocker was found.
