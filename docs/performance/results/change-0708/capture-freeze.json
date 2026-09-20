@@ -1,0 +1,10 @@
+{
+  "time_utc": "2026-09-20T06:37:13.292128+00:00",
+  "sha256": {
+    "plan.json": "1791e8e0af11817e7200bf108aff0382b0aad7a0283ccc4f20b6e94a18c9c218",
+    "capture.py": "a3bb16bfed2ad717be9b9821c8ef72ff3b6c8d082d39da7f0cdd1c364ad929bc",
+    "mechanism-plan.json": "3a7754c4a083289393b764fbc552a72d44b594c918939ce7c087d0a5e130fbd9",
+    "mechanism.py": "d4fae53f027a8db618b178d3ebe9c9279f8bf1546627b00c1530237b6544d089"
+  },
+  "scope": "Frozen before any timing, allocator, profile or RSS child"
+}

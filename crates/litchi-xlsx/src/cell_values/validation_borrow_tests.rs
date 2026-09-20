@@ -157,6 +157,117 @@ fn empty_rebind_foreign_sibling() -> Vec<u8> {
     .into_bytes()
 }
 
+fn modeled_worksheet_forms(sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration) = if prefixed {
+        ("x:", format!(r#"xmlns:x="{}""#, namespace(sml)))
+    } else {
+        ("", format!(r#"xmlns="{}""#, namespace(sml)))
+    };
+    format!(
+        r#"<{prefix}worksheet {declaration}><{prefix}dimension/><{prefix}sheetData><{prefix}row r="1"><{prefix}c r="A1"><{prefix}f>SUM(B1)</{prefix}f><{prefix}v>1</{prefix}v></{prefix}c><{prefix}c r="B1"><{prefix}is><{prefix}t>plain</{prefix}t><{prefix}t/><{prefix}r><{prefix}t>rich</{prefix}t></{prefix}r><{prefix}r/></{prefix}is></{prefix}c><{prefix}c r="C1"/></{prefix}row><{prefix}row r="2"/></{prefix}sheetData></{prefix}worksheet>"#,
+        prefix = prefix,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn modeled_worksheet_empty_payload(sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration) = if prefixed {
+        ("x:", format!(r#"xmlns:x="{}""#, namespace(sml)))
+    } else {
+        ("", format!(r#"xmlns="{}""#, namespace(sml)))
+    };
+    format!(
+        r#"<{prefix}worksheet {declaration}><{prefix}dimension/><{prefix}sheetData><{prefix}row><{prefix}c><{prefix}f/><{prefix}v/><{prefix}is/></{prefix}c></{prefix}row></{prefix}sheetData></{prefix}worksheet>"#,
+        prefix = prefix,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn modeled_worksheet_empty_sheet_data(sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration) = if prefixed {
+        ("x:", format!(r#"xmlns:x="{}""#, namespace(sml)))
+    } else {
+        ("", format!(r#"xmlns="{}""#, namespace(sml)))
+    };
+    format!(
+        r#"<{prefix}worksheet {declaration}><{prefix}dimension></{prefix}dimension><{prefix}sheetData/></{prefix}worksheet>"#,
+        prefix = prefix,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn modeled_workbook_forms(sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration) = if prefixed {
+        ("x:", format!(r#"xmlns:x="{}""#, namespace(sml)))
+    } else {
+        ("", format!(r#"xmlns="{}""#, namespace(sml)))
+    };
+    format!(
+        r#"<{prefix}workbook {declaration}><{prefix}sheets><{prefix}sheet name="First" sheetId="1"></{prefix}sheet><{prefix}sheet name="Second" sheetId="2"/></{prefix}sheets></{prefix}workbook>"#,
+        prefix = prefix,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn modeled_workbook_empty_sheets(sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration) = if prefixed {
+        ("x:", format!(r#"xmlns:x="{}""#, namespace(sml)))
+    } else {
+        ("", format!(r#"xmlns="{}""#, namespace(sml)))
+    };
+    format!(
+        r#"<{prefix}workbook {declaration}><{prefix}sheets/></{prefix}workbook>"#,
+        prefix = prefix,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn empty_modeled_root(owner: XmlOwner, sml: &[u8], prefixed: bool) -> Vec<u8> {
+    let (prefix, declaration, local) = if prefixed {
+        (
+            "x:",
+            format!(r#"xmlns:x="{}""#, namespace(sml)),
+            owner_name(owner),
+        )
+    } else {
+        (
+            "",
+            format!(r#"xmlns="{}""#, namespace(sml)),
+            owner_name(owner),
+        )
+    };
+    format!(
+        r#"<{prefix}{local} {declaration}/>"#,
+        prefix = prefix,
+        local = local,
+        declaration = declaration,
+    )
+    .into_bytes()
+}
+
+fn copied_modeled_names_with_rebinding() -> Vec<u8> {
+    let sml = namespace(TRANSITIONAL_SML);
+    format!(
+        r#"<worksheet xmlns="{sml}" xmlns:f="urn:fixture:foreign:one"><f:opaque><f:worksheet><f:empty/><f:rebound xmlns:f="urn:fixture:foreign:two"><f:v/></f:rebound><f:sheetData><f:row><f:c><f:v>opaque</f:v></f:c></f:row></f:sheetData></f:worksheet></f:opaque><sheetData><row r="1"><c r="A1"><v>real</v></c></row></sheetData></worksheet>"#,
+        sml = sml
+    )
+    .into_bytes()
+}
+
+fn copied_close_mismatch() -> Vec<u8> {
+    let sml = namespace(TRANSITIONAL_SML);
+    format!(
+        r#"<worksheet xmlns="{sml}" xmlns:f="urn:fixture:foreign"><f:opaque><f:child></f:wrong></f:child></f:opaque><sheetData/></worksheet>"#,
+        sml = sml
+    )
+    .into_bytes()
+}
+
 fn mixed_dialect() -> Vec<u8> {
     format!(
         r#"<worksheet xmlns="{transitional}"><sheetData xmlns="{strict}"/></worksheet>"#,
@@ -197,6 +308,157 @@ fn transitional_and_strict_worksheet_and_workbook_inputs_are_accepted() {
             true,
         );
     }
+}
+
+#[test]
+fn every_modeled_name_and_event_form_matches_the_owned_reference() {
+    for (dialect, sml) in [("transitional", TRANSITIONAL_SML), ("strict", STRICT_SML)] {
+        for prefixed in [false, true] {
+            let namespace_form = if prefixed { "prefixed" } else { "default" };
+            let worksheet = modeled_worksheet_forms(sml, prefixed);
+            assert_differential(
+                &format!("{dialect} {namespace_form} modeled worksheet forms"),
+                &worksheet,
+                XmlOwner::Worksheet,
+                true,
+            );
+            for (label, worksheet) in [
+                (
+                    "empty worksheet payload forms",
+                    modeled_worksheet_empty_payload(sml, prefixed),
+                ),
+                (
+                    "empty sheetData and paired dimension forms",
+                    modeled_worksheet_empty_sheet_data(sml, prefixed),
+                ),
+            ] {
+                assert_differential(
+                    &format!("{dialect} {namespace_form} {label}"),
+                    &worksheet,
+                    XmlOwner::Worksheet,
+                    true,
+                );
+            }
+            let workbook = modeled_workbook_forms(sml, prefixed);
+            assert_differential(
+                &format!("{dialect} {namespace_form} modeled workbook forms"),
+                &workbook,
+                XmlOwner::Workbook,
+                true,
+            );
+            let empty_sheets = modeled_workbook_empty_sheets(sml, prefixed);
+            assert_differential(
+                &format!("{dialect} {namespace_form} empty sheets form"),
+                &empty_sheets,
+                XmlOwner::Workbook,
+                true,
+            );
+            for owner in [XmlOwner::Worksheet, XmlOwner::Workbook] {
+                let empty = empty_modeled_root(owner, sml, prefixed);
+                assert_differential(
+                    &format!(
+                        "{dialect} {namespace_form} empty {} root",
+                        owner_name(owner)
+                    ),
+                    &empty,
+                    owner,
+                    true,
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn modeled_names_in_the_wrong_composed_context_keep_exact_refusals() {
+    let sml = namespace(TRANSITIONAL_SML);
+    let cases = [
+        (
+            "v under row",
+            format!(
+                r#"<worksheet xmlns="{sml}"><sheetData><row><v/></row></sheetData></worksheet>"#
+            ),
+            "value-only edits refuse element 'v' in this XML context",
+        ),
+        (
+            "t under c",
+            format!(
+                r#"<worksheet xmlns="{sml}"><sheetData><row><c><t/></c></row></sheetData></worksheet>"#
+            ),
+            "value-only edits refuse element 't' in this XML context",
+        ),
+        (
+            "c under sheetData",
+            format!(r#"<worksheet xmlns="{sml}"><sheetData><c/></sheetData></worksheet>"#),
+            "value-only edits refuse element 'c' in this XML context",
+        ),
+        (
+            "sheet nested under workbook",
+            format!(
+                r#"<workbook xmlns="{sml}"><sheets><sheet><sheet/></sheet></sheets></workbook>"#
+            ),
+            "value-only edits refuse element 'sheet' in this XML context",
+        ),
+    ];
+    for (label, content, expected_error) in cases {
+        let owner = if label.starts_with("sheet") {
+            XmlOwner::Workbook
+        } else {
+            XmlOwner::Worksheet
+        };
+        assert_differential_error(label, content.as_bytes(), owner, expected_error);
+    }
+}
+
+#[test]
+fn copied_subtrees_keep_modeled_looking_names_opaque_across_namespace_rebinding() {
+    let content = copied_modeled_names_with_rebinding();
+    assert_differential(
+        "copied modeled-looking foreign subtree followed by real sheetData",
+        &content,
+        XmlOwner::Worksheet,
+        true,
+    );
+}
+
+#[test]
+fn copied_subtree_close_mismatches_match_without_fixing_the_error_owner() {
+    let content = copied_close_mismatch();
+    assert_differential(
+        "copied subtree close mismatch",
+        &content,
+        XmlOwner::Worksheet,
+        false,
+    );
+}
+
+#[test]
+fn malformed_and_composed_span_errors_keep_first_error_precedence() {
+    let sml = namespace(TRANSITIONAL_SML);
+    // The malformed attribute is encountered before the unknown composed-span
+    // child. The differential assertion intentionally leaves the diagnostic
+    // owner to the reader/reference pair.
+    let malformed_first = format!(
+        r#"<worksheet xmlns="{sml}"><sheetData><row><c broken=1><future/></c></row></sheetData></worksheet>"#
+    );
+    assert_differential(
+        "malformed XML before composed-span refusal",
+        malformed_first.as_bytes(),
+        XmlOwner::Worksheet,
+        false,
+    );
+
+    // The composed-span refusal is observed before the malformed trailing
+    // markup, so its established complete error string must win.
+    let invalid_first = format!(
+        r#"<worksheet xmlns="{sml}"><sheetData><row><c><future/></c></row></sheetData></worksheet><"#
+    );
+    assert_differential_error(
+        "composed-span refusal before malformed XML",
+        invalid_first.as_bytes(),
+        XmlOwner::Worksheet,
+        "value-only edits refuse dependency-bearing or unknown element 'future'",
+    );
 }
 
 #[test]

@@ -274,6 +274,53 @@ fn assert_rejected_with_retry(sheet: &[u8], expected: &str) {
     }
 }
 
+fn copied_modeled_names_with_rebinding() -> Vec<u8> {
+    format!(
+        r#"<worksheet xmlns="{SML}" xmlns:f="urn:fixture:foreign:one"><f:opaque><f:worksheet><f:empty/><f:rebound xmlns:f="urn:fixture:foreign:two"><f:v/></f:rebound><f:sheetData><f:row><f:c><f:v>opaque</f:v></f:c></f:row></f:sheetData></f:worksheet></f:opaque><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes()
+}
+
+fn copied_close_mismatch() -> Vec<u8> {
+    format!(
+        r#"<worksheet xmlns="{SML}" xmlns:f="urn:fixture:foreign"><f:opaque><f:child></f:wrong></f:child></f:opaque><sheetData/></worksheet>"#
+    )
+    .into_bytes()
+}
+
+fn invalid_composed_span_after_valid_prefix() -> Vec<u8> {
+    format!(
+        r#"<worksheet xmlns="{SML}"><sheetData><row><c><future/></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes()
+}
+
+fn malformed_before_composed_span_refusal() -> Vec<u8> {
+    format!(
+        r#"<worksheet xmlns="{SML}"><sheetData><row><c broken=1><future/></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes()
+}
+
+fn composed_span_refusal_before_malformed_tail() -> Vec<u8> {
+    format!(
+        r#"<worksheet xmlns="{SML}"><sheetData><row><c><future/></c></row></sheetData></worksheet><"#
+    )
+    .into_bytes()
+}
+
+fn assert_shared_fallback_is_transparent(name: &str, content: &[u8]) {
+    assert!(
+        crate::raw::worksheet::source_stream_admission(content).is_some(),
+        "{name}: fixture must reach the shared source admission gate"
+    );
+    assert!(
+        !shared_source_completes(content),
+        "{name}: refusal should force authoritative fallback"
+    );
+    assert_admission_is_transparent(name, content);
+}
+
 #[test]
 fn source_size_cap_falls_back_without_refusing_valid_or_late_failures() {
     assert_valid_noop(&worksheet_over_byte_cap(VALID_TAIL));
@@ -480,6 +527,32 @@ fn eligible_small_source_uses_successful_value_edit_control() {
     assert_eq!(source.as_slice(), bytes.as_slice());
 }
 
+#[test]
+fn copied_modeled_names_and_namespace_rebinding_match_authoritative_fallback() {
+    let content = copied_modeled_names_with_rebinding();
+    assert!(authoritative(&content).is_ok());
+    assert!(admitted(&content).is_ok());
+    assert_admission_is_transparent("copied modeled names with rebinding", &content);
+    assert_valid_noop(&content);
+}
+
+#[test]
+fn shared_fallback_preserves_reader_and_validator_first_error_order() {
+    assert_shared_fallback_is_transparent("copied close mismatch", &copied_close_mismatch());
+    assert_shared_fallback_is_transparent(
+        "malformed XML before composed-span refusal",
+        &malformed_before_composed_span_refusal(),
+    );
+    assert_shared_fallback_is_transparent(
+        "composed-span refusal before malformed XML",
+        &composed_span_refusal_before_malformed_tail(),
+    );
+    assert_shared_fallback_is_transparent(
+        "invalid composed-span element",
+        &invalid_composed_span_after_valid_prefix(),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Markup-compatibility admission (change 0603)
 // ---------------------------------------------------------------------------
@@ -650,9 +723,7 @@ fn ignorable_directive_proof_is_narrow_and_transparent() {
         &format!(
             " xmlns:mc=\"{MCE}\" xmlns:future=\"urn:litchi:future\" xmlns:other=\"urn:litchi:other\" mc:Ignorable=\"future\""
         ),
-        &format!(
-            "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>"
-        ),
+        "<sheetData future:flag=\"ignored\" other:flag=\"retained\"><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
     );
     assert_eq!(
         crate::raw::worksheet::source_stream_admission(&valid),

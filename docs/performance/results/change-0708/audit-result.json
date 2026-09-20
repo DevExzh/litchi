@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "log_sha256": "50dafc58488829a4bf59e0f5542b4c9db79b6785970b8bda2e166f53854195f3",
+  "audit_sha256": "f9f20f95f4b06828b2db64eddceb40da1875a591d7c308fa7667bc2f027bad6f",
+  "scope": "Post-cleanup final source, quality, six evidence gates, report bindings and byte-identical analysis replay"
+}

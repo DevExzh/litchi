@@ -1,0 +1,84 @@
+{
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "Separate planning, staging, commit core, aggregate commit, publication regions; peaks never summed"
+  },
+  "gates": {
+    "total_p50_reduction_percent": 2.0,
+    "total_mean_reduction_percent": 2.0,
+    "plan_p50_reduction_percent": 5.0,
+    "allocation_calls_reduction_percent": 20.0,
+    "plan_ir_reduction_percent": 3.0,
+    "require_every_shape_repeat": true
+  },
+  "revision": "553227504ed384cf6724c81913930823a85ffa09",
+  "created_utc": "2026-09-20T06:20:09.838429+00:00",
+  "cpu": 12,
+  "hypothesis": "Retain private static modeled element names and own unknown names; borrow Empty local names, eliminating avoidable Validator name copies without changing validation.",
+  "order": [
+    "baseline-noise-1",
+    "baseline-noise-2",
+    "baseline-A1",
+    "candidate-B1",
+    "candidate-B2",
+    "baseline-A2"
+  ],
+  "scope": "Matched current-source XLSX planning experiment; no semantic validation removed or reordered",
+  "candidate_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "admission": "Every primary paired row requires total p50/mean >=2% and plan p50 >=5% reduction; every allocator shape/repeat requires planning allocation calls >=20% reduction. If native pilot passes, require planning Ir >=3% improvement, RSS and memory review, focused and broad quality/consumer gates. Flag all >5% regressions/repeat drift; no benefit claim if gates fail.",
+  "producer": "xlsx_producer_medium_source_one_edit_save"
+}

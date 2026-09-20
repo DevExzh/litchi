@@ -1,0 +1,9 @@
+{
+  "time_utc": "2026-09-20T06:53:23.261904+00:00",
+  "reason": "All-target Clippy found pre-existing useless format! in the owned shared traversal test file; replace it with the identical string literal.",
+  "interrupted_owned_gate_pids": [
+    1610680,
+    1610599
+  ],
+  "source_change_reason": "Retained test-only lint correction; production remains restored; no measurement source or binary is modified retroactively"
+}

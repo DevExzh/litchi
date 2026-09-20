@@ -1,0 +1,16 @@
+{
+  "retained": false,
+  "decision": "reject",
+  "native_primary_rows_failed": 8,
+  "native_primary_rows_total": 8,
+  "allocation_gate_passed": true,
+  "production_restored": true,
+  "retained_tests": [
+    "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs"
+  ],
+  "restored_utc": "2026-09-20T06:50:30.029992+00:00",
+  "conditional_profiles_rss": "not run: native pilot failed",
+  "candidate_full_quality": "not run: native pilot failed",
+  "pilot_analysis_sha256": "5741af73edce86bffed7bf6aee986cd4221c6f6b4daf957ccc65f0193e62d7ab"
+}

@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0708 — validator name storage reduces allocations but fails native admission
+
+[0708](0708-xlsx-validator-name-storage.md) tests the validator's private
+static/owned element-name stack after 0707 attribution. Planning allocation
+calls fall 27.477–27.746% on the two primary shapes, while the measured
+planning peak above region start grows by 64 bytes per shape and the logical
+stack slot costs 8 additional bytes per active depth entry. The native pilot
+fails all eight joint primary rows: total p50 reductions reach only 0.452–2.147%
+and planning p50 reductions −0.262–1.406%, below the 2% / 2% / 5% gates.
+Production is restored and seven guard tests remain. Conditional Callgrind and
+RSS are deferred; the allocation reduction is diagnostic and supplies no
+retained speedup claim. [Packet](results/change-0708/README.md).
+
 ## 0707 — XLSX planning name storage is the next attribution boundary
 
 [0707](0707-xlsx-planning-attribution.md) refreshes the unchanged

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.05141324899159372,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0708-xlsx-validator-name-storage.md": "7b6c6798ee9629a9bd63911487588fd5f88cf2dcef65f10868084405b73b7369",
+    "docs/performance/BASELINE.md": "c736c76f940437ea88f5db4d2a37539ddedd01d79470ae34ba84b964d23d5d53",
+    "docs/performance/HOTSPOTS.md": "ca64df256a9a2367921bd37c54c6c35eddd1a12082b064bb42cff5baa3ccb933",
+    "docs/performance/GOAL_AUDIT.md": "96aeb2cd4ae0d50637e6181c6da16ff348d653aa9c4e13833a614be71ccdd2cd",
+    "docs/performance/results/change-0708/README.md": "acfe3e6d440ca4d2159be81bb5782239db90a6ce0c2edca3e62b38be69f37b51"
+  }
+}

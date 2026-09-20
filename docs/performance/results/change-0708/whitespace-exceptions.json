@@ -1,0 +1,82 @@
+{
+  "scope": "Preserved raw logs and patches; authored tracked diff passes git diff --check",
+  "files": [
+    {
+      "path": "baseline-focused-facts.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "baseline-focused-planning-errors.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "baseline-focused-validation.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "candidate-focused-facts.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "candidate-focused-planning-errors.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "candidate-focused-validation.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "candidate-production.patch",
+      "trailing_whitespace_lines": [
+        17
+      ],
+      "blank_line_at_eof": false
+    },
+    {
+      "path": "candidate-tests.patch",
+      "trailing_whitespace_lines": [
+        8,
+        62,
+        99,
+        217
+      ],
+      "blank_line_at_eof": false
+    },
+    {
+      "path": "quality-preflight/restored-focused-facts.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "quality-preflight/restored-focused-planning-errors.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "quality-preflight/restored-focused-validation.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "restored-focused-facts.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "restored-focused-planning-errors.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    },
+    {
+      "path": "restored-focused-validation.log",
+      "trailing_whitespace_lines": [],
+      "blank_line_at_eof": true
+    }
+  ]
+}

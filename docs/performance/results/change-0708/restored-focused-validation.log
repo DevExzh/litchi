@@ -1,0 +1,38 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.73s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0708/debug/deps/litchi_xlsx-33e2e7d76bc7978d)
+
+running 30 tests
+test cell_values::validation::borrow_tests::document_type_declarations_are_refused_with_exact_errors ... ok
+test cell_values::validation::borrow_tests::malformed_and_composed_span_errors_keep_first_error_precedence ... ok
+test cell_values::validation::borrow_tests::aliases_and_default_namespace_scopes_are_resolved_identically ... ok
+test cell_values::validation::borrow_tests::copied_subtree_close_mismatches_match_without_fixing_the_error_owner ... ok
+test cell_values::validation::borrow_tests::malformed_and_truncated_inputs_keep_parser_errors_identical ... ok
+test cell_values::validation::borrow_tests::workbook_invalid_inputs_are_checked_against_the_same_owned_loop ... ok
+test cell_values::validation::borrow_tests::modeled_names_in_the_wrong_composed_context_keep_exact_refusals ... ok
+test cell_values::validation::borrow_tests::copied_subtrees_keep_modeled_looking_names_opaque_across_namespace_rebinding ... ok
+test cell_values::validation::borrow_tests::text_cdata_and_general_references_are_checked_in_context ... ok
+test cell_values::validation::borrow_tests::namespace_failures_have_the_frozen_exact_errors ... ok
+test cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags ... ok
+test cell_values::validation::borrow_tests::mismatched_and_unbalanced_closing_tags_have_exact_errors ... ok
+test cell_values::validation::borrow_tests::transitional_and_strict_worksheet_and_workbook_inputs_are_accepted ... ok
+test cell_values::validation::borrow_tests::malformed_and_duplicate_attributes_match_parser_errors ... ok
+test cell_values::validation::borrow_tests::every_modeled_name_and_event_form_matches_the_owned_reference ... ok
+test cell_values::validation::shared_traversal_tests::shared_fallback_preserves_reader_and_validator_first_error_order ... ok
+test cell_values::validation::shared_traversal_tests::copied_modeled_names_and_namespace_rebinding_match_authoritative_fallback ... ok
+test cell_values::validation::shared_traversal_tests::eligible_small_source_uses_successful_value_edit_control ... ok
+test cell_values::validation::shared_traversal_tests::declaration_only_markers_reach_the_shared_traversal ... ok
+test cell_values::validation::shared_traversal_tests::ignorable_directive_proof_is_narrow_and_transparent ... ok
+test cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission ... ok
+test cell_values::validation::borrow_tests::every_truncation_of_namespace_rich_valid_fixture_is_differentially_checked ... ok
+test cell_values::validation::shared_traversal_tests::event_bound_admits_main_numeric_grids ... ok
+test cell_values::validation::shared_traversal_tests::rewrite_declaration_budget_is_per_start_tag ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_false_positive_still_uses_authoritative_fallback ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_matches_direct_ns_reader_edge_oracle ... ok
+test cell_values::validation::shared_traversal_tests::provisional_event_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::marker_admission_matches_the_authoritative_path_on_every_real_worksheet ... ok
+test cell_values::validation::shared_traversal_tests::source_size_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::exact_text_cap_and_chunk_boundaries ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1017 filtered out; finished in 4.74s
+

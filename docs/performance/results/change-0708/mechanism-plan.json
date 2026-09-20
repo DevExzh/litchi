@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-20T06:34:00+00:00",
+  "revision": "553227504ed384cf6724c81913930823a85ffa09",
+  "cpu": 12,
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "profile": {
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+    "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+    "nested_targets": [
+      "litchi_xlsx::cell_values::validation::Validator::observe",
+      "litchi_xlsx::cell_values::validation::validate_element"
+    ],
+    "numbered_parts": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "expected_lifecycle_calls": 3,
+    "expected_measured_calls": 1,
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+      "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+      "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+    ],
+    "selection": "Retain every numbered raw dump and the Program termination dump. Select the one measured dump and three lifecycle dumps by the positive raw incoming edge into edit_sheets, using the measured or lifecycle parent respectively. Dump numbering is evidence only.",
+    "scope": "Guest-instruction attribution for the outer source-backed edit_sheets planning operation. It includes selector/catalog/closure construction and selected worksheet loading; staging, commit, publication, and reopen are outside this owner.",
+    "claim": "Callgrind Ir is a mechanism diagnostic. It is not a latency, allocation, hardware-cycle, or production-change claim."
+  },
+  "rss": {
+    "repeats": 2,
+    "samples": 3,
+    "warmup": 2,
+    "launcher": "/usr/bin/time",
+    "launcher_options": [
+      "-v"
+    ],
+    "scope": "Whole child process maximum resident set size, including benchmark setup and oracle work. The measurement is not an operation-level peak claim.",
+    "review_threshold_percent": 5.0,
+    "claim": "RSS is a process-level review signal only; it is not attributed to edit_sheets or any individual operation."
+  },
+  "native_reference": {
+    "source": "0708 ABBA native outputs from the primary native capture",
+    "phase_by_stage": {
+      "baseline": "baseline-A1",
+      "candidate": "candidate-B1"
+    },
+    "result_pattern": "native-{phase}-r{repeat}-{shape}.json",
+    "receipt_pattern": "native-{phase}-r{repeat}-{shape}.receipt.json",
+    "parity": "For each matching stage/repeat/shape, profile and RSS reports must preserve the native reference case, corpus, source identity, sink identity, and output identity. Timing and per-sample fields are excluded from this identity comparison."
+  },
+  "custody": {
+    "build_records": "build-{stage}.json",
+    "source_manifests": "source-{stage}.json",
+    "constraints": "constraints.json",
+    "main_plan": "plan.json",
+    "mechanism_plan": "mechanism-plan.json",
+    "capture_script": "mechanism.py",
+    "analyzer_script": "analyze_mechanism.py",
+    "source_policy": "Candidate children require the candidate manifest exactly. A baseline frozen binary may run while the checkout is already at the candidate source; in that case the current census must equal either the retained baseline manifest or source-candidate.json, and every delta must stay under candidate_roots.",
+    "binary_policy": "Each child binds to the build-record binary hash. After owned binary cleanup, the same hash and byte count must be replayable from cleanup.json; custody mode is excluded from normalized identity."
+  },
+  "gates": {
+    "conditional": "Run only after the 0708 native pilot has passed its primary gates.",
+    "planning_ir_reduction_percent": 3.0,
+    "require_planning_ir_reduction_every_shape_repeat": true,
+    "rss_review_threshold_percent": 5.0,
+    "allocation_call_interpretation": "disabled: the 0707 Callgrind allocation-call discrepancy remains unresolved; this packet retains no allocation-call comparison or claim.",
+    "native_parity_required": true,
+    "brk_segment_overflow": "Record any explicit brk-segment overflow text in child logs or GNU time output; do not turn it into a numerical allocation or call-count claim.",
+    "no_benefit_claim_on_failure": true
+  },
+  "order": [
+    "profile-baseline",
+    "profile-candidate",
+    "rss-baseline",
+    "rss-candidate"
+  ],
+  "execution_policy": "This packet supplies refusal-safe, one-phase-at-a-time commands. The coordinator owns all native, Valgrind, and RSS executions; this planning agent performs none.",
+  "finalized_utc": "2026-09-20T06:37:13.291972+00:00"
+}

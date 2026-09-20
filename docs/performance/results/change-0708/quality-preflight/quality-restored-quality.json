@@ -1,0 +1,64 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 18.353850199026056,
+    "log": "restored-quality-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_manifest": "quality-restored-quality.source.json",
+    "source_manifest_sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+  },
+  {
+    "name": "xlsx-check",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "litchi-xlsx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0708",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 27.03515405091457,
+    "log": "restored-quality-xlsx-check.log",
+    "log_sha256": "09fc9ef6e00e237865951cec5652e7d6ac4c7b52e8bde8029afc0cbfa31e60fa",
+    "source_manifest": "quality-restored-quality.source.json",
+    "source_manifest_sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+  },
+  {
+    "name": "xlsx-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-xlsx",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0708",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "seconds": 25.251731824013405,
+    "log": "restored-quality-xlsx-clippy.log",
+    "log_sha256": "70f81b1cf29bd94194b5aaa3b61208aa97edfe480b519e5a8bb8baab1d159dbf",
+    "source_manifest": "quality-restored-quality.source.json",
+    "source_manifest_sha256": "d1fcffd882347539a0750ad7efd3230e51f9cf32c500d50b176286288eb25352"
+  }
+]

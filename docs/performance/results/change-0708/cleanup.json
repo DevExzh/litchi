@@ -1,0 +1,37 @@
+{
+  "utc": "2026-09-20T07:01:12.153325+00:00",
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0708-bin/baseline-alloc",
+      "sha256": "10fc678a1491492331bfded1b9e24757c0b766b76f24e6ebfb105d530a7a6428",
+      "bytes": 62980896
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0708-bin/baseline-native",
+      "sha256": "19b4723c6f08089b38783350baef6b4a55e44a6a00d95a39e87073acdacc38ca",
+      "bytes": 63339376
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0708-bin/candidate-alloc",
+      "sha256": "683ef9bcdb75666c0cf85170b429199aef6d0f18bb6c18303a305daf52302891",
+      "bytes": 62985008
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0708-bin/candidate-native",
+      "sha256": "0b711c97515aa05b8e8274eda575b6bf4765c53194e9410217711512f681f0db",
+      "bytes": 63343480
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0708-bin/layout-probe",
+      "sha256": "2a911d37059b41aeba49ca48224bbc10f4b8a024693964e2fe14b7a695b77116",
+      "bytes": 4337296
+    }
+  ],
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-0708-candidate",
+    "/home/zhuhe/code/litchi-0708-bin",
+    "/home/zhuhe/code/litchi-target-0708"
+  ],
+  "worktree_status_before": " M crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs\n M crates/litchi-xlsx/src/cell_values/validation.rs\n M crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs\n",
+  "owned_paths_absent": true
+}

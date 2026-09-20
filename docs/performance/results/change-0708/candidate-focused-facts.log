@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0708/debug/deps/litchi_xlsx-33e2e7d76bc7978d)
+
+running 5 tests
+test cell_values::facts_oracle_tests::change_0622_retained_records_stay_compact ... ok
+test cell_values::facts_oracle_tests::change_0622_declined_shapes_keep_the_scan_and_its_answers ... ok
+test cell_values::facts_oracle_tests::change_0622_admitted_shapes_take_the_fact_route_and_match_the_scan ... ok
+test cell_values::facts_oracle_tests::change_0622_dense_grid_matches_the_scan_on_every_cell ... ok
+test cell_values::facts_oracle_tests::change_0622_oracle_over_test_data_worksheets ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1042 filtered out; finished in 35.40s
+
