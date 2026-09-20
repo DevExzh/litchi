@@ -351,6 +351,48 @@ fn exact_arity_and_domain_errors_cover_every_date_time_name() {
 }
 
 #[test]
+fn formula_errors_propagate_through_each_argument_taking_date_function() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-argument-errors");
+    for source in [
+        "=DATE(NA();1;1)",
+        "=DATEDIF(NA();1;\"Y\")",
+        "=DATEVALUE(NA())",
+        "=DAY(NA())",
+        "=DAYS(NA();1)",
+        "=DAYS360(NA();1)",
+        "=EASTERSUNDAY(NA())",
+        "=EDATE(NA();1)",
+        "=EOMONTH(NA();1)",
+        "=HOUR(NA())",
+        "=ISOWEEKNUM(NA())",
+        "=MINUTE(NA())",
+        "=MONTH(NA())",
+        "=NETWORKDAYS(NA();1)",
+        "=SECOND(NA())",
+        "=TIME(NA();1;1)",
+        "=TIMEVALUE(NA())",
+        "=WEEKDAY(NA())",
+        "=WEEKNUM(NA())",
+        "=WORKDAY(NA();1)",
+        "=YEAR(NA())",
+        "=YEARFRAC(NA();1)",
+    ] {
+        assert_error(
+            observe_scalar(source, &execution).expect("scalar formula error remains a value"),
+            ScalarError::NotAvailable,
+            source,
+        );
+        assert_error(
+            observe_value(source, &resolver, &execution, Mode::Scalar)
+                .expect("value formula error remains a value"),
+            ScalarError::NotAvailable,
+            source,
+        );
+    }
+}
+
+#[test]
 fn every_function_rejects_arguments_outside_its_declared_arity() {
     let resolver = DateResolver::standard();
     let (_budget, _cancellation, execution) = execution("ods-formula-date-time-arity-bounds");
@@ -434,6 +476,28 @@ fn required_missing_and_optional_empty_slots_keep_distinct_profiles() {
 }
 
 #[test]
+fn datedif_formats_trim_case_and_apply_signed_month_remainders() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-datedif-profile");
+    for (source, expected) in [
+        ("=DATEDIF(43524;43890;\" y \")", 1.0),
+        ("=DATEDIF(43831;43890;\"m\")", 1.0),
+        ("=DATEDIF(43831;43890;\" D \")", 59.0),
+        ("=DATEDIF(43831;43890;\"md\")", 28.0),
+        ("=DATEDIF(43861;43889;\"YM\")", 0.0),
+        ("=DATEDIF(43861;44197;\"YM\")", 11.0),
+    ] {
+        assert_differential(source, expected, &resolver, &execution);
+    }
+    let source = "=DATEDIF(43831;43890;\" \" )";
+    assert_error(
+        observe_scalar(source, &execution).expect("empty format is a formula value"),
+        ScalarError::Value,
+        source,
+    );
+}
+
+#[test]
 fn time_parameters_accept_finite_values_outside_the_date_domain() {
     let resolver = DateResolver::standard();
     let (_budget, _cancellation, execution) = execution("ods-formula-date-time-time-domain");
@@ -449,6 +513,35 @@ fn time_parameters_accept_finite_values_outside_the_date_domain() {
         ("=TIME(-0.000001;0;0)", -0.000001 / 24.0),
     ] {
         assert_differential(source, expected, &resolver, &execution);
+    }
+}
+
+#[test]
+fn date_bounds_fractional_floor_and_zero_offsets_follow_the_profile() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-bounds");
+    for (source, expected) in [
+        ("=DATE(1;1;1)", -693_593.0),
+        ("=DATE(9999;12;31)", 2_958_465.0),
+        ("=DATE(2020.9;1.9;1.9)", 43_831.0),
+        ("=DATEVALUE(\"0001-01-01\")", -693_593.0),
+        ("=DATEVALUE(\"9999-12-31\")", 2_958_465.0),
+        ("=DAY(43890.75)", 29.0),
+        ("=MONTH(43890.75)", 2.0),
+        ("=YEAR(43890.75)", 2020.0),
+        ("=DAYS360(43890.75;43891.25)", 1.0),
+        ("=EDATE(43890.75;0)", 43_890.0),
+        ("=EOMONTH(43890.75;0)", 43_890.0),
+        ("=WORKDAY(45298.75;0)", 45_298.75),
+    ] {
+        assert_differential(source, expected, &resolver, &execution);
+    }
+    for source in ["=DAY(2958466)", "=YEAR(-693594)"] {
+        assert_error(
+            observe_scalar(source, &execution).expect("date bound failure is a formula value"),
+            ScalarError::Number,
+            source,
+        );
     }
 }
 
@@ -495,6 +588,58 @@ fn fixed_parsers_accept_grouped_numeric_fallback_and_mixed_fractions() {
 }
 
 #[test]
+fn numeric_fallback_covers_exponent_percent_currency_and_fraction_forms() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-value-fallback");
+    for (source, expected) in [
+        ("=DATEVALUE(\"1.25E2\")", 125.0),
+        ("=DATEVALUE(\"50%\")", 0.0),
+        ("=DATEVALUE(\"$123.5\")", 123.0),
+        ("=DATEVALUE(\"1 1/2\")", 1.0),
+        ("=TIMEVALUE(\"1.25E2\")", 125.0),
+        ("=TIMEVALUE(\"50%\")", 0.5),
+        ("=TIMEVALUE(\"$123.5\")", 123.5),
+        ("=TIMEVALUE(\"(\u{0024}123.5)\")", -123.5),
+        ("=TIMEVALUE(\"1 1/2\")", 1.5),
+    ] {
+        assert_differential(source, expected, &resolver, &execution);
+    }
+
+    for source in ["=DATEVALUE(\"1,23\")", "=TIMEVALUE(\"1,23\")"] {
+        assert_error(
+            observe_scalar(source, &execution).expect("malformed numeric fallback is a value"),
+            ScalarError::Value,
+            source,
+        );
+        assert_error(
+            observe_value(source, &resolver, &execution, Mode::Scalar)
+                .expect("value malformed numeric fallback is a value"),
+            ScalarError::Value,
+            source,
+        );
+    }
+
+    for source in [
+        "=DATEVALUE(\"1e309\")",
+        "=DATEVALUE(\"-693594\")",
+        "=DATEVALUE(\"2958466\")",
+        "=TIMEVALUE(\"1e309\")",
+    ] {
+        assert_error(
+            observe_scalar(source, &execution).expect("numeric fallback domain failure is a value"),
+            ScalarError::Number,
+            source,
+        );
+        assert_error(
+            observe_value(source, &resolver, &execution, Mode::Scalar)
+                .expect("value numeric fallback domain failure is a value"),
+            ScalarError::Number,
+            source,
+        );
+    }
+}
+
+#[test]
 fn yearfrac_and_iso_week_edges_follow_profile_procedures() {
     let resolver = DateResolver::standard();
     let (_budget, _cancellation, execution) = execution("ods-formula-date-time-calendar-edges");
@@ -509,6 +654,20 @@ fn yearfrac_and_iso_week_edges_follow_profile_procedures() {
         ("=ISOWEEKNUM(DATE(2021;1;2))", 53.0),
         ("=ISOWEEKNUM(DATE(2021;1;3))", 53.0),
         ("=ISOWEEKNUM(DATE(2021;1;4))", 1.0),
+    ] {
+        assert_differential(source, expected, &resolver, &execution);
+    }
+}
+
+#[test]
+fn yearfrac_defaults_floors_dates_and_handles_thirty_first_rules() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-yearfrac-edges");
+    for (source, expected) in [
+        ("=YEARFRAC(43831;43890)", 58.0 / 360.0),
+        ("=YEARFRAC(43831;43890;)", 58.0 / 360.0),
+        ("=YEARFRAC(43831.75;43832.25;3)", 1.0 / 365.0),
+        ("=YEARFRAC(44227;44255;4)", 28.0 / 360.0),
     ] {
         assert_differential(source, expected, &resolver, &execution);
     }
