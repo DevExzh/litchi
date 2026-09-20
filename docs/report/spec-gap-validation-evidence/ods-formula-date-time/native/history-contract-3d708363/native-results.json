@@ -1,0 +1,1389 @@
+{
+  "schema": "ods-formula-date-time-native-v1",
+  "status": "captured compatibility observations",
+  "contract_sha256": "3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413",
+  "oracle_sha256": "e119042758617ff84dfc1f1dd065805166f9d9c7f840a050387e431d1be0194e",
+  "fixture": {
+    "input": "date-time-native.fods",
+    "input_sha256": "d6a929f51fe617c0e47f6c807a82eceaf87b30f68e57449946b4f68798e8b29f",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "64787d752ca7efe00d691039709219bb548817718d32d462be70c26ee2e32c62",
+    "content_xml": "content.xml",
+    "content_xml_sha256": "f3333ae179b72ea975fcfba9d1cb22b60b9485c8cde9a73a4012737a2891bdc2",
+    "rows": 130
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "locale": "C.UTF-8",
+    "headless": true,
+    "fresh_profile": true
+  },
+  "observations": [
+    {
+      "id": "date.month_rollover",
+      "function": "DATE",
+      "formula": "=DATE(2020;13;1)",
+      "native": {
+        "kind": "date",
+        "date_value": "2021-01-01"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "date.day_rollover_leap",
+      "function": "DATE",
+      "formula": "=DATE(2020;2;30)",
+      "native": {
+        "kind": "date",
+        "date_value": "2020-03-01"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "date.no_synthetic_1900_day",
+      "function": "DATE",
+      "formula": "=DATE(1900;2;29)",
+      "native": {
+        "kind": "date",
+        "date_value": "1900-03-01"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "date.fractional_arguments_truncate",
+      "function": "DATE",
+      "formula": "=DATE(2020.9;1.9;1.9)",
+      "native": {
+        "kind": "date",
+        "date_value": "2020-01-01"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "date.minimum_profile_date",
+      "function": "DATE",
+      "formula": "=DATE(1;1;1)",
+      "native": {
+        "kind": "date",
+        "date_value": "2001-01-01"
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "date result '2001-01-01' differs from profile date '0001-01-01'"
+    },
+    {
+      "id": "date.maximum_profile_date",
+      "function": "DATE",
+      "formula": "=DATE(9999;12;31)",
+      "native": {
+        "kind": "date",
+        "date_value": "9999-12-31"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "date.invalid_month",
+      "function": "DATE",
+      "formula": "=DATE(2020;0;1)",
+      "native": {
+        "kind": "date",
+        "date_value": "2019-12-01"
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'date' differs from profile '#NUM!'"
+    },
+    {
+      "id": "date.checked_overflow",
+      "function": "DATE",
+      "formula": "=DATE(9999;13;1)",
+      "native": {
+        "kind": "date",
+        "date_value": "10000-01-01"
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'date' differs from profile '#NUM!'"
+    },
+    {
+      "id": "datedif.Y",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43524;43890;\"Y\")",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.M",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43861;43890;\"M\")",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 0.0 differs from profile 1.0"
+    },
+    {
+      "id": "datedif.D",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43831;43891;\"D\")",
+      "native": {
+        "kind": "number",
+        "value": 60.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.MD",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43861;43889;\"MD\")",
+      "native": {
+        "kind": "number",
+        "value": 28.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.YM",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43616;43951;\"YM\")",
+      "native": {
+        "kind": "number",
+        "value": 10.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.YD",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43525;43890;\"YD\")",
+      "native": {
+        "kind": "number",
+        "value": 365.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.month_day_positive",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43845;43910;\"MD\")",
+      "native": {
+        "kind": "number",
+        "value": 5.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datedif.reversed_interval",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43891;43831;\"D\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#NUM!'"
+    },
+    {
+      "id": "datedif.invalid_format",
+      "function": "DATEDIF",
+      "formula": "=DATEDIF(43831;43890;\"Q\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "datevalue.iso_date",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"2020-02-29\")",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datevalue.datetime_discards_time",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"2020-02-29T12:34:56\")",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datevalue.en_us_numeric",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"2/29/20\")",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datevalue.two_digit_pivot",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"1/1/30\")",
+      "native": {
+        "kind": "number",
+        "value": 10959.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datevalue.english_month_name",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"February 29, 2020\")",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "datevalue.numeric_fallback",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"43890\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "native type 'error' differs from numeric profile result"
+    },
+    {
+      "id": "datevalue.numeric_fallback_small",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"123\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "native type 'error' differs from numeric profile result"
+    },
+    {
+      "id": "datevalue.invalid_calendar_day",
+      "function": "DATEVALUE",
+      "formula": "=DATEVALUE(\"2020-02-30\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "day.datetime_floor",
+      "function": "DAY",
+      "formula": "=DAY(43890.75)",
+      "native": {
+        "kind": "number",
+        "value": 29.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "day.iso_text",
+      "function": "DAY",
+      "formula": "=DAY(\"2020-03-01T23:59:59\")",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "day.out_of_domain",
+      "function": "DAY",
+      "formula": "=DAY(2958466)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#NUM!'"
+    },
+    {
+      "id": "days.retain_fraction",
+      "function": "DAYS",
+      "formula": "=DAYS(43832.5;43831.25)",
+      "native": {
+        "kind": "number",
+        "value": 1.25
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days.reversed",
+      "function": "DAYS",
+      "formula": "=DAYS(43831;43890)",
+      "native": {
+        "kind": "number",
+        "value": -59.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days.text_and_number",
+      "function": "DAYS",
+      "formula": "=DAYS(\"2020-02-29\";43831)",
+      "native": {
+        "kind": "number",
+        "value": 59.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days360.us_february_end",
+      "function": "DAYS360",
+      "formula": "=DAYS360(43890;43921)",
+      "native": {
+        "kind": "number",
+        "value": 30.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days360.us_reversed_signed",
+      "function": "DAYS360",
+      "formula": "=DAYS360(43921;43890)",
+      "native": {
+        "kind": "number",
+        "value": -31.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days360.european_swaps_with_sign",
+      "function": "DAYS360",
+      "formula": "=DAYS360(43921;43890;TRUE())",
+      "native": {
+        "kind": "number",
+        "value": -31.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "days360.european_31st",
+      "function": "DAYS360",
+      "formula": "=DAYS360(44227;44255;TRUE())",
+      "native": {
+        "kind": "number",
+        "value": 28.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eastersunday.explicit_1583",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY(1583)",
+      "native": {
+        "kind": "date",
+        "date_value": "1583-04-10"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eastersunday.explicit_2024",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY(2024)",
+      "native": {
+        "kind": "date",
+        "date_value": "2024-03-31"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eastersunday.explicit_9956",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY(9956)",
+      "native": {
+        "kind": "date",
+        "date_value": "9956-04-22"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eastersunday.invalid_year",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY(1582)",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#NUM!'"
+    },
+    {
+      "id": "eastersunday.timestamp_after_current_easter",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY()",
+      "native": {
+        "kind": "error",
+        "raw": "Err:511",
+        "error_value": ""
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "eastersunday.missing_timestamp",
+      "function": "EASTERSUNDAY",
+      "formula": "=EASTERSUNDAY()",
+      "native": {
+        "kind": "error",
+        "raw": "Err:511",
+        "error_value": ""
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "edate.leap_month_clamp",
+      "function": "EDATE",
+      "formula": "=EDATE(43861;1)",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "edate.nonleap_month_clamp",
+      "function": "EDATE",
+      "formula": "=EDATE(44227;1)",
+      "native": {
+        "kind": "number",
+        "value": 44255.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "edate.negative_month",
+      "function": "EDATE",
+      "formula": "=EDATE(43921;-2)",
+      "native": {
+        "kind": "number",
+        "value": 43861.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "edate.fractional_month_truncates",
+      "function": "EDATE",
+      "formula": "=EDATE(43890;1.9)",
+      "native": {
+        "kind": "number",
+        "value": 43919.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eomonth.leap_target",
+      "function": "EOMONTH",
+      "formula": "=EOMONTH(43831;1)",
+      "native": {
+        "kind": "number",
+        "value": 43890.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eomonth.previous_month",
+      "function": "EOMONTH",
+      "formula": "=EOMONTH(43890;-1)",
+      "native": {
+        "kind": "number",
+        "value": 43861.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "eomonth.invalid_domain",
+      "function": "EOMONTH",
+      "formula": "=EOMONTH(-693593;-1)",
+      "native": {
+        "kind": "number",
+        "value": -693624.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#NUM!'"
+    },
+    {
+      "id": "hour.midday_fraction",
+      "function": "HOUR",
+      "formula": "=HOUR(43831.5)",
+      "native": {
+        "kind": "number",
+        "value": 12.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "hour.negative_time",
+      "function": "HOUR",
+      "formula": "=HOUR(-0.25)",
+      "native": {
+        "kind": "number",
+        "value": 18.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "hour.final_second",
+      "function": "HOUR",
+      "formula": "=HOUR(0.9999884259259259)",
+      "native": {
+        "kind": "number",
+        "value": 23.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "isoweeknum.new_year_2021",
+      "function": "ISOWEEKNUM",
+      "formula": "=ISOWEEKNUM(44197)",
+      "native": {
+        "kind": "number",
+        "value": 53.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "isoweeknum.first_week_2021",
+      "function": "ISOWEEKNUM",
+      "formula": "=ISOWEEKNUM(44200)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "isoweeknum.end_2020",
+      "function": "ISOWEEKNUM",
+      "formula": "=ISOWEEKNUM(44196)",
+      "native": {
+        "kind": "number",
+        "value": 53.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "isoweeknum.2015_first_thursday",
+      "function": "ISOWEEKNUM",
+      "formula": "=ISOWEEKNUM(42005)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "minute.half_second_rounds_up",
+      "function": "MINUTE",
+      "formula": "=MINUTE(59.5/86400)",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 0.0 differs from profile 1.0"
+    },
+    {
+      "id": "minute.just_below_half",
+      "function": "MINUTE",
+      "formula": "=MINUTE(59.499/86400)",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "minute.negative_half_day",
+      "function": "MINUTE",
+      "formula": "=MINUTE(-0.5)",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "minute.end_of_day_wrap",
+      "function": "MINUTE",
+      "formula": "=MINUTE(86399.5/86400)",
+      "native": {
+        "kind": "number",
+        "value": 59.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 59.0 differs from profile 0.0"
+    },
+    {
+      "id": "month.datetime_floor",
+      "function": "MONTH",
+      "formula": "=MONTH(43890.75)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "month.text_name",
+      "function": "MONTH",
+      "formula": "=MONTH(\"February 29, 2020\")",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "month.invalid_text",
+      "function": "MONTH",
+      "formula": "=MONTH(\"not-a-date\")",
+      "native": {
+        "kind": "error",
+        "raw": "#VALUE!",
+        "error_value": ""
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.default_week",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298)",
+      "native": {
+        "kind": "number",
+        "value": 5.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.reversed_interval",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45298;45292)",
+      "native": {
+        "kind": "number",
+        "value": -5.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.custom_all_workdays",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298;;{0;0;0;0;0;0;0})",
+      "native": {
+        "kind": "number",
+        "value": 7.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.duplicate_holiday",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298;{45294;45294})",
+      "native": {
+        "kind": "number",
+        "value": 4.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.no_workday_sequence",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298;;{1;1;1;1;1;1;1})",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "networkdays.formula_error_holiday",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298;{NA()})",
+      "native": {
+        "kind": "error",
+        "raw": "Err:539",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:539' differs from profile '#N/A'"
+    },
+    {
+      "id": "networkdays.reference_list_refusal",
+      "function": "NETWORKDAYS",
+      "formula": "=NETWORKDAYS(45292;45298;[.A1]~[.B1])",
+      "native": {
+        "kind": "number",
+        "value": 5.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "now.explicit_timestamp",
+      "function": "NOW",
+      "formula": "=NOW()",
+      "native": {
+        "kind": "date",
+        "date_value": "2026-09-20T14:43:51.30908"
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "now.missing_timestamp",
+      "function": "NOW",
+      "formula": "=NOW()",
+      "native": {
+        "kind": "date",
+        "date_value": "2026-09-20T14:43:51.3091"
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "second.half_second_wrap",
+      "function": "SECOND",
+      "formula": "=SECOND(59.5/86400)",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "second.just_below_boundary",
+      "function": "SECOND",
+      "formula": "=SECOND(59.499/86400)",
+      "native": {
+        "kind": "number",
+        "value": 59.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "second.negative_fraction",
+      "function": "SECOND",
+      "formula": "=SECOND(-0.5/86400)",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "second.final_day_fraction",
+      "function": "SECOND",
+      "formula": "=SECOND(86399.4/86400)",
+      "native": {
+        "kind": "number",
+        "value": 59.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "time.direct_fraction",
+      "function": "TIME",
+      "formula": "=TIME(1.5;30.25;0.5)",
+      "native": {
+        "kind": "time",
+        "time_value": "PT02H00M15.5S"
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "time.negative_fraction",
+      "function": "TIME",
+      "formula": "=TIME(-1.5;0;0)",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "native type 'error' differs from numeric profile result"
+    },
+    {
+      "id": "time.multi_day",
+      "function": "TIME",
+      "formula": "=TIME(24;0;0)",
+      "native": {
+        "kind": "time",
+        "time_value": "PT00H00M00S"
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "time result 'PT00H00M00S' differs from profile fraction 1.0"
+    },
+    {
+      "id": "time.overflow",
+      "function": "TIME",
+      "formula": "=TIME(1E308;0;0)",
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!",
+        "error_value": ""
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "timevalue.clock_fraction",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"12:34:56.5\")",
+      "native": {
+        "kind": "number",
+        "value": 0.524265046296296
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "timevalue.datetime_fraction",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"2020-01-02T03:04:05\")",
+      "native": {
+        "kind": "number",
+        "value": 0.127835648148148
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "timevalue.numeric_fallback",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"0.5\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "native type 'error' differs from numeric profile result"
+    },
+    {
+      "id": "timevalue.invalid_24_hour",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"24:00\")",
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "timevalue.date_only_rejected",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"2020-01-01\")",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "timevalue.invalid_second",
+      "function": "TIMEVALUE",
+      "formula": "=TIMEVALUE(\"12:34:60\")",
+      "native": {
+        "kind": "number",
+        "value": 0.524305555555556
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "today.explicit_timestamp",
+      "function": "TODAY",
+      "formula": "=TODAY()",
+      "native": {
+        "kind": "date",
+        "date_value": "2026-09-20"
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "today.missing_timestamp",
+      "function": "TODAY",
+      "formula": "=TODAY()",
+      "native": {
+        "kind": "date",
+        "date_value": "2026-09-20"
+      },
+      "comparison": "host-observation",
+      "divergence_reason": "native uses LibreOffice calculation clock; not compared to injected profile timestamp"
+    },
+    {
+      "id": "weekday.type_1",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;1)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.type_2",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;2)",
+      "native": {
+        "kind": "number",
+        "value": 7.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.type_3",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;3)",
+      "native": {
+        "kind": "number",
+        "value": 6.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.type_11",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;11)",
+      "native": {
+        "kind": "number",
+        "value": 7.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.type_12",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;12)",
+      "native": {
+        "kind": "number",
+        "value": 6.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 6.0 differs from profile 2.0"
+    },
+    {
+      "id": "weekday.type_13",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;13)",
+      "native": {
+        "kind": "number",
+        "value": 5.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 5.0 differs from profile 3.0"
+    },
+    {
+      "id": "weekday.type_14",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;14)",
+      "native": {
+        "kind": "number",
+        "value": 4.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.type_15",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;15)",
+      "native": {
+        "kind": "number",
+        "value": 3.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 3.0 differs from profile 5.0"
+    },
+    {
+      "id": "weekday.type_16",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;16)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 2.0 differs from profile 6.0"
+    },
+    {
+      "id": "weekday.type_17",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;17)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.omitted_type",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weekday.invalid_type",
+      "function": "WEEKDAY",
+      "formula": "=WEEKDAY(44199;10)",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#NUM!'"
+    },
+    {
+      "id": "weeknum.mode_1",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;1)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_2",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;2)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_11",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;11)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_12",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;12)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_13",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;13)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_14",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;14)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_15",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;15)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_16",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;16)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_17",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;17)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_21",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;21)",
+      "native": {
+        "kind": "number",
+        "value": 53.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.mode_150",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;150)",
+      "native": {
+        "kind": "number",
+        "value": 53.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.omitted_mode",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199)",
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "weeknum.noninteger_mode",
+      "function": "WEEKNUM",
+      "formula": "=WEEKNUM(44199;21.5)",
+      "native": {
+        "kind": "number",
+        "value": 53.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'number' differs from profile '#NUM!'"
+    },
+    {
+      "id": "workday.forward_default",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;5)",
+      "native": {
+        "kind": "number",
+        "value": 45299.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "workday.backward_default",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;-1)",
+      "native": {
+        "kind": "number",
+        "value": 45289.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "workday.zero_preserves_fraction",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45298.75;0)",
+      "native": {
+        "kind": "number",
+        "value": 45298.0
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "numeric result 45298.0 differs from profile 45298.75"
+    },
+    {
+      "id": "workday.holiday_skip",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;3;{45294})",
+      "native": {
+        "kind": "number",
+        "value": 45296.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "workday.custom_all_workdays",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;3;;{0;0;0;0;0;0;0})",
+      "native": {
+        "kind": "error",
+        "raw": "Err:504",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "native type 'error' differs from numeric profile result"
+    },
+    {
+      "id": "workday.all_off_nonzero",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;1;;{1;1;1;1;1;1;1})",
+      "native": {
+        "kind": "error",
+        "raw": "Err:504",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:504' differs from profile '#NUM!'"
+    },
+    {
+      "id": "workday.reference_list_refusal",
+      "function": "WORKDAY",
+      "formula": "=WORKDAY(45292;1;[.A1]~[.B1])",
+      "native": {
+        "kind": "error",
+        "raw": "Err:504",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:504' differs from profile '#VALUE!'"
+    },
+    {
+      "id": "year.two_digit_pivot",
+      "function": "YEAR",
+      "formula": "=YEAR(\"1/1/30\")",
+      "native": {
+        "kind": "number",
+        "value": 1930.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "year.datetime",
+      "function": "YEAR",
+      "formula": "=YEAR(43890.75)",
+      "native": {
+        "kind": "number",
+        "value": 2020.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "year.minimum_profile",
+      "function": "YEAR",
+      "formula": "=YEAR(-693593)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "year.invalid_text",
+      "function": "YEAR",
+      "formula": "=YEAR(\"not-a-date\")",
+      "native": {
+        "kind": "error",
+        "raw": "#VALUE!",
+        "error_value": ""
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.basis_0_30us",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43861;43890;0)",
+      "native": {
+        "kind": "number",
+        "value": 0.0805555555555556
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.basis_1_actual_leap_year",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43831;44196;1)",
+      "native": {
+        "kind": "number",
+        "value": 0.997267759562842
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.basis_2_actual_360",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43831;44196;2)",
+      "native": {
+        "kind": "number",
+        "value": 1.01388888888889
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.basis_3_actual_365",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43831;44196;3)",
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.basis_4_30e",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43861;43890;4)",
+      "native": {
+        "kind": "number",
+        "value": 0.0805555555555556
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.reversed_is_nonnegative",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43890;43831;2)",
+      "native": {
+        "kind": "number",
+        "value": 0.163888888888889
+      },
+      "comparison": "parity"
+    },
+    {
+      "id": "yearfrac.invalid_basis",
+      "function": "YEARFRAC",
+      "formula": "=YEARFRAC(43831;43890;5)",
+      "native": {
+        "kind": "error",
+        "raw": "Err:502",
+        "error_value": ""
+      },
+      "comparison": "native-divergence",
+      "divergence_reason": "LibreOffice result 'Err:502' differs from profile '#NUM!'"
+    }
+  ],
+  "comparison_counts": {
+    "parity": 91,
+    "native-divergence": 33,
+    "host-observation": 6
+  },
+  "volatile_policy": "NOW/TODAY/no-Year EASTERSUNDAY are retained as host observations and are not compared to the injected deterministic timestamp."
+}
