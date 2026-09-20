@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "packet": "change-0722-docx-read-controls",
+  "name": "candidate-B4-read-generated-medium-list-paragraphs",
+  "stage": "candidate-B4",
+  "source_label": "candidate",
+  "build_label": "candidate",
+  "pair": "pair-4",
+  "cycle": 2,
+  "order": "reverse",
+  "control_id": "generated-medium-list-paragraphs",
+  "control_label": "generated medium semantic paragraph list",
+  "origin": "generated-harness-corpus",
+  "case": "docx_semantic_list_paragraphs",
+  "samples": 200,
+  "warmup": 100,
+  "fresh_child_process": true,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0722-bin/candidate-native",
+    "--warmup",
+    "100",
+    "--samples",
+    "200",
+    "--case",
+    "docx_semantic_list_paragraphs",
+    "--semantic-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0722/candidate-B4-read-generated-medium-list-paragraphs.json"
+  ],
+  "start_utc": "2026-09-20T16:21:12.377150+00:00",
+  "end_utc": "2026-09-20T16:21:13.076007+00:00",
+  "seconds": 0.3935852169524878,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0722-bin/candidate-native",
+  "binary_sha256": "fc1f89a599909f3861bc278f34ce1404f8b8f598f898c8b8615fe82c788c200f",
+  "binary_bytes": 62928848,
+  "build_record": "build-candidate.json",
+  "build_record_sha256": "79239ffd6adc9955763b86c4035503b99b9a4e206c39fa79e1b3dc48a37f9212",
+  "build_source_manifest": "source-candidate.json",
+  "build_source_manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+  "binary_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+    "source_census_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "source_entry_count": 7284
+  },
+  "live_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+    "source_census_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "source_entry_count": 7284,
+    "before_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "after_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "before_entry_count": 7284,
+    "after_entry_count": 7284,
+    "changed_paths": [],
+    "unchanged_during_child": true
+  },
+  "current_checkout_source": {
+    "manifest": "source-candidate.json",
+    "manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+    "source_census_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "source_entry_count": 7284,
+    "before_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "after_sha256": "77e08a812f6ae1a0d945b78b130b6408541778465fad6048eab139604452b2fb",
+    "before_entry_count": 7284,
+    "after_entry_count": 7284,
+    "changed_paths": [],
+    "unchanged_during_child": true
+  },
+  "expected_corpus": null,
+  "primary_native": {
+    "children": [
+      "candidate-B4-native-generated-edit",
+      "candidate-B4-native-generated-lifecycle",
+      "candidate-B4-native-numbered-list-edit",
+      "candidate-B4-native-numbered-list-lifecycle"
+    ],
+    "latest_end_utc": "2026-09-20T16:21:11.261175+00:00"
+  },
+  "plan_sha256": "145b0dc1b32c231adbc5e4c91e4a37156e20f32ef39a69b431d2aeb6a0f65a87",
+  "script_sha256": "e628cf06c36259f6f6a8bd57414aaf68a10b772d061dc4f2ca7e741c4aae3ca6",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "artifacts": {
+    "candidate-B4-read-generated-medium-list-paragraphs.json": {
+      "sha256": "61d87cb98146d9f883e099eb691fc1f289da9d8608d9911063916002266eb8ac",
+      "bytes": 11862
+    },
+    "candidate-B4-read-generated-medium-list-paragraphs.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "candidate-B4-read-generated-medium-list-paragraphs.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "stdout_stderr": {
+    "stdout": {
+      "empty": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stderr": {
+      "empty": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

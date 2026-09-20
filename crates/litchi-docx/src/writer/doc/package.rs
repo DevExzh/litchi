@@ -14,9 +14,8 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-use crate::alt::{Chunk, Conformance, scan};
+use crate::alt::{Chunk, Conformance, scan_with_block_ranges};
 use crate::error::{Error, Result};
-use crate::parts::document_part::active_block_ranges;
 
 use super::super::paragraph::MutableParagraph;
 use super::super::section::SectionProperties;
@@ -75,6 +74,15 @@ struct PreservedAltRange {
     chunk: Chunk,
 }
 
+fn scan_alt_and_block_ranges(
+    xml: &[u8],
+) -> Result<(
+    std::collections::BTreeMap<u32, Chunk>,
+    Vec<(usize, u32, u32)>,
+)> {
+    scan_with_block_ranges(xml)
+}
+
 impl DocumentBody {
     pub(super) fn new() -> Self {
         Self {
@@ -113,9 +121,9 @@ impl DocumentBody {
             None => ("", xml),
         };
         let bytes = xml.as_bytes();
-        let mut chunks = scan(bytes)?;
+        let (mut chunks, block_ranges) = scan_alt_and_block_ranges(bytes)?;
         let mut active_alts = Vec::new();
-        for (target, start, length) in active_block_ranges(bytes)? {
+        for (target, start, length) in block_ranges {
             if target != 2 {
                 continue;
             }
@@ -1330,3 +1338,7 @@ pub(crate) enum BodyElement {
     PreservedAlt(String, Chunk),
     PreservedOther(String),
 }
+
+#[cfg(test)]
+#[path = "fusion_tests_0722.rs"]
+mod fusion_tests_0722;

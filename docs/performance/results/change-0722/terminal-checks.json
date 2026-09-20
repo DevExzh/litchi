@@ -1,0 +1,65 @@
+{
+  "source_final_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641",
+  "script_sha256": "4f12cb92488c2f7b8bf025ca6039047bc88ab21bff6d250bf7f9b8f919d9135a",
+  "checks": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0722/audit.py"
+      ],
+      "script_sha256": "708fe179dfbc5e7f8382c7a8949a0924633d141ce1a9db17853070661bcb7e7f",
+      "exit_code": 0,
+      "stdout": "PASS: exact 0722 source/build/oracle/trace custody, 48 primary (32 native + 16 allocator) and 16 read-control children, final disposition, replay, and cleanup\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0722/source-guard.py",
+        "--check"
+      ],
+      "script_sha256": "0a61186594ff7e52e7505e4235286341a2c8a8d8898e9720eefcda0374a2c8f8",
+      "exit_code": 0,
+      "stdout": "PASS: existing public codec, namespace scanner, and read consumers preserved\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0722/memory-diagnostics.py",
+        "--check"
+      ],
+      "script_sha256": "97747989af58147452ad845c1d25153af286bf5ade739c95b2f1e152ad1f36ee",
+      "exit_code": 0,
+      "stdout": "Verified 16 aligned memory diagnostic reports\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0722/trace-details.py",
+        "--check"
+      ],
+      "script_sha256": "ed11586e8e77e0d38da1715742e7c53f94b9ec765cbefb8dc4048bd1776816ce",
+      "exit_code": 0,
+      "stdout": "PASS: 21 document trace rows rendered\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0722/quality-summary.py",
+        "--check"
+      ],
+      "script_sha256": "42993185df9c97b72665a101688e99e14ed647f48a937a552b8ce600878bae13",
+      "exit_code": 0,
+      "stdout": "PASS: quality receipts and log totals agree\n",
+      "stderr": ""
+    }
+  ]
+}

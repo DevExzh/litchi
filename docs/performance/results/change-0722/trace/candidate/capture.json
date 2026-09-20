@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0722-bin/candidate-trace",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0722/trace/candidate/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "elapsed_seconds": 0.13115566596388817,
+  "exit_code": 0,
+  "report_sha256": "4540ce8b6e236dae30f92f8d26b3a0068c0e866dd6b5695adde455badacb9721",
+  "schema": "litchi.docx-trace-capture-0722.v1",
+  "stderr_sha256": "37d5b18d0e53029dc325f9a4f1dcd578a40c9509c55383de11486de020dd48f1",
+  "stdout_sha256": "857bbfa588f6870647a8581520baa27e49ccbf8054a3da2148664a667281e61e"
+}

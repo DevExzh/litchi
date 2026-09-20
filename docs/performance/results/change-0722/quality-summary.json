@@ -1,0 +1,218 @@
+{
+  "status": "pass",
+  "inputs": {
+    "quality-docx.json": "19aeecab8452901b216f2f8b89823862bc2294438fdf59ba6628d9641ac51c9d",
+    "quality-docx-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-docx-tests.log": "910e292be9aa2d63a97a009a4d72a8e0f8ec88900ec9a1a7f1ce45ee6f4db777",
+    "quality-docx-clippy.log": "486f580d7a81aa4b2f7e5c3f12ce0836315726c0a9028290a7ca37aad093d24f",
+    "quality-docx-doctests.log": "d061dcf267649ab7d558f60310581d378a9e211cdfc75dc3f3b26da535e37594",
+    "quality-docx-rustdoc.log": "09007481d613d62f2f5a31109e16fc133714d073c4fe7857dbad960bf959808b",
+    "quality-harness.json": "2a81dbb4d50ed012dbb9f2a03655a1b7b9e0363a68bec75cb56234ee990b64bf",
+    "quality-harness-tests.log": "59a6f32139b287e4306947241afbd4a9e3dc25ff720c87678ed3ab9568e7b67e",
+    "quality-evidence.json": "a59d9b5ac180a9af9f729698f87e8309a43f8f01e65d790b5d11b7a20869d333",
+    "quality-evidence-crate-boundaries.log": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+    "quality-evidence-claims.log": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8",
+    "quality-evidence-claims-structural.log": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850",
+    "quality-evidence-report.log": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+    "quality-evidence-coverage.log": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+    "quality-evidence-non-iwork.log": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2"
+  },
+  "lanes": {
+    "docx": [
+      {
+        "name": "fmt",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "fmt",
+          "-p",
+          "litchi-docx",
+          "--",
+          "--check"
+        ]
+      },
+      {
+        "name": "tests",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "litchi-docx",
+          "--locked",
+          "--target-dir",
+          "/home/zhuhe/code/litchi-target-0722",
+          "-j",
+          "2",
+          "--all-features",
+          "--all-targets"
+        ],
+        "test_suites": 59,
+        "passed": 1471,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "name": "clippy",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "clippy",
+          "-p",
+          "litchi-docx",
+          "--locked",
+          "--target-dir",
+          "/home/zhuhe/code/litchi-target-0722",
+          "-j",
+          "2",
+          "--all-features",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      },
+      {
+        "name": "doctests",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "litchi-docx",
+          "--locked",
+          "--target-dir",
+          "/home/zhuhe/code/litchi-target-0722",
+          "-j",
+          "2",
+          "--all-features",
+          "--doc"
+        ],
+        "test_suites": 1,
+        "passed": 75,
+        "failed": 0,
+        "ignored": 31
+      },
+      {
+        "name": "rustdoc",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "doc",
+          "-p",
+          "litchi-docx",
+          "--locked",
+          "--target-dir",
+          "/home/zhuhe/code/litchi-target-0722",
+          "-j",
+          "2",
+          "--all-features",
+          "--no-deps"
+        ]
+      }
+    ],
+    "harness": [
+      {
+        "name": "tests",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "test",
+          "--release",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--locked",
+          "--target-dir",
+          "/home/zhuhe/code/litchi-target-0722",
+          "-j",
+          "2",
+          "--lib"
+        ],
+        "test_suites": 1,
+        "passed": 535,
+        "failed": 0,
+        "ignored": 1
+      }
+    ],
+    "evidence": [
+      {
+        "name": "crate-boundaries",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/check_crate_boundaries.py"
+        ]
+      },
+      {
+        "name": "claims",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/check_perf_claims.py",
+          "--registry",
+          "docs/performance/claim-registry-v1.json",
+          "--repo-root",
+          ".",
+          "--evidence-root",
+          ".",
+          "--mode",
+          "strict"
+        ]
+      },
+      {
+        "name": "claims-structural",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/check_perf_claims.py",
+          "--registry",
+          "docs/performance/claim-registry-v1.json",
+          "--repo-root",
+          ".",
+          "--mode",
+          "structural"
+        ]
+      },
+      {
+        "name": "report",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/check_report_claim_classification.py",
+          "--registry",
+          "docs/performance/report-claim-classification-v1.json",
+          "--repo-root",
+          "."
+        ]
+      },
+      {
+        "name": "coverage",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/validate_crud_coverage_index.py",
+          "--index",
+          "docs/performance/crud-coverage-index-v1.json",
+          "--catalog",
+          "docs/performance/results/perf-corpus-manifest-v2.json",
+          "--selector-source",
+          "tools/perf-baseline/src/lib.rs",
+          "--checklist",
+          "docs/CRUD_Scenario_Checklist.md",
+          "--repo-root",
+          "."
+        ]
+      },
+      {
+        "name": "non-iwork",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/non_iwork_gate.py",
+          "verify"
+        ]
+      }
+    ]
+  },
+  "script_sha256": "42993185df9c97b72665a101688e99e14ed647f48a937a552b8ce600878bae13"
+}

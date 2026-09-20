@@ -20,6 +20,9 @@ use super::model::{
     TRANSITIONAL_RELATIONSHIP_NAMESPACE, TRANSITIONAL_WORD_NAMESPACE,
 };
 
+mod document_scan;
+pub(crate) use document_scan::scan_with_block_ranges;
+
 impl Chunk {
     /// Serialize this anchor using an isolated, namespace-complete element.
     #[must_use]

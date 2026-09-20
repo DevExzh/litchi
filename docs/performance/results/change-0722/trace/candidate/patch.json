@@ -1,0 +1,43 @@
+{
+  "fragment_sha256": "8564d288153045bd6c505b6247238ae6d466befeb650ac8503ecb0d6004dbc52",
+  "lane": "candidate",
+  "module": "/home/zhuhe/code/litchi-scratch-0722-trace/scan_trace_0722.rs",
+  "repo_root": "/home/zhuhe/code/litchi",
+  "scratch": "/home/zhuhe/code/litchi-scratch-0722-trace",
+  "sources": [
+    {
+      "backup": "originals/crates/litchi-docx/src/alt/codec.rs.orig",
+      "original_bytes": 14507,
+      "original_sha256": "b6be75f3ec8f14192fbd1f2faa0327b08c865ebbda87b9d48ac09299ae0b2336",
+      "relative": "crates/litchi-docx/src/alt/codec.rs",
+      "transformed_bytes": 15256,
+      "transformed_sha256": "2918f4a8a038c1b8e14901c0aa3c2476c70c1f79e6f30625afecb882904cf166"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/alt/codec/document_scan.rs.orig",
+      "original_bytes": 17870,
+      "original_sha256": "48fdc33689fec252247376779580232c9f51105eca4c67dc02b94645f8173b76",
+      "relative": "crates/litchi-docx/src/alt/codec/document_scan.rs",
+      "transformed_bytes": 18996,
+      "transformed_sha256": "7581ef3d1508a4f0e54f3affc44aa17e89a0a426ab272cc0cdf4a056dca98a6d"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/lib.rs.orig",
+      "original_bytes": 5879,
+      "original_sha256": "ba9965127f1b6ddfdc2cd5fe5e4684479e2c7b6848d48b945489e30296d87225",
+      "relative": "crates/litchi-docx/src/lib.rs",
+      "transformed_bytes": 5975,
+      "transformed_sha256": "1531b6154ef936b37e9f80fd14ffb2b1453f5539f61c5081b48d59f139446292"
+    },
+    {
+      "backup": "originals/crates/litchi-docx/src/writer/doc/package.rs.orig",
+      "original_bytes": 50919,
+      "original_sha256": "2fb9dcfb155aaf2e4ff2146a651adbeb07cc49251cead80cccc7c57af34ead83",
+      "relative": "crates/litchi-docx/src/writer/doc/package.rs",
+      "transformed_bytes": 51005,
+      "transformed_sha256": "ce9075c5a9332f83c197269c4222789b4b1721db4b91cd10038614950f2a0381"
+    }
+  ],
+  "status": "applied",
+  "version": 2
+}

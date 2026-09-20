@@ -1,0 +1,50 @@
+{
+  "schema": "litchi.docx.writer-fusion-candidate-diff.v1",
+  "candidate_root": "candidate/crates/litchi-docx/src",
+  "files": {
+    "alt/codec.rs": {
+      "baseline_sha256": "4c60069945e369657a0fd3bcf968f317bf3c0d42fb7dce3795321c41a1aa9725",
+      "candidate_sha256": "b6be75f3ec8f14192fbd1f2faa0327b08c865ebbda87b9d48ac09299ae0b2336",
+      "change": "baseline implementation plus declaration and re-export of the private document_scan child"
+    },
+    "alt/codec/document_scan.rs": {
+      "change": "private writer-local dual-state scan importing the existing codec grammar",
+      "candidate_sha256": "48fdc33689fec252247376779580232c9f51105eca4c67dc02b94645f8173b76",
+      "public_scan_sha256": "88263fb849f38941fd969eb5e382b3ff81777f2ceb9188363820a058159bfa15"
+    },
+    "alt/mod.rs": {
+      "baseline_sha256": "79a3367a48958a94d9b0e8c4967c24eb9f6710909d31b540869055e0909cc9fc",
+      "candidate_sha256": "36356c6318b37f03a19fcf0e49fc6a3352b7467447f7c26a0b927fd165e99ea0",
+      "change": "private re-export of scan_with_block_ranges"
+    },
+    "namespace.rs": {
+      "baseline_sha256": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+      "candidate_sha256": "1b50df0db904a6c9f39cd8780562b43d1fa45f9959989802f3b98dc5f09b527f",
+      "change": "byte-identical"
+    },
+    "parts/document_part.rs": {
+      "baseline_sha256": "847caf3dba89a7bf948d07c3b70a4729b4e6d742dcc48dae2fdcd25ac26f65a9",
+      "candidate_sha256": "7f0f4645011e5db597486da4ce6fde1b8fa6a941b604124d9ab8d07f938257f6",
+      "change": "remove obsolete active_block_ranges and its now-unused import; read consumers unchanged"
+    },
+    "writer/doc/package.rs": {
+      "baseline_sha256": "f5670594685a8035952169487777381e39c950515c59fcc9d176ebedf0e42e92f",
+      "candidate_sha256": "2fb9dcfb155aaf2e4ff2146a651adbeb07cc49251cead80cccc7c57af34ead83",
+      "change": "replace adjacent scan and active_block_ranges calls with writer adapter and wire differential tests"
+    },
+    "writer/doc/fusion_tests_0722.rs": {
+      "change": "independent frozen differential matrix supplied by the test lane",
+      "candidate_sha256": "cd05b403e294fe6359c65725faf7639db91b1e4e324064ea298f02a0bfb13cdd"
+    }
+  },
+  "invariants": [
+    "namespace.rs remains byte-identical",
+    "the public scan function and existing codec helpers remain at their original module path",
+    "reader and range state are explicitly dropped before both MCE calls",
+    "range admission and active-offset resource labels remain unchanged"
+  ],
+  "validation": {
+    "rustfmt": "pass with skip_children=true on staged candidate sources",
+    "build": "not run by implementation lane"
+  }
+}

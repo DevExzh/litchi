@@ -1,0 +1,23 @@
+[
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0722",
+      "-j",
+      "2",
+      "--lib"
+    ],
+    "exit_code": 0,
+    "seconds": 175.17699821200222,
+    "log": "quality-harness-tests.log",
+    "log_sha256": "59a6f32139b287e4306947241afbd4a9e3dc25ff720c87678ed3ab9568e7b67e",
+    "source_manifest_sha256": "539943da77f0178c04b35924ec436e613b26b511a00d1acfeb356d365245e641"
+  }
+]

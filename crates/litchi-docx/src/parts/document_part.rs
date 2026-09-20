@@ -12,7 +12,7 @@
 )]
 //! DocumentPart - the main document.xml part of a Word document.
 
-use crate::alt::{Chunk, active, scan};
+use crate::alt::{Chunk, scan};
 use crate::error::Result;
 use crate::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
 use crate::paragraph::{Paragraph, extract_word_text};
@@ -22,7 +22,6 @@ use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
-use std::collections::BTreeSet;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
@@ -581,38 +580,6 @@ pub(crate) fn document_paragraph_count(xml: &[u8]) -> Result<usize> {
         Ok(())
     })?;
     Ok(count)
-}
-
-/// Select the active supported block ranges from original document XML.
-///
-/// This remains available to the mutable writer, whose source-preserving body
-/// codec operates on untouched package bytes. Read-only semantic block queries
-/// use [`body_block_ranges`] after MCE branch selection so they can retain an
-/// `Unknown` fallback for every visible direct body child.
-pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
-    let mut ranges = Vec::new();
-    scan_word_element_ranges(
-        xml,
-        &[b"p".as_slice(), b"tbl".as_slice(), b"altChunk".as_slice()],
-        |target, start, length| {
-            reserve_document_value(&mut ranges, "active document block ranges")?;
-            ranges.push((target, start, length));
-            Ok(())
-        },
-    )?;
-    let mut starts = Vec::new();
-    starts
-        .try_reserve_exact(ranges.len())
-        .map_err(|source| crate::Error::Allocation {
-            resource: "active document block offsets",
-            source,
-        })?;
-    for &(_, start, _) in &ranges {
-        starts.push(start);
-    }
-    let selected = active(xml, &starts)?.into_iter().collect::<BTreeSet<_>>();
-    ranges.retain(|&(_, start, _)| selected.contains(&start));
-    Ok(ranges)
 }
 
 /// Select active direct children of the main document body in source order.
