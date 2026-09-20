@@ -427,8 +427,10 @@ def main() -> int:
         forged["status"] = "PASS"
         for entry in forged["functions"].values():
             entry["evidence"]["status"] = "PASS"
+            entry["evidence"]["bindings"] = []
         for entry in forged["cross_cutting_evidence"]:
             entry["evidence"]["status"] = "PASS"
+            entry["evidence"]["bindings"] = []
         forged_manifest.write_text(json.dumps(forged), encoding="utf-8")
         old_manifest = verifier.MANIFEST
         verifier.MANIFEST = forged_manifest
