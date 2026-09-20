@@ -1,9 +1,8 @@
 # Financial numerical design review
 
-Status: bounded implementation design for the twenty-function financial
-contract. This document is a proposal for semantic and numerical review; it
-does not claim that the functions are implemented or that the proposed profile
-has been accepted.
+Status: numerical design review aligned with the finalized twenty-function
+financial contract. It records the accepted bounded solver profile and does
+not claim that the functions are implemented or validated.
 
 The normative inputs are the repository-local ODF 1.4 Part 4 archive and the
 [financial contract](contract.md). The archive is
@@ -13,13 +12,14 @@ the archive and extracted HTML SHA-256 values. The direct root-solving rules
 are §§6.12.24 (`IRR`), 6.12.42 (`RATE`), and 6.12.51 (`XIRR`); the residual
 functions are `NPV` (§6.12.30) and `XNPV` (§6.12.52).
 
+The finalized contract snapshot used for this review is SHA-256
+`fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b`.
+
 The labels in this note have a precise meaning:
 
 - **Normative** is required by ODF or already fixed by the repository contract.
-- **Profile choice** is a concrete proposal needed to make evaluation bounded
-  and reproducible. It must be accepted before tests are treated as an oracle.
-- **Open** is a question that the semantic or numerical reviewer must resolve;
-  an implementation must not silently choose a host-library behavior.
+- **Profile choice** is a deterministic rule selected by the contract where
+  ODF leaves an algorithmic detail unspecified.
 
 ## Findings
 
@@ -29,7 +29,7 @@ converge. It does not define a tolerance, iteration count, bracketing method,
 or choice among multiple roots. The implementation therefore needs a visible
 profile for all of these decisions.
 
-The proposed positive-base branch evaluates a rate through
+The accepted positive-base branch evaluates a rate through
 
 ```text
 u = ln(1 + rate)
@@ -46,26 +46,26 @@ scratch after its complete source-order scan. Root evaluations never reread a
 resolver range. This is necessary for deterministic results and makes read
 and cancellation accounting auditable.
 
-The suggested initial limits are:
+The accepted initial limits are:
 
-| Item | Proposed profile value | Status and reason |
+| Item | Accepted profile value | Status and reason |
 | --- | ---: | --- |
 | Default guess | `0.1` | Normative default in ODF. |
-| Positive-base root branch | `rate > -1` | Required for `XIRR`/`XNPV` fractional date exponents and proposed for the common `IRR`/`RATE` root branch. `IRR` and integer-period `NPV` do not normatively forbid a negative base; that separate branch is called out below. |
-| Transformed lower bound | `u_min = ln1p(r_min)`, where `r_min` is the next representable `f64` above `-1` | Profile choice; avoids evaluating `rate == -1`. |
-| Transformed upper bound | `u_max = ln1p(f64::MAX)` | Profile choice; covers every finite positive `f64` rate while keeping bracket exploration finite. The final `expm1` result is checked and can be clipped to the greatest finite rate if rounding reaches infinity. |
-| Negative-base branch | `v = ln(-(1 + rate))` | Profile choice for `IRR` and integral-`Nper` `RATE` when the supplied guess is below `-1`; `rate = -1 - exp(v)`. |
-| Negative-base bounds | `v_min = ln(-(1 + nextbelow(-1)))`, `v_max = ln(f64::MAX)` | Profile choice; covers representable finite rates below `-1` without treating the branch as available to fractional date/exponent functions. |
-| Bracket expansion steps | `64` | Profile choice; each step doubles the distance in the active transformed coordinate (`u` or `v`). |
-| Root iterations | `128` | Profile choice; the caller's work budget remains an independent lower bound. |
-| Residual/derivative evaluations | `256` total per root call | Profile choice; bracket probes and solve iterations share this cap. |
-| Relative residual tolerance | `16 * f64::EPSILON * scale(z)` | Profile choice, where `scale(z)` is the current bounded sum of absolute residual terms in the active transformed coordinate. There is no `max(1, ...)` floor. |
-| Transformed-rate step tolerance | `16 * f64::EPSILON * max(1, abs(z))` | Profile choice for active coordinate `z` (`u` or `v`); both residual and step/bracket criteria are required. |
-| Log-magnitude span in a scaled sum | `2048` natural-log units | Profile choice; crossing it refuses explicitly rather than discarding a tail that could become visible after cancellation. |
+| Positive-base root branch | `rate > -1` | Required for `XIRR`/`XNPV` fractional date exponents and selected for the common positive `IRR`/`RATE` branch. `IRR` and integer-period `NPV` also use the accepted negative-base branch below. |
+| Transformed lower bound | `u_min = ln1p(r_min)`, where `r_min` is the next representable `f64` above `-1` | Accepted branch bound; avoids evaluating `rate == -1` through `ln1p`. |
+| Transformed upper bound | `u_max = ln1p(f64::MAX)` | Accepted branch bound; covers every finite positive `f64` rate while keeping bracket exploration finite. A non-finite final conversion is `#NUM!`, never replaced by `f64::MAX`. |
+| Negative-base branch | `v = ln(-(1 + rate))` | Accepted for `IRR` and integral-`Nper` `RATE` when the supplied guess is below `-1`; `rate = -1 - exp(v)`. |
+| Negative-base bounds | `v_min = ln(-(1 + nextbelow(-1)))`, `v_max = ln(f64::MAX)` | Accepted branch bounds; they cover representable finite rates below `-1` without applying the branch to fractional date/exponent functions. |
+| Bracket expansion steps | `64` | Accepted cap; each step doubles the distance in the active transformed coordinate (`u` or `v`). |
+| Root iterations | `128` | Accepted cap; the caller's work budget remains an independent lower bound. |
+| Residual/derivative evaluations | `256` total per root call | Accepted cap; bracket probes and solve iterations share this counter. |
+| Relative residual tolerance | `16 * f64::EPSILON * scale(z)` | Accepted criterion, where `scale(z)` is the current bounded sum of absolute residual terms in the active transformed coordinate. There is no `max(1, ...)` floor. |
+| Transformed-rate step tolerance | `16 * f64::EPSILON * max(1, abs(z))` | Accepted criterion for active coordinate `z` (`u` or `v`); both residual and step/bracket criteria are required. |
+| Log-magnitude span in a scaled sum | `2048` natural-log units | Accepted refusal bound; crossing it returns `#NUM!` rather than discarding a tail that could become visible after cancellation. |
 
-The values above are review inputs, not magic compatibility constants. A
-different accepted profile must update the contract, tests, and resource
-receipts together.
+The values above are contract inputs, not magic compatibility constants. Any
+future profile change must update the contract, tests, and resource receipts
+together.
 
 The evaluation cap is authoritative when it meets the iteration cap first:
 the initial residual, bracket probes, and safeguarded solve evaluations all
@@ -113,11 +113,16 @@ required for integer-period `NPV` and is a deliberate guard against applying
 `FV`, `PV`, and `PMT` should use the contract's balance equations with
 `growth`, `annuity_factor`, and `due_factor`. `IPMT`, `PPMT`, and `CUMIPMT` /
 `CUMPRINC` should derive their period balances from those same helpers instead
-of maintaining a second power or annuity implementation. `NPER` should use
-the source's zero-rate branch and the stable logarithmic form of the nonzero
-branch; if a log argument is not positive, it returns the profile's numeric
-error rather than a NaN. `ISPMT` is linear in the period and does not need a
-root solver.
+of maintaining a second power or annuity implementation. Here `B` is the
+contract's period balance built from `growth(rate, period - 1)`, the payment,
+`due_factor`, and `annuity_factor(rate, period - 1)`. The finalized IPMT
+profile uses `IPMT = -B * rate` for `Type = 0`; for `Type = 1`, the first
+period's interest is zero and later periods use `IPMT = -B * rate / (1 + rate)`.
+`PPMT` is `Payment - IPMT` in both cases, and the cumulative functions sum
+those period results in order. `NPER` should use the source's zero-rate branch
+and the stable logarithmic form of the nonzero branch; if a log argument is not
+positive, it returns `#NUM!` rather than a NaN. `ISPMT` is linear in the period
+and does not need a root solver.
 
 The other scalar conversions should use the corresponding stable identities:
 
@@ -126,12 +131,20 @@ The other scalar conversions should use the corresponding stable identities:
 | `EFFECT` | `expm1(payments * ln1p(rate / payments))` | Apply the normative `rate >= 0` and `payments > 0` constraints before arithmetic. |
 | `NOMINAL` | `payments * expm1(ln1p(effective_rate) / payments)` | Apply the normative positive constraints and check the final product. |
 | `PDURATION` | `(ln(specified) - ln(current)) / ln1p(rate)` | Positive values and `rate > 0`; reject zero/non-finite denominator. |
-| `RRI` | `expm1((ln(abs(fv)) - ln(abs(pv))) / nper)` when `fv/pv > 0` | `nper > 0`; same-sign negative `pv`/`fv` is valid for the ratio. Zero or opposite-sign values need the accepted domain/error mapping. |
+| `RRI` | Positive ratio: `expm1((ln(abs(fv)) - ln(abs(pv))) / nper)`; negative ratio: checked signed integer power only when binary64 `1 / nper` is exactly integral | `nper > 0`; same-sign negative `pv`/`fv` is valid. A zero numerator with nonzero `pv` uses the checked zero-power branch; `pv = 0` uses `#DIV/0!`. A negative ratio with a non-integral binary64 reciprocal is `#NUM!`; there is no odd-root extension. No NaN or complex result escapes. |
 | `NPV` | Positive base: `value_i * exp(-i * ln1p(rate))`; negative base: checked signed integer power | Preserve one-based indices and argument/row-major source order. ODF prints no rate constraint for NPV, so `rate < -1` cannot be rejected solely because `ln1p` is unavailable. |
 | `XNPV` | `value_i * exp(-((date_i-date_0)/365) * ln1p(rate))` | Enforce `rate > -1`, equal element counts, numeric elements, and the contract's date ordering. |
 
+For `RRI`, do not infer an odd-root extension from a negative `Fv/Pv` ratio.
+After binary64 conversion, accept a negative ratio only when `1 / Nper` is
+exactly integral and evaluate it with checked signed integer power; otherwise
+return `#NUM!`. A positive ratio, including one formed by two negative inputs,
+uses the stable logarithmic expression in the table. A zero numerator with a
+nonzero denominator uses the checked zero-power branch; a zero denominator is
+`#DIV/0!`.
+
 `FVSCHEDULE` has no stated positivity constraint on each schedule element, so
-it cannot blindly take `ln1p(schedule_i)`. The proposed implementation reuses
+it cannot blindly take `ln1p(schedule_i)`. The implementation reuses
 the existing checked `ProductTerm`/`ScaledProductSum` machinery: each factor
 `1 + schedule_i` is admitted in source order, decomposed into sign, mantissa,
 and exponent, and committed without an overflowing intermediate product. A
@@ -143,12 +156,22 @@ before the product state is changed. This preserves the repository's checked
 product behavior and avoids the avoidable rounding error of a sum-of-logs
 product.
 
-For `MIRR`, keep separate bounded accumulators for positive and negative
-cash-flow contributions and use `log1p`/`expm1` for their rate powers. The
-explicit requirement for at least one positive and one negative value is
-normative. The admission of Logical values, References, and ReferenceLists is
-still open in the contract and must be settled before choosing the exact
-accumulator shape.
+For `MIRR`, evaluate the finalized contract equation
+
+```text
+((-NPV(reinvest_rate; positive_mask) * (1 + reinvest_rate)^n)
+ / (NPV(investment; negative_mask) * (1 + investment)))^(1 / (n - 1)) - 1
+```
+
+with separate bounded accumulators for positive and negative contributions and
+`log1p`/`expm1` for rate powers where their bases are positive. The explicit
+requirement for at least one positive and one negative value is normative. Text
+and Empty elements are removed, Logical elements are converted to `0`/`1`,
+direct scalar References and ReferenceLists are refused as the wrong shape,
+and matrix-produced Arrays are admitted. Positive and negative masks retain
+shared positions and exponents; they are not compacted into separate period
+sequences. A zero denominator such as `n - 1` follows the fixed `#DIV/0!`
+mapping.
 
 ## Root residuals and deterministic solving
 
@@ -190,13 +213,13 @@ of the same terms. Convergence uses
 `abs(f(z)) <= 16 * f64::EPSILON * scale(z)`. If `scale(z) == 0`, there is no
 nonzero residual input and the sign-variation precondition fails; do not turn
 that case into an absolute tolerance of one. If a scaled sum cannot represent
-the term span, return the explicit numeric/profile refusal instead of silently
+the term span, return `#NUM!` instead of silently
 accepting a small residual.
 
 The positive-base coordinate is the natural branch for `XIRR`, whose date
 exponents are generally fractional, and for `RATE` when `Nper` is non-integer.
 `IRR` has integer period exponents, so its equation can also have real roots
-below `-1`. The proposed profile supports that branch when the caller supplies
+below `-1`. The accepted profile supports that branch when the caller supplies
 a guess below `-1`: use `v = ln(-(1 + rate))`, evaluate each periodic term as
 `cashflow_i * (-1)^i * exp(-i*v)`, and apply the same safeguarded solver in
 `v`. For `RATE`, use the negative-base branch only when `Nper` is a positive
@@ -208,37 +231,40 @@ itself still supports the checked signed integer-power path described above.
 The residual evaluator must not form a raw `c * exp(...)` when the product may
 overflow before cancellation. It should decompose each nonzero term into a
 sign and log magnitude, then feed it into a fixed-width, normalized signed
-sum. The existing `ScaledProductSum` and fixed-width sum kernels provide the
-right resource model; a financial-specific variant may be needed because the
-exponent is produced by a real logarithm rather than an exact binary product.
-The accumulator must either retain a term or return an explicit numeric/profile
-refusal when the `2048`-unit span is exceeded. It must never drop a small term
+sum. Positive and negative log magnitudes must never be accumulated as two
+independent rounded `f64` totals and subtracted afterward: that loses the
+low-order information needed to resolve cancellation. The existing
+`ScaledProductSum` and fixed-width sum kernels provide the right resource
+model; a financial-specific variant may be needed because the exponent is
+produced by a real logarithm rather than an exact binary product.
+The accumulator must either retain a term or return `#NUM!` when the `2048`-unit
+span is exceeded. It must never drop a small term
 because it is currently below an `f64` addend: a later cancellation can make
 that term determine the sign of the residual.
 
 The absolute term scale used by the residual tolerance is accumulated by the
 same bounded scaled state at each candidate coordinate. If that scale itself
-cannot be represented, the solver returns a numeric error instead of using an
-infinite or unit-sized tolerance.
+cannot be represented, the solver returns `#NUM!` instead of using an infinite
+or unit-sized tolerance.
 
 ### Bracketing and iteration
 
-The following is the proposed deterministic profile:
+The following is the finalized deterministic profile:
 
 1. Validate the collected values and the guess. A supplied guess must be
    finite. A guess above `-1` selects the positive-base coordinate. A guess
    below `-1` selects the negative-base coordinate only for `IRR` and for
-   `RATE` with positive integral `Nper`; otherwise it produces the accepted
-   numeric/profile error. The omitted guess is `0.1`. This branch selection is
-   a **profile choice** because ODF calls the guess an initial estimate and
-   does not specify behavior below the real fractional-power domain.
+   `RATE` with positive integral `Nper`; otherwise it produces `#NUM!`. The
+   omitted guess is `0.1`. This branch selection is fixed by the contract
+   because ODF calls the guess an initial estimate and does not specify
+   behavior below the real fractional-power domain.
 2. Map a positive-base guess to `u0 = ln1p(guess)`, or a negative-base guess
    to `v0 = ln(-(1 + guess))`, and evaluate the corresponding residual. An
    exact zero is returned after converting the coordinate back to a finite
    rate. A `RATE` guess exactly equal to `-1` first uses the explicit boundary
    evaluation below.
-3. Probe outward from the active coordinate with radii `1, 2, 4, ...`, clipped
-   to its full representable branch bounds. At each radius, inspect endpoints
+3. Probe outward from the active coordinate with radii `1, 2, 4, ...`, bounded
+   by its full representable branch bounds. At each radius, inspect endpoints
    in increasing distance from the guess. If two brackets are equally near,
    choose the one whose resulting rate is numerically lower. Keep the first
    sign-changing bracket found, and return an endpoint immediately if it is
@@ -261,8 +287,8 @@ with lower-rate tie-breaking. That makes a multiple-root result deterministic
 while preserving the purpose of the ODF guess. It does not promise complete
 root discovery, but roots bracketed meaningfully around the supplied guess are
 handled by the bounded scan. A tangent root with no sign change is reported as
-no bracket. Those are intentional consequences of this bounded profile,
-subject to review.
+no bracket. Those are intentional consequences of the contract-fixed bounded
+profile.
 
 The transformed search has two useful safety properties. A negative rate is
 allowed whenever it is greater than `-1`, including rates close to `-1`; the
@@ -291,21 +317,21 @@ the normal numeric error mapping.
 
 ### No-root, multiple-root, and overflow policy
 
-The following are **profile choices**, pending approval:
+The following contract-fixed outcomes apply:
 
 - no sign-changing bracket, no positive/negative cash-flow variation, an
   invalid transformed domain, non-finite residual state, and nonconvergence
-  map to the existing numeric formula error (normally `#NUM!`);
+  map to `#NUM!`;
 - a multiple-root input returns the first sign-changing bracket in the
   deterministic outward order above, rather than the smallest root globally;
 - a root at an endpoint is accepted only when the residual satisfies the same
   finite tolerance, unless it is exactly zero; and
-- an intermediate that cannot fit the fixed-width scaled state is a numeric
-  error, never an infinity, NaN, or silently rounded cancellation.
+- an intermediate that cannot fit the fixed-width scaled state is `#NUM!`,
+  never an infinity, NaN, or silently rounded cancellation.
 
-The contract leaves the exact error category open. The implementation contract
-must record whether these cases are `ScalarError::Number` or another existing
-formula-level category before the test oracle is frozen.
+At the Rust boundary, `#NUM!` uses the established `ScalarError::Number`
+mapping. Typed resolver, allocation, cancellation, and source-version
+failures remain outside this formula-error mapping.
 
 ## Sequence admission, storage, and resource behavior
 
@@ -321,6 +347,20 @@ failure aborts and supersedes a retained formula error. Formula errors are
 never converted into typed provider failures, and typed failures are never
 converted into formula errors.
 
+`XIRR` retains each Values and Dates slot's original flattened index. The
+original flattened counts must match; a slot skipped on both sides is dropped,
+while a slot skipped on exactly one side retains a generated `#VALUE!` marker
+and both scans continue. Pair only matching original indices, including scalar
+inputs at synthetic index zero. Different rectangular geometries are admitted
+when their flattened counts and admission masks match. This prevents an
+independently compacted date sequence from being assigned to an earlier cash
+flow.
+
+The finalized sign constraints apply before root solving: `XIRR` requires its
+first admitted cash flow to be negative and at least one admitted cash flow to
+be positive. `XNPV` has the same first-negative/positive sign profile, in
+addition to its numeric element, date-order, and equal-count constraints.
+
 After the scan:
 
 - if a formula error was retained, finish the complete scan and return that
@@ -330,8 +370,16 @@ After the scan:
   constraint error;
 - reserve checked storage for the exact number of admitted values before
   filling the scratch buffer; and
-- for `XIRR`, retain finite date offsets or date serials alongside the values,
-  with no borrowed text or provider object in the buffer.
+- for `XIRR`, retain finite date offsets or date serials alongside the values
+  and original slot markers, with no borrowed text or provider object in the
+  buffer.
+
+`XIRR` DateSequence admission follows the finalized date profile: scalar
+Number, Text, and Logical values first use Number conversion, while a single
+Reference admits numeric Date serials and formula errors and skips Empty, Text,
+and distinguished Logical cells. ReferenceLists are not invented for this
+pseudotype. A computed expression may still be evaluated to establish its
+resulting type before the shape rule is applied.
 
 The root solver charges one work unit per residual term and one per derivative
 term, plus one unit for each iteration or bracket probe. These are suggested
@@ -343,12 +391,14 @@ budget is larger. A work-limit failure is a typed resource failure. Reaching
 the numerical iteration cap is a formula-level nonconvergence result.
 
 `RATE` has no sequence scratch, but it uses the same evaluation, cancellation,
-and hard-cap rules. `NPV`, `FVSCHEDULE`, and `XNPV` are one-pass operations and
-must remain streaming; they must not materialize a range merely to reuse the
-root implementation. Their scalar accumulator state is fixed-size or has an
-explicit checked reservation. `CUMIPMT` and `CUMPRINC` charge each requested
-period and each arithmetic step; their inclusive period range is checked for
-integer overflow before the loop begins.
+and hard-cap rules. `NPV` and `FVSCHEDULE` are one-pass operations and must
+remain streaming; they must not materialize a range merely to reuse the root
+implementation. `XNPV` deliberately uses bounded two-sided admission: it
+scans Values completely into numeric slots in row-major order, then scans
+Dates completely and pairs by element index even when rectangular geometries
+differ. Its slots and scalar accumulator have checked reservations. `CUMIPMT`
+and `CUMPRINC` charge each requested period and each arithmetic step; their
+inclusive period range is checked for integer overflow before the loop begins.
 
 The value evaluator's source-version and publication fences surround the whole
 operation. A cancellation request after the last term but before publication
@@ -359,8 +409,8 @@ key. A projected scalar guess or payment remains position-sensitive.
 
 ## Overflow and cancellation-sensitive cases
 
-The implementation and oracle should include these cases before the profile is
-accepted:
+The implementation and oracle should include these cases before implementation
+evidence is accepted:
 
 - zero rate, `+/-1e-12` rates, and rates near the representable value above
   `-1` for `FV`, `PV`, `PMT`, `NPER`, `EFFECT`, and `NOMINAL`;
@@ -390,32 +440,26 @@ count includes the initial scan and all bounded residual/derivative terms.
 Tests should assert that the resolver is not reread by the numerical loop and
 that a typed failure remains distinguishable from a generated `#NUM!`.
 
-## Review questions before implementation evidence
+## Inspection handoff
 
-The numerical reviewer and `inspection_kernel` should explicitly accept or
-change these points:
+The numerical reviewer and `inspection_kernel` should verify implementation
+evidence against these already-fixed decisions rather than reopen them:
 
-1. Is the nearest sign-changing bracket to the supplied guess, with lower-rate
-   tie-breaking across the positive/negative integral branches, the desired
-   multiple-root policy, or should the profile choose a globally ordered root?
-2. Are `u_max = ln1p(f64::MAX)`, `v_max = ln(f64::MAX)`, 128 iterations, 256
-   evaluations, and the two `16*EPSILON` convergence tests sufficient for the
-   expected financial range?
-3. Should an unsupported negative-base guess (for example, `XIRR` below
-   `-1`) be a numeric error, or should the evaluator use the default as a
-   fallback? The latter would hide input data and is not recommended without a
-   contract decision.
-4. Should the `2048`-unit scaled-sum span refusal be a numeric formula error or
-   a typed resource/profile refusal? The choice must not silently discard
-   terms.
-5. Does the accepted contract enforce XIRR's explanatory first-negative-cash-
-   flow wording and XNPV's described sign pattern, or only their explicit
-   count/type constraints?
-6. Which existing formula error represents root nonconvergence, invalid
-   rate-domain input, and overflow? The implementation and all oracle fixtures
-   must use that mapping consistently.
-7. Which Logical/Reference/ReferenceList forms are admitted by `MIRR(Array
-   Values)` before its separate accumulator and resource tests are frozen?
+1. The branch bounds, negative-base eligibility, `rate == -1` RATE boundary,
+   lower-rate tie rule, `16 * EPSILON * scale` residual criterion, 2048-unit
+   term-span refusal, 64/128/256 caps, and `#NUM!` mapping must match the
+   finalized contract exactly.
+2. Non-iterative functions must not inherit XNPV/XIRR's `rate > -1` gate. In
+   particular, integer-period NPV and other real-valued negative-base paths
+   must use checked signed powers, while fractional exponents retain their
+   domain errors.
+3. The finalized MIRR admission must be visible in tests: Text/Empty removal,
+   Logical `0`/`1` conversion, direct scalar Reference/ReferenceList refusal,
+   matrix-produced Array admission, and shared-position positive/negative
+   masks.
+4. Formula outcomes must use the fixed `#VALUE!`, `#NUM!`, and `#DIV/0!`
+   mapping, while typed resolver, allocation, cancellation, and source-version
+   failures remain typed. No host-library fallback or rate clipping is allowed.
 
-Until these questions are answered, numerical outputs from a host spreadsheet
-library are useful for exploration only. They are not a conformance oracle.
+Host spreadsheet outputs remain useful for exploratory comparisons, but the
+contract and its bounded resource/error rules are the conformance oracle.
