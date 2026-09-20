@@ -42,9 +42,9 @@ from that float before any integer display rounding. The retained manifest is a
 flat relative-path to SHA256 object at `results/retained-files.json` and
 excludes itself.
 
-The runner remains capture-gated. Before timing, the root owner must pin the
-reviewed contract digest in `run_profile.py`, stage the candidate freeze, and
-send the explicit frozen-source handoff. The preparation command after that
+The runner remains capture-gated. The reviewed contract digest is pinned in
+`run_profile.py`. Before timing, the root owner must stage the candidate freeze
+and send the explicit frozen-source handoff. The preparation command after that
 handoff is:
 
 ```text
