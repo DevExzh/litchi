@@ -536,10 +536,88 @@ fn date_bounds_fractional_floor_and_zero_offsets_follow_the_profile() {
     ] {
         assert_differential(source, expected, &resolver, &execution);
     }
-    for source in ["=DAY(2958466)", "=YEAR(-693594)"] {
+}
+
+#[test]
+fn component_and_month_shift_edges_use_checked_profile_bounds() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-component-bounds");
+    for (source, expected) in [
+        ("=ISOWEEKNUM(44197.75)", 53.0),
+        ("=WEEKDAY(44197.75;2)", 5.0),
+        ("=MONTH(-693593)", 1.0),
+        ("=MONTH(2958465)", 12.0),
+        ("=YEAR(-693593)", 1.0),
+        ("=YEAR(2958465)", 9_999.0),
+    ] {
+        assert_differential(source, expected, &resolver, &execution);
+    }
+    for source in [
+        "=DATE(2020;-1;1)",
+        "=DATE(2020;1;-1)",
+        "=DATE(-1.9;1;1)",
+        "=EDATE(2958465;1)",
+        "=EDATE(-693593;-1)",
+        "=EOMONTH(2958465;1)",
+        "=EOMONTH(-693593;-1)",
+        "=DAY(2958466)",
+        "=MONTH(2958466)",
+        "=YEAR(-693594)",
+        "=YEAR(2958466)",
+    ] {
         assert_error(
-            observe_scalar(source, &execution).expect("date bound failure is a formula value"),
+            observe_scalar(source, &execution).expect("profile bound failure is a value"),
             ScalarError::Number,
+            source,
+        );
+        assert_error(
+            observe_value(source, &resolver, &execution, Mode::Scalar)
+                .expect("value profile bound failure is a value"),
+            ScalarError::Number,
+            source,
+        );
+    }
+}
+
+#[test]
+fn days_converts_logicals_and_single_cell_references() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-conversions");
+    assert_differential("=DAYS(TRUE();FALSE())", 1.0, &resolver, &execution);
+    assert_number(
+        observe_value("=DAYS([.A2];[.A1])", &resolver, &execution, Mode::Scalar)
+            .expect("single-cell references convert through the resolver"),
+        7.0,
+        "=DAYS([.A2];[.A1])",
+    );
+}
+
+#[test]
+fn invalid_holiday_dates_and_leap_second_text_remain_typed_formula_values() {
+    let resolver = DateResolver::standard();
+    let (_budget, _cancellation, execution) = execution("ods-formula-date-time-invalid-members");
+    let holiday = "=NETWORKDAYS(45292;45298;{2958466})";
+    assert_error(
+        observe_value(holiday, &resolver, &execution, Mode::Scalar)
+            .expect("invalid holiday is retained as a formula value"),
+        ScalarError::Number,
+        holiday,
+    );
+
+    for source in [
+        "=TIMEVALUE(\"12:34:60\")",
+        "=SECOND(\"12:34:60\")",
+        "=MINUTE(\"12:34:60\")",
+    ] {
+        assert_error(
+            observe_scalar(source, &execution).expect("leap second refusal is a value"),
+            ScalarError::Value,
+            source,
+        );
+        assert_error(
+            observe_value(source, &resolver, &execution, Mode::Scalar)
+                .expect("value leap second refusal is a value"),
+            ScalarError::Value,
             source,
         );
     }

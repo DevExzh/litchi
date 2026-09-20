@@ -39,6 +39,7 @@ struct LimitsResolver {
     reads: Cell<usize>,
     read_order: RefCell<Vec<(usize, usize)>>,
     cancel_after_read: Option<CancellationSource>,
+    cancel_on_read: Option<(usize, CancellationSource)>,
     fail_after_read: Cell<Option<(usize, UnsupportedKind)>>,
     source_versions: Cell<Option<(SourceVersion, SourceVersion)>>,
     source_version_calls: Cell<usize>,
@@ -55,6 +56,7 @@ impl LimitsResolver {
             reads: Cell::new(0),
             read_order: RefCell::new(Vec::new()),
             cancel_after_read: None,
+            cancel_on_read: None,
             fail_after_read: Cell::new(None),
             source_versions: Cell::new(None),
             source_version_calls: Cell::new(0),
@@ -99,6 +101,10 @@ impl LimitsResolver {
         self.cancel_after_read = Some(cancellation.clone());
     }
 
+    fn cancel_on_read(&mut self, read: usize, cancellation: &CancellationSource) {
+        self.cancel_on_read = Some((read, cancellation.clone()));
+    }
+
     fn fail_after_read(&self, successful_reads: usize, kind: UnsupportedKind) {
         self.fail_after_read.set(Some((successful_reads, kind)));
     }
@@ -134,6 +140,11 @@ impl Resolver for LimitsResolver {
         }
         if let Some(cancellation) = &self.cancel_after_read {
             cancellation.cancel();
+        }
+        if let Some((read, cancellation)) = &self.cancel_on_read {
+            if self.reads.get() >= *read {
+                cancellation.cancel();
+            }
         }
         if sheet != "Main" || row >= self.rows || column >= self.columns {
             return Ok(CellRead::Error(ScalarError::Reference));
@@ -684,4 +695,45 @@ fn explicit_timestamp_contexts_change_results_and_remain_fenced() {
     .expect_err("final cancellation must prevent timestamp publication");
     assert!(matches!(error, EvaluationFailure::Cancelled));
     assert_eq!(cancel_budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn workday_cancellation_follows_complete_sequences_and_work_is_bounded() {
+    let mut resolver = LimitsResolver::standard();
+    for row in 0..16 {
+        resolver.set(row, 0, FixtureCell::Number(40_000.0 + row as f64));
+    }
+    let (budget, cancellation, execution) = make_execution("ods-formula-date-time-workday-cancel");
+    resolver.cancel_on_read(23, &cancellation);
+    let error = evaluate_source(
+        "=WORKDAY(DATE(2024;1;5);1;[.A1:.A16];[.B1:.B7])",
+        &resolver,
+        &execution,
+        &Limits::default(),
+    )
+    .expect_err("WORKDAY must check cancellation after complete sequence consumption");
+    assert!(matches!(error, EvaluationFailure::Cancelled));
+    assert_eq!(resolver.reads(), 23);
+    let expected_order: Vec<_> = (0..16)
+        .map(|row| (row, 0))
+        .chain((0..7).map(|row| (row, 1)))
+        .collect();
+    assert_eq!(*resolver.read_order.borrow(), expected_order);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let resolver = LimitsResolver::standard();
+    let (budget, _cancellation, execution) = make_execution("ods-formula-date-time-workday-work");
+    let error = evaluate_source(
+        "=WORKDAY(DATE(2024;1;5);1024)",
+        &resolver,
+        &execution,
+        &Limits::default().with_max_steps(16),
+    )
+    .expect_err("WORKDAY date stepping must charge bounded work");
+    assert!(matches!(
+        error,
+        EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work
+    ));
+    assert_eq!(resolver.reads(), 0);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
