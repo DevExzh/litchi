@@ -1,0 +1,16 @@
+{
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-target-0714",
+    "/home/zhuhe/code/litchi-0714-bin",
+    "/home/zhuhe/code/litchi-0714-fs"
+  ],
+  "owned_paths_absent": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0714-bin/current-native",
+      "sha256": "b6ecd431888936b8b9df9fc3939cddb8e16f54be8b63947c6dae813916ab6092",
+      "bytes": 62887288
+    }
+  ],
+  "created_utc": "2026-09-20T10:19:28.203901+00:00"
+}

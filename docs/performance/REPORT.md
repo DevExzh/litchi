@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## 0714 — DOCX atomic publication attribution
+
+[0714](0714-docx-atomic-publication-attribution.md) records 16 fresh native
+phase children and eight separate publication traces on unchanged 0713 source.
+Atomic-publication p50 is 5.20–5.37 ms; counting-sink publication is
+0.122–0.336 ms. Each measured traced atomic transaction writes the archive
+once, then syncs the temporary file and parent directory around replacement.
+Four setup saves are excluded; counting controls have no fifth publication.
+Seven native tail repeat flags remain explicit. Trace timings do not establish
+a native syscall fraction, hardware cause or durability floor. No optimization
+claim follows. Exact-source prior quality checks are reused with all seven
+PPTX/XLSB test Clippy exceptions and 46 ignored doctests disclosed.
+[Evidence packet](results/change-0714/README.md). The non-iWork goal remains active.
+
 ## 0713 — retained exact MCE substring search
 
 [0713](0713-mce-substring-search.md) replaces the private scalar byte-window
