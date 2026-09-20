@@ -1,0 +1,26 @@
+[
+  {
+    "case": "tiny-marker-free",
+    "profile": "baseline",
+    "pair": "b1/a3",
+    "metric": "mean_ns",
+    "delta_pct": 6.74225063321674,
+    "delta_ns": 1.8633333333333333
+  },
+  {
+    "case": "tiny-valid-marked",
+    "profile": "baseline",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 10.463743612005993,
+    "delta_ns": 45.796666666666624
+  },
+  {
+    "case": "tiny-valid-marked",
+    "profile": "baseline",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 6.1224489795918435,
+    "delta_ns": 30
+  }
+]

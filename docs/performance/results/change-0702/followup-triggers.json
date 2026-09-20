@@ -1,0 +1,218 @@
+[
+  {
+    "kind": "native",
+    "case": "noop-real",
+    "phase": "commit_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 18.168149354717443,
+    "delta_ns": 14500
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "capture_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 12.789449064026414,
+    "delta_ns": 298832
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 18.83636363636363,
+    "delta_ns": 5180
+  },
+  {
+    "kind": "native",
+    "case": "one-control",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 8.234785171303782,
+    "delta_ns": 43591
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "capture_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 20.10196223855889,
+    "delta_ns": 120341
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 24.983943481053306,
+    "delta_ns": 3890
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 10.009861932938847,
+    "delta_ns": 2030
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "commit_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 8.999482462642593,
+    "delta_ns": 60340
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "settext_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 57.78919384969106,
+    "delta_ns": 80431
+  },
+  {
+    "kind": "native",
+    "case": "one-generated",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 20.58720552540043,
+    "delta_ns": 296941
+  },
+  {
+    "kind": "native",
+    "case": "two-generated",
+    "phase": "clone_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 50.8718726307809,
+    "delta_ns": 6710
+  },
+  {
+    "kind": "native",
+    "case": "two-generated",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 14.77716966379985,
+    "delta_ns": 1890
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "apply_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 9.160092807424602,
+    "delta_ns": 9870
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 14.470954356846466,
+    "delta_ns": 2790
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "clone_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 30.105840846726785,
+    "delta_ns": 7680
+  },
+  {
+    "kind": "native",
+    "case": "two-real",
+    "phase": "settext_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 21.549478114423692,
+    "delta_ns": 266661
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "mean_ns",
+    "delta_pct": 5.13535492300754,
+    "delta_ns": 963.4400000000023
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "p95_ns",
+    "delta_pct": 55.053191489361694,
+    "delta_ns": 10350
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "p99_ns",
+    "delta_pct": 15.39670070699135,
+    "delta_ns": 3920
+  },
+  {
+    "kind": "refusal",
+    "case": "early-name-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 12.425565700674879,
+    "delta_ns": 3130
+  },
+  {
+    "kind": "refusal",
+    "case": "late-missing-relationship",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 10.961677512653644,
+    "delta_ns": 7580
+  },
+  {
+    "kind": "refusal",
+    "case": "late-root-error",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 14.272330224163344,
+    "delta_ns": 10359
+  },
+  {
+    "kind": "refusal",
+    "case": "late-root-error-mce",
+    "phase": "total_ns",
+    "pair": "b0/a0",
+    "metric": "max_ns",
+    "delta_pct": 24.855160354880223,
+    "delta_ns": 40370
+  },
+  {
+    "kind": "refusal",
+    "case": "mixed-conformance",
+    "phase": "total_ns",
+    "pair": "b1/a3",
+    "metric": "max_ns",
+    "delta_pct": 8.087110613691472,
+    "delta_ns": 8671
+  }
+]

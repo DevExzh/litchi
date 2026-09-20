@@ -1,0 +1,7 @@
+fmt 0 18.12
+check 0 57.75
+clippy 0 25.82
+tests-default 0 103.61
+tests 0 328.48
+facade 0 41.06
+rustdoc 0 8.43

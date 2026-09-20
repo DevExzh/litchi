@@ -1,0 +1,67 @@
+[
+  {
+    "case": "one-real",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "one"
+  },
+  {
+    "case": "one-control",
+    "source": "/home/zhuhe/code/litchi/docs/performance/results/change-0702/marker-control.pptx",
+    "workflow": "one"
+  },
+  {
+    "case": "one-generated",
+    "source": "generated:12x8",
+    "workflow": "one"
+  },
+  {
+    "case": "one-notes-poi",
+    "source": "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+    "workflow": "one"
+  },
+  {
+    "case": "one-notes-lo",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+    "workflow": "one"
+  },
+  {
+    "case": "noop-real",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "noop"
+  },
+  {
+    "case": "noop-control",
+    "source": "/home/zhuhe/code/litchi/docs/performance/results/change-0702/marker-control.pptx",
+    "workflow": "noop"
+  },
+  {
+    "case": "noop-generated",
+    "source": "generated:12x8",
+    "workflow": "noop"
+  },
+  {
+    "case": "noop-notes-poi",
+    "source": "/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/prProps.pptx",
+    "workflow": "noop"
+  },
+  {
+    "case": "noop-notes-lo",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx",
+    "workflow": "noop"
+  },
+  {
+    "case": "two-real",
+    "source": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "workflow": "two"
+  },
+  {
+    "case": "two-control",
+    "source": "/home/zhuhe/code/litchi/docs/performance/results/change-0702/marker-control.pptx",
+    "workflow": "two"
+  },
+  {
+    "case": "two-generated",
+    "source": "generated:12x8",
+    "workflow": "two"
+  }
+]

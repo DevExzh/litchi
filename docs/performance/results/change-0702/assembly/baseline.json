@@ -1,0 +1,14 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "-l",
+    "--disassemble=_ZN19litchi_ooxml_common3mce5codec5start17hdd6022752589c6d9E",
+    "/home/zhuhe/code/litchi-0702-bin/baseline-native"
+  ],
+  "symbol": "_ZN19litchi_ooxml_common3mce5codec5start17hdd6022752589c6d9E",
+  "exit_code": 0,
+  "binary_sha256": "b07fcaa940e244d78128cd96e22f86f544a1031f19b84a96f7f8cf92334f6d82",
+  "output_sha256": "2dc6beaa2b5b4fafdf18aa5b883de77d0199483cbcff48ca54714b846601e782",
+  "stderr": ""
+}

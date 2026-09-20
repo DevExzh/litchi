@@ -1,0 +1,58 @@
+[
+  {
+    "case": "generated-12x8-valid",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 5.426592463626156,
+    "delta_ns": 30140
+  },
+  {
+    "case": "late-root-error",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 9.9524015577672,
+    "delta_ns": 6900
+  },
+  {
+    "case": "notes-invalid-tail",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 44.497800431949265,
+    "delta_ns": 94981
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "pair": "b0/a2",
+    "metric": "p50_ns",
+    "delta_pct": 6.655829667877855,
+    "delta_ns": 10441.0
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "pair": "b0/a2",
+    "metric": "mean_ns",
+    "delta_pct": 6.0679528768994295,
+    "delta_ns": 9631.339999999997
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "pair": "b0/a2",
+    "metric": "p95_ns",
+    "delta_pct": 10.032225085345647,
+    "delta_ns": 16780
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "pair": "b0/a2",
+    "metric": "p99_ns",
+    "delta_pct": 11.61185377972318,
+    "delta_ns": 19631
+  },
+  {
+    "case": "slide-raw-overlimit-16m-to-64m",
+    "pair": "b1/a3",
+    "metric": "p99_ns",
+    "delta_pct": 8.038286142693662,
+    "delta_ns": 14260
+  }
+]

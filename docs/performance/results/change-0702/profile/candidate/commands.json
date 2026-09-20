@@ -1,0 +1,118 @@
+[
+  {
+    "name": "record",
+    "command": [
+      "perf",
+      "record",
+      "-F",
+      "997",
+      "-g",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/home/zhuhe/code/litchi-0702-profile/candidate-capture.data",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0702-bin/candidate-native",
+      "prefix",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "capture",
+      "800"
+    ],
+    "exit_code": 0,
+    "seconds": 4.8365823100320995
+  },
+  {
+    "name": "self-symbols",
+    "command": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-children",
+      "--percent-limit",
+      "0.1",
+      "-i",
+      "/home/zhuhe/code/litchi-0702-profile/candidate-capture.data"
+    ],
+    "exit_code": 0,
+    "seconds": 0.27259618195239455
+  },
+  {
+    "name": "inclusive-symbols",
+    "command": [
+      "perf",
+      "report",
+      "--stdio",
+      "--children",
+      "--percent-limit",
+      "1",
+      "-i",
+      "/home/zhuhe/code/litchi-0702-profile/candidate-capture.data"
+    ],
+    "exit_code": 0,
+    "seconds": 0.27663325204048306
+  },
+  {
+    "name": "counters-10",
+    "command": [
+      "perf",
+      "stat",
+      "-x",
+      "\t",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults,task-clock",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0702-bin/candidate-native",
+      "prefix",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "capture",
+      "10"
+    ],
+    "exit_code": 0,
+    "seconds": 0.07438457093667239
+  },
+  {
+    "name": "counters-210",
+    "command": [
+      "perf",
+      "stat",
+      "-x",
+      "\t",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults,task-clock",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0702-bin/candidate-native",
+      "prefix",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "capture",
+      "210"
+    ],
+    "exit_code": 0,
+    "seconds": 1.229820673004724
+  },
+  {
+    "name": "rss",
+    "command": [
+      "/usr/bin/time",
+      "-v",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0702-bin/candidate-native",
+      "prefix",
+      "/home/zhuhe/code/litchi/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "capture",
+      "210"
+    ],
+    "exit_code": 0,
+    "seconds": 1.2320763339521363
+  }
+]

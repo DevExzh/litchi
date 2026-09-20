@@ -1,0 +1,2 @@
+PASS: marker-control cases, oracle identities, raw samples, statistics and >5% flags
+{"cases": 5, "cpu": 12, "legs": 6, "profile": "baseline", "runs": 30, "samples_per_run": 300, "schema": "0702-marker-control-audit-v1", "trigger_count": 3}
