@@ -1,0 +1,11 @@
+{
+  "revision": "a664c8539894de38fea670bb34eaa66cc69058ce",
+  "created_utc": "2026-09-20T05:42:36.502426+00:00",
+  "previous_batch": "0706 completed: rejected pilot, production restored, tests and evidence committed",
+  "next_owner": "XLSX source-backed one-percent edit planning",
+  "basis": "0705/0706 current production: planning35\u201338%total;67845/129411allocationcalls. Auditorbookkeepingfailedend-to-endgate.",
+  "scope": "Profile current planning before selecting a code change; preserve publication audits and all semantic validation",
+  "candidate_status": "none selected",
+  "constraints": "All33 previously read GOAL/ADR documents hashes revalidated unchanged",
+  "cpu": 12
+}

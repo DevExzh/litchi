@@ -1,0 +1,3 @@
+0707 analysis pass: /tmp/litchi-0707-audit-rpkac3eb/analysis.json
+Planning profile edges, native identity, and annotations verified: /tmp/litchi-0707-audit-rpkac3eb/profile-analysis.json
+PASS exact source, constraints, helper identities, six evidence gates and byte-identical diagnostic replays

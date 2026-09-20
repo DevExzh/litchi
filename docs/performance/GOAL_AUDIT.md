@@ -1,5 +1,24 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0707 — current-source XLSX planning diagnostic
+
+[0707](0707-xlsx-planning-attribution.md) measures the unchanged XLSX
+source-backed one-percent edit/save route with separate native, allocator, and
+Callgrind lanes. It identifies planning and publication as the two largest
+current phases and records the allocator-heavy planning region. The measured
+planning profile places the combined worksheet validation/parser owner at
+96.36–96.79% inclusive Ir and `Validator::observe` at 18.38–18.75%; nested
+inclusive diagnostics are retained without summing. The profile process uses
+Valgrind's allocator replacement, so its allocator edge counts are not native
+allocation measurements. Same-build repeat-drift flags remain visible. No
+candidate is implemented and no performance claim or coverage
+promotion is made. The
+validator name-storage proposal remains a bounded follow-up design that must
+preserve validation order, typed refusals, source identity, budgets, and exact
+output. RSS, physical cold behavior, native Office, parallel scaling, and
+broader CRUD coverage remain open; iWork is excluded and the non-iWork GOAL is
+still active. [Evidence packet](results/change-0707/README.md).
+
 ## 0706 — XML attribute-cardinality pilot rejected
 
 [0706](0706-xml-attribute-cardinality-pilot.md) evaluates a source-compatible

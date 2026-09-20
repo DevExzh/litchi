@@ -1,0 +1,16 @@
+{
+  "command": [
+    "nm",
+    "-C",
+    "/home/zhuhe/code/litchi-0707-bin/baseline-native"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+  "filter_substrings": [
+    "cell_values::source::SourceBackedEditor::edit_sheets",
+    "cell_values::snapshot::MultiSnapshot::load_source_backed",
+    "cell_values::snapshot::Snapshot::from_source_selected"
+  ],
+  "artifact_sha256": "fa61b250a8491651886f51a7e0221c4500db4c887d25549297cf8bfe49945919",
+  "scope": "Demangled symbol discovery; two outer edit_sheets specializations present"
+}

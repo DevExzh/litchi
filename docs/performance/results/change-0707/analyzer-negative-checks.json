@@ -1,0 +1,21 @@
+{
+  "analyzer_sha256": "63b370a9c8ba23aabc0f0a6fd38e79c59ef0022a02233b243a1fccdb62018e4b",
+  "scope": "In-memory corrupted receipt values; retained raw artifacts unchanged",
+  "checks": [
+    {
+      "case": "missing_plan_binding",
+      "rejected": true,
+      "error": "native-baseline-r1-medium receipt keys changed"
+    },
+    {
+      "case": "changed_binary_digest",
+      "rejected": true,
+      "error": "native-baseline-r1-medium receipt binary digest differs"
+    },
+    {
+      "case": "changed_source_count",
+      "rejected": true,
+      "error": "native-baseline-r1-medium retained source entry count differs"
+    }
+  ]
+}

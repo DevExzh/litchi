@@ -1,0 +1,6 @@
+{
+  "stage": "Before any benchmark child was launched",
+  "issue": "Overwrite guard tested nonempty list of expected paths instead of path existence",
+  "correction": "Refuse only if an expected artifact exists or is a symlink",
+  "measurements_discarded": 0
+}

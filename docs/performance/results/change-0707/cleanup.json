@@ -1,0 +1,22 @@
+{
+  "time_utc": "2026-09-20T06:16:45.506829+00:00",
+  "owned_paths": [
+    "/home/zhuhe/code/litchi-target-0707",
+    "/home/zhuhe/code/litchi-0707-bin"
+  ],
+  "owned_paths_absent": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0707-bin/baseline-native",
+      "sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+      "bytes": 63339216
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0707-bin/baseline-alloc",
+      "sha256": "38722d2b49b721dec045fd66642c13e79033fa2bfd870dfb47589acbaae55760",
+      "bytes": 62980736
+    }
+  ],
+  "python_caches_removed": [],
+  "scope": "Only this batch owned target, binaries, and packet Python cache; no other worktree touched"
+}

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.05170968105085194,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0707-xlsx-planning-attribution.md": "048ada62a6542b9f594c5e4618d373cad93323ca5bbfd5acd78c7c0ed597b2f8",
+    "docs/performance/BASELINE.md": "6342f67fd172c6599e5690c72de01f3bec129e89b3ee59e318156f6be78d01fc",
+    "docs/performance/HOTSPOTS.md": "04af4453dcc10a575ce29b1f030d325f9ea6f2183be6780eadc17cbf934764c1",
+    "docs/performance/GOAL_AUDIT.md": "f0e2865286a14f91750b59685126c47755acb0f39f162e85185154cd5ab2f31f",
+    "docs/performance/results/change-0707/README.md": "4aa26d2d3aee637defa0daab42046ffe2cc65b2bbfd4654731802c6c17ac23c9"
+  }
+}

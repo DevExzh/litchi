@@ -1,0 +1,25 @@
+{
+  "logs": [
+    {
+      "path": "profile-baseline-r1-dense-sparse.stderr",
+      "sha256": "a7124c7c08a85505ac14caf6e17008bf3a4941d4e39080ceb253593edbc72ef1",
+      "brk_segment_overflow": true
+    },
+    {
+      "path": "profile-baseline-r1-medium.stderr",
+      "sha256": "bff5f4eb192f829c5ab646cdb23f322fecf37c822d3aea5ae66dd89e00fdd39e",
+      "brk_segment_overflow": true
+    },
+    {
+      "path": "profile-baseline-r2-dense-sparse.stderr",
+      "sha256": "bcc88c212c1b510b4f75b72165359864685cdeeae8d154c937a2993423b58603",
+      "brk_segment_overflow": true
+    },
+    {
+      "path": "profile-baseline-r2-medium.stderr",
+      "sha256": "4767c5cfa3c8580e9518d2b70e82159cd2d638e55387913b8ff527ecc7f48b26",
+      "brk_segment_overflow": true
+    }
+  ],
+  "interpretation": "All profile children completed successfully and output identities matched. Valgrind brk segment overflow is a retained instrumentation environment limitation. No causal explanation for allocator call-field discrepancy is asserted."
+}

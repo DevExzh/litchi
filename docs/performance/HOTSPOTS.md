@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0707 — XLSX planning name storage is the next attribution boundary
+
+[0707](0707-xlsx-planning-attribution.md) refreshes the unchanged
+source-backed one-percent edit/save route. Planning takes 35.75–36.88% of the
+native interval, while publication remains the largest phase at 41.06–42.72%.
+Planning has the largest operation-region allocation count and requested-byte
+volume. The measured planning profile places the combined worksheet
+validation/parser owner at 96.36–96.79% inclusive Ir and
+`Validator::observe` at 18.38–18.75%. The profile process uses Valgrind's
+allocator replacement, so its allocator edge counts are not native allocation
+measurements. The immediate-child partition is disjoint and nested inclusive
+rows are not added.
+The prospective private design uses static modeled names, callback-borrowed
+Empty names, and owned unknown-name fallback, with exact validation and
+preservation behavior retained. No production optimization or speedup claim
+follows this diagnostic.
+
 ## 0706 — XML auditor bookkeeping is attributable but not retained
 
 [0706](0706-xml-attribute-cardinality-pilot.md) tests reuse of the existing
