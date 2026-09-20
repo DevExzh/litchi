@@ -1,0 +1,9 @@
+{
+  "corrections": [
+    "Native analyzer fixed optional receipt checks to require frozen0707 schema and normalized binary custody across cleanup; results unchanged.",
+    "Profile nested direct self_ir label identified as inclusive; correction requested before final seal.",
+    "Root attempted audit during profile analyzer edits: native replay byte-identical; profile validation passed but output differed from then-existing report. Final audit must rerun after analyzer freeze.",
+    "Raw Callgrind allocator calls did not reconcile with independent planning counts. Retained as raw fields only, discrepancy explicitly unresolved; removed measured-allocation and causal interpretation. Guest Ir attribution remains independently checked."
+  ],
+  "raw_measurements_changed": false
+}

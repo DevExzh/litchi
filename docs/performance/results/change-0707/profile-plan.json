@@ -1,0 +1,29 @@
+{
+  "created_utc": "2026-09-20T05:54:11.923527+00:00",
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+  "nested_owner": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+  "nested_sheet_owner": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "repeats": 2,
+  "warmup": 0,
+  "samples": 1,
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+  ],
+  "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+  "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+  "expected_lifecycle_calls": 3,
+  "expected_measured_calls": 1,
+  "expected_numbered_dumps": 4,
+  "scope": "Callgrind guest instructions attributed to the outer source-backed edit_sheets planning operation, including MultiSnapshot selector/catalog/closure construction and selected worksheet loading; staging, commit, publication, and returned edit teardown are outside the owner.",
+  "selection_policy": "Select the measured dump by one positive owner incoming edge from run_xlsx_cell_values_edit_save; select lifecycle dumps by one positive owner incoming edge from run_xlsx_cell_value_lifecycle_gates. Retain every numbered raw dump and the zero-Ir termination dump.",
+  "call_count_basis": "The lifecycle gate invokes edit_sheets for no-op, clear, and remove. Its foreign-source checks call publication only. The measured one-percent loop invokes edit_sheets once per one-sample child.",
+  "claim": "Attribution only; Callgrind Ir is a guest-instruction mechanism diagnostic and is not a latency, hardware-cycle, allocation, or production-change claim."
+}

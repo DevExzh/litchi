@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "name": "alloc-baseline-r2-dense-sparse",
+  "kind": "alloc",
+  "role": "baseline",
+  "lane": "alloc",
+  "repeat": 2,
+  "shape": "dense-sparse",
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0707-bin/baseline-alloc",
+    "--warmup",
+    "2",
+    "--samples",
+    "3",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0707/alloc-baseline-r2-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-20T05:55:23.553670+00:00",
+  "end_utc": "2026-09-20T05:55:25.410792+00:00",
+  "seconds": 1.5194109180010855,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0707-bin/baseline-alloc",
+  "binary_sha256": "38722d2b49b721dec045fd66642c13e79033fa2bfd870dfb47589acbaae55760",
+  "binary_bytes": 62980736,
+  "build_record_sha256": "ed1070fcb64245d174b820cb271913bbb6277860aba9094a1bb6cd111639a3b2",
+  "build_source_manifest_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+  "retained_source_manifest": "source-baseline.json",
+  "retained_source_manifest_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+  "retained_source_census_sha256": "e4a604bd7e28fe43122fb334925b190e22692515cb55f197022bbd2c4b190e3d",
+  "retained_source_entry_count": 7282,
+  "current_checkout_source": {
+    "before_artifact": "alloc-baseline-r2-dense-sparse.source-before.json",
+    "after_artifact": "alloc-baseline-r2-dense-sparse.source-after.json",
+    "before_sha256": "e4a604bd7e28fe43122fb334925b190e22692515cb55f197022bbd2c4b190e3d",
+    "after_sha256": "e4a604bd7e28fe43122fb334925b190e22692515cb55f197022bbd2c4b190e3d",
+    "before_file_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+    "after_file_sha256": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "plan_sha256": "0d3c0c7d24b003b662f679540e51bc184a4be1c71e5ea8ddc227401ff58a0302",
+  "script_sha256": "f90a787b9ecbec5cb6c308c4d12cdd91951a4c55fef31b8dce8af286b2564b6a",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "profile_plan_sha256": null,
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-baseline-r2-dense-sparse.json": "7520c03b487e1a24736ea4031887097218a5cf9a2c0ba1f8413a4793696193e8",
+    "alloc-baseline-r2-dense-sparse.source-after.json": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+    "alloc-baseline-r2-dense-sparse.source-before.json": "f5682d9ea41d3a598961725456a99fecb7286e3ef4c2a2121eb52d55767bd998",
+    "alloc-baseline-r2-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-baseline-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

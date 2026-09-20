@@ -1,0 +1,205 @@
+{
+  "scope": "Preserve byte-exact raw Callgrind output, annotations and stderr; no authored whitespace exception",
+  "files": {
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.callgrind": {
+      "sha256": "8b85c62bd3a629ceac4d90b3165daa5ce613817dbe8925ac53f7674e43dfdaf5",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.callgrind.1": {
+      "sha256": "1f7f3ba7642cb0e53434b824806f76c9d697790bd9fac95b57904f5d73b1decb",
+      "issues": {
+        "trailing whitespace.": 975
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.callgrind.2": {
+      "sha256": "e0f96563fa664fc2e3b1f825542e24be023134b35e93d5d004c0908d6efb670a",
+      "issues": {
+        "trailing whitespace.": 965
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.callgrind.3": {
+      "sha256": "1e4cafdf0d42636589be966aea9a4ff7e8e3f105d47a2edda8520f6437aa1d7d",
+      "issues": {
+        "trailing whitespace.": 965
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.callgrind.4": {
+      "sha256": "9298ac39485e4db6fb6a89b9747a0d184a5b8d2e22e3d7bdad4fd8c8f65a3c44",
+      "issues": {
+        "trailing whitespace.": 972
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.inclusive.txt": {
+      "sha256": "355cfe4050a5b23ac2ad625a4c359daaf9a8637352d953f8e57c730de79bb6e8",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.self.txt": {
+      "sha256": "a3f0fbf57020bcc607c51a2afc65029d0f805f48c74333ccf6b6d87be4303e32",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-dense-sparse.stderr": {
+      "sha256": "a7124c7c08a85505ac14caf6e17008bf3a4941d4e39080ceb253593edbc72ef1",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.callgrind": {
+      "sha256": "a1cbf243547fa5a3a02c3d4a1340e42d1a39a7be2225054c044ea356f4cef208",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.callgrind.1": {
+      "sha256": "f8f11bc72ab622678e9e0e07576f2871dc41d703230d392c7d1a4dde1c52b270",
+      "issues": {
+        "trailing whitespace.": 978
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.callgrind.2": {
+      "sha256": "3e5c851d24938b261b36c3ae9e8f0887b30ed2edac603b850e4a3f4ac42c2220",
+      "issues": {
+        "trailing whitespace.": 971
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.callgrind.3": {
+      "sha256": "bce9afcbeb28edba7842c2f9c4b4dd134e28ae77da4aea594c8b8e5a20dc42d5",
+      "issues": {
+        "trailing whitespace.": 971
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.callgrind.4": {
+      "sha256": "a5d81e75f50d7e5f8dbf86769f3bd0412d8ffb61d7bd38377a2415e4f76594ac",
+      "issues": {
+        "trailing whitespace.": 975
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.inclusive.txt": {
+      "sha256": "09d2e3b7d8c1bfb75a08ef4a5f0c3109a1f197470317eeb051f4ef82ae92a427",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.self.txt": {
+      "sha256": "702e01bfa19eaa8f516b8c3a99fdfc1766fc6f00c4e5639538694435c51e38da",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r1-medium.stderr": {
+      "sha256": "bff5f4eb192f829c5ab646cdb23f322fecf37c822d3aea5ae66dd89e00fdd39e",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.callgrind": {
+      "sha256": "7614fce04c0316d05ba938ef9014618d5d1f646ee1fc70630b1ec174731894a6",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.callgrind.1": {
+      "sha256": "aad945de9902f9c357a5620036891c5f75ff607e165cb3be304e6d292919f467",
+      "issues": {
+        "trailing whitespace.": 976
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.callgrind.2": {
+      "sha256": "650c171c19d674c52cc58b8ebffca0459a80afef1e0b0d1e1fa4021c7c0addde",
+      "issues": {
+        "trailing whitespace.": 964
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.callgrind.3": {
+      "sha256": "cd2ccf12d0d588ab79b38e551b188428114f719cb97bdb28ac503a3c701500dd",
+      "issues": {
+        "trailing whitespace.": 964
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.callgrind.4": {
+      "sha256": "8f84d53b775ffc610d097610e3dd04efeb416938fde3857edf08f8415b83d77a",
+      "issues": {
+        "trailing whitespace.": 971
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.inclusive.txt": {
+      "sha256": "293633d86770911e5905f240b3aa9af5083b2d0d3acc0c7f22448f5c36bd8a2d",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.self.txt": {
+      "sha256": "3eb1c5453b464e182730f3b9e526b14bf01adfc120ef9611e261f72490bbb4b4",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-dense-sparse.stderr": {
+      "sha256": "bcc88c212c1b510b4f75b72165359864685cdeeae8d154c937a2993423b58603",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.callgrind": {
+      "sha256": "471416332b8e957afb5efbc36b2694d1616d4d2e348ef90ac641ff5a29894581",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.callgrind.1": {
+      "sha256": "2bce244ab8f594f5979a373aa7a8f5a26a679dc612fa3819d14bc7d97f9f14ee",
+      "issues": {
+        "trailing whitespace.": 978
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.callgrind.2": {
+      "sha256": "771c1ebf3ac0ef8663fb3b9f55186688bd77eebbd272fd5c961413e07de5f4b7",
+      "issues": {
+        "trailing whitespace.": 971
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.callgrind.3": {
+      "sha256": "580dafc93fd3a32a84ba8dbb862d1479188fe3d09ebb04114735cd64b3e2c21d",
+      "issues": {
+        "trailing whitespace.": 970
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.callgrind.4": {
+      "sha256": "41c14998f599566325018e1beb8ba042c549208ddb5d86bdeddfa07d93e01c41",
+      "issues": {
+        "trailing whitespace.": 974
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.inclusive.txt": {
+      "sha256": "03f4a2ce8d3ee870c98fc7122bc19cbafdeb54e3fca61c99892c70516e2922ec",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.self.txt": {
+      "sha256": "25e51f78236d81318d09bfab39c16e78918b2f5fbb206af8db9870ff58becb5e",
+      "issues": {
+        "trailing whitespace.": 6,
+        "new blank line at EOF.": 1
+      }
+    },
+    "docs/performance/results/change-0707/profile-baseline-r2-medium.stderr": {
+      "sha256": "4767c5cfa3c8580e9518d2b70e82159cd2d638e55387913b8ff527ecc7f48b26",
+      "issues": {
+        "trailing whitespace.": 3
+      }
+    }
+  }
+}

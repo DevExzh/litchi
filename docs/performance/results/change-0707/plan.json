@@ -1,0 +1,23 @@
+{
+  "revision": "a664c8539894de38fea670bb34eaa66cc69058ce",
+  "created_utc": "2026-09-20T05:44:46.318534+00:00",
+  "cpu": 12,
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "native_repeats": 2,
+  "samples": 100,
+  "warmup": 20,
+  "allocation_repeats": 2,
+  "allocation_samples": 3,
+  "allocation_warmup": 2,
+  "profile_repeats": 2,
+  "profile_samples": 1,
+  "profile_warmup": 0,
+  "order": "Native then allocator then profiles; reverse shapes in repeat2; no overlapping benchmark/Cargo runs",
+  "claim": "Current-source planning attribution only; no before/after speedup claim",
+  "scope": "Existing instrumented in-memory source-backed one-percent edit/save; selected worksheets allfour; native total excludes sinksetup/reopen/oracles; allocator values separate",
+  "decision": "Choose a code change only after source and measured nested-owner attribution agree"
+}

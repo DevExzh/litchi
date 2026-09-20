@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0707 — current XLSX source-backed planning attribution
+
+[0707](0707-xlsx-planning-attribution.md) measures the unchanged source-backed
+one-percent XLSX edit/save route before selecting a candidate. Planning is
+35.75–36.88% of the native interval and publication is 41.06–42.72% on the
+two retained synthetic shapes. Planning also has the largest operation-region
+allocation count and requested-byte volume. Five same-build repeat flags over
+5% remain visible, with no native total drift over 5%. The measured Callgrind
+rows put the combined worksheet validation/parser owner at 96.36–96.79% of
+planning instructions and `Validator::observe` at 18.38–18.75%; its direct
+allocator edge counts are not treated as native allocation measurements.
+Nested inclusive rows are not summed. No before/after, RSS, physical cold-storage, native
+Office, parallel, or universal performance claim is admitted, and production
+is unchanged. The prospective validator name-storage experiment is a design
+handoff only. [Evidence packet](results/change-0707/README.md).
+
 ## 0706 — rejected XML attribute-cardinality pilot
 
 [0706](0706-xml-attribute-cardinality-pilot.md) measures a source-compatible
