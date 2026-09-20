@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0709 — DOCX ordinary-save baseline is diagnostic, with preservation work outstanding
+
+[0709](0709-docx-ordinary-save-baseline.md) refreshes the ordinary DOCX
+open/edit/save route after correcting the harness's real-file decoded-member
+metadata. The generated medium corpus, admitted real fixture, and refused
+fixture complete source-bound native and allocator acquisition; the independent
+analysis verifies custody, recomputed statistics, deterministic outputs, and
+harness-level lane parity. These checks do not promote workflow correctness:
+the strict public-API oracle finds that both no-edit and refused-edit
+`to_stream`/`save` routes rewrite decoded `docProps/custom.xml` (632 → 602
+bytes), while the main document and semantic text remain intact. The admitted
+marker edit itself passes its semantic checks. No speedup claim, native Office
+claim, profile conclusion, or broad CRUD coverage promotion follows this
+baseline. The next bounded task is the `custom_props_dirty` guard plus clean,
+dirty, retry, and raw OPC tests; iWork remains excluded. [Evidence packet](results/change-0709/README.md).
+
 ## 0708 — rejected XLSX validator name-storage pilot
 
 [0708](0708-xlsx-validator-name-storage.md) evaluates a private validator

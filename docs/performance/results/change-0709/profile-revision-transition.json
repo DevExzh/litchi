@@ -1,0 +1,12 @@
+{
+  "build_revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+  "profile_checkout_revision": "1de70e7c702081c2d7a46ff58b2bdc27339fe2ec",
+  "changed_paths": [
+    "docs/performance/results/change-0709/analyze_profiles.py",
+    "docs/performance/results/change-0709/profile-plan.json",
+    "docs/performance/results/change-0709/profile.py"
+  ],
+  "scope": "Only packet profile scripts committed between native capture and profile capture; production and harness source census and frozen binaries unchanged",
+  "patch_sha256": "c4d6e35f2bc75ce74f9bcc408d6f3cbdf5c83d30672efa6d4911ff4d1903cd75",
+  "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+}

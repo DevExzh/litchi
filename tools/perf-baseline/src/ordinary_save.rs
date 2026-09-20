@@ -69,6 +69,7 @@ use std::{
 };
 
 use serde::Serialize;
+use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 use soapberry_zip::{CompressionMethod, ZipArchive};
 
 use crate::{
@@ -867,11 +868,16 @@ fn generated_archive(format: Format) -> Result<(Vec<u8>, CorpusManifest), Box<dy
 fn real_file_manifest(
     format: Format,
     archive: &[u8],
+    members: &[(String, MemberFacts)],
     member_count: usize,
     main_part: &str,
-    main_payload_bytes: usize,
-    main_payload_sha256: String,
 ) -> Result<CorpusManifest, Box<dyn Error>> {
+    let uncompressed_payload_bytes = checked_uncompressed_member_bytes(members)?;
+    // Keep the manifest target on the decoded side of the ZIP boundary. The
+    // reader's default limits are finite, so a caller-named archive cannot
+    // turn this identity read into an unbounded decompression allocation.
+    let reader = ArchiveReader::new_with_limits(archive, ArchiveLimits::default())?;
+    let main_payload = reader.read(main_part)?;
     Ok(CorpusManifest {
         name: format!("{}-real-file-save", format.extension()),
         generator: format.real_file_generator(),
@@ -882,15 +888,27 @@ fn real_file_manifest(
         entry_count: member_count,
         archive_member_count: member_count,
         entry_bytes: 0,
-        uncompressed_payload_bytes: main_payload_bytes,
+        uncompressed_payload_bytes,
         archive_bytes: archive.len(),
         archive_sha256: sha256_hex(archive),
         target_entry: main_part.to_owned(),
-        target_payload_bytes: main_payload_bytes,
-        target_payload_sha256: main_payload_sha256,
+        target_payload_bytes: main_payload.len(),
+        target_payload_sha256: sha256_hex(&main_payload),
         rtf_variant: None,
         xlsx: None,
     })
+}
+
+fn checked_uncompressed_member_bytes(
+    members: &[(String, MemberFacts)],
+) -> Result<usize, Box<dyn Error>> {
+    let total = members.iter().try_fold(0_u64, |total, (_, facts)| {
+        total
+            .checked_add(facts.uncompressed_size)
+            .ok_or("real-file ZIP member uncompressed byte total overflows u64")
+    })?;
+    usize::try_from(total)
+        .map_err(|_| "real-file ZIP member uncompressed byte total does not fit usize".into())
 }
 
 /// Derives the XLSX edit target from the workbook itself: the first worksheet
@@ -985,18 +1003,16 @@ pub(crate) fn build_corpus(
             })?;
             let archive = read_bounded(path)?;
             let members = member_facts(&archive)?;
-            let main = members
+            members
                 .iter()
                 .find(|(name, _)| name == format.main_part())
                 .ok_or("ordinary-save real file lost its main part between classify and build")?;
-            let main_payload_sha256 = sha256_hex(&main.1.compressed);
             let manifest = real_file_manifest(
                 format,
                 &archive,
+                &members,
                 members.len(),
                 format.main_part(),
-                main.1.compressed.len(),
-                main_payload_sha256.clone(),
             )?;
             let provenance = RealFileProvenance {
                 path: path.display().to_string(),
@@ -1363,7 +1379,62 @@ pub(crate) fn run_case(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use soapberry_zip::office::StreamingArchiveWriter;
+
     use super::*;
+
+    struct TestDirectory(PathBuf);
+
+    struct ManifestFixture {
+        _directory: TestDirectory,
+        path: PathBuf,
+        archive: Vec<u8>,
+        main_payload: Vec<u8>,
+        opaque_payload: Vec<u8>,
+    }
+
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn real_file_manifest_fixture(format: Format) -> ManifestFixture {
+        let mut main_payload = b"<document>".to_vec();
+        main_payload.extend(std::iter::repeat_n(b'M', 64 * 1024));
+        main_payload.extend_from_slice(b"</document>");
+
+        let mut state = 0x1234_5678_u32;
+        let opaque_payload = (0..8 * 1024)
+            .map(|_| {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (state >> 24) as u8
+            })
+            .collect::<Vec<_>>();
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated(format.main_part(), &main_payload)
+            .expect("main ZIP member");
+        writer
+            .write_deflated("custom/opaque.bin", &opaque_payload)
+            .expect("opaque ZIP member");
+        let archive = writer.finish_to_bytes().expect("fixture ZIP");
+
+        let root = crate::filesystem::scratch_root(None, "ordinary-save-manifest-test")
+            .expect("fixture scratch root");
+        let path = root.join(format!("fixture.{}", format.extension()));
+        fs::write(&path, &archive).expect("fixture real file");
+        ManifestFixture {
+            _directory: TestDirectory(root),
+            path,
+            archive,
+            main_payload,
+            opaque_payload,
+        }
+    }
 
     #[test]
     fn formats_origins_and_phases_describe_themselves() {
@@ -1482,5 +1553,72 @@ mod tests {
                     .publications_identical
             );
         }
+    }
+
+    #[test]
+    fn real_file_manifest_uses_decoded_main_and_checked_member_totals() {
+        for format in Format::ALL {
+            let fixture = real_file_manifest_fixture(format);
+            assert_eq!(classify(&fixture.path).expect("fixture format"), format);
+
+            let archive_from_file = read_bounded(&fixture.path).expect("fixture read");
+            assert_eq!(archive_from_file, fixture.archive);
+            let members = member_facts(&archive_from_file).expect("fixture members");
+            let main_compressed_bytes = members
+                .iter()
+                .find(|(name, _)| name == format.main_part())
+                .expect("fixture main member")
+                .1
+                .compressed
+                .len();
+            let manifest = real_file_manifest(
+                format,
+                &archive_from_file,
+                &members,
+                members.len(),
+                format.main_part(),
+            )
+            .expect("real-file manifest");
+
+            assert_eq!(manifest.archive_bytes, fixture.archive.len());
+            assert_eq!(manifest.archive_sha256, sha256_hex(&fixture.archive));
+            assert_eq!(manifest.target_payload_bytes, fixture.main_payload.len());
+            assert_eq!(
+                manifest.target_payload_sha256,
+                sha256_hex(&fixture.main_payload)
+            );
+            assert_eq!(
+                manifest.uncompressed_payload_bytes,
+                fixture.main_payload.len() + fixture.opaque_payload.len()
+            );
+            assert!(main_compressed_bytes < fixture.main_payload.len());
+            assert_ne!(manifest.target_payload_bytes, main_compressed_bytes);
+            assert_ne!(manifest.uncompressed_payload_bytes, main_compressed_bytes);
+        }
+    }
+
+    #[test]
+    fn real_file_manifest_rejects_uncompressed_member_total_overflow() {
+        let members = vec![
+            (
+                "first".to_owned(),
+                MemberFacts {
+                    method: CompressionMethod::Store,
+                    compressed: Vec::new(),
+                    uncompressed_size: u64::MAX,
+                },
+            ),
+            (
+                "second".to_owned(),
+                MemberFacts {
+                    method: CompressionMethod::Store,
+                    compressed: Vec::new(),
+                    uncompressed_size: 1,
+                },
+            ),
+        ];
+        let error = checked_uncompressed_member_bytes(&members)
+            .expect_err("member total must use checked addition");
+        assert!(error.to_string().contains("overflows u64"));
     }
 }

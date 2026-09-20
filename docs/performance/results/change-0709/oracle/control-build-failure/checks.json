@@ -1,0 +1,36 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.28967957105487585,
+    "log": "fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "build",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/Cargo.toml",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0709",
+      "-j",
+      "2"
+    ],
+    "exit_code": 101,
+    "seconds": 0.4349441780941561,
+    "log": "build.log",
+    "log_sha256": "265dd69656c3e4522f5eeb23c747cc7a4cf069ab22e286e2ffa128943cbfbf40"
+  }
+]

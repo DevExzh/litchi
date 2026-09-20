@@ -1,0 +1,5 @@
+{
+  "error": "IndexError in refuse_existing eager message existing[0] when list empty",
+  "children_started": 0,
+  "correction": "format entire list in error message"
+}

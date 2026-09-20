@@ -1,0 +1,11 @@
+{
+  "status": "reviewed-known-preservation-failure",
+  "report_sha256": "d4807c2486529dc34594d9a556536bcc11a237f20479a2bf2192a4fc51696aa6",
+  "result_sha256": "b970a6940d486f5f7976296d2cc0c54b665004f122587d3b646227279a69c0c3",
+  "source_custom_sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+  "output_custom_sha256": "146d2312d442e391430cf609203fb11f0df47e43bfe582904e85cb98c31c1966",
+  "expanded_xml_tree_equal": true,
+  "exact_decoded_bytes_equal": false,
+  "scope": "ElementTree expanded names, sorted attributes, text, tail and ordered children; no native Office validation",
+  "admitted_scope": "Paragraph projection and marker checks pass; document relationships also change, so whole-package preservation is not established"
+}

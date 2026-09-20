@@ -1,0 +1,10 @@
+{
+  "reason": "Preserve failing strict oracle before adding decoded-byte and no-edit control diagnostics; do not weaken original assertions",
+  "binary": {
+    "original_path": "/home/zhuhe/code/litchi-0709-bin/oracle",
+    "path": "/home/zhuhe/code/litchi-0709-bin/oracle-first-semantic",
+    "sha256": "bfa2aafa771f5d9c61190285ceec4410d0881530c25bcf86096c96eed86b0518",
+    "bytes": 4765416
+  },
+  "archive": "first-semantic/"
+}

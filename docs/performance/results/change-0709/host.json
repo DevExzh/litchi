@@ -1,0 +1,120 @@
+{
+  "utc": "2026-09-20T07:06:57.658588+00:00",
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "commands": [
+    {
+      "command": [
+        "rustc",
+        "-Vv"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "-V"
+      ],
+      "exit_code": 0,
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "uname",
+        "-a"
+      ],
+      "exit_code": 0,
+      "stdout": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "lscpu"
+      ],
+      "exit_code": 0,
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "free",
+        "-b"
+      ],
+      "exit_code": 0,
+      "stdout": "               total        used        free      shared  buff/cache   available\nMem:     132553797632 41835597824 44523483136 30101897216 77545410560 90718199808\nSwap:              0           0           0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "df",
+        "-T",
+        "."
+      ],
+      "exit_code": 0,
+      "stdout": "Filesystem     Type  1K-blocks       Used Available Use% Mounted on\n/dev/root      ext4 2033087068 1538589320 494481364  76% /\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "findmnt",
+        "-T",
+        "."
+      ],
+      "exit_code": 0,
+      "stdout": "TARGET SOURCE         FSTYPE OPTIONS\n/      /dev/nvme0n1p1 ext4   rw,relatime,discard,errors=remount-ro,commit=30\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "ps",
+        "-eo",
+        "pid,comm"
+      ],
+      "exit_code": 0,
+      "stdout": "    PID COMMAND\n      1 systemd\n      2 kthreadd\n      3 pool_workqueue_release\n      4 kworker/R-rcu_gp\n      5 kworker/R-sync_wq\n      6 kworker/R-kvfree_rcu_reclaim\n      7 kworker/R-slub_flushwq\n      8 kworker/R-netns\n     10 kworker/0:0H-kblockd\n     12 kworker/u128:0-ipv6_addrconf\n     13 kworker/R-mm_percpu_wq\n     14 ksoftirqd/0\n     15 pr/ttyS0\n     16 rcu_sched\n     17 rcu_exp_par_gp_kthread_worker/1\n     18 rcu_exp_gp_kthread_worker\n     19 migration/0\n     20 kprobe-optimizer\n     21 idle_inject/0\n     22 cpuhp/0\n     23 cpuhp/1\n     24 idle_inject/1\n     25 migration/1\n     26 ksoftirqd/1\n     28 kworker/1:0H-kblockd\n     29 cpuhp/2\n     30 idle_inject/2\n     31 migration/2\n     32 ksoftirqd/2\n     34 kworker/2:0H-kblockd\n     35 cpuhp/3\n     36 idle_inject/3\n     37 migration/3\n     38 ksoftirqd/3\n     40 kworker/3:0H-kblockd\n     41 cpuhp/4\n     42 idle_inject/4\n     43 migration/4\n     44 ksoftirqd/4\n     46 kworker/4:0H-kblockd\n     47 cpuhp/5\n     48 idle_inject/5\n     49 migration/5\n     50 ksoftirqd/5\n     52 kworker/5:0H-kblockd\n     53 cpuhp/6\n     54 idle_inject/6\n     55 migration/6\n     56 ksoftirqd/6\n     58 kworker/6:0H-kblockd\n     59 cpuhp/7\n     60 idle_inject/7\n     61 migration/7\n     62 ksoftirqd/7\n     64 kworker/7:0H-kblockd\n     65 cpuhp/8\n     66 idle_inject/8\n     67 migration/8\n     68 ksoftirqd/8\n     70 kworker/8:0H-kblockd\n     71 cpuhp/9\n     72 idle_inject/9\n     73 migration/9\n     74 ksoftirqd/9\n     76 kworker/9:0H-kblockd\n     77 cpuhp/10\n     78 idle_inject/10\n     79 migration/10\n     80 ksoftirqd/10\n     82 kworker/10:0H-kblockd\n     83 cpuhp/11\n     84 idle_inject/11\n     85 migration/11\n     86 ksoftirqd/11\n     88 kworker/11:0H-kblockd\n     89 cpuhp/12\n     90 idle_inject/12\n     91 migration/12\n     92 ksoftirqd/12\n     94 kworker/12:0H-kblockd\n     95 cpuhp/13\n     96 idle_inject/13\n     97 migration/13\n     98 ksoftirqd/13\n    100 kworker/13:0H-kblockd\n    101 cpuhp/14\n    102 idle_inject/14\n    103 migration/14\n    104 ksoftirqd/14\n    106 kworker/14:0H-kblockd\n    107 cpuhp/15\n    108 idle_inject/15\n    109 migration/15\n    110 ksoftirqd/15\n    112 kworker/15:0H-kblockd\n    113 cpuhp/16\n    114 idle_inject/16\n    115 migration/16\n    116 ksoftirqd/16\n    118 kworker/16:0H-kblockd\n    119 rcu_exp_par_gp_kthread_worker/2\n    120 cpuhp/17\n    121 idle_inject/17\n    122 migration/17\n    123 ksoftirqd/17\n    125 kworker/17:0H-kblockd\n    126 cpuhp/18\n    127 idle_inject/18\n    128 migration/18\n    129 ksoftirqd/18\n    131 kworker/18:0H-kblockd\n    132 cpuhp/19\n    133 idle_inject/19\n    134 migration/19\n    135 ksoftirqd/19\n    137 kworker/19:0H-kblockd\n    138 cpuhp/20\n    139 idle_inject/20\n    140 migration/20\n    141 ksoftirqd/20\n    143 kworker/20:0H-kblockd\n    144 cpuhp/21\n    145 idle_inject/21\n    146 migration/21\n    147 ksoftirqd/21\n    149 kworker/21:0H-kblockd\n    150 cpuhp/22\n    151 idle_inject/22\n    152 migration/22\n    153 ksoftirqd/22\n    155 kworker/22:0H-kblockd\n    156 cpuhp/23\n    157 idle_inject/23\n    158 migration/23\n    159 ksoftirqd/23\n    161 kworker/23:0H-kblockd\n    162 cpuhp/24\n    163 idle_inject/24\n    164 migration/24\n    165 ksoftirqd/24\n    167 kworker/24:0H-kblockd\n    168 cpuhp/25\n    169 idle_inject/25\n    170 migration/25\n    171 ksoftirqd/25\n    173 kworker/25:0H-kblockd\n    174 cpuhp/26\n    175 idle_inject/26\n    176 migration/26\n    177 ksoftirqd/26\n    179 kworker/26:0H-kblockd\n    180 cpuhp/27\n    181 idle_inject/27\n    182 migration/27\n    183 ksoftirqd/27\n    185 kworker/27:0H-kblockd\n    186 cpuhp/28\n    187 idle_inject/28\n    188 migration/28\n    189 ksoftirqd/28\n    191 kworker/28:0H-kblockd\n    192 cpuhp/29\n    193 idle_inject/29\n    194 migration/29\n    195 ksoftirqd/29\n    197 kworker/29:0H-kblockd\n    198 cpuhp/30\n    199 idle_inject/30\n    200 migration/30\n    201 ksoftirqd/30\n    203 kworker/30:0H-kblockd\n    204 cpuhp/31\n    205 idle_inject/31\n    206 migration/31\n    207 ksoftirqd/31\n    209 kworker/31:0H-kblockd\n    214 kdevtmpfs\n    215 kworker/R-inet_frag_wq\n    216 rcu_tasks_kthread\n    217 rcu_tasks_rude_kthread\n    218 kauditd\n    219 khungtaskd\n    220 oom_reaper\n    223 kworker/R-writeback\n    224 kcompactd0\n    225 ksmd\n    226 khugepaged\n    227 kworker/R-kblockd\n    228 kworker/R-blkcg_punt_bio\n    229 kworker/R-kintegrityd\n    231 irq/9-acpi\n    236 kworker/R-tpm_dev_wq\n    237 kworker/R-ata_sff\n    238 kworker/R-md_bitmap\n    239 kworker/R-md_llbitmap_io\n    240 kworker/R-md_llbitmap_unplug\n    241 kworker/R-edac-poller\n    242 kworker/u128:1-ipv6_addrconf\n    243 kworker/R-devfreq_wq\n    244 watchdogd\n    247 kworker/R-quota_events_unbound\n    249 kswapd0\n    250 ecryptfs-kthread\n    252 kworker/R-kthrotld\n    253 irq/24-pciehp\n    254 irq/25-pciehp\n    255 irq/26-pciehp\n    256 irq/27-pciehp\n    257 irq/28-pciehp\n    258 irq/29-pciehp\n    259 irq/30-pciehp\n    260 irq/31-pciehp\n    261 irq/32-pciehp\n    262 irq/33-pciehp\n    263 irq/34-pciehp\n    264 irq/35-pciehp\n    265 irq/36-pciehp\n    266 irq/37-pciehp\n    267 irq/38-pciehp\n    268 irq/39-pciehp\n    269 irq/40-pciehp\n    270 irq/41-pciehp\n    271 irq/42-pciehp\n    272 irq/43-pciehp\n    273 irq/44-pciehp\n    274 irq/45-pciehp\n    275 irq/46-pciehp\n    276 irq/47-pciehp\n    277 irq/48-pciehp\n    278 irq/49-pciehp\n    279 irq/50-pciehp\n    280 irq/51-pciehp\n    281 irq/52-pciehp\n    282 irq/53-pciehp\n    283 irq/54-pciehp\n    284 irq/55-pciehp\n    285 irq/56-pciehp\n    286 irq/57-pciehp\n    287 irq/58-pciehp\n    288 irq/59-pciehp\n    289 irq/60-pciehp\n    290 irq/61-pciehp\n    291 irq/62-pciehp\n    292 irq/63-pciehp\n    293 irq/64-pciehp\n    294 irq/65-pciehp\n    295 irq/66-pciehp\n    296 irq/67-pciehp\n    297 irq/68-pciehp\n    298 kworker/R-acpi_thermal_pm\n    299 kworker/R-nvme-wq\n    300 kworker/R-nvme-reset-wq\n    301 kworker/R-nvme-delete-wq\n    302 kworker/R-nvme-auth-wq\n    303 kworker/R-mld\n    304 kworker/R-ipv6_addrconf\n    305 kworker/R-kstrp\n    319 kworker/u133:0\n    320 kworker/u134:0\n    321 kworker/u135:0\n    322 kworker/u136:0\n    323 kworker/u137:0\n    335 kworker/R-charger_manager\n    337 jbd2/nvme0n1p1-8\n    338 kworker/R-ext4-rsv-conversion\n    388 kworker/16:1H-kblockd\n    399 systemd-journal\n    416 kworker/R-kmpathd\n    417 kworker/R-kmpath_handlerd\n    438 kworker/R-tls-strp\n    453 multipathd\n    462 kworker/0:1H-kblockd\n    472 systemd-resolve\n    478 systemd-udevd\n    479 psimon\n    582 kworker/R-ena\n    632 jbd2/nvme0n1p13-8\n    633 kworker/R-ext4-rsv-conversion\n    942 kworker/R-cfg80211\n    949 kworker/31:1H-kblockd\n    959 kworker/14:1H-kblockd\n    965 kworker/15:1H-kblockd\n    966 kworker/18:1H-kblockd\n    967 kworker/17:1H-kblockd\n    984 systemd-network\n   1033 acpid\n   1035 chronyd-starter\n   1037 cron\n   1041 dbus-daemon\n   1049 irqbalance\n   1055 networkd-dispat\n   1059 amazon-ssm-agen\n   1063 snapd\n   1070 systemd-logind\n   1085 rsyslogd\n   1086 sshd\n   1122 unattended-upgr\n   1151 kworker/19:1H-kblockd\n   1152 kworker/20:1H-kblockd\n   1156 chronyd\n   1157 kworker/21:1H-kblockd\n   1159 kworker/22:1H-kblockd\n   1160 kworker/23:1H-kblockd\n   1161 kworker/24:1H-kblockd\n   1165 kworker/25:1H-kblockd\n   1167 kworker/26:1H-kblockd\n   1168 kworker/27:1H-kblockd\n   1172 kworker/28:1H-kblockd\n   1176 chronyd\n   1179 kworker/29:1H-kblockd\n   1180 kworker/30:1H-kblockd\n   1198 agetty\n   1276 containerd\n   1288 agetty\n   1295 lighttpd\n   1349 kworker/8:1H-kblockd\n   1368 kworker/9:1H-kblockd\n   1391 dockerd\n   1398 kworker/2:1H-kblockd\n   1418 kworker/1:1H-kblockd\n   1432 kworker/11:1H-kblockd\n   1505 kworker/3:1H-kblockd\n   1530 kworker/10:1H-kblockd\n   1962 kworker/4:1H-kblockd\n   1963 kworker/5:1H-kblockd\n   1964 kworker/6:1H-kblockd\n   1965 kworker/7:1H-kblockd\n   2028 systemd\n   2030 (sd-pam)\n   2206 kworker/12:1H-kblockd\n   2207 kworker/13:1H-kblockd\n   2276 tmux: server\n   2278 dbus-daemon\n   2349 bash\n   2690 bash\n 160387 code-08d4889f9e\n 163296 bash\n 163502 bash\n 227101 bash\n 250109 bash\n 254895 bash\n 264200 bash\n 265000 bash\n 297017 bash\n 527786 bash\n 554434 bash\n 595140 bash\n 613304 bun\n 613306 MainThread\n 677024 codex\n 678397 codex-code-mode\n 678584 codex\n 679820 codex-code-mode\n 716338 bash\n 823437 kworker/9:1-events\n1064723 nvim\n1064724 nvim\n1096650 kworker/31:0-events\n1097573 kworker/30:0-events\n1156509 sshd-session\n1164994 sshd-session\n1165355 bash\n1165376 bash\n1170194 tmux: client\n1261180 MainThread\n1261210 cloudflared\n1277495 kworker/13:1-events\n1319013 kworker/6:0-events\n1359817 kworker/u130:1-events_unbound\n1389375 kworker/10:0-events\n1390476 bash\n1424130 kworker/u131:1-flush-259:0\n1439238 kworker/24:1-events\n1440950 kworker/8:0-events\n1445149 kworker/7:1-events\n1471255 kworker/11:1-events\n1473588 kworker/4:0-events\n1493787 kworker/17:0-events\n1494790 kworker/u132:1-events_power_efficient\n1494791 kworker/21:1-events\n1495808 kworker/0:0-events\n1497924 kworker/u131:0-events_unbound\n1506080 kworker/u129:2-flush-259:0\n1523719 kworker/18:1-events\n1534862 kworker/u130:3-events_unbound\n1541063 kworker/3:1-events\n1543015 kworker/25:0-events\n1558540 kworker/u131:3-flush-259:0\n1571570 kworker/28:2-events\n1577474 kworker/u129:0-flush-259:0\n1577494 kworker/14:0-events\n1584722 kworker/15:2-events\n1592056 kworker/u130:0-events_unbound\n1592467 kworker/22:2-events\n1593064 kworker/1:1-events\n1594994 kworker/27:0-events\n1596569 kworker/19:1-events\n1597144 kworker/20:1-events\n1599166 kworker/5:0-events\n1599557 kworker/29:2-events\n1599643 kworker/2:2-events\n1600968 kworker/u132:2-events_unbound\n1605177 kworker/u129:3-events_unbound\n1605375 kworker/26:0-events\n1605831 kworker/16:2-events\n1605904 postgres\n1606172 kworker/5:2-events\n1606674 kworker/23:0-events\n1610258 kworker/0:1-events\n1612079 kworker/3:2-events\n1612346 postgres\n1613008 kworker/12:2-events\n1613142 kworker/6:2-events\n1613346 kworker/9:2-events\n1613900 kworker/19:0-events\n1614088 kworker/2:1-events\n1614606 kworker/24:0-events\n1614813 kworker/1:0-events\n1614946 kworker/26:2-events\n1615694 kworker/17:1-events\n1615732 kworker/28:0-events\n1621304 kworker/21:0-events\n1624769 kworker/20:2-events\n1629326 nvim\n1629327 nvim\n1632241 kworker/31:2-events\n1632353 kworker/23:1-events\n1632680 kworker/0:2-events\n1633055 kworker/16:0-events\n1633651 kworker/7:0-events\n1633909 kworker/14:1-events\n1634124 kworker/11:2-events\n1634493 kworker/22:0-events\n1634546 kworker/12:1-events\n1634657 kworker/8:1-events\n1634734 kworker/4:1-events\n1634831 kworker/30:2-events\n1634955 kworker/25:1-events\n1635051 kworker/15:0-events\n1636221 kworker/u130:2-events_unbound\n1636240 kworker/10:2-events\n1636367 kworker/u132:0-flush-259:0\n1636386 kworker/13:0-mm_percpu_wq\n1636833 kworker/29:1-events\n1636854 kworker/27:2-events\n1637046 kworker/18:0-mm_percpu_wq\n1637473 kworker/20:0-events\n1637503 kworker/24:2-events\n1637535 kworker/2:0-events\n1637631 kworker/21:2-events\n1637668 kworker/31:1-events\n1639214 kworker/1:2-events\n1654579 kworker/23:2-events\n1655770 kworker/u131:2-flush-259:0\n1656182 kworker/5:1-events\n1656678 kworker/14:2-mm_percpu_wq\n1656786 python3\n1656806 cargo\n1657858 kworker/7:2-events\n1659067 kworker/4:2-events\n1659244 kworker/26:1-mm_percpu_wq\n1661415 kworker/11:0-events\n1663432 kworker/15:1-events\n1664291 kworker/10:1-mm_percpu_wq\n1664560 kworker/u129:1-events_unbound\n1664652 kworker/19:2-events\n1665056 kworker/25:2-mm_percpu_wq\n1665432 postgres\n1665433 postgres\n1665872 rustc\n1666033 kworker/30:1-events\n1666091 rustc\n1666167 kworker/8:2-events\n1666423 bash\n1666424 python3\n1666465 ps\n2265882 polkitd\n2265899 ModemManager\n2265966 psimon\n2266053 upowerd\n2266062 udisksd\n2287297 bun\n2434642 kimi-code\n2463606 bash\n2463728 nvim\n2463729 nvim\n2463966 bash\n2465256 kimi-code\n2465319 kimi-code\n2540422 bash\n2581204 bash\n2612069 postgres\n2612070 postgres\n2612071 postgres\n2612072 postgres\n2612073 postgres\n2612074 postgres\n2612076 postgres\n2612077 postgres\n2612078 postgres\n2622579 MainThread\n2622580 bash\n2622586 MainThread\n2622587 bash\n2622594 MainThread\n2622651 postgres\n2622655 postgres\n2713678 bash\n2763755 at-spi-bus-laun\n2786044 bash\n2854579 bash\n2960390 containerd-shim\n2960413 systemd\n2960515 docker-proxy\n2960643 systemd-journal\n2960688 containerd\n2961174 containerd-shim\n2961195 containerd-shim\n2961235 containerd-shim\n2961240 containerd-shim\n2961289 pause\n2961298 pause\n2961302 pause\n2961314 pause\n2961467 kube-controller\n2961493 kube-scheduler\n2961573 kube-apiserver\n2961580 etcd\n2961713 psimon\n2961728 kubelet\n2962670 containerd-shim\n2962687 containerd-shim\n2962722 pause\n2962730 pause\n2962825 kube-proxy\n2962880 kindnetd\n2964050 containerd-shim\n2964084 containerd-shim\n2964103 containerd-shim\n2964150 pause\n2964157 pause\n2964164 pause\n2964333 coredns\n2964343 local-path-prov\n2964346 coredns\n3029839 containerd-shim\n3029863 pause\n3029889 redis-server\n3031859 containerd-shim\n3031884 pause\n3031910 tilt-restart-wr\n3031934 entr\n3085443 service\n3408199 bash\n3409828 MainThread\n3444008 bash\n3451619 kimi-code\n3707601 lazygit\n3708689 MainThread\n3740692 bash\n3870805 bash\n",
+      "stderr": ""
+    }
+  ],
+  "scope": "Build-time host snapshot; no continuous isolation guarantee; no cache dropping"
+}

@@ -1,0 +1,44 @@
+   Compiling syn v2.0.119
+   Compiling generic-array v0.14.9
+    Checking hybrid-array v0.4.14
+   Compiling num-traits v0.2.19
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+   Compiling zerocopy v0.8.56
+   Compiling synstructure v0.13.2
+   Compiling rustix v1.1.4
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+    Checking zerofrom v0.1.8
+   Compiling zerovec-derive v0.11.3
+    Checking yoke v0.8.3
+    Checking zerotrie v0.2.4
+    Checking digest v0.11.3
+    Checking digest v0.10.7
+    Checking zerovec v0.11.6
+    Checking sha2 v0.10.9
+    Checking tinystr v0.8.3
+    Checking icu_locale_core v2.2.0
+    Checking potential_utf v0.1.5
+    Checking icu_collections v2.2.0
+    Checking icu_provider v2.2.0
+    Checking icu_normalizer v2.2.0
+    Checking icu_properties v2.2.0
+    Checking chrono v0.4.45
+    Checking idna_adapter v1.2.2
+    Checking sha2 v0.11.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking tempfile v3.27.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking docx-ordinary-save-oracle-0709 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.84s

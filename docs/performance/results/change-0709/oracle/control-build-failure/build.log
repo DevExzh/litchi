@@ -1,0 +1,25 @@
+   Compiling docx-ordinary-save-oracle-0709 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle)
+error[E0596]: cannot borrow `package` as mutable, as it is not declared as mutable
+   --> src/main.rs:613:5
+    |
+613 |     package.to_stream(&mut output)?;
+    |     ^^^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+611 |     let mut package = Package::open(source_path)?;
+    |         +++
+
+error[E0596]: cannot borrow `package` as mutable, as it is not declared as mutable
+   --> src/main.rs:640:5
+    |
+640 |     package.save(&output_path)?;
+    |     ^^^^^^^ cannot borrow as mutable
+    |
+help: consider changing this to be mutable
+    |
+639 |     let mut package = Package::open(source_path)?;
+    |         +++
+
+For more information about this error, try `rustc --explain E0596`.
+error: could not compile `docx-ordinary-save-oracle-0709` (bin "docx-ordinary-save-oracle-0709") due to 2 previous errors

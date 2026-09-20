@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "tools/test_perf_baseline_source_policy.py"
+  ],
+  "exit_code": 0,
+  "seconds": 0.05029195791576058,
+  "log_sha256": "7572abc7d861764a9862975208af7dc23f57e457e748975758db1a3893c9fbbd"
+}

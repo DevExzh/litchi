@@ -1,0 +1,14 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 1m 34s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0709/release/deps/litchi_perf_baseline-33885687342732a3)
+
+running 6 tests
+test ordinary_save::tests::every_ordinary_save_case_is_opt_in_and_round_trips ... ok
+test ordinary_save::tests::formats_origins_and_phases_describe_themselves ... ok
+test ordinary_save::tests::real_file_manifest_rejects_uncompressed_member_total_overflow ... ok
+test ordinary_save::tests::real_file_manifest_uses_decoded_main_and_checked_member_totals ... ok
+test ordinary_save::tests::generated_docx_save_is_deterministic_and_reports_its_byte_split ... ok
+test ordinary_save::tests::generated_xlsx_and_pptx_saves_are_deterministic ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 524 filtered out; finished in 0.18s
+

@@ -1,0 +1,439 @@
+[
+  {
+    "fixture": {
+      "label": "numbered-list",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true
+    },
+    "members": [
+      {
+        "name": "[Content_Types].xml",
+        "bytes": 2079,
+        "compressed_bytes": 460,
+        "sha256": "0ef4fbe7f84036b4963be096cc139f5cfd0124848c4fb892eeb1dc3f32f5d610",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "_rels/.rels",
+        "bytes": 590,
+        "compressed_bytes": 243,
+        "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/_rels/document.xml.rels",
+        "bytes": 1622,
+        "compressed_bytes": 374,
+        "sha256": "a0bac0323ead9628a837cdad689cc559a1e8e5cbddb2f80156a59dab0447d8bf",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/document.xml",
+        "bytes": 4563,
+        "compressed_bytes": 1242,
+        "sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/endnotes.xml",
+        "bytes": 1530,
+        "compressed_bytes": 457,
+        "sha256": "810a35859563fe6a4feb406e19791f70a6c487e4332c0e415fa72cc6c2abe741",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/footnotes.xml",
+        "bytes": 1536,
+        "compressed_bytes": 458,
+        "sha256": "c630c3ba2c6b4430b9024e5a17e87d5e5dc54997170edf833a0689c700addebe",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/footer1.xml",
+        "bytes": 2001,
+        "compressed_bytes": 624,
+        "sha256": "ce2f4fd30421f880e2d38d20013c8141e6e0403650dd8268051201d7e40abeab",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/theme/theme1.xml",
+        "bytes": 6992,
+        "compressed_bytes": 1686,
+        "sha256": "bf4992e3fa7832e5c68fdbc4ec5189c8e5d347fef03c5ba2522ad704bde5078f",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/_rels/settings.xml.rels",
+        "bytes": 373,
+        "compressed_bytes": 249,
+        "sha256": "48f4f74a2b747f121de78c6bf3c096b2aae16ab95af5f0f782afbbb8f37883f4",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/settings.xml",
+        "bytes": 17262,
+        "compressed_bytes": 4227,
+        "sha256": "7673c424e5caf93de822959d7ecceabb0a468addf775fb9d5d756699c711224b",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/styles.xml",
+        "bytes": 173620,
+        "compressed_bytes": 16794,
+        "sha256": "abaa5f800e916cfcb11b0dae7f27c7a27df7e3f980d9439c8d309c6d6062e862",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/numbering.xml",
+        "bytes": 46532,
+        "compressed_bytes": 4328,
+        "sha256": "504f4220ee9ec6f124fd3ec18daf763873e0a12ddf6bc87c84a1741939c94982",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "customXml/_rels/item1.xml.rels",
+        "bytes": 296,
+        "compressed_bytes": 194,
+        "sha256": "80482f86e196171d66001e0e74d1900408a3aaf2463e54005d251b5f2db9a0b0",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/itemProps1.xml",
+        "bytes": 333,
+        "compressed_bytes": 238,
+        "sha256": "2cdb70037edb05582017b71de18d4db5094dd341f48f961c6455c5f525b324f9",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/fontTable.xml",
+        "bytes": 3153,
+        "compressed_bytes": 776,
+        "sha256": "ddf62b3345aeff04a2dbb36c4abe637f91e56098eaf4d1fa23f88ac5cd9948e1",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "docProps/core.xml",
+        "bytes": 621,
+        "compressed_bytes": 319,
+        "sha256": "61c6b50a90567e5325669e09f0df22b5e7b2be7cf5246d04d0cbe61e5cfb91fe",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/item1.xml",
+        "bytes": 3177,
+        "compressed_bytes": 562,
+        "sha256": "683bcb920b3549f8e91115bbe83a35af0479922ec22748ec9c8c74a6a1626649",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/webSettings.xml",
+        "bytes": 832,
+        "compressed_bytes": 373,
+        "sha256": "adc66c7c59549a52898013b74e050600d5ee77d62bac6efebda080f884dcd9c2",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/stylesWithEffects.xml",
+        "bytes": 174373,
+        "compressed_bytes": 16940,
+        "sha256": "dab72c42614cea6d89751165d37ebe83d56e5a91ef2c0d63f58ad7d7f62433f1",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "docProps/app.xml",
+        "bytes": 970,
+        "compressed_bytes": 467,
+        "sha256": "c0771716099c45c6ecf9e96446e8b1c744c1859359ed8145a7c725258952a188",
+        "mce_namespace_literal": false
+      }
+    ],
+    "main_part_bytes": 4563,
+    "direct_body_paragraphs": 4,
+    "scope": "ZIP decoded-member census and structural XML count only; not API admission or preservation proof",
+    "self_reported_application": {
+      "Application": "Microsoft Office Word",
+      "AppVersion": "14.0000"
+    },
+    "provenance_limit": "Checked-in third-party fixture with self-reported producer metadata; no native Office reopening performed in this batch"
+  },
+  {
+    "fixture": {
+      "label": "alt-chunk-header",
+      "path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "bytes": 77621,
+      "expected_edit_admitted": false
+    },
+    "members": [
+      {
+        "name": "[Content_Types].xml",
+        "bytes": 3294,
+        "compressed_bytes": 497,
+        "sha256": "6b7df229e0287da0c0e461e9fa77b1c99bb64c3ba606d23cadabf76c42a9caf1",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "_rels/.rels",
+        "bytes": 883,
+        "compressed_bytes": 303,
+        "sha256": "74d51edee3a58e2579b973d064c4cb071b94789dc5e3e6eaf2520eeedcb4d233",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/_rels/document.xml.rels",
+        "bytes": 2625,
+        "compressed_bytes": 401,
+        "sha256": "f5290c4c12fe55c5b842ceb5851834c774f20d8038ae40fc01e2ca2ac2369f4f",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/document.xml",
+        "bytes": 3476,
+        "compressed_bytes": 905,
+        "sha256": "f573a236ac24f491ef2728208b8fdb7d63c70013f57aeae95dd737ae6ad840ee",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/footnotes.xml",
+        "bytes": 5047,
+        "compressed_bytes": 884,
+        "sha256": "14db3b0c47ca01708a40395dbd407e81bd36d7637a497e978086b612d337735b",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/endnotes.xml",
+        "bytes": 5041,
+        "compressed_bytes": 888,
+        "sha256": "f10049c42f016cd9da0541d32a2e49115b4c9c3777154ed8d72adea839ea8eaf",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/header1.xml",
+        "bytes": 2593,
+        "compressed_bytes": 605,
+        "sha256": "9e9e793017139e4b45ecfe5bb68fe9eba6f2a37800d10ba0af80bba2cb8b06ea",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/header2.xml",
+        "bytes": 10551,
+        "compressed_bytes": 3809,
+        "sha256": "67ee51b81f20f337ac6a9f403e8f265e39842de19429952d66c3a24de03544c1",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/header3.xml",
+        "bytes": 2593,
+        "compressed_bytes": 604,
+        "sha256": "4542edd1a5dd0bd84baa4bf5dc4e565ac34266c401c02b19b51d986dcacfe746",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/footer3.xml",
+        "bytes": 2593,
+        "compressed_bytes": 605,
+        "sha256": "508cd43d95b6675a2ce78e617f11bdd7441d5c1e9f6edeb0a6d3a60813cbd05c",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/footer1.xml",
+        "bytes": 2593,
+        "compressed_bytes": 606,
+        "sha256": "475cff38df3166944aa3115bfde097e605555b728b1136f696091578fc5000eb",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/_rels/header2.xml.rels",
+        "bytes": 289,
+        "compressed_bytes": 188,
+        "sha256": "94bca6aec3177c3b64686e1248ecfb39e9750dc067c2274af33e6b442d1f6617",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/_rels/footer2.xml.rels",
+        "bytes": 289,
+        "compressed_bytes": 184,
+        "sha256": "945fc39fce65dd016b4dc56362fef96e0bf6b75b7c066948a9bf0fb17721923d",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/footer2.xml",
+        "bytes": 6169,
+        "compressed_bytes": 1412,
+        "sha256": "8ac85e6246d46deac81ba5066960090c8a370a7351a88baf77ba644ab6071fee",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/media/image1.png",
+        "bytes": 6464,
+        "compressed_bytes": 6464,
+        "sha256": "c1b1e51d4efc36f5741231f707c604cd1bff2645a2d8329827ac5989b3609adc",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/theme/theme1.xml",
+        "bytes": 7042,
+        "compressed_bytes": 1530,
+        "sha256": "2032598324b6bd78fe69743b8a9297eca5aa544e173041e9df92e219fea0b3bd",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/media/image2.png",
+        "bytes": 8697,
+        "compressed_bytes": 8697,
+        "sha256": "623f52bf86c700d1e496fd74f5b05f06a005e2d1e58eb104572b57f8a196eb48",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/settings.xml",
+        "bytes": 3940,
+        "compressed_bytes": 1282,
+        "sha256": "f869ad032b0cc6038d8321195d980be0f860d9ece57e2a86be7f32c1a94d7963",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/_rels/settings.xml.rels",
+        "bytes": 395,
+        "compressed_bytes": 253,
+        "sha256": "afadfd9c55d9e06cc7895733178d54f03d11272e56ecc7153f27ca23074a95bc",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/item1.xml",
+        "bytes": 270,
+        "compressed_bytes": 175,
+        "sha256": "c8092edbb672f8c93f1d5ef66539a6f169462ba8738b785b59cc5d96f4aca59a",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/itemProps1.xml",
+        "bytes": 341,
+        "compressed_bytes": 226,
+        "sha256": "0e435e7ba46625ffe47a147c0472a3d3e3b2a4a830ae6a7d0207fde8b1a24d20",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/item2.xml",
+        "bytes": 143,
+        "compressed_bytes": 122,
+        "sha256": "c427db5dc8ef58bee18cde5c6d523d6c3695ffd71e5ea223aeedce11eaba0e23",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/itemProps2.xml",
+        "bytes": 363,
+        "compressed_bytes": 263,
+        "sha256": "827938ae2f691c5852ef245bc906cc430bff401cb146e03f4fd154ca4dcde73a",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/item3.xml",
+        "bytes": 5658,
+        "compressed_bytes": 681,
+        "sha256": "c9708857f0569c6c68a43657ba69390dc3f6acdff8744d45ee1e51066946cbe9",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/itemProps3.xml",
+        "bytes": 307,
+        "compressed_bytes": 232,
+        "sha256": "622d9c7a42ab220472e5f2cb6e91a807b11f81839223135b9347927a5bf14c67",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/numbering.xml",
+        "bytes": 24010,
+        "compressed_bytes": 2435,
+        "sha256": "f7163e03f4b53e0b6bdfe753ada2b50ad8b59401495625cc15c8d2b14e9da01f",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/styles.xml",
+        "bytes": 1139,
+        "compressed_bytes": 421,
+        "sha256": "bc41932c545d9aee8d659d79dfa0f65cc9c95eea7e1828ce0aded6e4bfade2ae",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/webSettings.xml",
+        "bytes": 8514,
+        "compressed_bytes": 667,
+        "sha256": "905e921b32ea7e59e6b31354d234bf8cfdc6c9fb9ceffd2fa54c4fe999c8f15e",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "word/fontTable.xml",
+        "bytes": 3558,
+        "compressed_bytes": 772,
+        "sha256": "bedaaa42e00767244f635499ca5c0eec958432de022b027fc86a7c6e72e4076a",
+        "mce_namespace_literal": true
+      },
+      {
+        "name": "docProps/core.xml",
+        "bytes": 655,
+        "compressed_bytes": 353,
+        "sha256": "c7dc4386d67f9f8c43ef9b5f3521c3ea29c3714b3d1ad2ad24b0417b2b626e19",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "docProps/app.xml",
+        "bytes": 1015,
+        "compressed_bytes": 494,
+        "sha256": "b635e54a4cfa1eb6a9a502666e42f09379619b3ef12072d7b82762cf6a8d81f4",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "docProps/custom.xml",
+        "bytes": 632,
+        "compressed_bytes": 274,
+        "sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "docMetadata/LabelInfo.xml",
+        "bytes": 323,
+        "compressed_bytes": 245,
+        "sha256": "8dce86b7a477bf66808e8291a4accab3a2a620608ca409934f22e0603b25a173",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/_rels/item1.xml.rels",
+        "bytes": 296,
+        "compressed_bytes": 194,
+        "sha256": "80482f86e196171d66001e0e74d1900408a3aaf2463e54005d251b5f2db9a0b0",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/_rels/item2.xml.rels",
+        "bytes": 296,
+        "compressed_bytes": 194,
+        "sha256": "2a6aee4c8a9714223a3568077411a0c82d11b484b1c9ab93a19d50b99c57baa5",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "customXml/_rels/item3.xml.rels",
+        "bytes": 296,
+        "compressed_bytes": 195,
+        "sha256": "3aa4054f7f463c6d441102c960783aa7f937d6945a0a885b624a66aafaeedb6c",
+        "mce_namespace_literal": false
+      },
+      {
+        "name": "word/afchunk2.docx",
+        "bytes": 38699,
+        "compressed_bytes": 32097,
+        "sha256": "7ea84b276299e42c81a439ac69bd70bc5b6b9cb3fde47fc644aa7c8d54cf656f",
+        "mce_namespace_literal": false
+      }
+    ],
+    "main_part_bytes": 3476,
+    "direct_body_paragraphs": 1,
+    "scope": "ZIP decoded-member census and structural XML count only; not API admission or preservation proof",
+    "self_reported_application": {
+      "Application": "Microsoft Office Word",
+      "AppVersion": "16.0000"
+    },
+    "provenance_limit": "Checked-in third-party fixture with self-reported producer metadata; no native Office reopening performed in this batch"
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 19.565780442091636,
+    "log": "quality-fmt.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_manifest": "quality-source.json",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  },
+  {
+    "name": "ordinary-save-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0709",
+      "-j",
+      "2",
+      "--release",
+      "--lib",
+      "ordinary_save::tests"
+    ],
+    "exit_code": 0,
+    "seconds": 94.96839276293758,
+    "log": "quality-ordinary-save-tests.log",
+    "log_sha256": "4aeeec3e99e117603b10f14351ea823302a023325326cdd368c2a4600411b2e3",
+    "source_manifest": "quality-source.json",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  },
+  {
+    "name": "harness-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-target-0709",
+      "-j",
+      "2",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 67.11633632297162,
+    "log": "quality-harness-clippy.log",
+    "log_sha256": "09ca77ff90ed3b4273b35afe58bc3ad2d3a323594cbf1ab4e9bb142d01e99481",
+    "source_manifest": "quality-source.json",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  },
+  {
+    "name": "source-policy",
+    "command": [
+      "python3",
+      "tools/test_perf_baseline_source_policy.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.29033580399118364,
+    "log": "quality-source-policy.log",
+    "log_sha256": "7572abc7d861764a9862975208af7dc23f57e457e748975758db1a3893c9fbbd",
+    "source_manifest": "quality-source.json",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  }
+]

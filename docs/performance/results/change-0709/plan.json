@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-20T07:16:28.622153+00:00",
+  "revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+  "cpu": 12,
+  "filesystem_root": "/home/zhuhe/code/litchi-0709-fs",
+  "corpora": [
+    {
+      "label": "generated",
+      "path": null,
+      "sha256": null,
+      "expected_edit_admitted": true,
+      "id": "generated",
+      "origin": "generated-harness-corpus"
+    },
+    {
+      "label": "numbered-list",
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "bytes": 55519,
+      "expected_edit_admitted": true,
+      "id": "numbered-list",
+      "origin": "caller-named-real-file"
+    },
+    {
+      "label": "alt-chunk-header",
+      "path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "bytes": 77621,
+      "expected_edit_admitted": false,
+      "id": "alt-chunk-header",
+      "origin": "caller-named-real-file"
+    }
+  ],
+  "native": {
+    "repeats": 3,
+    "samples": 100,
+    "warmup": 10
+  },
+  "allocator": {
+    "repeats": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "order": "repeat 1 forward, repeat 2 reverse, repeat 3 forward across corpus and phase jobs",
+  "review_threshold_percent": 5,
+  "claim": "Current-source descriptive baseline only; no before/after speedup claim; independent phase timings are not additive",
+  "source_change": "Harness real-file corpus metadata correction only; production remains unchanged",
+  "phase_order": [
+    "lifecycle",
+    "edit",
+    "atomic_publish",
+    "counting_publish"
+  ]
+}

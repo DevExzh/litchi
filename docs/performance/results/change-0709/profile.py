@@ -323,7 +323,7 @@ def refuse_existing(name: str) -> None:
     ]
     patterns.extend(f"{name}.callgrind.{part}" for part in range(1, 64))
     existing = [HERE / filename for filename in patterns if (HERE / filename).exists()]
-    require(not existing, f"refusing to replace existing profile artifacts: {existing[0]}")
+    require(not existing, f"refusing to replace existing profile artifacts: {existing}")
 
 
 def write_custody(name: str, expected_source: dict[str, str], corpus: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:

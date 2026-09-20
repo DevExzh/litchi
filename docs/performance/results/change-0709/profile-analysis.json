@@ -1,0 +1,3751 @@
+{
+  "aggregate": {
+    "generated:counting_publish": {
+      "immediate_child_partition_ir": 14481126,
+      "nested_diagnostics_added": false,
+      "owner_self_ir": 88,
+      "owner_total_ir": 14481214,
+      "partition_equation": "aggregate self Ir + aggregate immediate-child Ir = aggregate owner Ir",
+      "profile_count": 2
+    },
+    "generated:edit": {
+      "immediate_child_partition_ir": 14493319,
+      "nested_diagnostics_added": false,
+      "owner_self_ir": 64,
+      "owner_total_ir": 14493383,
+      "partition_equation": "aggregate self Ir + aggregate immediate-child Ir = aggregate owner Ir",
+      "profile_count": 2
+    },
+    "numbered-list:counting_publish": {
+      "immediate_child_partition_ir": 6093923,
+      "nested_diagnostics_added": false,
+      "owner_self_ir": 88,
+      "owner_total_ir": 6094011,
+      "partition_equation": "aggregate self Ir + aggregate immediate-child Ir = aggregate owner Ir",
+      "profile_count": 2
+    },
+    "numbered-list:edit": {
+      "immediate_child_partition_ir": 5369175,
+      "nested_diagnostics_added": false,
+      "owner_self_ir": 64,
+      "owner_total_ir": 5369239,
+      "partition_equation": "aggregate self Ir + aggregate immediate-child Ir = aggregate owner Ir",
+      "profile_count": 2
+    }
+  },
+  "analyzer_script": "analyze_profiles.py",
+  "analyzer_script_sha256": "7f4ea583cff8414879b23050353555b08e7839dc6ed1554ecece61918162303b",
+  "build": {
+    "binary": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+    "binary_bytes": 62889832,
+    "binary_custody": {
+      "bytes": 62889832,
+      "mode": "validated",
+      "path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+      "sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0"
+    },
+    "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+    "record": "build-baseline.json",
+    "record_sha256": "c4e3f23e4969c7cc8fe14fcfc297ce78401a942768c951dd28c6c614fc6c724a",
+    "source_census_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "source_manifest": "source-baseline.json",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+    "symbols": {
+      "edit_count": 1,
+      "json": "symbols.json",
+      "json_sha256": "a91ae850ef2e6e46c7dbe94fd637abc251f4f537414e1d56de7b8a4c0f66a58b",
+      "run_case_count": 1,
+      "text": "symbols.txt",
+      "text_sha256": "0aa26fb2d565d1ba98d98f4d5380df92fe248a626c037865f9b9cd3be29c711d",
+      "write_plain_count": 4
+    }
+  },
+  "helpers": {
+    "docs/performance/results/change-0521/analyze_profiles.py": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7",
+    "docs/performance/results/change-0705/analyze_profiles.py": "1cd145fdeaadddea013747dc7fcd418214237cfca1f57002f95d374933f74819"
+  },
+  "limitations": [
+    "Callgrind Ir is guest-instruction attribution, not native latency, hardware instructions, cycles, allocation counts, RSS, or cache counters.",
+    "The edit owner covers the direct Owner::edit call, including document_mut admission; setup probes and reference publications are separate retained parts.",
+    "The publication owner covers exact write_plain symbols; write_plain closure helpers are outside the toggle pattern, and their nested inclusive costs are represented only inside the owner total.",
+    "Immediate direct children are the only disjoint partition. Nested document_mut and serializer helper rows are overlapping diagnostics and are never added to owner totals."
+  ],
+  "owners": {
+    "counting_publish": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "edit": "litchi_perf_baseline::ordinary_save::Owner::edit",
+    "measured_parent": "litchi_perf_baseline::ordinary_save::run_case",
+    "nested_edit_diagnostic": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+  },
+  "packet": "change-0709-docx-ordinary-save",
+  "plan": "plan.json",
+  "plan_sha256": "d69de12689b7537fd00165b48c8f1ba5ca081975f4b68caea0c27879adb2fd17",
+  "profile_plan": "profile-plan.json",
+  "profile_plan_sha256": "62bb99d3b05d6da34a5adb51e5e85cc327bba8f6f0271d52c6de21158db9cd77",
+  "profile_script": "profile.py",
+  "profile_script_sha256": "767a5b718002c421488e668155826e7b78a77422097f4ac3d7e28e900d5b4c28",
+  "profiles": [
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-edit.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-edit.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r1-generated-edit.inclusive.txt",
+          "inclusive_sha256": "7c78251909d472f53a44bd0115cb24195c16feb78d3c62139d1f54c3ac2b1791",
+          "self": "profile-r1-generated-edit.self.txt",
+          "self_sha256": "11503bf1671d82b8d047dec2a99ef42dadc3192303a42857c9e146b05bff124d"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 7224593,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 7224625,
+          "self_ir": 32
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 7222265,
+            "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 2328
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7222265,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2328,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+            }
+          ],
+          "inclusive_ir": 7224625,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "self_ir": 32
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "generated",
+      "direct_callee_ir": {
+        "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 7222265,
+        "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 2328
+      },
+      "direct_ir": 7224593,
+      "fixture": {
+        "after": null,
+        "after_artifact": "profile-r1-generated-edit.fixture-after.json",
+        "before": null,
+        "before_artifact": "profile-r1-generated-edit.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r1-generated-edit",
+      "order_index": 0,
+      "parts": [
+        {
+          "file": "profile-r1-generated-edit.callgrind.1",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7214160
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7214160
+              }
+            ],
+            "inclusive_ir": 7214160,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7216505
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "inclusive_ir": 7216505
+              }
+            ],
+            "inclusive_ir": 7216505,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "5d3144af906d1ba185198a1caef0b07fdcf1ebc4acb842eafab9bf9595b063e8",
+          "summary_ir": 7216505
+        },
+        {
+          "file": "profile-r1-generated-edit.callgrind.2",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7256811
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7256811
+              }
+            ],
+            "inclusive_ir": 7256811,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7259215
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7259215
+              }
+            ],
+            "inclusive_ir": 7259215,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "d301b43541f7e7039f9f795bcf4c1d870ae2da59d31e311e439329ecc216996c",
+          "summary_ir": 7259215
+        },
+        {
+          "file": "profile-r1-generated-edit.callgrind.3",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7253674
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7253674
+              }
+            ],
+            "inclusive_ir": 7253674,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7256044
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7256044
+              }
+            ],
+            "inclusive_ir": 7256044,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "fc1b45f079b06d22ca3718d99ddb150cb1fae2f18ffbe91b725feaec772c0dbb",
+          "summary_ir": 7256044
+        },
+        {
+          "file": "profile-r1-generated-edit.callgrind.4",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7283169
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7283169
+              }
+            ],
+            "inclusive_ir": 7283169,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7285470
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7285470
+              }
+            ],
+            "inclusive_ir": 7285470,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "c91a2fd71a560ed23d1b3fdcc1a65399a458dcc71f06da232bc529f3d45005ed",
+          "summary_ir": 7285470
+        },
+        {
+          "file": "profile-r1-generated-edit.callgrind.5",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7222265
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7222265
+              }
+            ],
+            "inclusive_ir": 7222265,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7224625
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7224625
+              }
+            ],
+            "inclusive_ir": 7224625,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "c2a2aa75a56d9e4fc99444c62e348068e4f4a5452c1ac8ee3999ba88435980f6",
+          "summary_ir": 7224625
+        }
+      ],
+      "phase": "edit",
+      "receipt": "profile-r1-generated-edit.receipt.json",
+      "receipt_sha256": "16231f5eb868e345aad00ba7e20a67fd01708e7c847f35cb11383b24d31310a3",
+      "repeat": 1,
+      "result": "profile-r1-generated-edit.json",
+      "result_identity": {
+        "case": "docx_ordinary_save_edit",
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "sink": null,
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 12,
+                "framing_bytes": 1560,
+                "members_identical_to_source": 11,
+                "members_regenerated": 1,
+                "output_member_count": 12,
+                "output_total_bytes": 9070,
+                "payload_bytes_deflated": 7510,
+                "payload_bytes_identical_to_source": 6524,
+                "payload_bytes_regenerated": 986,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 51980,
+                "uncompressed_payload_bytes_regenerated": 21601
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-perf-existing-corpus",
+              "origin": "generated-harness-corpus",
+              "published_bytes": 9070,
+              "published_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycle_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 9051,
+              "source_archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+              "source_member_count": 12
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "generated-harness-corpus",
+            "phase": "edit",
+            "publications_identical": true,
+            "published_sha256": [],
+            "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "9b0ce51cc32096cb0478ac870a82ccfbb978904157aa02e6e5fd6d0da3f231eb",
+      "selected": "profile-r1-generated-edit.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 32,
+      "source_custody": {
+        "after": "profile-r1-generated-edit.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r1-generated-edit.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r1-generated-edit.callgrind",
+        "part": 6,
+        "sha256": "7dfe826dfbfee11ccaef5c05ca27f47f1b2ca87d345b7ae329b133c87fb275e3",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 7224625,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-numbered-list-edit.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-numbered-list-edit.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r1-numbered-list-edit.inclusive.txt",
+          "inclusive_sha256": "1fa07811b75e4161e2c301477fdfa1f7cbca27b135765b48a1083cc1dfc0fd62",
+          "self": "profile-r1-numbered-list-edit.self.txt",
+          "self_sha256": "7b6a98e70ff33a7673dd9e361524b7afc267d6371ca4d45b2a9a0ed7bb5d1c82"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 2685198,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 2685230,
+          "self_ir": 32
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 2684153,
+            "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 1045
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2684153,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 1045,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+            }
+          ],
+          "inclusive_ir": 2685230,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "self_ir": 32
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "numbered-list",
+      "direct_callee_ir": {
+        "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 2684153,
+        "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 1045
+      },
+      "direct_ir": 2685198,
+      "fixture": {
+        "after": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "after_artifact": "profile-r1-numbered-list-edit.fixture-after.json",
+        "before": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "before_artifact": "profile-r1-numbered-list-edit.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r1-numbered-list-edit",
+      "order_index": 1,
+      "parts": [
+        {
+          "file": "profile-r1-numbered-list-edit.callgrind.1",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2682914
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2682914
+              }
+            ],
+            "inclusive_ir": 2682914,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2683812
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "inclusive_ir": 2683812
+              }
+            ],
+            "inclusive_ir": 2683812,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "6a394bccf9dfc99f4bdf1b33a7999c54bb33a49ea888714c86407cc613428e4a",
+          "summary_ir": 2683812
+        },
+        {
+          "file": "profile-r1-numbered-list-edit.callgrind.2",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2680411
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2680411
+              }
+            ],
+            "inclusive_ir": 2680411,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2681309
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2681309
+              }
+            ],
+            "inclusive_ir": 2681309,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "8b9ec6d9e1cce9084447669f1d692fb3d7d4bc7190735bd7389680bbe7f21573",
+          "summary_ir": 2681309
+        },
+        {
+          "file": "profile-r1-numbered-list-edit.callgrind.3",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2685970
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2685970
+              }
+            ],
+            "inclusive_ir": 2685970,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2687051
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2687051
+              }
+            ],
+            "inclusive_ir": 2687051,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "fab371898a275c7816e445815b56c1787ab438cd72ecee3124564a28cbc97564",
+          "summary_ir": 2687051
+        },
+        {
+          "file": "profile-r1-numbered-list-edit.callgrind.4",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2688648
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2688648
+              }
+            ],
+            "inclusive_ir": 2688648,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2689689
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2689689
+              }
+            ],
+            "inclusive_ir": 2689689,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "412661462936459738deeb618afd7c1c39fdf233d25e0d6ad3b8a13bd424a818",
+          "summary_ir": 2689689
+        },
+        {
+          "file": "profile-r1-numbered-list-edit.callgrind.5",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2684153
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2684153
+              }
+            ],
+            "inclusive_ir": 2684153,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2685230
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 2685230
+              }
+            ],
+            "inclusive_ir": 2685230,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "f14cf51bbf75042291668d203e3407d2a81365ea3c4f732ff830df7d6f81f457",
+          "summary_ir": 2685230
+        }
+      ],
+      "phase": "edit",
+      "receipt": "profile-r1-numbered-list-edit.receipt.json",
+      "receipt_sha256": "4c3d2c7a7c74571834f07c1745418e247209f1895903fb8db154ab66bdc0499c",
+      "repeat": 1,
+      "result": "profile-r1-numbered-list-edit.json",
+      "result_identity": {
+        "case": "docx_real_file_ordinary_save_edit",
+        "corpus": {
+          "archive_bytes": 55519,
+          "archive_member_count": 20,
+          "archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+          "compression": "deflate",
+          "entry_bytes": 0,
+          "entry_count": 20,
+          "generator": "litchi-docx-real-file-v1",
+          "name": "docx-real-file-save",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "real-producer-ooxml",
+          "shape": "real-file",
+          "target_entry": "word/document.xml",
+          "target_payload_bytes": 4563,
+          "target_payload_sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f",
+          "uncompressed_payload_bytes": 442455,
+          "xlsx": null
+        },
+        "sink": null,
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 20,
+                "framing_bytes": 4276,
+                "members_identical_to_source": 18,
+                "members_regenerated": 2,
+                "output_member_count": 20,
+                "output_total_bytes": 55123,
+                "payload_bytes_deflated": 50847,
+                "payload_bytes_identical_to_source": 49395,
+                "payload_bytes_regenerated": 1452,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 442335,
+                "uncompressed_payload_bytes_regenerated": 6065
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-docx-real-file-v1",
+              "origin": "caller-named-real-file",
+              "published_bytes": 55123,
+              "published_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "real_file": {
+                "bytes": 55519,
+                "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+                "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+              },
+              "repeated_cycle_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 55519,
+              "source_archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+              "source_member_count": 20
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "caller-named-real-file",
+            "phase": "edit",
+            "publications_identical": true,
+            "published_sha256": [],
+            "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "d48862f4089718db80685d7f86627d49b16e04eef9dea9a79234597115b40b74",
+      "selected": "profile-r1-numbered-list-edit.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 32,
+      "source_custody": {
+        "after": "profile-r1-numbered-list-edit.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r1-numbered-list-edit.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r1-numbered-list-edit.callgrind",
+        "part": 6,
+        "sha256": "b16f98934401f66cb3cf3d21d0768d39a1793376a8296650d9927d49ef977e1a",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 2685230,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-counting_publish.callgrind.6"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-counting_publish.callgrind.6"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r1-generated-counting_publish.inclusive.txt",
+          "inclusive_sha256": "b7afd34e8c26de3a640f93cde04cbca92a1dc5fb85a0b00077339362f3210aef",
+          "self": "profile-r1-generated-counting_publish.self.txt",
+          "self_sha256": "59ddcf330f9859d0688503b87e2c6e3735f8651b938c4925c23e73de18ab552f"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 7248420,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 7248464,
+          "self_ir": 44
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "__memcpy_avx_unaligned_erms": 185,
+            "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 7202629,
+            "litchi_docx::package::model::WriteRollbackGuard::new": 25464,
+            "litchi_docx::package::model::WriteRollbackGuard::publish": 20142
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7202629,
+              "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 25464,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::new"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 20142,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::publish"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 185,
+              "name": "__memcpy_avx_unaligned_erms"
+            }
+          ],
+          "inclusive_ir": 7248464,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+          "self_ir": 44
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "generated",
+      "direct_callee_ir": {
+        "__memcpy_avx_unaligned_erms": 185,
+        "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 7202629,
+        "litchi_docx::package::model::WriteRollbackGuard::new": 25464,
+        "litchi_docx::package::model::WriteRollbackGuard::publish": 20142
+      },
+      "direct_ir": 7248420,
+      "fixture": {
+        "after": null,
+        "after_artifact": "profile-r1-generated-counting_publish.fixture-after.json",
+        "before": null,
+        "before_artifact": "profile-r1-generated-counting_publish.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r1-generated-counting_publish",
+      "order_index": 2,
+      "parts": [
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.1",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::semantic_docx_bytes",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 11150986
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::semantic_docx_bytes",
+                "calls": 1,
+                "inclusive_ir": 11150986
+              }
+            ],
+            "inclusive_ir": 11150986,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "083f70179d6544e15e2f06000ff9a92b4e9ef349f7157a6e32025c695ebfad4c",
+          "summary_ir": 11150986
+        },
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.2",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7264781
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7264781
+              }
+            ],
+            "inclusive_ir": 7264781,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "3fc60a581eb9050390d055e371e3e73b6bf4a82a3e0b1932609665027cb75924",
+          "summary_ir": 7264781
+        },
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.3",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7238903
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7238903
+              }
+            ],
+            "inclusive_ir": 7238903,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "5898fdeb3357af646f5562646f20bb52215167b17559ec83232c3681a5a1949a",
+          "summary_ir": 7238903
+        },
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.4",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7200891
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7200891
+              }
+            ],
+            "inclusive_ir": 7200891,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "1393ba74552332fcd2bccd84a88b2a7d20bebe279170f0e42c44e6eec0948db8",
+          "summary_ir": 7200891
+        },
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.5",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7165473
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7165473
+              }
+            ],
+            "inclusive_ir": 7165473,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 5,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "e9c43d5189f7d2d385ee5cd055ddeb517540e421a42b402e108c1ad91b319199",
+          "summary_ir": 7165473
+        },
+        {
+          "file": "profile-r1-generated-counting_publish.callgrind.6",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7248464
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7248464
+              }
+            ],
+            "inclusive_ir": 7248464,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 6,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "da0ef53919e8b5dd6848def8096cebf0679f9bd833d63ec98626b6321b636b51",
+          "summary_ir": 7248464
+        }
+      ],
+      "phase": "counting_publish",
+      "receipt": "profile-r1-generated-counting_publish.receipt.json",
+      "receipt_sha256": "26ba3be5df1da3c04fb9e80771e8462000908a18f74e8de68693882ec7d2aa3b",
+      "repeat": 1,
+      "result": "profile-r1-generated-counting_publish.json",
+      "result_identity": {
+        "case": "docx_ordinary_save_counting_publish",
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "output_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "sink": {
+          "accepted_bytes": 9070,
+          "largest_write": 1652,
+          "write_calls": 51,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 0,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 12,
+                "framing_bytes": 1560,
+                "members_identical_to_source": 11,
+                "members_regenerated": 1,
+                "output_member_count": 12,
+                "output_total_bytes": 9070,
+                "payload_bytes_deflated": 7510,
+                "payload_bytes_identical_to_source": 6524,
+                "payload_bytes_regenerated": 986,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 51980,
+                "uncompressed_payload_bytes_regenerated": 21601
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-perf-existing-corpus",
+              "origin": "generated-harness-corpus",
+              "published_bytes": 9070,
+              "published_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycle_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 9051,
+              "source_archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+              "source_member_count": 12
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "generated-harness-corpus",
+            "phase": "serialize-to-counting-sink",
+            "publications_identical": true,
+            "published_sha256": [
+              "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+            ],
+            "sample_byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "deflate_member_count": 12,
+              "framing_bytes": 1560,
+              "members_identical_to_source": 11,
+              "members_regenerated": 1,
+              "output_member_count": 12,
+              "output_total_bytes": 9070,
+              "payload_bytes_deflated": 7510,
+              "payload_bytes_identical_to_source": 6524,
+              "payload_bytes_regenerated": 986,
+              "payload_bytes_stored": 0,
+              "stored_member_count": 0,
+              "uncompressed_payload_bytes_compressed": 51980,
+              "uncompressed_payload_bytes_regenerated": 21601
+            },
+            "timing_scope": "the documented sequential serialization into a bounded counting sink only; the open, the edit and the byte accounting are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "8d9974f29a83942eb8f58c7c20f88b4bcad233f89df40be1f3210b516b5a6bcd",
+      "selected": "profile-r1-generated-counting_publish.callgrind.6",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 44,
+      "source_custody": {
+        "after": "profile-r1-generated-counting_publish.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r1-generated-counting_publish.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r1-generated-counting_publish.callgrind",
+        "part": 7,
+        "sha256": "324b92ad6e8184ca0ed894c9f455f457973f676bb4e98d92078325b029b90a9d",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 7248464,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-numbered-list-counting_publish.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-numbered-list-counting_publish.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r1-numbered-list-counting_publish.inclusive.txt",
+          "inclusive_sha256": "bd882f0c6cf5efcaff144c92274e60bc2d5417767c25a4d89d83684f60b4af80",
+          "self": "profile-r1-numbered-list-counting_publish.self.txt",
+          "self_sha256": "860282f4cd29476c251db76776a3fdc5dc5865b27f66ea105f35ab50e17bcc92"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 3047136,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 3047180,
+          "self_ir": 44
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "__memcpy_avx_unaligned_erms": 185,
+            "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 2964581,
+            "litchi_docx::package::model::WriteRollbackGuard::new": 47372,
+            "litchi_docx::package::model::WriteRollbackGuard::publish": 34998
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2964581,
+              "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 47372,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::new"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 34998,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::publish"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 185,
+              "name": "__memcpy_avx_unaligned_erms"
+            }
+          ],
+          "inclusive_ir": 3047180,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+          "self_ir": 44
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "numbered-list",
+      "direct_callee_ir": {
+        "__memcpy_avx_unaligned_erms": 185,
+        "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 2964581,
+        "litchi_docx::package::model::WriteRollbackGuard::new": 47372,
+        "litchi_docx::package::model::WriteRollbackGuard::publish": 34998
+      },
+      "direct_ir": 3047136,
+      "fixture": {
+        "after": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "after_artifact": "profile-r1-numbered-list-counting_publish.fixture-after.json",
+        "before": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "before_artifact": "profile-r1-numbered-list-counting_publish.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r1-numbered-list-counting_publish",
+      "order_index": 3,
+      "parts": [
+        {
+          "file": "profile-r1-numbered-list-counting_publish.callgrind.1",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3042475
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3042475
+              }
+            ],
+            "inclusive_ir": 3042475,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "920c3b745eb276ca7a12aeb71243c92969043462ac41d0f1bbbf21db1a12c2d8",
+          "summary_ir": 3042475
+        },
+        {
+          "file": "profile-r1-numbered-list-counting_publish.callgrind.2",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3049137
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3049137
+              }
+            ],
+            "inclusive_ir": 3049137,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "fa78693744284285e7de2ee7e3c9c0e98acf8431dc857750699b0eb59e68906c",
+          "summary_ir": 3049137
+        },
+        {
+          "file": "profile-r1-numbered-list-counting_publish.callgrind.3",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3047477
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3047477
+              }
+            ],
+            "inclusive_ir": 3047477,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "eca562a4ccf7ded0cf1c19eb8adef46bd2cba7cf7d8ad9256f55d77e80d924bb",
+          "summary_ir": 3047477
+        },
+        {
+          "file": "profile-r1-numbered-list-counting_publish.callgrind.4",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2931568
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 2931568
+              }
+            ],
+            "inclusive_ir": 2931568,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "14d0c65ff941d69e11c929272545df915ffcc9c1817cf5dd0d6329ddbd7fbb81",
+          "summary_ir": 2931568
+        },
+        {
+          "file": "profile-r1-numbered-list-counting_publish.callgrind.5",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3047180
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 3047180
+              }
+            ],
+            "inclusive_ir": 3047180,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "6e24c1ef4ee2db022e2a47f4fbfacbf6ddecc9f47f4a7fc138a8ceb8d11d21c3",
+          "summary_ir": 3047180
+        }
+      ],
+      "phase": "counting_publish",
+      "receipt": "profile-r1-numbered-list-counting_publish.receipt.json",
+      "receipt_sha256": "ff73a927c062f29564aac60defc9182a6d70b17403ffd3bd0363dfea2e540145",
+      "repeat": 1,
+      "result": "profile-r1-numbered-list-counting_publish.json",
+      "result_identity": {
+        "case": "docx_real_file_ordinary_save_counting_publish",
+        "corpus": {
+          "archive_bytes": 55519,
+          "archive_member_count": 20,
+          "archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+          "compression": "deflate",
+          "entry_bytes": 0,
+          "entry_count": 20,
+          "generator": "litchi-docx-real-file-v1",
+          "name": "docx-real-file-save",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "real-producer-ooxml",
+          "shape": "real-file",
+          "target_entry": "word/document.xml",
+          "target_payload_bytes": 4563,
+          "target_payload_sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f",
+          "uncompressed_payload_bytes": 442455,
+          "xlsx": null
+        },
+        "output_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+        "sink": {
+          "accepted_bytes": 55123,
+          "largest_write": 16996,
+          "write_calls": 85,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 0,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 20,
+                "framing_bytes": 4276,
+                "members_identical_to_source": 18,
+                "members_regenerated": 2,
+                "output_member_count": 20,
+                "output_total_bytes": 55123,
+                "payload_bytes_deflated": 50847,
+                "payload_bytes_identical_to_source": 49395,
+                "payload_bytes_regenerated": 1452,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 442335,
+                "uncompressed_payload_bytes_regenerated": 6065
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-docx-real-file-v1",
+              "origin": "caller-named-real-file",
+              "published_bytes": 55123,
+              "published_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "real_file": {
+                "bytes": 55519,
+                "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+                "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+              },
+              "repeated_cycle_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 55519,
+              "source_archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+              "source_member_count": 20
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "caller-named-real-file",
+            "phase": "serialize-to-counting-sink",
+            "publications_identical": true,
+            "published_sha256": [
+              "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a"
+            ],
+            "sample_byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "deflate_member_count": 20,
+              "framing_bytes": 4276,
+              "members_identical_to_source": 18,
+              "members_regenerated": 2,
+              "output_member_count": 20,
+              "output_total_bytes": 55123,
+              "payload_bytes_deflated": 50847,
+              "payload_bytes_identical_to_source": 49395,
+              "payload_bytes_regenerated": 1452,
+              "payload_bytes_stored": 0,
+              "stored_member_count": 0,
+              "uncompressed_payload_bytes_compressed": 442335,
+              "uncompressed_payload_bytes_regenerated": 6065
+            },
+            "timing_scope": "the documented sequential serialization into a bounded counting sink only; the open, the edit and the byte accounting are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "a403aca4d55e99cf0fea0bb08f3c28dd0f1a6d70849911a69f6ac810c8503299",
+      "selected": "profile-r1-numbered-list-counting_publish.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 44,
+      "source_custody": {
+        "after": "profile-r1-numbered-list-counting_publish.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r1-numbered-list-counting_publish.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r1-numbered-list-counting_publish.callgrind",
+        "part": 6,
+        "sha256": "cf5985296c73b7b13447eb13d6e9518669377a5f84c9279e0fbe66a1141101e1",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 3047180,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-numbered-list-counting_publish.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-numbered-list-counting_publish.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r2-numbered-list-counting_publish.inclusive.txt",
+          "inclusive_sha256": "634e46efb5bc9c641cbbef718ae4aebb771fca2a3cbce14981b809fe9d8173d0",
+          "self": "profile-r2-numbered-list-counting_publish.self.txt",
+          "self_sha256": "953ff68cec32b70ac2aaa8e3b79346628798a4d0d7e7fc3f2165f50f3446917d"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 3046787,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 3046831,
+          "self_ir": 44
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "__memcpy_avx_unaligned_erms": 185,
+            "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 2966213,
+            "litchi_docx::package::model::WriteRollbackGuard::new": 45700,
+            "litchi_docx::package::model::WriteRollbackGuard::publish": 34689
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2966213,
+              "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 45700,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::new"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 34689,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::publish"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 185,
+              "name": "__memcpy_avx_unaligned_erms"
+            }
+          ],
+          "inclusive_ir": 3046831,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+          "self_ir": 44
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "numbered-list",
+      "direct_callee_ir": {
+        "__memcpy_avx_unaligned_erms": 185,
+        "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 2966213,
+        "litchi_docx::package::model::WriteRollbackGuard::new": 45700,
+        "litchi_docx::package::model::WriteRollbackGuard::publish": 34689
+      },
+      "direct_ir": 3046787,
+      "fixture": {
+        "after": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "after_artifact": "profile-r2-numbered-list-counting_publish.fixture-after.json",
+        "before": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "before_artifact": "profile-r2-numbered-list-counting_publish.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r2-numbered-list-counting_publish",
+      "order_index": 4,
+      "parts": [
+        {
+          "file": "profile-r2-numbered-list-counting_publish.callgrind.1",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3042447
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3042447
+              }
+            ],
+            "inclusive_ir": 3042447,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "527b5afdfbba448f8925a9e318dfc7f92dff6d5b1733e95570c15f9c13998dc9",
+          "summary_ir": 3042447
+        },
+        {
+          "file": "profile-r2-numbered-list-counting_publish.callgrind.2",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3052257
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3052257
+              }
+            ],
+            "inclusive_ir": 3052257,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "811d09ef31ae93cd1f0930895b204fc2dc4fa5baa1c64e6b8f874c705df452eb",
+          "summary_ir": 3052257
+        },
+        {
+          "file": "profile-r2-numbered-list-counting_publish.callgrind.3",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3053693
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 3053693
+              }
+            ],
+            "inclusive_ir": 3053693,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "fe2b6a6a2a5d5226dd4f01947903faac04f55a1788b67e424060117678beff27",
+          "summary_ir": 3053693
+        },
+        {
+          "file": "profile-r2-numbered-list-counting_publish.callgrind.4",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2929095
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 2929095
+              }
+            ],
+            "inclusive_ir": 2929095,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "742fbf881d2d529346df7081fefff714c556859f1303288ab50752fbf2c8c871",
+          "summary_ir": 2929095
+        },
+        {
+          "file": "profile-r2-numbered-list-counting_publish.callgrind.5",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 3046831
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 3046831
+              }
+            ],
+            "inclusive_ir": 3046831,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "0e4a063cc6919d9c56128cb6653a0d2bf1b3c3161c10e864ea530a088a8bbe0c",
+          "summary_ir": 3046831
+        }
+      ],
+      "phase": "counting_publish",
+      "receipt": "profile-r2-numbered-list-counting_publish.receipt.json",
+      "receipt_sha256": "f765b3b1290264917435e1d5670269abf77aad47f44f166d2f57ea6c0fc635b0",
+      "repeat": 2,
+      "result": "profile-r2-numbered-list-counting_publish.json",
+      "result_identity": {
+        "case": "docx_real_file_ordinary_save_counting_publish",
+        "corpus": {
+          "archive_bytes": 55519,
+          "archive_member_count": 20,
+          "archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+          "compression": "deflate",
+          "entry_bytes": 0,
+          "entry_count": 20,
+          "generator": "litchi-docx-real-file-v1",
+          "name": "docx-real-file-save",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "real-producer-ooxml",
+          "shape": "real-file",
+          "target_entry": "word/document.xml",
+          "target_payload_bytes": 4563,
+          "target_payload_sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f",
+          "uncompressed_payload_bytes": 442455,
+          "xlsx": null
+        },
+        "output_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+        "sink": {
+          "accepted_bytes": 55123,
+          "largest_write": 16996,
+          "write_calls": 85,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 0,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 20,
+                "framing_bytes": 4276,
+                "members_identical_to_source": 18,
+                "members_regenerated": 2,
+                "output_member_count": 20,
+                "output_total_bytes": 55123,
+                "payload_bytes_deflated": 50847,
+                "payload_bytes_identical_to_source": 49395,
+                "payload_bytes_regenerated": 1452,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 442335,
+                "uncompressed_payload_bytes_regenerated": 6065
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-docx-real-file-v1",
+              "origin": "caller-named-real-file",
+              "published_bytes": 55123,
+              "published_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "real_file": {
+                "bytes": 55519,
+                "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+                "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+              },
+              "repeated_cycle_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 55519,
+              "source_archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+              "source_member_count": 20
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "caller-named-real-file",
+            "phase": "serialize-to-counting-sink",
+            "publications_identical": true,
+            "published_sha256": [
+              "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a"
+            ],
+            "sample_byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "deflate_member_count": 20,
+              "framing_bytes": 4276,
+              "members_identical_to_source": 18,
+              "members_regenerated": 2,
+              "output_member_count": 20,
+              "output_total_bytes": 55123,
+              "payload_bytes_deflated": 50847,
+              "payload_bytes_identical_to_source": 49395,
+              "payload_bytes_regenerated": 1452,
+              "payload_bytes_stored": 0,
+              "stored_member_count": 0,
+              "uncompressed_payload_bytes_compressed": 442335,
+              "uncompressed_payload_bytes_regenerated": 6065
+            },
+            "timing_scope": "the documented sequential serialization into a bounded counting sink only; the open, the edit and the byte accounting are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "6a8c80fe7f27e17e12dde7cdb536e0ba1130a758ff71370f02d6383af4a5a4fa",
+      "selected": "profile-r2-numbered-list-counting_publish.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 44,
+      "source_custody": {
+        "after": "profile-r2-numbered-list-counting_publish.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r2-numbered-list-counting_publish.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r2-numbered-list-counting_publish.callgrind",
+        "part": 6,
+        "sha256": "0c7ec4617930c6a4da73f8349a93f325b323c56b8096ca5cd36d3ec6b47e260a",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 3046831,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-generated-counting_publish.callgrind.6"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-generated-counting_publish.callgrind.6"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r2-generated-counting_publish.inclusive.txt",
+          "inclusive_sha256": "cf409cec3d76dce798209d31ddd77f7e783c85bb9580c13970e8dac594e351f8",
+          "self": "profile-r2-generated-counting_publish.self.txt",
+          "self_sha256": "d6b1562940dff53774f81850b9018991a56a1fc8fea7bd8c3a2245dd39e19b82"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 7232706,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 7232750,
+          "self_ir": 44
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "__memcpy_avx_unaligned_erms": 185,
+            "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 7187413,
+            "litchi_docx::package::model::WriteRollbackGuard::new": 25026,
+            "litchi_docx::package::model::WriteRollbackGuard::publish": 20082
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7187413,
+              "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 25026,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::new"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 20082,
+              "name": "litchi_docx::package::model::WriteRollbackGuard::publish"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 185,
+              "name": "__memcpy_avx_unaligned_erms"
+            }
+          ],
+          "inclusive_ir": 7232750,
+          "name": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+          "self_ir": 44
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "generated",
+      "direct_callee_ir": {
+        "__memcpy_avx_unaligned_erms": 185,
+        "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain::{{closure}}": 7187413,
+        "litchi_docx::package::model::WriteRollbackGuard::new": 25026,
+        "litchi_docx::package::model::WriteRollbackGuard::publish": 20082
+      },
+      "direct_ir": 7232706,
+      "fixture": {
+        "after": null,
+        "after_artifact": "profile-r2-generated-counting_publish.fixture-after.json",
+        "before": null,
+        "before_artifact": "profile-r2-generated-counting_publish.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r2-generated-counting_publish",
+      "order_index": 5,
+      "parts": [
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.1",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::semantic_docx_bytes",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 11151537
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::semantic_docx_bytes",
+                "calls": 1,
+                "inclusive_ir": 11151537
+              }
+            ],
+            "inclusive_ir": 11151537,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "62d47cb1b7e2f07f3423d6e3b2c38b4bdb734c1ed7a261afe281a0efc55647f9",
+          "summary_ir": 11151537
+        },
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.2",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7313214
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7313214
+              }
+            ],
+            "inclusive_ir": 7313214,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "392aeeebf26f08c95410a85e1e577c673bdc15778767b515b29abe656bd22bb2",
+          "summary_ir": 7313214
+        },
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.3",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7231563
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7231563
+              }
+            ],
+            "inclusive_ir": 7231563,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "5c67610fe90698d4c03c7c6a37bde59de4c06b5ebe9f8309cc7f51e6b48112a4",
+          "summary_ir": 7231563
+        },
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.4",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7299135
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7299135
+              }
+            ],
+            "inclusive_ir": 7299135,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "1be22e427fa3a553c9b781b368f64c39ea63b9c978e03d9b8ecd007859a3c232",
+          "summary_ir": 7299135
+        },
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.5",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7167751
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_opc::atomic::replace_with_impl",
+                "calls": 1,
+                "inclusive_ir": 7167751
+              }
+            ],
+            "inclusive_ir": 7167751,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 5,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "64bf8b27f0567bedec633f94b9a413971af0b316020510db95c38ccc5639331c",
+          "summary_ir": 7167751
+        },
+        {
+          "file": "profile-r2-generated-counting_publish.callgrind.6",
+          "nested_document_mut": null,
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7232750
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7232750
+              }
+            ],
+            "inclusive_ir": 7232750,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain"
+          },
+          "part": 6,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "bc2d252e8e5f6c5467a6a34db49b0c9cdddfa0303aa58a2726ffa5f9922aea91",
+          "summary_ir": 7232750
+        }
+      ],
+      "phase": "counting_publish",
+      "receipt": "profile-r2-generated-counting_publish.receipt.json",
+      "receipt_sha256": "59bc57113a1d70e5eabcda0e8b21bb70bcc0250647d60eb99a4ef42f2bd76087",
+      "repeat": 2,
+      "result": "profile-r2-generated-counting_publish.json",
+      "result_identity": {
+        "case": "docx_ordinary_save_counting_publish",
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "output_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "sink": {
+          "accepted_bytes": 9070,
+          "largest_write": 1652,
+          "write_calls": 51,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 0,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 12,
+                "framing_bytes": 1560,
+                "members_identical_to_source": 11,
+                "members_regenerated": 1,
+                "output_member_count": 12,
+                "output_total_bytes": 9070,
+                "payload_bytes_deflated": 7510,
+                "payload_bytes_identical_to_source": 6524,
+                "payload_bytes_regenerated": 986,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 51980,
+                "uncompressed_payload_bytes_regenerated": 21601
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-perf-existing-corpus",
+              "origin": "generated-harness-corpus",
+              "published_bytes": 9070,
+              "published_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycle_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 9051,
+              "source_archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+              "source_member_count": 12
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "generated-harness-corpus",
+            "phase": "serialize-to-counting-sink",
+            "publications_identical": true,
+            "published_sha256": [
+              "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+            ],
+            "sample_byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "deflate_member_count": 12,
+              "framing_bytes": 1560,
+              "members_identical_to_source": 11,
+              "members_regenerated": 1,
+              "output_member_count": 12,
+              "output_total_bytes": 9070,
+              "payload_bytes_deflated": 7510,
+              "payload_bytes_identical_to_source": 6524,
+              "payload_bytes_regenerated": 986,
+              "payload_bytes_stored": 0,
+              "stored_member_count": 0,
+              "uncompressed_payload_bytes_compressed": 51980,
+              "uncompressed_payload_bytes_regenerated": 21601
+            },
+            "timing_scope": "the documented sequential serialization into a bounded counting sink only; the open, the edit and the byte accounting are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "2ebd69ce4160800862bf706621f072721f7be0efafa9983a8f465a9d3fc0aa97",
+      "selected": "profile-r2-generated-counting_publish.callgrind.6",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 44,
+      "source_custody": {
+        "after": "profile-r2-generated-counting_publish.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r2-generated-counting_publish.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r2-generated-counting_publish.callgrind",
+        "part": 7,
+        "sha256": "b8cb617712eef4cd95d6aeef094659d5c27b13cba1aabfb1cdffa2609e258b53",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 7232750,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-numbered-list-edit.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-numbered-list-edit.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r2-numbered-list-edit.inclusive.txt",
+          "inclusive_sha256": "780fc228558ad82b1a9cb291af0027b6b4b4495f68dc6235ba8252380f82f837",
+          "self": "profile-r2-numbered-list-edit.self.txt",
+          "self_sha256": "fed4907597197b21bf8682c9469839e7800385702e0faf01eff607710a4f594a"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 2683977,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 2684009,
+          "self_ir": 32
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 2683053,
+            "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 924
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 2683053,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 924,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+            }
+          ],
+          "inclusive_ir": 2684009,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "self_ir": 32
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "numbered-list",
+      "direct_callee_ir": {
+        "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 2683053,
+        "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 924
+      },
+      "direct_ir": 2683977,
+      "fixture": {
+        "after": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "after_artifact": "profile-r2-numbered-list-edit.fixture-after.json",
+        "before": {
+          "bytes": 55519,
+          "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+          "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+        },
+        "before_artifact": "profile-r2-numbered-list-edit.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r2-numbered-list-edit",
+      "order_index": 6,
+      "parts": [
+        {
+          "file": "profile-r2-numbered-list-edit.callgrind.1",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2684549
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2684549
+              }
+            ],
+            "inclusive_ir": 2684549,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2685447
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "inclusive_ir": 2685447
+              }
+            ],
+            "inclusive_ir": 2685447,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "c3705e379c09c5653363f514c8ce5e836b076db9872172cfbef63da5a942f621",
+          "summary_ir": 2685447
+        },
+        {
+          "file": "profile-r2-numbered-list-edit.callgrind.2",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2679299
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2679299
+              }
+            ],
+            "inclusive_ir": 2679299,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2680197
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2680197
+              }
+            ],
+            "inclusive_ir": 2680197,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "a805a0e0a415a6122e4c50d8d540dfa11a80e33d511fc25f9aad7223d8b763c6",
+          "summary_ir": 2680197
+        },
+        {
+          "file": "profile-r2-numbered-list-edit.callgrind.3",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2686355
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2686355
+              }
+            ],
+            "inclusive_ir": 2686355,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2687397
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2687397
+              }
+            ],
+            "inclusive_ir": 2687397,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "b12c98c94f7badba0c0f770ca44dd65223164a83b69a1b89b479cf7f0164e3c3",
+          "summary_ir": 2687397
+        },
+        {
+          "file": "profile-r2-numbered-list-edit.callgrind.4",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2687595
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2687595
+              }
+            ],
+            "inclusive_ir": 2687595,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2688571
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 2688571
+              }
+            ],
+            "inclusive_ir": 2688571,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "cbe1c616cd3f8656b85400183d231481d09d0c94a2cf9c02d9039e38d6e8050a",
+          "summary_ir": 2688571
+        },
+        {
+          "file": "profile-r2-numbered-list-edit.callgrind.5",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2683053
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 2683053
+              }
+            ],
+            "inclusive_ir": 2683053,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 2684009
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 2684009
+              }
+            ],
+            "inclusive_ir": 2684009,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "c4e98bbebfb0b484147c43ea7d1f9817a955eb527a3df9d5ddcd52590dbb5b84",
+          "summary_ir": 2684009
+        }
+      ],
+      "phase": "edit",
+      "receipt": "profile-r2-numbered-list-edit.receipt.json",
+      "receipt_sha256": "3c9cf2a4dde624ebae451ef1ead451bbb9e09bdb70cbb4a7c53094b12f49cbfe",
+      "repeat": 2,
+      "result": "profile-r2-numbered-list-edit.json",
+      "result_identity": {
+        "case": "docx_real_file_ordinary_save_edit",
+        "corpus": {
+          "archive_bytes": 55519,
+          "archive_member_count": 20,
+          "archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+          "compression": "deflate",
+          "entry_bytes": 0,
+          "entry_count": 20,
+          "generator": "litchi-docx-real-file-v1",
+          "name": "docx-real-file-save",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "real-producer-ooxml",
+          "shape": "real-file",
+          "target_entry": "word/document.xml",
+          "target_payload_bytes": 4563,
+          "target_payload_sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f",
+          "uncompressed_payload_bytes": 442455,
+          "xlsx": null
+        },
+        "sink": null,
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 20,
+                "framing_bytes": 4276,
+                "members_identical_to_source": 18,
+                "members_regenerated": 2,
+                "output_member_count": 20,
+                "output_total_bytes": 55123,
+                "payload_bytes_deflated": 50847,
+                "payload_bytes_identical_to_source": 49395,
+                "payload_bytes_regenerated": 1452,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 442335,
+                "uncompressed_payload_bytes_regenerated": 6065
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-docx-real-file-v1",
+              "origin": "caller-named-real-file",
+              "published_bytes": 55123,
+              "published_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "real_file": {
+                "bytes": 55519,
+                "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+                "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+              },
+              "repeated_cycle_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 55519,
+              "source_archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+              "source_member_count": 20
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "caller-named-real-file",
+            "phase": "edit",
+            "publications_identical": true,
+            "published_sha256": [],
+            "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "4a0a474b4313d93101cc6f75bac8428a7abec1af4723f6a0bf503515ff996a15",
+      "selected": "profile-r2-numbered-list-edit.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 32,
+      "source_custody": {
+        "after": "profile-r2-numbered-list-edit.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r2-numbered-list-edit.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r2-numbered-list-edit.callgrind",
+        "part": 6,
+        "sha256": "8d53e05f5e39e8a68447f9368ff7f5cd2b9f20aac3641802d739af93104d127c",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 2684009,
+      "warnings": []
+    },
+    {
+      "annotations": {
+        "command": {
+          "inclusive": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-generated-edit.callgrind.5"
+          ],
+          "self": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--threshold=100",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r2-generated-edit.callgrind.5"
+          ]
+        },
+        "environment": {
+          "PERL_HASH_SEED": "0",
+          "PERL_PERTURB_KEYS": "0"
+        },
+        "files": {
+          "inclusive": "profile-r2-generated-edit.inclusive.txt",
+          "inclusive_sha256": "0609bef40efaa3c477864607ab7fe47d2cd684d51fcc443b971b15ad58b8c003",
+          "self": "profile-r2-generated-edit.self.txt",
+          "self_sha256": "a29a88fb845b40adf4a32d3abcf2a5ed2b4f481f95382483f9f49eb13f016375"
+        },
+        "immediate_child_partition": {
+          "direct_children_ir": 7268726,
+          "disjoint": true,
+          "equation": "self_ir + sum(immediate direct-child inclusive Ir) = owner inclusive Ir",
+          "nested_inclusive_costs_excluded": true,
+          "owner_ir": 7268758,
+          "self_ir": 32
+        },
+        "owner": {
+          "direct_callee_ir": {
+            "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 7266443,
+            "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 2283
+          },
+          "direct_callees": [
+            {
+              "calls": 1,
+              "inclusive_ir": 7266443,
+              "name": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+            },
+            {
+              "calls": 1,
+              "inclusive_ir": 2283,
+              "name": "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text"
+            }
+          ],
+          "inclusive_ir": 7268758,
+          "name": "litchi_perf_baseline::ordinary_save::Owner::edit",
+          "self_ir": 32
+        },
+        "validation": {
+          "inclusive_and_self_direct_children_match": true,
+          "inclusive_owner_matches_raw": true,
+          "self_plus_immediate_children_equals_inclusive": true
+        }
+      },
+      "corpus_id": "generated",
+      "direct_callee_ir": {
+        "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut": 7266443,
+        "litchi_docx::writer::doc::model::MutableDocument::add_paragraph_with_text": 2283
+      },
+      "direct_ir": 7268726,
+      "fixture": {
+        "after": null,
+        "after_artifact": "profile-r2-generated-edit.fixture-after.json",
+        "before": null,
+        "before_artifact": "profile-r2-generated-edit.fixture-before.json"
+      },
+      "limitations": [
+        "The setup parts are retained as lifecycle evidence and excluded from the measured Ir row.",
+        "Valgrind allocation edges, if present, are not converted into allocation counts."
+      ],
+      "name": "profile-r2-generated-edit",
+      "order_index": 7,
+      "parts": [
+        {
+          "file": "profile-r2-generated-edit.callgrind.1",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7216958
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7216958
+              }
+            ],
+            "inclusive_ir": 7216958,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7219372
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::build_corpus",
+                "calls": 1,
+                "inclusive_ir": 7219372
+              }
+            ],
+            "inclusive_ir": 7219372,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 1,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "2079d6f5783cc1575ba3aac06c4a6d36723be76b97e5e973b26979d8042aaf14",
+          "summary_ir": 7219372
+        },
+        {
+          "file": "profile-r2-generated-edit.callgrind.2",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7260711
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7260711
+              }
+            ],
+            "inclusive_ir": 7260711,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7263056
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7263056
+              }
+            ],
+            "inclusive_ir": 7263056,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 2,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "4ea5501b3492f47c4afb252f1568a2e8881f41a0cf4d7631905e8f962438a578",
+          "summary_ir": 7263056
+        },
+        {
+          "file": "profile-r2-generated-edit.callgrind.3",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7151769
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7151769
+              }
+            ],
+            "inclusive_ir": 7151769,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7154080
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7154080
+              }
+            ],
+            "inclusive_ir": 7154080,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 3,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "bda8cc2c048197228761a62caa4cfa714082243df72f538a16f31f284379e6a1",
+          "summary_ir": 7154080
+        },
+        {
+          "file": "profile-r2-generated-edit.callgrind.4",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7245283
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7245283
+              }
+            ],
+            "inclusive_ir": 7245283,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7247589
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::publish_reference",
+                "calls": 1,
+                "inclusive_ir": 7247589
+              }
+            ],
+            "inclusive_ir": 7247589,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 4,
+          "role": "setup",
+          "selection_edge": {
+            "caller": "setup",
+            "calls": 1
+          },
+          "sha256": "942c8fbcf8fb4c7d4a953df6274506bdb1d349db638eacdd9240e7eb41d0f178",
+          "summary_ir": 7247589
+        },
+        {
+          "file": "profile-r2-generated-edit.callgrind.5",
+          "nested_document_mut": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7266443
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut",
+                "caller": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "calls": 1,
+                "inclusive_ir": 7266443
+              }
+            ],
+            "inclusive_ir": 7266443,
+            "positive_edge_count": 1,
+            "target": "litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_mut"
+          },
+          "owner_incoming": {
+            "by_caller": [
+              {
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 7268758
+              }
+            ],
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_perf_baseline::ordinary_save::Owner::edit",
+                "caller": "litchi_perf_baseline::ordinary_save::run_case",
+                "calls": 1,
+                "inclusive_ir": 7268758
+              }
+            ],
+            "inclusive_ir": 7268758,
+            "positive_edge_count": 1,
+            "target": "litchi_perf_baseline::ordinary_save::Owner::edit"
+          },
+          "part": 5,
+          "role": "measured",
+          "selection_edge": {
+            "caller": "litchi_perf_baseline::ordinary_save::run_case",
+            "calls": 1
+          },
+          "sha256": "6f46f8af983c4397b16f59cb8b451f8586bc75f0b864e86d9a8a9337e9aa1edf",
+          "summary_ir": 7268758
+        }
+      ],
+      "phase": "edit",
+      "receipt": "profile-r2-generated-edit.receipt.json",
+      "receipt_sha256": "af589688c030ef4f150bc2e12c032d0929f0d8197874c442a8514e6895c2c7b3",
+      "repeat": 2,
+      "result": "profile-r2-generated-edit.json",
+      "result_identity": {
+        "case": "docx_ordinary_save_edit",
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "sink": null,
+        "source": {
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "ordinary_save": {
+            "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+            "corpus": {
+              "byte_split": {
+                "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+                "deflate_member_count": 12,
+                "framing_bytes": 1560,
+                "members_identical_to_source": 11,
+                "members_regenerated": 1,
+                "output_member_count": 12,
+                "output_total_bytes": 9070,
+                "payload_bytes_deflated": 7510,
+                "payload_bytes_identical_to_source": 6524,
+                "payload_bytes_regenerated": 986,
+                "payload_bytes_stored": 0,
+                "stored_member_count": 0,
+                "uncompressed_payload_bytes_compressed": 51980,
+                "uncompressed_payload_bytes_regenerated": 21601
+              },
+              "edit_admitted": true,
+              "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+              "edit_outcome": "admitted",
+              "format": "DOCX",
+              "generator": "litchi-perf-existing-corpus",
+              "origin": "generated-harness-corpus",
+              "published_bytes": 9070,
+              "published_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycle_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_cycles_identical": true,
+              "repeated_save_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+              "repeated_saves_identical": true,
+              "save_entry_point": "litchi_docx::Package::save",
+              "sink_entry_point": "litchi_docx::Package::to_stream",
+              "source_archive_bytes": 9051,
+              "source_archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+              "source_member_count": 12
+            },
+            "edit_outcome_sha256": [
+              "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+            ],
+            "edit_outcomes_identical": true,
+            "format": "DOCX",
+            "origin": "generated-harness-corpus",
+            "phase": "edit",
+            "publications_identical": true,
+            "published_sha256": [],
+            "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock"
+          },
+          "read_bytes": [],
+          "read_calls": []
+        }
+      },
+      "result_sha256": "0e773f2c964fa9f47007a9bc99fa5890c504b0c5b843df85d9fcd1baefa40760",
+      "selected": "profile-r2-generated-edit.callgrind.5",
+      "selected_by": {
+        "caller": "litchi_perf_baseline::ordinary_save::run_case",
+        "positive_owner_call_count": 1,
+        "selection_is_raw_incoming_edge_based": true
+      },
+      "self_ir": 32,
+      "source_custody": {
+        "after": "profile-r2-generated-edit.source-after.json",
+        "after_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+        "before": "profile-r2-generated-edit.source-before.json",
+        "before_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244"
+      },
+      "termination": {
+        "file": "profile-r2-generated-edit.callgrind",
+        "part": 6,
+        "sha256": "4264c1b733407b6da710db07467cfd2dfaeadf75b537115af73d80abb67fe55b",
+        "summary_ir": 0,
+        "trigger": "Program termination"
+      },
+      "total_ir": 7268758,
+      "warnings": []
+    }
+  ],
+  "revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+  "revision_transition": {
+    "build_revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+    "changed_paths": [
+      "docs/performance/results/change-0709/analyze_profiles.py",
+      "docs/performance/results/change-0709/profile-plan.json",
+      "docs/performance/results/change-0709/profile.py"
+    ],
+    "patch": "profile-revision-transition.patch",
+    "patch_sha256": "c4d6e35f2bc75ce74f9bcc408d6f3cbdf5c83d30672efa6d4911ff4d1903cd75",
+    "path": "profile-revision-transition.json",
+    "profile_checkout_revision": "1de70e7c702081c2d7a46ff58b2bdc27339fe2ec",
+    "sha256": "373880bb709b422fd7191dbad79e44cdc37fba89079baad456eeffc2e1a0642c",
+    "source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  },
+  "schema": "docx_callgrind_ordinary_save_profile_analysis_v1",
+  "status": "pass",
+  "validation": {
+    "all_numbered_raw_parts_retained": true,
+    "allocation_counts_inferred": false,
+    "binary_and_nm_bindings": true,
+    "immediate_children_disjoint_partition": true,
+    "measured_selected_by_raw_run_case_edge": true,
+    "native_latency_claim": false,
+    "nested_document_mut_diagnostic_excluded_from_partition": true,
+    "profile_matrix": true,
+    "setup_parts_preserved": true,
+    "source_and_fixture_custody": true,
+    "termination_parts_zero_ir": true
+  },
+  "warnings": []
+}

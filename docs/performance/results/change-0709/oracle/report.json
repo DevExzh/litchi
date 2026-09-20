@@ -1,0 +1,466 @@
+{
+  "schema": "litchi.docx-ordinary-save-oracle-0709.v2",
+  "probe": "public-package-semantic-append-and-refusal-round-trip",
+  "revision": "9b6a9bbfc7bcc2fbf103419eb6968e1025c529c7",
+  "repository_root": "/home/zhuhe/code/litchi",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "successful_fixture": {
+    "identity": {
+      "relative_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "absolute_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "source_bytes": 55519,
+      "source_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "source_member_count": 20,
+      "source_main_member_compressed_payload_sha256": "28a2983cb708ff12bf93d8fa66f9b8f79d1c95c553032e7aa09a4cc152a17494"
+    },
+    "source": {
+      "document_text": "\t.\tSettingInstructionsMemoryWe recommend that you use Dynamic memory.\t.",
+      "document_text_error": null,
+      "paragraph_text": [
+        "",
+        "",
+        "",
+        "\t.\t",
+        "",
+        "Setting",
+        "Instructions",
+        "Memory",
+        "We recommend that you use Dynamic memory.",
+        "\t",
+        ".",
+        ""
+      ],
+      "paragraph_text_error": null
+    },
+    "edit_admitted": true,
+    "edit_error": null,
+    "routes": [
+      {
+        "route": "to_stream",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/success-to-stream.docx",
+        "output_bytes": 55123,
+        "output_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+        "before": {
+          "document_text": "\t.\tSettingInstructionsMemoryWe recommend that you use Dynamic memory.\t.",
+          "document_text_error": null,
+          "paragraph_text": [
+            "",
+            "",
+            "",
+            "\t.\t",
+            "",
+            "Setting",
+            "Instructions",
+            "Memory",
+            "We recommend that you use Dynamic memory.",
+            "\t",
+            ".",
+            ""
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "\t.\tSettingInstructionsMemoryWe recommend that you use Dynamic memory.\t.litchi-perf-0638-ordinary-save",
+          "document_text_error": null,
+          "paragraph_text": [
+            "",
+            "",
+            "",
+            "\t.\t",
+            "",
+            "Setting",
+            "Instructions",
+            "Memory",
+            "We recommend that you use Dynamic memory.",
+            "\t",
+            ".",
+            "",
+            "litchi-perf-0638-ordinary-save"
+          ],
+          "paragraph_text_error": null
+        },
+        "checks": {
+          "source_marker_occurrences": 0,
+          "output_marker_occurrences": 1,
+          "marker_is_last_paragraph": true,
+          "marker_exactly_once": true,
+          "prior_paragraphs_exact_prefix": true,
+          "prior_document_text_is_prefix": true,
+          "output_reopened": true,
+          "semantic_edit_verified": true
+        },
+        "members": {
+          "output_member_count": 20,
+          "changed_non_main_compressed_members": [
+            "word/_rels/document.xml.rels"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "word/_rels/document.xml.rels",
+              "source_compressed_payload_sha256": "0b22c7a281bd3379f13b16e76f3cfddd993f4329efe36d8ef108a7d904d6d42d",
+              "output_compressed_payload_sha256": "2c67826409c53f31b4723f085673f4c73b0b997eafef323d7450cb62cede2f94",
+              "source_decoded_sha256": "a0bac0323ead9628a837cdad689cc559a1e8e5cbddb2f80156a59dab0447d8bf",
+              "output_decoded_sha256": "16900e17fad1120e0efe88a87e42bec298fc57350d8854739381625a7af1fd71",
+              "source_decoded_bytes": 1622,
+              "output_decoded_bytes": 1356,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "word/_rels/document.xml.rels"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": true,
+          "main_member_decoded_payload_changed": true,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      },
+      {
+        "route": "save",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/success-save.docx",
+        "output_bytes": 55123,
+        "output_sha256": "963db77748c0dff453c78ae7567dec4df35de7242b2d6cc53ccf720fcb487e1a",
+        "before": {
+          "document_text": "\t.\tSettingInstructionsMemoryWe recommend that you use Dynamic memory.\t.",
+          "document_text_error": null,
+          "paragraph_text": [
+            "",
+            "",
+            "",
+            "\t.\t",
+            "",
+            "Setting",
+            "Instructions",
+            "Memory",
+            "We recommend that you use Dynamic memory.",
+            "\t",
+            ".",
+            ""
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "\t.\tSettingInstructionsMemoryWe recommend that you use Dynamic memory.\t.litchi-perf-0638-ordinary-save",
+          "document_text_error": null,
+          "paragraph_text": [
+            "",
+            "",
+            "",
+            "\t.\t",
+            "",
+            "Setting",
+            "Instructions",
+            "Memory",
+            "We recommend that you use Dynamic memory.",
+            "\t",
+            ".",
+            "",
+            "litchi-perf-0638-ordinary-save"
+          ],
+          "paragraph_text_error": null
+        },
+        "checks": {
+          "source_marker_occurrences": 0,
+          "output_marker_occurrences": 1,
+          "marker_is_last_paragraph": true,
+          "marker_exactly_once": true,
+          "prior_paragraphs_exact_prefix": true,
+          "prior_document_text_is_prefix": true,
+          "output_reopened": true,
+          "semantic_edit_verified": true
+        },
+        "members": {
+          "output_member_count": 20,
+          "changed_non_main_compressed_members": [
+            "word/_rels/document.xml.rels"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "word/_rels/document.xml.rels",
+              "source_compressed_payload_sha256": "0b22c7a281bd3379f13b16e76f3cfddd993f4329efe36d8ef108a7d904d6d42d",
+              "output_compressed_payload_sha256": "2c67826409c53f31b4723f085673f4c73b0b997eafef323d7450cb62cede2f94",
+              "source_decoded_sha256": "a0bac0323ead9628a837cdad689cc559a1e8e5cbddb2f80156a59dab0447d8bf",
+              "output_decoded_sha256": "16900e17fad1120e0efe88a87e42bec298fc57350d8854739381625a7af1fd71",
+              "source_decoded_bytes": 1622,
+              "output_decoded_bytes": 1356,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "word/_rels/document.xml.rels"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": true,
+          "main_member_decoded_payload_changed": true,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      }
+    ],
+    "fixture_pass": true
+  },
+  "refusal_fixture": {
+    "identity": {
+      "relative_path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+      "absolute_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+      "source_bytes": 77621,
+      "source_sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8",
+      "source_member_count": 37,
+      "source_main_member_compressed_payload_sha256": "329b2aef425dd09f87e4c1ce49ff84795dba1f78524c0ee98098d7b7c31a5b6d"
+    },
+    "source": {
+      "document_text": "start",
+      "document_text_error": null,
+      "paragraph_text": [
+        "start"
+      ],
+      "paragraph_text_error": null
+    },
+    "historical_0638_outcome": "0638 recorded a syntax refusal; current source reaches the same contract as a body-final section-placement refusal",
+    "routes": [
+      {
+        "route": "to_stream",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/refusal-after-refused-edit-to-stream.docx",
+        "output_bytes": 77370,
+        "output_sha256": "8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122",
+        "before": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "edit_error": "invalid DOCX format: body-final section properties are not the final body child",
+        "checks": {
+          "edit_admitted": false,
+          "refusal_contains_current_structural_reason": true,
+          "output_reopened": true,
+          "source_and_output_text_equal": true,
+          "no_marker_added": true,
+          "no_non_main_compressed_payload_changed": false,
+          "no_non_main_decoded_payload_changed": false,
+          "refusal_round_trip_verified": false
+        },
+        "members": {
+          "output_member_count": 37,
+          "changed_non_main_compressed_members": [
+            "docProps/custom.xml"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "docProps/custom.xml",
+              "source_compressed_payload_sha256": "41d7545eeac45fad6c1bdd6ecf5a3e27b39bf54026406461c6983566336e2d04",
+              "output_compressed_payload_sha256": "8a2e31328f8f63d972382b8a7c337be5af8e24518f14fadaf8fa57274c1a1a41",
+              "source_decoded_sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+              "output_decoded_sha256": "146d2312d442e391430cf609203fb11f0df47e43bfe582904e85cb98c31c1966",
+              "source_decoded_bytes": 632,
+              "output_decoded_bytes": 602,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "docProps/custom.xml"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": false,
+          "main_member_decoded_payload_changed": false,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      },
+      {
+        "route": "save",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/refusal-after-refused-edit-save.docx",
+        "output_bytes": 77370,
+        "output_sha256": "8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122",
+        "before": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "edit_error": "invalid DOCX format: body-final section properties are not the final body child",
+        "checks": {
+          "edit_admitted": false,
+          "refusal_contains_current_structural_reason": true,
+          "output_reopened": true,
+          "source_and_output_text_equal": true,
+          "no_marker_added": true,
+          "no_non_main_compressed_payload_changed": false,
+          "no_non_main_decoded_payload_changed": false,
+          "refusal_round_trip_verified": false
+        },
+        "members": {
+          "output_member_count": 37,
+          "changed_non_main_compressed_members": [
+            "docProps/custom.xml"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "docProps/custom.xml",
+              "source_compressed_payload_sha256": "41d7545eeac45fad6c1bdd6ecf5a3e27b39bf54026406461c6983566336e2d04",
+              "output_compressed_payload_sha256": "8a2e31328f8f63d972382b8a7c337be5af8e24518f14fadaf8fa57274c1a1a41",
+              "source_decoded_sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+              "output_decoded_sha256": "146d2312d442e391430cf609203fb11f0df47e43bfe582904e85cb98c31c1966",
+              "source_decoded_bytes": 632,
+              "output_decoded_bytes": 602,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "docProps/custom.xml"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": false,
+          "main_member_decoded_payload_changed": false,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      }
+    ],
+    "no_edit_routes": [
+      {
+        "route": "to_stream",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/refusal-no-edit-to-stream.docx",
+        "output_bytes": 77370,
+        "output_sha256": "8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122",
+        "before": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "checks": {
+          "output_reopened": true,
+          "source_and_output_text_equal": true,
+          "no_non_main_compressed_payload_changed": false,
+          "no_non_main_decoded_payload_changed": false
+        },
+        "members": {
+          "output_member_count": 37,
+          "changed_non_main_compressed_members": [
+            "docProps/custom.xml"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "docProps/custom.xml",
+              "source_compressed_payload_sha256": "41d7545eeac45fad6c1bdd6ecf5a3e27b39bf54026406461c6983566336e2d04",
+              "output_compressed_payload_sha256": "8a2e31328f8f63d972382b8a7c337be5af8e24518f14fadaf8fa57274c1a1a41",
+              "source_decoded_sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+              "output_decoded_sha256": "146d2312d442e391430cf609203fb11f0df47e43bfe582904e85cb98c31c1966",
+              "source_decoded_bytes": 632,
+              "output_decoded_bytes": 602,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "docProps/custom.xml"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": false,
+          "main_member_decoded_payload_changed": false,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      },
+      {
+        "route": "save",
+        "artifact_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/artifacts/refusal-no-edit-save.docx",
+        "output_bytes": 77370,
+        "output_sha256": "8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122",
+        "before": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "after": {
+          "document_text": "start",
+          "document_text_error": null,
+          "paragraph_text": [
+            "start"
+          ],
+          "paragraph_text_error": null
+        },
+        "checks": {
+          "output_reopened": true,
+          "source_and_output_text_equal": true,
+          "no_non_main_compressed_payload_changed": false,
+          "no_non_main_decoded_payload_changed": false
+        },
+        "members": {
+          "output_member_count": 37,
+          "changed_non_main_compressed_members": [
+            "docProps/custom.xml"
+          ],
+          "changed_non_main_member_diffs": [
+            {
+              "name": "docProps/custom.xml",
+              "source_compressed_payload_sha256": "41d7545eeac45fad6c1bdd6ecf5a3e27b39bf54026406461c6983566336e2d04",
+              "output_compressed_payload_sha256": "8a2e31328f8f63d972382b8a7c337be5af8e24518f14fadaf8fa57274c1a1a41",
+              "source_decoded_sha256": "accf6b87aa82a7ffdb36b1917db0f7fc9617a3272277a9d3307a84c1582f91f0",
+              "output_decoded_sha256": "146d2312d442e391430cf609203fb11f0df47e43bfe582904e85cb98c31c1966",
+              "source_decoded_bytes": 632,
+              "output_decoded_bytes": 602,
+              "decoded_bytes_equal": false,
+              "decoded_bytes_equal_after_ascii_whitespace_removal": false
+            }
+          ],
+          "changed_non_main_decoded_members": [
+            "docProps/custom.xml"
+          ],
+          "missing_non_main_members": [],
+          "added_non_main_members": [],
+          "main_member_compressed_payload_changed": false,
+          "main_member_decoded_payload_changed": false,
+          "unchanged_compressed_payloads_except_main": false,
+          "unchanged_decoded_payloads_except_main": false
+        }
+      }
+    ],
+    "fixture_pass": false
+  },
+  "oracle_pass": false
+}

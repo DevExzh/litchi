@@ -1,0 +1,102 @@
+{
+  "artifacts": {
+    "profile-r1-generated-counting_publish.callgrind": "324b92ad6e8184ca0ed894c9f455f457973f676bb4e98d92078325b029b90a9d",
+    "profile-r1-generated-counting_publish.callgrind.1": "083f70179d6544e15e2f06000ff9a92b4e9ef349f7157a6e32025c695ebfad4c",
+    "profile-r1-generated-counting_publish.callgrind.2": "3fc60a581eb9050390d055e371e3e73b6bf4a82a3e0b1932609665027cb75924",
+    "profile-r1-generated-counting_publish.callgrind.3": "5898fdeb3357af646f5562646f20bb52215167b17559ec83232c3681a5a1949a",
+    "profile-r1-generated-counting_publish.callgrind.4": "1393ba74552332fcd2bccd84a88b2a7d20bebe279170f0e42c44e6eec0948db8",
+    "profile-r1-generated-counting_publish.callgrind.5": "e9c43d5189f7d2d385ee5cd055ddeb517540e421a42b402e108c1ad91b319199",
+    "profile-r1-generated-counting_publish.callgrind.6": "da0ef53919e8b5dd6848def8096cebf0679f9bd833d63ec98626b6321b636b51",
+    "profile-r1-generated-counting_publish.fixture-after.json": "909b5077ac5de0c0f631569b3c4fd25233cb058851d9ce4bbdb71c539e3bab24",
+    "profile-r1-generated-counting_publish.fixture-before.json": "909b5077ac5de0c0f631569b3c4fd25233cb058851d9ce4bbdb71c539e3bab24",
+    "profile-r1-generated-counting_publish.json": "8d9974f29a83942eb8f58c7c20f88b4bcad233f89df40be1f3210b516b5a6bcd",
+    "profile-r1-generated-counting_publish.source-after.json": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+    "profile-r1-generated-counting_publish.source-before.json": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+    "profile-r1-generated-counting_publish.stderr": "a38d50605134bc345ce56669db404cb65cbcc84d25504280b2d17d802319f946",
+    "profile-r1-generated-counting_publish.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+  "binary_bytes": 62889832,
+  "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+  "build_record": "build-baseline.json",
+  "build_record_sha256": "c4e3f23e4969c7cc8fe14fcfc297ce78401a942768c951dd28c6c614fc6c724a",
+  "build_source_manifest": "source-baseline.json",
+  "build_source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+  "case": "docx_ordinary_save_counting_publish",
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--zero-before=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--dump-after=litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-counting_publish.callgrind",
+    "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0709/profile-r1-generated-counting_publish.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0709-fs"
+  ],
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "corpus_id": "generated",
+  "corpus_origin": "generated-harness-corpus",
+  "cpu": 12,
+  "current_checkout_source": {
+    "after_artifact": "profile-r1-generated-counting_publish.source-after.json",
+    "after_file_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+    "after_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "before_artifact": "profile-r1-generated-counting_publish.source-before.json",
+    "before_file_sha256": "df99fd98eed63908fe41ec8b3c68bf3c21237a898d1c48140bf99b8378b3a244",
+    "before_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "unchanged_during_child": true
+  },
+  "exit_code": 0,
+  "expected_numbered_dumps": 6,
+  "finished_utc": "2026-09-20T07:47:41.236168+00:00",
+  "fixture": {
+    "after": null,
+    "after_artifact": "profile-r1-generated-counting_publish.fixture-after.json",
+    "before": null,
+    "before_artifact": "profile-r1-generated-counting_publish.fixture-before.json"
+  },
+  "lane": "profile",
+  "measured_parent": "litchi_perf_baseline::ordinary_save::run_case",
+  "name": "profile-r1-generated-counting_publish",
+  "order_index": 2,
+  "owner": "litchi_docx::package::codec::<impl litchi_docx::package::model::Package>::write_plain",
+  "owner_match": "exact",
+  "phase": "counting_publish",
+  "plan_sha256": "d69de12689b7537fd00165b48c8f1ba5ca081975f4b68caea0c27879adb2fd17",
+  "profile_plan_sha256": "62bb99d3b05d6da34a5adb51e5e85cc327bba8f6f0271d52c6de21158db9cd77",
+  "repeat": 1,
+  "retained_source_census_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+  "retained_source_entry_count": 7282,
+  "samples": 1,
+  "schema_version": 1,
+  "script_sha256": "767a5b718002c421488e668155826e7b78a77422097f4ac3d7e28e900d5b4c28",
+  "setup_parents": {
+    "generated": {
+      "litchi_opc::atomic::replace_with_impl": 4,
+      "litchi_perf_baseline::semantic_docx_bytes": 1
+    },
+    "numbered-list": {
+      "litchi_opc::atomic::replace_with_impl": 4
+    }
+  },
+  "started_utc": "2026-09-20T07:47:38.710390+00:00",
+  "wall_time_ns": 2525802610,
+  "warmup": 0,
+  "warnings": [
+    "Callgrind Ir is guest-instruction attribution; no allocation count is inferred from Valgrind.",
+    "The analyzer selects the measured dump from a raw incoming edge; dump numbering is retained as evidence."
+  ]
+}

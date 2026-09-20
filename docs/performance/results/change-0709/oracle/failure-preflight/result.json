@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/zhuhe/code/litchi-0709-bin/oracle",
+    "--repo-root",
+    "/home/zhuhe/code/litchi",
+    "--marker",
+    "litchi-perf-0638-ordinary-save",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0709/oracle/report.json"
+  ],
+  "exit_code": 1,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0709-bin/oracle",
+    "sha256": "bfa2aafa771f5d9c61190285ceec4410d0881530c25bcf86096c96eed86b0518",
+    "bytes": 4765416
+  },
+  "probe_manifest_sha256": "2daebf1554a8b08b7acbe9ba39b7a0eecc779624182c29d965908b4ddf1ef04b",
+  "workspace_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+  "artifacts": {
+    "run.stdout": "0d22c69599f0de73a78dd39c44ed805a708d0d41203f464c4b8e8b419a21c683",
+    "run.stderr": "16cdf7028a9edd3c2cfa46d6c8ded5f4f9c19ccaddca14321f523ef86493ae8c",
+    "report.json": "c34905f1d28d070568ce087d30202efce92738d38112bf9e252dd60ff3f9041e"
+  },
+  "temporary_root": "/home/zhuhe/code/litchi-0709-fs/oracle"
+}

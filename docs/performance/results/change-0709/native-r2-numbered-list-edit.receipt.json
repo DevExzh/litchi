@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "name": "native-r2-numbered-list-edit",
+  "lane": "native",
+  "lane_order_index": 19,
+  "repeat": 2,
+  "corpus_id": "numbered-list",
+  "corpus_label": "numbered-list",
+  "corpus_origin": "caller-named-real-file",
+  "phase": "edit",
+  "case": "docx_real_file_ordinary_save_edit",
+  "samples": 100,
+  "warmup": 10,
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--case",
+    "docx_real_file_ordinary_save_edit",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0709/native-r2-numbered-list-edit.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0709-fs",
+    "--ooxml-file",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "start_utc": "2026-09-20T07:36:08.938652+00:00",
+  "end_utc": "2026-09-20T07:36:09.631063+00:00",
+  "seconds": 0.34814146300777793,
+  "exit_code": 0,
+  "cpu": 12,
+  "binary_path": "/home/zhuhe/code/litchi-0709-bin/baseline-native",
+  "binary_sha256": "042587f297602881a313881c77017bb53af286e7ee24d42906a24ed3b08455c0",
+  "binary_bytes": 62889832,
+  "build_record_sha256": "c4e3f23e4969c7cc8fe14fcfc297ce78401a942768c951dd28c6c614fc6c724a",
+  "build_source_manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+  "retained_binary_source": {
+    "manifest": "source-baseline.json",
+    "manifest_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+    "source_census_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "source_entry_count": 7282
+  },
+  "current_checkout_source": {
+    "before_artifact": "native-r2-numbered-list-edit.source-before.json",
+    "after_artifact": "native-r2-numbered-list-edit.source-after.json",
+    "before_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "after_sha256": "db839c00b1048798c2141047394e6286c0d558f56cc814a32ada1c6410fa8ae8",
+    "before_file_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+    "after_file_sha256": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+    "before_entry_count": 7282,
+    "after_entry_count": 7282,
+    "relation_before": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "relation_after": {
+      "mode": "exact",
+      "changed_paths": [],
+      "expected_entry_count": 7282,
+      "current_entry_count": 7282
+    },
+    "unchanged_during_child": true
+  },
+  "fixture": {
+    "plan_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "plan_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+    "before": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    },
+    "after": {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "resolved_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  },
+  "plan_sha256": "d69de12689b7537fd00165b48c8f1ba5ca081975f4b68caea0c27879adb2fd17",
+  "script_sha256": "e1646b8574e3e1f4a563c7e721619273e16beedd5ec9c42258827bcdc5e9a99c",
+  "constraints_sha256": "3b5c45ea8219abe064bd23d5abfca14fb277c84f8a9cc3b2784ac92e730d7e65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r2-numbered-list-edit.json": "85ddc3233fa92333ebec599d1cb1deab8fc43cdd8937b989d2b14ab35a3aac93",
+    "native-r2-numbered-list-edit.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-numbered-list-edit.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-numbered-list-edit.source-before.json": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea",
+    "native-r2-numbered-list-edit.source-after.json": "7b322d8d66abde992b0e05fae73c7388c3c09fcd233257de0f8291e6c8eb87ea"
+  }
+}

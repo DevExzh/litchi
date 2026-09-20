@@ -1,0 +1,9 @@
+{
+  "command": [
+    "nm",
+    "-C",
+    "/home/zhuhe/code/litchi-0709-bin/baseline-native"
+  ],
+  "binary_sha256": "246876149ec188bfce0e2b8b87dfe39a8961a12929e52eece22513f2c346f2a9",
+  "log_sha256": "d53a313a697974a8d8eaa9817b926b9d4cf75cda7e4c334fa32c46f93365a8c0"
+}
