@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "docs/performance/results/change-0723/trace.py",
+    "baseline",
+    "--queries",
+    "4"
+  ],
+  "driver_exit_code": 1,
+  "cargo_exit_code": 101,
+  "candidate_source_restored": true,
+  "reason": "Sequence probe used cell.value() on the already returned CellValue. Changed only debug projection to format the value directly. No diagnostic captures or native performance measurements were produced."
+}

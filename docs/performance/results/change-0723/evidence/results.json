@@ -1,0 +1,85 @@
+[
+  {
+    "name": "crate-boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 263.09159256808925
+  },
+  {
+    "name": "claims",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "exit_code": 0,
+    "seconds": 70.20348477002699
+  },
+  {
+    "name": "claims-structural",
+    "command": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "exit_code": 0,
+    "seconds": 0.045947926002554595
+  },
+  {
+    "name": "report",
+    "command": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--registry",
+      "docs/performance/report-claim-classification-v1.json",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.05060598801355809
+  },
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "seconds": 0.04668908892199397
+  },
+  {
+    "name": "non-iwork",
+    "command": [
+      "python3",
+      "tools/non_iwork_gate.py",
+      "verify"
+    ],
+    "exit_code": 0,
+    "seconds": 3.972366717061959
+  }
+]

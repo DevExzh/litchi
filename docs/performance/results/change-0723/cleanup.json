@@ -1,0 +1,92 @@
+{
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0723",
+    "/home/zhuhe/code/litchi-0723-bin",
+    "/home/zhuhe/code/litchi-0723-profile",
+    "/home/zhuhe/code/litchi-target-0723-trace",
+    "/home/zhuhe/code/litchi-0723-trace-bin"
+  ],
+  "identities": [
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/baseline/xls-index-budget-probe-0684",
+      "bytes": 136621064,
+      "sha256": "f0271efd5728802c916f7a86d110867db59cf6dee83d512a725779f2df0f393a"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/baseline/xls-index-probe-0684",
+      "bytes": 139580336,
+      "sha256": "08fae1558d415d7f42a2fa8498c406d6c5815c5a5b454d2a13d2a7aea934bc23"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/baseline/xls-index-retry-probe-0686",
+      "bytes": 136764800,
+      "sha256": "cf7c6d4df5989f8457173a4f60530f42eea8007ddb7585f11d97934b44508a72"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/baseline/xls0684-repeat",
+      "bytes": 136409480,
+      "sha256": "510ec3ae7f8c916b7e57a6946fd2fd8dd4153c59529a7f2ff506b3f94acd6a73"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/baseline/xls0686-alloc",
+      "bytes": 137180744,
+      "sha256": "6c7e63d4cc2b7fabbc703fafa3ace4c238c4a118d0ad997598a289f99704ec50"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/candidate/xls-index-budget-probe-0684",
+      "bytes": 136450112,
+      "sha256": "364112b238ec3820cadb437b5464ec894daceca2d8ad52870752c71d07f4dfb6"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/candidate/xls-index-probe-0684",
+      "bytes": 139409920,
+      "sha256": "2044d1844139a8979d0116665145485fb2647303065e2cb8811e938e04f4e792"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/candidate/xls-index-retry-probe-0686",
+      "bytes": 136593856,
+      "sha256": "84aa04c4a78017b466e7c1f146ff95e68768948fefb553df4b1d31a5dd942d54"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/candidate/xls0684-repeat",
+      "bytes": 136238520,
+      "sha256": "bbf86c406fc2e585c0f6217b525f239f5bfb39a523b9c5f0bdf59a8a730cb829"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-bin/candidate/xls0686-alloc",
+      "bytes": 137010080,
+      "sha256": "41f91716145d07b83913bc73e8c67c10de44b218f649bf236fa8ac2f0e49109e"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-profile/baseline.data",
+      "bytes": 6886928,
+      "sha256": "223f999634b878cd074224baa362df0518832eb33013ad973f5fbc1ab73fb714"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-profile/candidate.data",
+      "bytes": 6659608,
+      "sha256": "6d30059210eaffdd4e951984facff124f09c717ad8939f2201b90de6710ae703"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-trace-bin/baseline/xls-index-retry-probe-0686",
+      "bytes": 136778904,
+      "sha256": "ac21996a559efb5fb8bf5a8b5d8fa20e825c86fc071549ccc9f8b421e9ebdde0"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-trace-bin/baseline/xls-query-chain-sequence-0723",
+      "bytes": 136831384,
+      "sha256": "4136062eae0a91b7fbfa244b38b8f87b740192b79e634d0322ec8ed640e518e2"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-trace-bin/candidate/xls-index-retry-probe-0686",
+      "bytes": 136889592,
+      "sha256": "0e3b3db273b3a69dff67927d6b8657bf946571b89e2e59fea940b29040f36887"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0723-trace-bin/candidate/xls-query-chain-sequence-0723",
+      "bytes": 136942080,
+      "sha256": "65282956e4deb0c9f32205225f9b2b36a4b815b71afe4a50050cf11e8af00a56"
+    }
+  ],
+  "removed": true
+}

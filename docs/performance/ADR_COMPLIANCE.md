@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0723 — rejected XLS target-frame checkpoint
+
+[0723](0723-xls-target-frame-chain-checkpoint.md) archives a private XLS index
+candidate with a 40-byte additional logical charge, fallible metadata-only
+checkpoint construction and the original worksheet-start fallback. Source
+fences, validation, duplicate order, typed outcomes and cancellation checks
+remain. No public API, unsafe code, dependency, ambient I/O, decoded cache or
+parallel execution is added. Correctness, corpus, allocator and counted-source
+checks pass, but frozen timing gates fail. Baseline production source is restored;
+no accepted ADR or CRUD coverage claim changes. The performance goal remains
+active. [Review and evidence](results/change-0723/README.md).
+
 ## 0722 — retained writer-local DOCX fusion
 
 [0722](0722-docx-writer-local-fusion-pilot.md) keeps all 33 constraint hashes

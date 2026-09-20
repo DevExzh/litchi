@@ -1,0 +1,26 @@
+[
+  {
+    "file": "owned.json",
+    "files_seen": 126,
+    "query_mismatches": 0,
+    "equal": true
+  },
+  {
+    "file": "file.json",
+    "files_seen": 126,
+    "query_mismatches": 0,
+    "equal": true
+  },
+  {
+    "file": "synthetic-70000-default-owned.json",
+    "callbacks": 70001,
+    "digest": "cells:70001:b3c444c55a7de92bdf70458d5af56ed4e5172a63f00db66360976c2de4c8567f",
+    "equal": true
+  },
+  {
+    "file": "synthetic-70000-default-file.json",
+    "callbacks": 70001,
+    "digest": "cells:70001:b3c444c55a7de92bdf70458d5af56ed4e5172a63f00db66360976c2de4c8567f",
+    "equal": true
+  }
+]

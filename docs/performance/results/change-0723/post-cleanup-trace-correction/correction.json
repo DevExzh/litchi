@@ -1,0 +1,7 @@
+{
+  "reason": "Trace analyzer required live diagnostic binaries after documented cleanup. Add exact path/hash/positive-size cleanup witness fallback only for absent binaries; present binaries still require their hash.",
+  "before_sha256": "8d03823d331e1acd4968d4cd7cdf25c386a697ad5c79558a3d6bb17f8308415a",
+  "after_sha256": "279f85fd547bb398165d16e3851226cba2275ea04924aab7699474f44c10bee1",
+  "frozen_native_tools_changed": false,
+  "raw_captures_changed": false
+}

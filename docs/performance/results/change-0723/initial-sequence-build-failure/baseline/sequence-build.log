@@ -1,0 +1,9 @@
+   Compiling xls-query-chain-sequence-0723 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0723/sequence-probe)
+error[E0599]: no method named `value` found for enum `litchi_core::sheet::CellValue` in the current scope
+   --> src/main.rs:244:52
+    |
+244 |             value_debug: Some(format!("{:?}", cell.value())),
+    |                                                    ^^^^^ method not found in `litchi_core::sheet::CellValue`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `xls-query-chain-sequence-0723` (bin "xls-query-chain-sequence-0723") due to 1 previous error

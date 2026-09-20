@@ -1,0 +1,81 @@
+{
+  "allocator_scope": "native binary uses the system allocator without allocation counters; allocation metrics come from the separate change-0686 allocation probe",
+  "column": 0,
+  "fresh_owner_per_sample": true,
+  "input_bytes": 165888,
+  "input_path": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "input_sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+  "max_query_index_bytes": 2097152,
+  "mode": "owned",
+  "probe": "change-0686-xls-index-budget-retry",
+  "queries": 4,
+  "records": [
+    {
+      "all_queries_agree": true,
+      "open": {
+        "outcome": {
+          "error": null,
+          "status": "ok",
+          "value": null
+        }
+      },
+      "queries": [
+        {
+          "agrees_with_first": true,
+          "ordinal": 0,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "kind": "String",
+              "value": "GERENCIAMENTO PELAS DIRETRIZES - DATASUL TECNOLOGIA"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 1,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "kind": "String",
+              "value": "GERENCIAMENTO PELAS DIRETRIZES - DATASUL TECNOLOGIA"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 2,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "kind": "String",
+              "value": "GERENCIAMENTO PELAS DIRETRIZES - DATASUL TECNOLOGIA"
+            }
+          }
+        },
+        {
+          "agrees_with_first": true,
+          "ordinal": 3,
+          "outcome": {
+            "error": null,
+            "status": "value",
+            "value": {
+              "kind": "String",
+              "value": "GERENCIAMENTO PELAS DIRETRIZES - DATASUL TECNOLOGIA"
+            }
+          }
+        }
+      ],
+      "sample": 1
+    }
+  ],
+  "row": 0,
+  "samples": 1,
+  "schema_version": 1,
+  "source_construction_scope": "source adapter is constructed before each open timer; owned bytes are read once before all samples",
+  "warmups": 1,
+  "worksheet": 0
+}
