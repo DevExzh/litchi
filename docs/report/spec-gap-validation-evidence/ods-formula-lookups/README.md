@@ -1,7 +1,7 @@
 # ODS lookup and reference functions
 
-Status: active implementation and validation work. This bundle does not yet
-claim production support or passing gates.
+Status: frozen implementation passes semantic/resource review and all seven
+isolated gates. Performance acceptance and final batch publication remain pending.
 
 The batch covers ADDRESS, CHOOSE, HLOOKUP, INDEX, INDIRECT, LOOKUP, MATCH,
 OFFSET, and VLOOKUP in the existing explicit, read-only formula evaluator.
@@ -14,10 +14,16 @@ See [integration-plan.md](integration-plan.md) for ownership and acceptance,
 [resource-plan.md](resource-plan.md) records the independent resource design.
 [contract.md](contract.md) records implementation contract v2, accepted by the
 independent [specification review](spec-review.md). Its original pending-status
-header is retained to preserve the reviewed bytes; implementation remains on
-HOLD pending source fixes and validation. [coverage-requirements.json](coverage-requirements.json)
-lists required coverage, with evidence still pending. Neither document is a
-passing receipt. Final source reviews will be linked here after source handoff.
+header is retained to preserve the reviewed bytes. The current
+[semantic review](semantic-review.md) and [resource review](resource-review.md)
+are bound to the 62-input freeze by [review-receipt.json](review-receipt.json).
+[Gate evidence](gates/README.md) records 1,700 passed tests, zero failures or
+ignored tests, strict Clippy/rustdoc, formatting, boundaries, and source stability.
+The focused suites contain 34 semantic tests and 9 resource tests; independent
+evidence contains 127 oracle observations and 32 native rows.
+[coverage-requirements.json](coverage-requirements.json) binds the executed
+evidence to the immutable requirements; its overall acceptance remains pending
+until the performance receipt is available.
 GETPIVOTDATA, MULTIPLE.OPERATIONS, dependency recalculation, pivot calculation,
 external-source execution and formula-cache publication remain open work in the
 broader audit.
