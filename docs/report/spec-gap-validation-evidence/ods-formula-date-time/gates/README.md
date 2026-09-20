@@ -40,6 +40,7 @@ After semantic/resource review and source freeze, root should create
 ```json
 {
   "schema": "ods-formula-date-time-freeze-v1",
+  "production_commit": "<baseline production_commit>",
   "base_commit": "<baseline preparation_commit>",
   "isolated_lock_sha256": "<baseline isolated_lock.sha256>",
   "selected_files": {"<repository-relative path>": "<sha256>"}
