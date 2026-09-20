@@ -699,10 +699,10 @@ def vector_specs() -> list[dict[str, Any]]:
         (
             "nper.zero_denominator_divzero",
             "NPER",
-            "=NPER(0.1;-10;100)",
-            ["0.1", "-10", "100"],
+            "=NPER(0.125;-12.5;100)",
+            ["0.125", "-12.5", "100"],
             ["domain-error"],
-            "balance-equation denominator is zero",
+            "exactly representable binary64 Rate and Payment make the balance-equation denominator zero",
         ),
         (
             "nper.invalid_pay_type_num",
