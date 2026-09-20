@@ -100,6 +100,7 @@ def main() -> int:
         (evidence / "native" / "fixture.ods").write_bytes(b"fixture")
         (evidence / "performance").mkdir()
         (evidence / "performance" / "performance-plan.md").write_text("fixed performance plan\n", encoding="utf-8")
+        (evidence / "performance" / "case-matrix.json").write_text("{\"cases\": []}\n", encoding="utf-8")
         (evidence / "performance" / "harness" / "src").mkdir(parents=True)
         (evidence / "performance" / "harness" / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
         (evidence / "performance" / "harness" / "Cargo.lock").write_text("# lock\n", encoding="utf-8")
@@ -117,6 +118,9 @@ def main() -> int:
                 raise AssertionError(f"oracle receipt escaped the evidence allowlist: {receipt}")
         if str((evidence / "native" / "fixture.ods").relative_to(mirror)) not in fixture_paths:
             raise AssertionError("native fixture escaped the evidence allowlist")
+        case_matrix = evidence / "performance" / "case-matrix.json"
+        if str(case_matrix.relative_to(mirror)) not in fixture_paths:
+            raise AssertionError("authoritative performance case matrix escaped the evidence allowlist")
         harness_output = evidence / "performance" / "harness" / "run.log"
         harness_output.write_text("future harness output\n", encoding="utf-8")
         if str(harness_output.relative_to(mirror)) in set(stage.evidence_input_paths(mirror)):

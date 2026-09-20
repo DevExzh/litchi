@@ -35,7 +35,11 @@ DATE_TIME_TEST_GLOB = "crates/litchi-ods/tests/ods_formula_date_time*.rs"
 IMMUTABLE_EVIDENCE_FILES = ("baseline.json", "contract.md", "coverage-scope.json", "oracle-vectors.json")
 ORACLE_SOURCE_FILES = ("oracle-plan.md", "oracle-vectors.json", "oracle_verify.py")
 NATIVE_DIRECTORY = "native"
-PERFORMANCE_FILES = ("performance/performance-plan.md", "performance/run_profile.py")
+PERFORMANCE_FILES = (
+    "performance/performance-plan.md",
+    "performance/case-matrix.json",
+    "performance/run_profile.py",
+)
 PERFORMANCE_HARNESS_DIRECTORY = "performance/harness"
 PERFORMANCE_HARNESS_FILES = (
     "performance/harness/Cargo.toml",

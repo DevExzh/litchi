@@ -13,7 +13,7 @@ derived from the current tree:
   positive immutable date/time input allowlist: `baseline.json`,
   `contract.md`, `coverage-scope.json`, the explicit oracle plan/vector/
   verifier inputs, native
-  fixtures/results/provenance, the fixed performance plan/runner, and its
+  fixtures/results/provenance, the fixed performance plan/case matrix/runner, and its
   harness sources;
 * the complete recursive `crates/litchi-ods/src/codec/formula/evaluation`
   subtree, including generic dispatch, cache, reference, calendar, parser,
