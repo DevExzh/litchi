@@ -1,0 +1,2501 @@
+{
+  "schema": "ods-formula-lookups-oracle-v0",
+  "status": "contract-bound independent observations",
+  "baseline_commit": "635fd2e1348b621426b50909cbd5765c91837306",
+  "normative_archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+  "normative_part4_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+  "functions": [
+    "ADDRESS",
+    "CHOOSE",
+    "HLOOKUP",
+    "INDEX",
+    "INDIRECT",
+    "LOOKUP",
+    "MATCH",
+    "OFFSET",
+    "VLOOKUP"
+  ],
+  "workbook": {
+    "sheets": [
+      "Main",
+      "Data",
+      "Hidden",
+      "Archive"
+    ],
+    "extent": {
+      "rows": 16,
+      "columns": 24
+    },
+    "empty_search_range": "Main.J1:J4",
+    "formula_error_search_range": "Main.L1:L3",
+    "formula_error_result_range": "Main.M1:N2"
+  },
+  "profile": {
+    "address_r1c1": "relative components retain supplied row/column in brackets; ADDRESS does not subtract an origin",
+    "indirect_r1c1": "relative brackets are offsets from caller position",
+    "lookup_text": "Unicode17 stable fixture subset: ASCII, U+00DF/U+1E9E and U+03A3/U+03C2/U+03C3/U+0130/U+0307; no normalization",
+    "duplicate_ties": "exact first match; ascending approximate last duplicate",
+    "empty_profile": "Empty search keys/cells normalize to Number 0; Empty results remain Empty",
+    "read_profile": "inline arrays and descriptor-only cases require zero resolver reads",
+    "formula_error_scan": "retain first visited error and scan suffix before publication",
+    "deferred": "typed provider/resource failure receipts remain in focused resource tests"
+  },
+  "observations": [
+    {
+      "case": "address.a1.default",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$AB$7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.r1c1.default",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;1;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "R7C28"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.a1.row_absolute",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "AB$7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.r1c1.row_absolute",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "R7C[28]"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.a1.column_absolute",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;3)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$AB7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.r1c1.column_absolute",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;3;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "R[7]C28"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.a1.relative",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;4)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "AB7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.r1c1.relative",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;4;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "R[7]C[28]"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.scalar_1",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(1;10;\"alpha\";30)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 10
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.scalar_2",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2;10;\"alpha\";30)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "alpha"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.scalar_3",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(3;10;\"alpha\";30)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 30
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.exact_first_duplicate",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;{1;2;2;3|10;20;21;30};2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 20
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.approximate_last_duplicate",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2.5;{1;2;2;3|10;20;21;30};2;TRUE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 21
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_explicit_row_column",
+      "function": "INDEX",
+      "formula": "=INDEX({10;20|30;40};2;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 30
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.a1_current_sheet",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"B2\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 2,
+            "column": 2,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.r1c1_relative_to_caller",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"R[1]C[2]\";FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 6,
+            "column": 5,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.r1c1_absolute",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"R6C5\";FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 6,
+            "column": 5,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "lookup.approximate_largest_less_equal",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(2.5;{1;2;3};{10;20;30})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 20
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_first_duplicate",
+      "function": "MATCH",
+      "formula": "=MATCH(20;{10;20;20;30};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.approximate_ascending",
+      "function": "MATCH",
+      "formula": "=MATCH(25;{10;20;30};1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_text_casefold",
+      "function": "MATCH",
+      "formula": "=MATCH(\"ALPHA\";{\"alpha\";\"Beta\"};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_text_sharp_s_expansion",
+      "function": "MATCH",
+      "formula": "=MATCH(\"STRASSE\";{\"Straße\";\"other\"};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_text_sigma_final_sigma",
+      "function": "MATCH",
+      "formula": "=MATCH(\"Σ\";{\"ς\";\"other\"};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_text_dotted_i_no_normalization",
+      "function": "MATCH",
+      "formula": "=MATCH(\"i\";{\"İ\"};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.checked_positive_shift",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.B2];1;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 3,
+            "column": 4,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.exact_first_duplicate",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;{1;10|2;20|2;21|3;30};2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 20
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.approximate_last_duplicate",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2.5;{1;10|2;20|2;21|3;30};2;TRUE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 21
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.quoted_sheet_a1",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;1;TRUE();\"Data Sheet\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "'Data Sheet'.$AB$7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.apostrophe_escape_a1",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(1;1;1;TRUE();\"O'Brien\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "'O''Brien'.$A$1"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.quoted_sheet_r1c1",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(7;28;4;FALSE();\"Data Sheet\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "'Data Sheet'!R[7]C[28]"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.empty_sheet_is_unqualified",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(1;1;1;TRUE();\"\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$A$1"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.finite_numeric_text_integer_conversion",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(\"7\";28)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$AB$7"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.logical_integer_conversion",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(TRUE();1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$A$1"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.logical_text_style_refusal",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(1;1;1;\"1\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.missing_optional_slots_use_defaults",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(1;1;;)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "$A$1"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.malformed_numeric_text_is_value_error",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(\"x\";1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.matrix_row_parameter",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS({1|2};1)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 2,
+        "columns": 1,
+        "values": [
+          {
+            "type": "text",
+            "value": "$A$1"
+          },
+          {
+            "type": "text",
+            "value": "$A$2"
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.invalid_row_is_value_error",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(0;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "address.invalid_absolute_mode_is_value_error",
+      "function": "ADDRESS",
+      "formula": "=ADDRESS(1;1;5)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.fractional_index_truncates",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2.9;10;20;30)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 20
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.invalid_zero_index",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(0;10;20)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.selected_reference_identity",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2;42;[.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "direct"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.selected_reference_matrix_mode_preserves_descriptor",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2;42;[.A1])",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "direct"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.selected_reference_list_identity",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2;42;[.A1]~[.B1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference_list",
+        "records": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 1,
+            "owner": "direct"
+          },
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 2,
+            "rows": 1,
+            "columns": 1,
+            "owner": "direct"
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.matrix_index_selection",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE({1;3};10;20;30)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 10
+          },
+          {
+            "type": "number",
+            "value": 30
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.selected_formula_error_identity",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(2;10;NA())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "choose.unselected_missing_sheet_is_lazy",
+      "function": "CHOOSE",
+      "formula": "=CHOOSE(1;42;[Missing.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 42
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_one_argument",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4})",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 2,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 1
+          },
+          {
+            "type": "number",
+            "value": 2
+          },
+          {
+            "type": "number",
+            "value": 3
+          },
+          {
+            "type": "number",
+            "value": 4
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_zero_row_column_slice",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};;2)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 2,
+        "columns": 1,
+        "values": [
+          {
+            "type": "number",
+            "value": 2
+          },
+          {
+            "type": "number",
+            "value": 4
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_zero_column_row_slice",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};2;)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 3
+          },
+          {
+            "type": "number",
+            "value": 4
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_both_zero_returns_complete_array",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};;)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 2,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 1
+          },
+          {
+            "type": "number",
+            "value": 2
+          },
+          {
+            "type": "number",
+            "value": 3
+          },
+          {
+            "type": "number",
+            "value": 4
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.negative_row_is_value_error",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};-1;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.row_beyond_shape_is_reference_error",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};3;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.array_area_number_must_be_one",
+      "function": "INDEX",
+      "formula": "=INDEX({1;2|3;4};1;1;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.scalar_data_is_value_error",
+      "function": "INDEX",
+      "formula": "=INDEX(2;1;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.reference_slice_clears_owner",
+      "function": "INDEX",
+      "formula": "=INDEX([.A1:.C4];2;3)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 2,
+            "column": 3,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.reference_list_second_record",
+      "function": "INDEX",
+      "formula": "=INDEX([.A1:.B2]~[.C3:.D4];1;1;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 3,
+            "column": 3,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.reference_list_second_record_full_area",
+      "function": "INDEX",
+      "formula": "=INDEX([.A1:.B2]~[.C3:.D4];0;0;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 3,
+            "column": 3,
+            "rows": 2,
+            "columns": 2
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.reference_list_duplicate_record_identity",
+      "function": "INDEX",
+      "formula": "=INDEX([.A1]~[.A1];1;1;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.three_dimensional_record_preserved",
+      "function": "INDEX",
+      "formula": "=INDEX([Main.A1:Data.B2];1;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 1,
+            "sheet_end": "Data"
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "index.three_dimensional_full_area_preserved",
+      "function": "INDEX",
+      "formula": "=INDEX([Main.A1:Data.B2];0;0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 2,
+            "columns": 2,
+            "sheet_end": "Data"
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.missing_dimensions_use_original_shape",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.A1:.B2];0;0;;)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 2,
+            "columns": 2
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.explicit_positive_dimensions",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.B2];0;0;2;3)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 2,
+            "column": 2,
+            "rows": 2,
+            "columns": 3
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.negative_shift",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.B2:.C3];-1;-1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 2,
+            "columns": 2
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.zero_height_is_value_error",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.B2];0;0;0;1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.out_of_sheet_is_reference_error",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.A1];-1;0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.reference_list_is_value_error_before_reads",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.A1]~[.B1];0;0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.three_dimensional_planes_preserved",
+      "function": "OFFSET",
+      "formula": "=OFFSET([Main.A1:Data.B2];0;0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 2,
+            "columns": 2,
+            "sheet_end": "Data"
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "offset.actual_empty_height_is_not_omitted",
+      "function": "OFFSET",
+      "formula": "=OFFSET([.A1:.B2];0;0;[.J1];)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 1
+    },
+    {
+      "case": "indirect.a1_range_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"B2:C3\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 2,
+            "column": 2,
+            "rows": 2,
+            "columns": 2
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.dot_sheet_separator",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"Data.C3\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Data",
+            "row": 3,
+            "column": 3,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.exclamation_sheet_separator",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"Data!C3\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Data",
+            "row": 3,
+            "column": 3,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.three_dimensional_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"Main.A1:Data.B2\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 2,
+            "columns": 2,
+            "sheet_end": "Data"
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.whole_column_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"A:A\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 16,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.whole_row_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"1:1\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 1,
+            "column": 1,
+            "rows": 1,
+            "columns": 24
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.r1c1_absolute_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"R6C5\";FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 6,
+            "column": 5,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.r1c1_relative_descriptor",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"R[1]C[2]\";FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 6,
+            "column": 5,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.r1c1_omitted_current_column",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"R[-1]C\";FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 4,
+            "column": 3,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.array_text_uses_first_element_in_scalar_mode",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT({\"B2\";\"C3\"})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "reference",
+        "areas": [
+          {
+            "sheet": "Main",
+            "row": 2,
+            "column": 2,
+            "rows": 1,
+            "columns": 1
+          }
+        ],
+        "owner": "derived"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "indirect.malformed_text_is_reference_error",
+      "function": "INDIRECT",
+      "formula": "=INDIRECT(\"not-a-reference\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.descending_last_duplicate",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{4;2;2;1};-1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.invalid_match_type",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{1;2;3};2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.finite_numeric_text_match_type",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{1;2;3};\"0\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.scalar_data_refusal",
+      "function": "MATCH",
+      "formula": "=MATCH(2;2;0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.reference_list_data_refusal",
+      "function": "MATCH",
+      "formula": "=MATCH(2;[.A1]~[.A2];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.two_dimensional_data_refusal",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{1;2|3;4};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.number_text_barrier",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{\"1\";\"2\"};0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.ascending_text_key_does_not_fallback_to_numbers",
+      "function": "MATCH",
+      "formula": "=MATCH(\"2\";{1;2;3};1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.descending_number_key_does_not_fallback_to_text",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{\"3\";\"2\";\"1\"};-1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.ascending_mixed_type_midpoint",
+      "function": "MATCH",
+      "formula": "=MATCH(\"b\";{1|\"a\"|\"c\"};1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.descending_mixed_type_midpoint",
+      "function": "MATCH",
+      "formula": "=MATCH(2;{\"z\"|2|1};-1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.exact_mixed_midpoint",
+      "function": "MATCH",
+      "formula": "=MATCH(1;[.J1:.J4];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 2
+    },
+    {
+      "case": "match.logical_ascending_order",
+      "function": "MATCH",
+      "formula": "=MATCH(TRUE();{FALSE();TRUE()};1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.matrix_key_iteration",
+      "function": "MATCH",
+      "formula": "=MATCH({1;4};{1;2;2;4};0)",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 1
+          },
+          {
+            "type": "number",
+            "value": 4
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "match.empty_search_cell_normalizes_to_zero",
+      "function": "MATCH",
+      "formula": "=MATCH(0;[.J1:.J4];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 1
+    },
+    {
+      "case": "match.empty_search_key_normalizes_to_zero",
+      "function": "MATCH",
+      "formula": "=MATCH([.J1];[.A1:.A4];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 5
+    },
+    {
+      "case": "match.visited_formula_error_propagates",
+      "function": "MATCH",
+      "formula": "=MATCH(2;[.L1:.L2];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 2
+    },
+    {
+      "case": "match.formula_error_scans_suffix_before_returning_error",
+      "function": "MATCH",
+      "formula": "=MATCH(2;[.L1:.L3];0)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 3
+    },
+    {
+      "case": "match.approximate_reference_reads_are_bounded",
+      "function": "MATCH",
+      "formula": "=MATCH(3;[.A1:.A4];1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": null,
+      "expected_reads_min": 2,
+      "expected_reads_max": 4
+    },
+    {
+      "case": "hlookup.scalar_data_refusal",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;2;1;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.selector_bounds_before_reads",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;{1;2|10;20};3;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.matrix_key_iteration",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP({1;4};{1;2;2;4|10;20;21;40};2;FALSE())",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 10
+          },
+          {
+            "type": "number",
+            "value": 40
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.matrix_index_iteration",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;{1;2;2;4|10;20;21;40};{1;2};FALSE())",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 2
+          },
+          {
+            "type": "number",
+            "value": 20
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "hlookup.reference_exact_first_duplicate",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;[.E1:.H3];2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-first"
+      },
+      "expected_reads": 3
+    },
+    {
+      "case": "hlookup.reference_approximate_duplicate_last",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(3;[.E1:.H3];2;TRUE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-last"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "hlookup.reference_list_data_refusal",
+      "function": "HLOOKUP",
+      "formula": "=HLOOKUP(2;[.E1:.H3]~[.A1:.C4];2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.scalar_data_refusal",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;2;1;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.selector_bounds_before_reads",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;{1;10|2;20};3;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.reference_exact_first_duplicate",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;[.A1:.C4];2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-first"
+      },
+      "expected_reads": 3
+    },
+    {
+      "case": "vlookup.reference_approximate_duplicate_last",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(3;[.A1:.C4];2;TRUE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-last"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "vlookup.logical_text_range_lookup_refusal",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;{1;10|2;20};2;\"1\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.referenced_empty_range_lookup_is_false",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;{1;10|2;20};2;[.J1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "number",
+        "value": 20
+      },
+      "expected_reads": 1
+    },
+    {
+      "case": "vlookup.matrix_key_iteration",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP({1;4};{1;10|2;20|2;21|4;40};2;FALSE())",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 10
+          },
+          {
+            "type": "number",
+            "value": 40
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.matrix_index_iteration",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;{1;10|2;20|2;21|4;40};{1;2};FALSE())",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 2
+          },
+          {
+            "type": "number",
+            "value": 20
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "vlookup.reference_result_empty_is_preserved",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(0;[.J1:.K4];2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "empty",
+        "value": null
+      },
+      "expected_reads": 2
+    },
+    {
+      "case": "vlookup.reference_result_error_is_preserved",
+      "function": "VLOOKUP",
+      "formula": "=VLOOKUP(2;[.M1:.N2];2;FALSE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 2
+    },
+    {
+      "case": "lookup.scalar_data_refusal",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(2;2)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "lookup.tall_orientation",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(3;[.A1:.B4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-last"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "lookup.wide_orientation",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(3;[.E1:.H2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-last"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "lookup.short_array_result_is_na_only_when_selected",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(4;{1;2;2;4};{10;20})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "lookup.result_must_be_vector",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(2;{1;2};{10;20|30;40})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "lookup.short_reference_result_extends_for_needed_match",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(4;[.A1:.A4];[.B1:.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "four"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 6
+    },
+    {
+      "case": "lookup.short_reference_result_not_extended_for_in_range_match",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(1;[.A1:.A4];[.B1:.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "one"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 2,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "lookup.long_reference_result_keeps_selected_duplicate",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(2;[.A1:.A4];[.B1:.B4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "text",
+        "value": "two-last"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 6
+    },
+    {
+      "case": "lookup.reference_extension_sheet_bound_is_na",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(4;[.A1:.A4];[.B16])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      },
+      "expected_reads": null,
+      "expected_reads_min": 3,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "lookup.empty_key_and_empty_result",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP(0;[.J1:.J4];[.K1:.K4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "empty",
+        "value": null
+      },
+      "expected_reads": null,
+      "expected_reads_min": 2,
+      "expected_reads_max": 5
+    },
+    {
+      "case": "lookup.matrix_key_iteration",
+      "function": "LOOKUP",
+      "formula": "=LOOKUP({1;4};{1;2;2;4};{10;20;21;40})",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 3
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 10
+          },
+          {
+            "type": "number",
+            "value": 40
+          }
+        ]
+      },
+      "expected_reads": 0
+    }
+  ]
+}
