@@ -74,3 +74,48 @@ host observations separate, using a fresh profile that it removed afterwards.
 These checks validate expected-value and compatibility artifacts; Rust oracle
 execution, final source review, full package gates, and performance capture
 remain pending.
+
+## Executed date/time diagnostics
+
+After unused-helper cleanup, the focused targets reached test execution.
+The semantic target passed all twelve tests in diagnostic snapshot 12 after
+these corrections:
+
+* WEEKNUM rejects non-integer modes rather than truncating them.
+* Omitted-year EASTERSUNDAY selects the next eligible Easter after the
+  injected current date, including the upper-year refusal.
+* TIMEVALUE returns the parsed clock fraction directly for datetime text,
+  avoiding precision loss from subtracting a large integer date serial.
+* The Procedure E multi-year fixture uses the inclusive-year average
+  denominator. An unrepresentable final-day timestamp is expected to fail
+  construction rather than round into the following day.
+
+The first executed limits snapshot passed five of six tests. Its remaining
+failure was the test observer classifying a legitimate 1-by-1 matrix result
+as `Other`; the fixture now checks that exact shape before extracting its
+element. Subsequent checks also cover actual formula-error precedence over
+generated conversion errors, zero-read list refusals, negative subnormal HOUR,
+and signed half-second rounding. Their final rerun is still pending.
+
+MINUTE/SECOND now round signed total seconds before taking the day remainder,
+as the contract specifies. The independent oracle's original
+`59.5/86400` half-second fixture exposed binary64 precision: multiplying its
+represented value by 86400 gives `59.49999999999999`, not exactly 59.5.
+The oracle owner is reviewing this fixture independently; no tolerance was
+added to production rounding to force agreement.
+
+The completed development rerun passed all 1,724 library and integration
+tests in 128 suites, including 13 date/time semantic tests, six limits tests,
+and the Rust consumer of all 132 oracle rows. All six documentation tests and
+strict Clippy across all targets also passed. The final oracle correction
+retains signed rounding for `SECOND(-0.5/86400) = 59`; its independent
+checker agrees with corpus hash
+`273421f087314733c9b383e6a1b5c1bb1e43de3b65b0be24aeb1945864e6438d`.
+Root compared every ODS source and test Rust file with the tested isolated
+checkout and found no differences. The feature matrix records implementation
+scope while explicitly leaving frozen validation and performance pending.
+
+Independent source reviews found no remaining semantic or resource blocker.
+The final freeze, reproducible gate receipts, complete coverage mapping, and
+performance capture are still required; these development runs do not replace
+those deliverables.

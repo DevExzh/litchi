@@ -1,13 +1,13 @@
 # ODS date and time contract semantic review
 
-Status: **contract semantic PASS; implementation and validation remain
-pending**. This review covers the complete twenty-four-function family in
-ODF 1.4 Part 4 §6.10. It does not claim production support, source
-integration, test passage, native parity, or performance.
+Status: **contract semantic PASS; source semantic review provisional PASS
+pending the final frozen-source gates**. This review covers the complete
+twenty-four-function family in ODF 1.4 Part 4 §6.10. It does not claim final
+production support, frozen-gate passage, native parity, or performance.
 
 The reviewed contract is
 [`contract.md`](contract.md), SHA-256
-`3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413`.
+`cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`.
 The repository-local normative inputs are:
 
 * `3rdparty/specs/OpenDocument-v1.4-os.zip`, SHA-256
@@ -47,8 +47,8 @@ are stated explicitly enough to be testable:
   Text parsing is fixed en_US with English month names, period/comma numeric
   syntax, and a 1930 two-digit-year pivot. The fallback after DATEVALUE or
   TIMEVALUE is deliberately numeric-only, but includes the fixed VALUE
-  numeric branch (exponents, percent, grouping, currency, and valid mixed
-  fractions), so a failed date/time parse does not recursively admit the
+  numeric branch (exponents, percent, grouping, currency, and valid simple or
+  mixed fractions), so a failed date/time parse does not recursively admit the
   full VALUE date/time grammar. DATEVALUE floors a successful numeric
   fallback; TIMEVALUE preserves its raw finite numeric result. The
   contract's examples (`DATEVALUE("123.5")` -> `123`,
@@ -100,9 +100,26 @@ algorithmic result. Its no-Year form uses one injected timestamp, compares
 the current and following eligible Easter, and explicitly handles the
 9956-after-Easter and 9957–9999 boundary instead of attempting an
 out-of-domain year. HOUR follows the normative INT/floor day-fraction rule;
-MINUTE and SECOND share the selected rounded-second profile. TIME accepts any
-finite component values as §6.10.18 permits, with checked arithmetic, and
-TIMEVALUE distinguishes clock parsing from its permitted numeric fallback.
+MINUTE and SECOND share the selected rounded-second profile. The reviewed
+source applies that profile literally as `ROUND(T * 86400)` followed by the
+day/second modulo operations; a finite input whose multiplication becomes
+non-finite therefore reaches the existing `#NUM!` boundary. This means
+`MINUTE(-0.5/86400)` and `SECOND(-0.5/86400)` are both 59 under the selected
+half-away-from-zero rule. The current oracle row
+`second.negative_fraction` still expects 0, which is the rejected
+normalized-fraction alternative and must be corrected before oracle evidence
+is accepted; this is an evidence-fixture issue, not a source semantic defect.
+TIME accepts any finite component values as §6.10.18 permits, with checked
+arithmetic, and TIMEVALUE distinguishes clock parsing from its permitted
+numeric fallback.
+
+The independent source review of `date_time.rs`, `date_time/kernel.rs`, and
+the shared date/time parser found no additional semantic blocker. The recent
+WEEKNUM exact-mode validation, EASTERSUNDAY no-Year boundary handling,
+fractional-second parsing, and negative-subnormal HOUR decomposition agree
+with the contract. Diagnostic focused checks reported by the implementation
+owners are evidence for the pending gate run only; they do not replace the
+frozen receipts.
 
 NETWORKDAYS and WORKDAY match the §6.10.15 and §6.10.23 signatures and
 default workweek. Their sequence rules correctly distinguish scalar sequence
@@ -177,13 +194,14 @@ cancellation identity, and timestamp identity.
 
 ## Disposition
 
-No remaining normative or API-design blocker was found in contract
-`3d70836316ccbd671a37714b6f3f773899e3dec9d1cef81d7ba50e8f3ed75413`. The
-resource companion review on disk is still bound to its earlier contract
-snapshot (`c093197150a40dd4166a8773412ba009df81b943f3d00b02910a087a8707a30e`);
+No remaining normative, API-design, or source-semantic blocker was found for
+contract `cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f`.
+The resource companion review on disk is bound to this same contract hash;
 its streaming, bounded-state, typed-precedence, timestamp-cache, and
-source-fence findings must be refreshed before they are cited as evidence for
-this contract revision.
+source-fence findings may be cited with the final frozen receipts. The
+source disposition remains provisional until those receipts are complete,
+and the stale `second.negative_fraction` oracle expectation must be corrected
+before the oracle corpus can serve as final evidence.
 
 Before implementation acceptance, the production work must still prove the
 dedicated clock error variant, the separate VALUE/date-family domains,

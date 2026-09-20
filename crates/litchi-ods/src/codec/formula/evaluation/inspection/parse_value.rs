@@ -13,12 +13,11 @@
 
 use super::super::ScalarError;
 use super::super::calendar::{
-    MONTH_LONG, MONTH_SHORT, SECONDS_PER_DAY, SERIAL_EPOCH_TO_UNIX_DAYS, civil_from_days,
+    CivilDate, MAX_CALENDAR_YEAR, MAX_DATE_SERIAL_EXCLUSIVE, MIN_CALENDAR_YEAR, MIN_DATE_SERIAL,
+    MONTH_LONG, MONTH_SHORT, SECONDS_PER_DAY, serial_from_civil,
 };
 
 const TWO_DIGIT_YEAR_PIVOT: u32 = 30;
-const MIN_CALENDAR_YEAR: i32 = 1;
-const MAX_DATE_YEAR: i32 = 9999;
 // Normal grouped values use the exact `fast_float2` conversion after commas
 // have been removed.  Larger inputs use caller-supplied scratch through
 // `parse_value_with_scratch`; the scalar wrapper remains intentionally bounded
@@ -28,7 +27,7 @@ const MAX_NORMALIZED_BYTES: usize = 1024;
 /// Parse one borrowed `VALUE` text according to the deterministic en-US
 /// profile.  No heap allocation is performed by this function.
 #[inline]
-pub(super) fn parse_value(text: &str) -> Result<f64, ScalarError> {
+pub(in super::super) fn parse_value(text: &str) -> Result<f64, ScalarError> {
     let mut scratch = [0_u8; MAX_NORMALIZED_BYTES];
     parse_value_with_scratch(text, &mut scratch)
 }
@@ -37,7 +36,7 @@ pub(super) fn parse_value(text: &str) -> Result<f64, ScalarError> {
 /// scratch before parsing this source.  Comma-free values take the direct
 /// `fast_float2` path and need no scratch even when they are long.
 #[inline]
-pub(super) fn needs_scratch(text: &str) -> bool {
+pub(in super::super) fn needs_scratch(text: &str) -> bool {
     text.len() > MAX_NORMALIZED_BYTES && text.contains(',')
 }
 
@@ -48,7 +47,10 @@ pub(super) fn needs_scratch(text: &str) -> bool {
 /// decimal, the caller must provide at least the input byte length (the exact
 /// normalized requirement is no larger); an undersized buffer returns the
 /// numeric-domain error instead of rounding a truncated prefix.
-pub(super) fn parse_value_with_scratch(text: &str, scratch: &mut [u8]) -> Result<f64, ScalarError> {
+pub(in super::super) fn parse_value_with_scratch(
+    text: &str,
+    scratch: &mut [u8],
+) -> Result<f64, ScalarError> {
     let text = trim_ascii_space(text);
     if text.is_empty() {
         return Err(ScalarError::Value);
@@ -61,6 +63,155 @@ pub(super) fn parse_value_with_scratch(text: &str, scratch: &mut [u8]) -> Result
         return result;
     }
     parse_number(text, scratch)
+}
+
+/// Parse the date-oriented profile used by `DATEVALUE` and DateParam.
+///
+/// Date and datetime spellings are admitted through the shared borrowed
+/// grammar.  A clock-only spelling is deliberately rejected, and the only
+/// fallback is the numeric portion of the VALUE grammar (grouping, currency,
+/// percent, sign, exponent, and mixed-fraction forms are retained; dates,
+/// clocks, slashes, and colons are not).
+pub(in super::super) fn parse_date_value(text: &str) -> Result<f64, ScalarError> {
+    let mut scratch = [0_u8; MAX_NORMALIZED_BYTES];
+    parse_date_value_with_scratch(text, &mut scratch)
+}
+
+/// Parse `DATEVALUE` text with caller-owned numeric normalization scratch.
+pub(in super::super) fn parse_date_value_with_scratch(
+    text: &str,
+    scratch: &mut [u8],
+) -> Result<f64, ScalarError> {
+    let text = trim_ascii_space(text);
+    if text.is_empty() {
+        return Err(ScalarError::Value);
+    }
+    if let Some((kind, result)) = parse_date_time_candidate(text, DateDomain::DateTime) {
+        return match kind {
+            DateTimeKind::Date | DateTimeKind::DateTime => {
+                let value = result?;
+                let value = validate_serial(value, DateDomain::DateTime)?;
+                Ok(value.floor())
+            },
+            DateTimeKind::Time => Err(ScalarError::Value),
+        };
+    }
+    let value = parse_numeric_fallback_with_scratch(text, scratch)?;
+    Ok(validate_serial(value, DateDomain::DateTime)?.floor())
+}
+
+/// Parse the time-oriented profile used by `TIMEVALUE` and TimeParam.
+///
+/// A combined datetime contributes only its fractional day.  Date-only text
+/// is rejected before the numeric fallback is attempted.
+pub(in super::super) fn parse_time_value(text: &str) -> Result<f64, ScalarError> {
+    let mut scratch = [0_u8; MAX_NORMALIZED_BYTES];
+    parse_time_value_with_scratch(text, &mut scratch)
+}
+
+/// Parse `TIMEVALUE` text with caller-owned numeric normalization scratch.
+pub(in super::super) fn parse_time_value_with_scratch(
+    text: &str,
+    scratch: &mut [u8],
+) -> Result<f64, ScalarError> {
+    let text = trim_ascii_space(text);
+    if text.is_empty() {
+        return Err(ScalarError::Value);
+    }
+    if let Some((kind, result)) = parse_date_time_candidate(text, DateDomain::DateTime) {
+        return match kind {
+            DateTimeKind::Time => result,
+            DateTimeKind::DateTime => {
+                let value = result?;
+                validate_serial(value, DateDomain::DateTime)?;
+                // Keep the clock conversion independent of the large date
+                // serial.  Subtracting `floor()` from a date-time serial can
+                // lose several ulps when the date is around 40,000.
+                parse_datetime_time_fraction(text)
+            },
+            DateTimeKind::Date => Err(ScalarError::Value),
+        };
+    }
+    parse_numeric_fallback_with_scratch(text, scratch)
+}
+
+/// Parse the numeric-only portion of the established VALUE grammar.  Date and
+/// clock forms are selected by the caller before this function; mixed
+/// fractions are still admitted here, followed by grouping, currency,
+/// percent, sign, and exponent behavior from `parse_number`.
+pub(in super::super) fn parse_numeric_fallback_with_scratch(
+    text: &str,
+    scratch: &mut [u8],
+) -> Result<f64, ScalarError> {
+    let text = trim_ascii_space(text);
+    if text.is_empty() {
+        return Err(ScalarError::Value);
+    }
+    if let Some(result) = parse_fraction(text) {
+        return result;
+    }
+    parse_number(text, scratch)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DateDomain {
+    Value,
+    DateTime,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DateTimeKind {
+    Date,
+    Time,
+    DateTime,
+}
+
+fn parse_date_time_candidate(
+    text: &str,
+    domain: DateDomain,
+) -> Option<(DateTimeKind, Result<f64, ScalarError>)> {
+    let bytes = text.as_bytes();
+
+    // ISO dates are checked before locale slash/dash forms.  A ten-byte
+    // candidate is a date; a suffix after the separator makes it a datetime
+    // even when that suffix is malformed and must return #VALUE!.
+    if bytes.len() >= 10 && bytes.get(4) == Some(&b'-') && bytes.get(7) == Some(&b'-') {
+        let kind = if bytes.len() == 10 {
+            DateTimeKind::Date
+        } else {
+            DateTimeKind::DateTime
+        };
+        return Some((kind, parse_iso_date_time_with_domain(text, domain)));
+    }
+
+    if bytes.contains(&b':') {
+        if let Some(result) = parse_non_iso_datetime_with_domain(text, domain) {
+            return Some((DateTimeKind::DateTime, result));
+        }
+        return Some((DateTimeKind::Time, parse_clock(text)));
+    }
+
+    let slash_count = bytes.iter().filter(|byte| **byte == b'/').count();
+    let dash_count = bytes.iter().filter(|byte| **byte == b'-').count();
+    let has_exponent_marker = bytes.iter().any(|byte| matches!(*byte, b'e' | b'E'));
+    if slash_count == 2 || (dash_count == 2 && !has_exponent_marker) {
+        return Some((
+            DateTimeKind::Date,
+            parse_numeric_date_with_domain(text, domain),
+        ));
+    }
+
+    if bytes
+        .iter()
+        .any(|byte| byte.is_ascii_alphabetic() && !matches!(*byte, b'e' | b'E'))
+    {
+        return Some((
+            DateTimeKind::Date,
+            parse_english_date_with_domain(text, domain),
+        ));
+    }
+
+    None
 }
 
 fn trim_ascii_space(text: &str) -> &str {
@@ -79,46 +230,13 @@ fn trim_ascii_space(text: &str) -> &str {
 }
 
 fn parse_date_or_time(text: &str) -> Option<Result<f64, ScalarError>> {
-    let bytes = text.as_bytes();
-
-    // ISO dates are checked before the locale's slash/dash forms.  This also
-    // gives ISO datetimes their required precedence over a malformed date.
-    if bytes.len() >= 10 && bytes.get(4) == Some(&b'-') && bytes.get(7) == Some(&b'-') {
-        return Some(parse_iso_date_time(text));
-    }
-
-    if bytes.contains(&b':') {
-        if let Some(result) = parse_non_iso_datetime(text) {
-            return Some(result);
-        }
-        return Some(parse_clock(text));
-    }
-
-    let slash_count = bytes.iter().filter(|byte| **byte == b'/').count();
-    let dash_count = bytes.iter().filter(|byte| **byte == b'-').count();
-    // A signed scientific number such as `-1e-3` has two dashes, but the
-    // exponent marker makes it a numeric candidate rather than a date. Keep
-    // the dash-date route for digit-shaped dates and let the ordinary number
-    // parser validate the exponent form.
-    let has_exponent_marker = bytes.iter().any(|byte| matches!(*byte, b'e' | b'E'));
-    if slash_count == 2 || (dash_count == 2 && !has_exponent_marker) {
-        return Some(parse_numeric_date(text));
-    }
-
-    // A month-name candidate is intentionally handed to the date parser even
-    // when malformed, so a misspelled English date cannot fall through into a
-    // more permissive numeric extension.
-    if bytes
-        .iter()
-        .any(|byte| byte.is_ascii_alphabetic() && !matches!(*byte, b'e' | b'E'))
-    {
-        return Some(parse_english_date(text));
-    }
-
-    None
+    parse_date_time_candidate(text, DateDomain::Value).map(|(_, result)| result)
 }
 
-fn parse_non_iso_datetime(text: &str) -> Option<Result<f64, ScalarError>> {
+fn parse_non_iso_datetime_with_domain(
+    text: &str,
+    domain: DateDomain,
+) -> Option<Result<f64, ScalarError>> {
     let bytes = text.as_bytes();
 
     // A literal T is unambiguous for the listed locale date forms.
@@ -131,7 +249,7 @@ fn parse_non_iso_datetime(text: &str) -> Option<Result<f64, ScalarError>> {
         if !date_text.is_empty()
             && !time_text.is_empty()
             && time_text.contains(':')
-            && let Ok(date) = parse_date_text(date_text)
+            && let Ok(date) = parse_date_text_with_domain(date_text, domain)
         {
             return Some(match parse_clock(time_text) {
                 Ok(time) => finite_sum(date, time),
@@ -148,23 +266,44 @@ fn parse_non_iso_datetime(text: &str) -> Option<Result<f64, ScalarError>> {
     if date_text.is_empty() || time_text.is_empty() || !time_text.contains(':') {
         return None;
     }
-    Some(combine_date_and_time(date_text, time_text))
+    Some(combine_date_and_time_with_domain(
+        date_text, time_text, domain,
+    ))
 }
 
-fn combine_date_and_time(date_text: &str, time_text: &str) -> Result<f64, ScalarError> {
-    let date = parse_date_text(date_text)?;
+fn parse_datetime_time_fraction(text: &str) -> Result<f64, ScalarError> {
+    let bytes = text.as_bytes();
+    if let Some(separator) = bytes
+        .iter()
+        .rposition(|byte| *byte == b'T' || *byte == b't')
+    {
+        return parse_clock(&text[separator + 1..]);
+    }
+    let separator = bytes.iter().rposition(u8::is_ascii_whitespace);
+    let Some(separator) = separator else {
+        return Err(ScalarError::Value);
+    };
+    parse_clock(trim_ascii_space(&text[separator + 1..]))
+}
+
+fn combine_date_and_time_with_domain(
+    date_text: &str,
+    time_text: &str,
+    domain: DateDomain,
+) -> Result<f64, ScalarError> {
+    let date = parse_date_text_with_domain(date_text, domain)?;
     finite_sum(date, parse_clock(time_text)?)
 }
 
-fn parse_date_text(date_text: &str) -> Result<f64, ScalarError> {
+fn parse_date_text_with_domain(date_text: &str, domain: DateDomain) -> Result<f64, ScalarError> {
     if date_text.as_bytes().contains(&b'/') || date_text.as_bytes().contains(&b'-') {
-        parse_numeric_date(date_text)
+        parse_numeric_date_with_domain(date_text, domain)
     } else {
-        parse_english_date(date_text)
+        parse_english_date_with_domain(date_text, domain)
     }
 }
 
-fn parse_iso_date_time(text: &str) -> Result<f64, ScalarError> {
+fn parse_iso_date_time_with_domain(text: &str, domain: DateDomain) -> Result<f64, ScalarError> {
     let bytes = text.as_bytes();
     if bytes.len() < 10
         || !all_ascii_digits(&bytes[0..4])
@@ -179,7 +318,7 @@ fn parse_iso_date_time(text: &str) -> Result<f64, ScalarError> {
     let year = parse_digits_u32(&bytes[0..4]).ok_or(ScalarError::Value)?;
     let month = parse_digits_u32(&bytes[5..7]).ok_or(ScalarError::Value)?;
     let day = parse_digits_u32(&bytes[8..10]).ok_or(ScalarError::Value)?;
-    let date = serial_date(year as i32, month, day)?;
+    let date = serial_date_with_domain(year as i32, month, day, domain)?;
     if bytes.len() == 10 {
         return Ok(date);
     }
@@ -192,7 +331,7 @@ fn parse_iso_date_time(text: &str) -> Result<f64, ScalarError> {
     finite_sum(date, time)
 }
 
-fn parse_numeric_date(text: &str) -> Result<f64, ScalarError> {
+fn parse_numeric_date_with_domain(text: &str, domain: DateDomain) -> Result<f64, ScalarError> {
     let bytes = text.as_bytes();
     let separator = if bytes.contains(&b'/') { b'/' } else { b'-' };
     let first = bytes
@@ -222,10 +361,10 @@ fn parse_numeric_date(text: &str) -> Result<f64, ScalarError> {
         None
     }
     .ok_or(ScalarError::Value)?;
-    serial_date(year, month, day)
+    serial_date_with_domain(year, month, day, domain)
 }
 
-fn parse_english_date(text: &str) -> Result<f64, ScalarError> {
+fn parse_english_date_with_domain(text: &str, domain: DateDomain) -> Result<f64, ScalarError> {
     let mut cursor = 0_usize;
     let (first, first_comma) = next_date_token(text, &mut cursor).ok_or(ScalarError::Value)?;
     let (second, second_comma) = next_date_token(text, &mut cursor).ok_or(ScalarError::Value)?;
@@ -243,7 +382,7 @@ fn parse_english_date(text: &str) -> Result<f64, ScalarError> {
             && second_comma
             && let Some(year) = parse_long_year_component(third)
         {
-            return serial_date(year, month, day);
+            return serial_date_with_domain(year, month, day, domain);
         }
     }
 
@@ -254,7 +393,7 @@ fn parse_english_date(text: &str) -> Result<f64, ScalarError> {
         && let Some(month) = month_number(second)
         && let Some(year) = parse_long_year_component(third)
     {
-        return serial_date(year, month, day);
+        return serial_date_with_domain(year, month, day, domain);
     }
 
     Err(ScalarError::Value)
@@ -608,51 +747,37 @@ fn valid_decimal_syntax(bytes: &[u8], grouped: bool) -> bool {
     cursor == bytes.len()
 }
 
-fn serial_date(year: i32, month: u32, day: u32) -> Result<f64, ScalarError> {
+fn serial_date_with_domain(
+    year: i32,
+    month: u32,
+    day: u32,
+    domain: DateDomain,
+) -> Result<f64, ScalarError> {
     if !(1..=12).contains(&month) {
         return Err(ScalarError::Value);
     }
-    if !(MIN_CALENDAR_YEAR..=MAX_DATE_YEAR).contains(&year) {
+    if !(MIN_CALENDAR_YEAR..=MAX_CALENDAR_YEAR).contains(&year) {
         return Err(ScalarError::Number);
     }
-    let days_in_month = match month {
-        2 if is_leap_year(year) => 29,
-        2 => 28,
-        4 | 6 | 9 | 11 => 30,
-        _ => 31,
+    let date = CivilDate::new(year, month, day).ok_or(ScalarError::Value)?;
+    let serial = serial_from_civil(date).ok_or(ScalarError::Number)?;
+    // Profile serials are below three million, so this conversion is exact.
+    let serial = serial as f64;
+    validate_serial(serial, domain)
+}
+
+fn validate_serial(value: f64, domain: DateDomain) -> Result<f64, ScalarError> {
+    let minimum = match domain {
+        DateDomain::Value => 0.0,
+        DateDomain::DateTime => MIN_DATE_SERIAL as f64,
     };
-    if day == 0 || day > days_in_month {
-        return Err(ScalarError::Value);
-    }
-    let days = days_from_civil(year, month, day);
-    let (roundtrip_year, roundtrip_month, roundtrip_day) = civil_from_days(days);
-    if roundtrip_year != year || roundtrip_month != month || roundtrip_day != day {
-        return Err(ScalarError::Value);
-    }
-    let serial = days + SERIAL_EPOCH_TO_UNIX_DAYS;
-    let maximum = days_from_civil(MAX_DATE_YEAR, 12, 31) + SERIAL_EPOCH_TO_UNIX_DAYS;
-    if !(0..=maximum).contains(&serial) {
+    let maximum = match domain {
+        DateDomain::Value | DateDomain::DateTime => MAX_DATE_SERIAL_EXCLUSIVE as f64,
+    };
+    if !value.is_finite() || value < minimum || value >= maximum {
         return Err(ScalarError::Number);
     }
-    Ok(serial as f64)
-}
-
-fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
-    let year = i64::from(year) - i64::from(month <= 2);
-    let era = if year >= 0 {
-        year / 400
-    } else {
-        (year - 399) / 400
-    };
-    let year_of_era = year - era * 400;
-    let month = i64::from(month);
-    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + i64::from(day) - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era - 719_468
-}
-
-fn is_leap_year(year: i32) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    Ok(value)
 }
 
 fn finite_sum(left: f64, right: f64) -> Result<f64, ScalarError> {
@@ -755,6 +880,23 @@ mod tests {
         assert_eq!(parse_value("1 1/0"), Err(ScalarError::Value));
         assert_eq!(parse_value("1 1/02"), Err(ScalarError::Value));
         assert_eq!(parse_value("1 1 /2"), Err(ScalarError::Value));
+    }
+
+    #[test]
+    fn date_time_numeric_fallback_keeps_mixed_fraction_profile() {
+        assert_eq!(parse_date_value("2 1/2").unwrap(), 2.0);
+        assert_eq!(parse_time_value("2 1/2").unwrap(), 2.5);
+        assert_eq!(parse_time_value("-2 1/2").unwrap(), -2.5);
+        assert_eq!(parse_date_value("-2 1/2").unwrap(), -3.0);
+    }
+
+    #[test]
+    fn timevalue_datetime_preserves_clock_precision() {
+        let expected = (12.0 * 3_600.0 + 34.0 * 60.0 + 56.5) / SECONDS_PER_DAY;
+        assert_eq!(
+            parse_time_value("2006-05-21 12:34:56.5").unwrap().to_bits(),
+            expected.to_bits()
+        );
     }
 
     #[test]
