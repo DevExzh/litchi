@@ -94,3 +94,22 @@ where the scalar API returns `#NUM!`; the solver owner is investigating.
 The test owner is adding per-row failure aggregation so later vectors remain
 observable. These are development results against actively edited sources,
 not frozen gate receipts.
+
+## Stable follow-up and public roots replay
+
+With the adapter briefly held stable at
+`afe55da777a669729314f7692b3f59d4a59b245af5634f2154838891d70c2501`,
+the focused evaluation suite improved to **9/13** and limits to **20/21**.
+The scalar oracle still passed all 65 vectors. The reducer replay now has
+only two failing rows: MIRR matrix-reference admission and the long NPV
+semantic case's still-insufficient explicit work budget. Cumulative and
+XNPV element-error regressions, and NPV formula-error precedence, now pass.
+Direct-rate NPV still performs 16 reads instead of eight. XIRR paired-text
+skips and MIRR reference materialization remain implementation work; nested
+FV arithmetic and per-API explicit-missing expectations remain fixture review.
+
+After the exact zero RATE boundary fix, both public roots tests pass, including
+the 31-row replay and a separate resolver-supplied NaN test. The corpus's NaN
+formula token is checked as parser-only, not substituted with infinity.
+`roots-public-development-check.json` retains the command and observed hashes.
+This does not establish full integration or performance acceptance.
