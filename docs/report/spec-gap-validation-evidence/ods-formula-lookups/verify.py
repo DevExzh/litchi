@@ -424,7 +424,28 @@ def validate_structured_receipt(
         if not isinstance(native_rows, list) or not native_rows:
             raise VerificationError(f"{label} native receipt has no typed result rows")
         for index, row in enumerate(native_rows):
-            if not isinstance(row, dict) or not any(
+            if not isinstance(row, dict):
+                raise VerificationError(f"{label} native result {index} is not a structured row")
+            comparison = row.get("comparison")
+            # A native workbook may include cells used only to seed the resolver
+            # fixture.  They are retained in the capture, but are not function
+            # observations and therefore have no case identifier.  Require an
+            # explicit disposition and explanation so arbitrary rows cannot
+            # silently evade function coverage.
+            if comparison == "fixture-data":
+                if (
+                    row.get("case") not in (None, "")
+                    or not isinstance(row.get("note"), str)
+                    or not row["note"].strip()
+                ):
+                    raise VerificationError(f"{label} fixture-data row {index} lacks an explicit note")
+                if not any(
+                    key in row
+                    for key in ("native", "expected", "result", "value", "error", "kind", "type")
+                ):
+                    raise VerificationError(f"{label} fixture-data row {index} has no typed value")
+                continue
+            if not any(
                 isinstance(row.get(key), str) and row.get(key)
                 for key in ("case", "id", "formula")
             ):
@@ -434,6 +455,15 @@ def validate_structured_receipt(
                 for key in ("native", "expected", "result", "value", "error", "kind", "type")
             ):
                 raise VerificationError(f"{label} native result {index} has no typed outcome")
+            if comparison not in {"parity", "native-divergence"}:
+                raise VerificationError(
+                    f"{label} native result {index} has no recognized comparison disposition"
+                )
+            reason = row.get("divergence_reason")
+            if comparison == "native-divergence" and (not isinstance(reason, str) or not reason.strip()):
+                raise VerificationError(f"{label} native result {index} lacks a documented divergence reason")
+            if comparison == "parity" and reason not in (None, ""):
+                raise VerificationError(f"{label} parity result {index} carries an unexpected divergence reason")
         if isinstance(value, dict):
             receipt_status(value, label)
             divergences = value.get("divergences", value.get("documented_divergences", []))

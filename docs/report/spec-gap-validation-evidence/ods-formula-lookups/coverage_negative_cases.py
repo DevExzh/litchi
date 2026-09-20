@@ -127,7 +127,13 @@ def main() -> int:
             json.dumps(
                 {
                     "status": "PASS",
-                    "results": [{"case": "native.case", "native": {"type": "number", "value": 1}}],
+                    "results": [
+                        {
+                            "case": "native.case",
+                            "native": {"type": "number", "value": 1},
+                            "comparison": "native-divergence",
+                        }
+                    ],
                     "divergences": [{"case": "native.case", "reason": "host token"}],
                 }
             ),
@@ -138,6 +144,45 @@ def main() -> int:
             "undocumented native divergence",
             lambda: verifier.validate_structured_receipt(
                 "native", receipt, "native/native.json", ["native.case"], "native divergence"
+            ),
+        )
+
+        receipt.write_text(
+            json.dumps(
+                {
+                    "status": "PASS",
+                    "results": [{"case": "native.case", "native": {"type": "number", "value": 1}}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        rejected(
+            verifier,
+            "native row without comparison disposition",
+            lambda: verifier.validate_structured_receipt(
+                "native", receipt, "native/native.json", ["native.case"], "native disposition"
+            ),
+        )
+
+        receipt.write_text(
+            json.dumps(
+                {
+                    "status": "PASS",
+                    "results": [
+                        {
+                            "comparison": "fixture-data",
+                            "native": {"type": "number", "value": 1},
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        rejected(
+            verifier,
+            "fixture-data without note",
+            lambda: verifier.validate_structured_receipt(
+                "native", receipt, "native/native.json", [], "native fixture"
             ),
         )
 
