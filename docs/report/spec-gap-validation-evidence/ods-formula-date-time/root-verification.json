@@ -4,16 +4,6 @@
       "functions": 24,
       "sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f"
     },
-    "coverage": {
-      "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
-      "cross_cutting": 20,
-      "cross_cutting_bindings": 54,
-      "function_bindings": 223,
-      "functions": 24,
-      "schema": "ods-formula-date-time-coverage-v1",
-      "scope_sha256": "28a754ded86ad7524d0d94c5856757f775f52dee2f52dd603f8f66353fdbd114",
-      "sha256": "c4c2cd219182d4e40b5a11ecaa67ffc877a632c501b7ce0ccc4bee9a1f50a4ae"
-    },
     "gates": {
       "receipt": {
         "commands": 7,
@@ -51,6 +41,9 @@
       "status": "PASS"
     }
   },
-  "status": "ok",
-  "verified": true
+  "pending": [
+    "coverage: coverage EASTERSUNDAY evidence is pending; coverage WEEKNUM evidence is pending; coverage manifest evidence is pending"
+  ],
+  "status": "pending",
+  "verified": false
 }

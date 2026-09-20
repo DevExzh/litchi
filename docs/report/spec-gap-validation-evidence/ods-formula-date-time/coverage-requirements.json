@@ -1,6 +1,6 @@
 {
   "schema": "ods-formula-date-time-coverage-v1",
-  "status": "PASS",
+  "status": "pending; branch and fractional-floor source evidence pending",
   "normative": "OpenDocument 1.4 Part 4 section 6.10",
   "functions": {
     "DATE": {
@@ -1215,7 +1215,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-date-time-coverage-v1",
-        "status": "PASS",
+        "status": "pending",
         "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
         "bindings": [
           {
@@ -1329,8 +1329,7 @@
             "path": "oracle-execution.json",
             "sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda",
             "identifiers": [
-              "eastersunday.timestamp_after_current_easter",
-              "eastersunday.invalid_year"
+              "eastersunday.timestamp_after_current_easter"
             ],
             "requirements": [
               "current/following-year selection and timestamp range limits"
@@ -3576,7 +3575,7 @@
       ],
       "evidence": {
         "schema": "ods-formula-date-time-coverage-v1",
-        "status": "PASS",
+        "status": "pending",
         "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
         "bindings": [
           {
@@ -3612,40 +3611,6 @@
               "root": "evidence",
               "path": "gates/ods-tests.log",
               "sha256": "026363768e8ef5a9a289523f29357ead967bcfeaa015d14f2cd17ca2b36149bb"
-            }
-          },
-          {
-            "kind": "focused_test",
-            "root": "repo",
-            "path": "crates/litchi-ods/tests/ods_formula_date_time_evaluation.rs",
-            "sha256": "d9644432fd5dcac9272dcd3f942e4b669865db22fb6fe866a706ebd05bf04ea1",
-            "identifiers": [
-              "component_and_month_shift_edges_use_checked_profile_bounds"
-            ],
-            "requirements": [
-              "DateParam flooring and week-start calculation"
-            ],
-            "receipt": {
-              "root": "evidence",
-              "path": "gates/ods-tests.log",
-              "sha256": "026363768e8ef5a9a289523f29357ead967bcfeaa015d14f2cd17ca2b36149bb"
-            }
-          },
-          {
-            "kind": "oracle",
-            "root": "evidence",
-            "path": "oracle-execution.json",
-            "sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda",
-            "identifiers": [
-              "weeknum.mode_1"
-            ],
-            "requirements": [
-              "DateParam flooring and week-start calculation"
-            ],
-            "receipt": {
-              "root": "evidence",
-              "path": "oracle-execution.json",
-              "sha256": "184609c7c7b40c51702947fd2549ab4190158032549f4cc91de594e857bc1dda"
             }
           },
           {
