@@ -299,6 +299,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
 
     if arguments.is_empty() {
         return Ok(formula_error(ScalarError::Value));
@@ -535,6 +543,9 @@ where
             Origin::Scalar,
         ),
         RuntimeValue::Scalar(value) => observe_working(evaluator, state, argument, ordinal, value),
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -689,7 +700,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Areas(_) => {},
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => {},
         }
     }
     Ok(None)

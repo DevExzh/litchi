@@ -1,0 +1,20 @@
+{
+  "status": "expected-verifier-diagnostic",
+  "returncode": 1,
+  "command": [
+    "/usr/bin/python3",
+    "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py",
+    "--candidate-root",
+    "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+    "--candidate-freeze",
+    "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json",
+    "--expected-warmups",
+    "3",
+    "--expected-samples",
+    "15"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-spec-gaps",
+  "reason": "retained performance/verify.py direct_read_bound treats every reference-metadata case as zero-read; revised computed ROW/COLUMN IF lanes are contractually exact two reads; root audit/metadata_verifier owns derived correction",
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py\", line 226, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py\", line 211, in main\n    verify_rows(results / CANDIDATE, candidate_records, list(expected_candidate), args.expected_warmups, args.expected_samples)\n    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/verify.py\", line 155, in verify_rows\n    raise RuntimeError(f\"{directory} {key}: reads {reads} outside expected bounds {bounds}\")\nRuntimeError: /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/results/candidate-final ('reference-metadata-row-computed-if-matrix', 'evaluate'): reads 2 outside expected bounds (0, 0)\n"
+}

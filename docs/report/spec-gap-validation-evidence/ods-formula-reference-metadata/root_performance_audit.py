@@ -20,6 +20,7 @@ import json
 import fnmatch
 from pathlib import Path
 import random
+import re
 from statistics import median
 import subprocess
 import sys
@@ -31,6 +32,7 @@ REPO = HERE.parents[3]
 PERFORMANCE = HERE / "performance"
 RESULTS = PERFORMANCE / "results"
 GATES = HERE / "gates"
+CASE_MATRIX = PERFORMANCE / "case-matrix.json"
 
 sys.path.insert(0, str(PERFORMANCE))
 import run_profile as profile  # noqa: E402
@@ -218,13 +220,224 @@ def expected_cases_for_capture(capture: dict[str, Any]) -> list[str]:
     raise AuditError(f"unknown capture case scope: {scope!r}")
 
 
+def reviewed_read_contract() -> dict[str, Any]:
+    """Load and validate the reviewed per-case read contract.
+
+    The retained performance verifier predates the computed matrix lanes and
+    still carries a zero-read bound for every metadata case.  The case matrix
+    is a hashed profile input, so the adapter can use its reviewed exceptions
+    without changing the capture or the generic verifier.
+    """
+
+    matrix = load(CASE_MATRIX)
+    if not isinstance(matrix, dict):
+        raise AuditError("performance case matrix is not an object")
+    equal("case matrix baseline", matrix.get("baseline_commit"), profile.BASELINE_COMMIT)
+    equal("case matrix scope", matrix.get("scope"), list(profile.REFERENCE_METADATA_FUNCTIONS))
+    equal("case matrix phases", matrix.get("phases"), list(profile.PHASES))
+    expected_cases = list(profile.REFERENCE_METADATA_CASES)
+    equal("case matrix candidate cases", matrix.get("candidate_cases"), expected_cases)
+    equal("case matrix controls", matrix.get("controls"), list(profile.MATCHED_CONTROL_CASES))
+    equal("case matrix candidate count", matrix.get("candidate_case_count"), len(expected_cases))
+    equal("case matrix control count", matrix.get("matched_control_count"), len(profile.MATCHED_CONTROL_CASES))
+
+    expected_reads = matrix.get("expected_reference_reads")
+    if not isinstance(expected_reads, dict):
+        raise AuditError("case matrix expected_reference_reads is malformed")
+    default = expected_reads.get("candidate_cases")
+    if isinstance(default, bool) or not isinstance(default, int) or default < 0:
+        raise AuditError("case matrix candidate read default is malformed")
+    exceptions = expected_reads.get("exceptions")
+    if not isinstance(exceptions, dict) or not exceptions:
+        raise AuditError("case matrix read exceptions are malformed")
+    computed_cases = {
+        case
+        for case in expected_cases
+        if re.fullmatch(r"reference-metadata-(?:row|column)-computed-(?:if|iferror|ifna)-matrix", case)
+    }
+    scalar_case = "reference-metadata-sheet-computed-scalar"
+    expected_exception_cases = computed_cases | {scalar_case}
+    equal("case matrix read exception cases", set(exceptions), expected_exception_cases)
+    for case, value in exceptions.items():
+        if case not in expected_cases or isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise AuditError(f"case matrix read exception is malformed: {case}")
+    equal("case matrix SHEET computed read count", exceptions.get(scalar_case), 1)
+    equal("case matrix computed matrix read counts", {exceptions[case] for case in computed_cases}, {2})
+
+    contract = {case: default for case in expected_cases}
+    contract.update({case: int(value) for case, value in exceptions.items()})
+    metadata_expectations: dict[str, dict[str, Any]] = {
+        scalar_case: {
+            "operation": "SHEET",
+            "shape": "array",
+            "rows": 1,
+            "columns": 1,
+            "elements": 1,
+            "expected": "error:#REF!",
+        }
+    }
+    for case in computed_cases:
+        operation = case.split("-", 3)[2].upper()
+        metadata_expectations[case] = {
+            "operation": operation,
+            "shape": "array",
+            "rows": 1,
+            "columns": 1,
+            "elements": 1,
+            "expected": "error:#VALUE!",
+        }
+    return {
+        "default": default,
+        "exceptions": {case: contract[case] for case in sorted(expected_exception_cases)},
+        "contract": contract,
+        "metadata": metadata_expectations,
+    }
+
+
+def verify_reviewed_metadata_records(
+    records: list[dict[str, Any]],
+    expected_cases: list[str],
+    reviewed: dict[str, Any],
+) -> dict[str, dict[str, int]]:
+    """Check exact metadata and raw read totals for the candidate matrix."""
+
+    contract = reviewed["contract"]
+    metadata_expectations = reviewed["metadata"]
+    metadata_cases = set(expected_cases) & set(contract)
+    grouped_records: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        case = record.get("case")
+        if case in metadata_cases:
+            grouped_records[str(case)].append(record)
+            expected_reads = contract[case]
+            repeat = int(record.get("repeat", 0))
+            if repeat <= 0:
+                raise AuditError(f"candidate {case}: invalid repeat for read contract")
+            equal(
+                f"candidate {case} total reference reads",
+                int(record.get("reference_reads_p50", -1)),
+                expected_reads * repeat,
+            )
+            equal(
+                f"candidate {case} normalized reference reads",
+                int(record.get("reference_reads_per_repeat", -1)),
+                expected_reads,
+            )
+            raw_samples = record.get("samples")
+            if not isinstance(raw_samples, list) or not raw_samples:
+                raise AuditError(f"candidate {case}: raw samples are absent")
+            for sample in raw_samples:
+                if not isinstance(sample, dict):
+                    raise AuditError(f"candidate {case}: raw sample is malformed")
+                equal(
+                    f"candidate {case} raw reference reads",
+                    int(sample.get("reference_reads", -1)),
+                    expected_reads * repeat,
+                )
+
+    equal("candidate metadata read case coverage", set(grouped_records), metadata_cases)
+    fields = ("operation", "shape", "rows", "columns", "elements", "expected")
+    totals: dict[str, dict[str, int]] = {}
+    for case, group in grouped_records.items():
+        signatures = {tuple(record.get(field) for field in fields) for record in group}
+        if len(signatures) != 1:
+            raise AuditError(f"candidate {case}: result metadata changes across retained rows")
+        expected = metadata_expectations.get(case)
+        if expected is not None:
+            for field, value in expected.items():
+                equal(f"candidate {case} {field}", group[0].get(field), value)
+        observed_total = sum(int(record["reference_reads_p50"]) for record in group)
+        expected_total = sum(
+            contract[case] * int(record["repeat"])
+            for record in group
+        )
+        equal(f"candidate {case} aggregate reference reads", observed_total, expected_total)
+        totals[case] = {
+            "rows": len(group),
+            "observed": observed_total,
+            "expected": expected_total,
+        }
+    return totals
+
+
+def verify_reviewed_preflight(directory: Path, expected_cases: list[str], reviewed: dict[str, Any]) -> None:
+    """Validate the candidate preflight map against the same reviewed contract."""
+
+    preflight = load(directory / "preflight.json")
+    reads = preflight.get("reference_reads")
+    if not isinstance(reads, dict):
+        raise AuditError(f"{directory}: reviewed preflight reads are absent")
+    contract = reviewed["contract"]
+    metadata_cases = set(contract)
+    if not metadata_cases.issubset(reads):
+        raise AuditError(f"{directory}: reviewed preflight metadata cases are incomplete")
+    for case in metadata_cases:
+        equal(f"{directory} reviewed preflight reads {case}", int(reads[case]), contract[case])
+
+
+def verify_candidate_rows_with_reviewed_contract(
+    directory: Path,
+    records: list[dict[str, Any]],
+    expected_cases: list[str],
+    warmups: int,
+    samples: int,
+    reviewed: dict[str, Any],
+) -> dict[str, Any]:
+    """Retain the stale verifier failure, then retry with reviewed bounds."""
+
+    metadata_totals = verify_reviewed_metadata_records(records, expected_cases, reviewed)
+    stale_failure: str | None = None
+    try:
+        receipts.verify_rows(directory, records, expected_cases, warmups, samples)
+    except RuntimeError as error:
+        stale_failure = str(error)
+        corrected_cases = set(reviewed["exceptions"]) - {"reference-metadata-sheet-computed-scalar"}
+        if "outside expected bounds" not in stale_failure or not any(
+            case in stale_failure for case in corrected_cases
+        ):
+            raise AuditError(f"retained performance verifier failed outside reviewed adapter: {error}") from error
+
+    original_bound = receipts.direct_read_bound
+    original_preflight_bound = receipts.preflight_read_bound
+    contract = reviewed["contract"]
+
+    def reviewed_bound(case: str, elements: int) -> tuple[int, int] | None:
+        if case in contract:
+            return contract[case], contract[case]
+        return original_bound(case, elements)
+
+    def reviewed_preflight_bound(case: str) -> int:
+        if case in contract:
+            return contract[case]
+        return original_preflight_bound(case)
+
+    receipts.direct_read_bound = reviewed_bound
+    receipts.preflight_read_bound = reviewed_preflight_bound
+    try:
+        receipts.verify_rows(directory, records, expected_cases, warmups, samples)
+        receipts.verify_preflight(directory, expected_cases)
+        verify_reviewed_preflight(directory, expected_cases, reviewed)
+    except RuntimeError as error:
+        raise AuditError(f"reviewed performance verifier failed: {error}") from error
+    finally:
+        receipts.direct_read_bound = original_bound
+        receipts.preflight_read_bound = original_preflight_bound
+    return {
+        "captured_verifier_failure": stale_failure,
+        "corrected": True,
+        "corrected_cases": sorted(set(reviewed["exceptions"])),
+        "raw_reference_read_totals": metadata_totals,
+    }
+
+
 def verify_capture(
     capture: dict[str, Any],
     *,
     profile_hashes: dict[str, str],
     warmups: int,
     samples: int,
-) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    reviewed: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any] | None]:
     label = capture.get("label")
     if not isinstance(label, str) or not label:
         raise AuditError("capture has no label")
@@ -243,14 +456,25 @@ def verify_capture(
         available = environment.get("available_cases")
         if not isinstance(available, list) or not set(expected_cases).issubset(available):
             raise AuditError(f"{label} environment case availability is incomplete")
-    receipts.verify_rows(directory, records, expected_cases, warmups, samples)
-    receipts.verify_preflight(directory, expected_cases)
+    if reviewed is None:
+        receipts.verify_rows(directory, records, expected_cases, warmups, samples)
+        receipts.verify_preflight(directory, expected_cases)
+        read_validation = None
+    else:
+        read_validation = verify_candidate_rows_with_reviewed_contract(
+            directory,
+            records,
+            expected_cases,
+            warmups,
+            samples,
+            reviewed,
+        )
     verify_raw_paths(directory, records)
     equal(f"{label} source git head", manifest["before"].get("git_head"), profile.BASELINE_COMMIT)
     equal(f"{label} stable source git head", manifest["after"].get("git_head"), profile.BASELINE_COMMIT)
     equal(f"{label} capture source git head", capture.get("source_git_head"), profile.BASELINE_COMMIT)
     equal(f"{label} capture binary", capture.get("binary_sha256"), manifest.get("binary_sha256"))
-    return records, manifest, environment
+    return records, manifest, environment, read_validation
 
 
 def compiled_workspace_map(workspace: dict[str, Any]) -> dict[str, Any]:
@@ -492,6 +716,7 @@ def main() -> int:
             raise AuditError("performance profile input receipt is empty or malformed")
         equal_map("profile input before/after", profile_after, profile_before)
         equal_map("current profile input", profile.profile_input_snapshot(), profile_before)
+        reviewed = reviewed_read_contract()
         summary = load(RESULTS / "capture-summary.json")
         equal_map("summary profile before", summary.get("profile_input_sha256_before"), profile_before)
         equal_map("summary profile after", summary.get("profile_input_sha256_after"), profile_after)
@@ -554,17 +779,19 @@ def main() -> int:
         if not preflight_dir.is_dir():
             raise AuditError(f"candidate preflight directory is absent: {preflight_dir}")
         receipts.verify_preflight(preflight_dir, list(receipts.expected_candidate_cases()))
-        baseline_records, baseline_manifest, baseline_env = verify_capture(
+        verify_reviewed_preflight(preflight_dir, list(receipts.expected_candidate_cases()), reviewed)
+        baseline_records, baseline_manifest, baseline_env, _ = verify_capture(
             baseline_capture,
             profile_hashes=profile_before,
             warmups=warmups,
             samples=samples,
         )
-        candidate_records, candidate_manifest, candidate_env = verify_capture(
+        candidate_records, candidate_manifest, candidate_env, candidate_read_validation = verify_capture(
             candidate_capture,
             profile_hashes=profile_before,
             warmups=warmups,
             samples=samples,
+            reviewed=reviewed,
         )
         verify_baseline_source(baseline_manifest, gate_lock)
         excluded_gate_workspace_paths = verify_candidate_source(
@@ -633,6 +860,13 @@ def main() -> int:
             "candidate_label": candidate_capture["label"],
             "matched_control_groups": len(matched_expected),
             "candidate_only_groups": len(candidate_only),
+            "reviewed_read_contract": {
+                "default": reviewed["default"],
+                "exceptions": reviewed["exceptions"],
+                "candidate_preflight_verified": True,
+                "candidate_rows_verified": True,
+            },
+            "retained_verifier_read_bound_correction": candidate_read_validation,
             "candidate_only": [{"case": case, "phase": phase} for case, phase in candidate_only],
             "gate_workspace_payloads_excluded_from_profiler_closure": excluded_gate_workspace_paths,
             "accounting_fields": list(accounting),

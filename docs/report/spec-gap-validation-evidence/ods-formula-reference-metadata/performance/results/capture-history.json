@@ -1,0 +1,51 @@
+{
+  "ambient_context": null,
+  "captures": [
+    {
+      "baseline_records": 840,
+      "candidate_records": 4080,
+      "command": "python3 docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/run_profile.py --candidate-root /var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout --candidate-freeze docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json --warmups 3 --samples 15",
+      "diagnostic_attempts": 1,
+      "disposition": "complete authorized revised frozen-source baseline/candidate pair",
+      "results": [
+        "baseline-049c09cdde3978593149079c4257df047a3fa419",
+        "candidate-final"
+      ],
+      "session_id": 38187
+    }
+  ],
+  "diagnostics": [
+    {
+      "disposition": "setup failure before build/preflight/timing",
+      "path": "diagnostic-revised-freeze-path-failure",
+      "timed_rows": 0
+    },
+    {
+      "disposition": "expected verifier failure due stale zero-read bound; root-performance-audit.json applied transparent correction and PASSed retained rows",
+      "path": "diagnostic-stale-read-bound-verifier",
+      "timed_rows": 0
+    },
+    {
+      "baseline_records": 840,
+      "candidate_records": 3810,
+      "disposition": "superseded complete pre-revision capture retained",
+      "path": "../../diagnostics/computed-array-preflight/performance-results"
+    }
+  ],
+  "generated_at_utc": "2026-09-20T09:40:41.931223+00:00",
+  "historical_complete_capture_rows": {
+    "combined": 9570,
+    "revised": 4920,
+    "superseded": 4650
+  },
+  "schema": "ods-formula-reference-metadata-capture-history-v2",
+  "source_freeze_sha256": "b4a0f0c9665e10f67fafa1b179bfbfdd8be2c65e6ec897bac86db1b2afc9330a",
+  "verification": {
+    "analysis": "capture-analysis.md/.json",
+    "performance_report": "performance-report.md/.json",
+    "preflight": "PASS (28 baseline cases, 136 candidate cases)",
+    "raw_capture": "complete; 4920 timed rows",
+    "retained_verify_py": "diagnostic failure recorded; stale two-read exception pending root correction",
+    "root_audit": "../../root-performance-audit.json (PASS; 4920 rows; corrected exact read contract)"
+  }
+}

@@ -280,6 +280,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
 
     if function.is_countblank() {
         if arguments.len() != 1 {
@@ -306,6 +314,11 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_) => return Ok(formula_error(ScalarError::Value)),
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
+            },
         }
         return state.finish();
     }
@@ -360,6 +373,9 @@ where
             Origin::Scalar,
         ),
         RuntimeValue::Scalar(value) => state.observe_scalar_working(evaluator, value),
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -423,7 +439,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Areas(_) => {},
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => {},
         }
     }
     Ok(None)

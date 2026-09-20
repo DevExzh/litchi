@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+  "target": "/var/tmp/litchi-ods-reference-metadata-candidate-final-5kgbanuu"
+}

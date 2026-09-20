@@ -158,6 +158,11 @@ where
                     },
                     RuntimeValue::Empty => fold_empty(&mut fold),
                     RuntimeValue::Missing => fold.push_formula_error(ScalarError::Value),
+                    RuntimeValue::SourceReference => {
+                        return Err(EvaluationFailure::Unsupported(
+                            super::super::UnsupportedKind::Reference,
+                        ));
+                    },
                     RuntimeValue::ScalarCell(_)
                     | RuntimeValue::Array(_)
                     | RuntimeValue::Areas(_) => {
@@ -173,6 +178,11 @@ where
             // omitted as required by ComplexSequence.
             RuntimeValue::Empty => fold_empty(&mut fold),
             RuntimeValue::Missing => fold.push_formula_error(ScalarError::Value),
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
+            },
         }
     }
 

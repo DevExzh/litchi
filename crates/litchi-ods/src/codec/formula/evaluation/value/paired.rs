@@ -157,6 +157,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
 
     if !function.valid_arity(arguments.len()) {
         if let Some(error) = direct_formula_error(evaluator, &arguments)? {
@@ -263,7 +271,8 @@ fn shape_of_data(value: &RuntimeValue<'_>) -> Result<Shape, ScalarError> {
         RuntimeValue::Empty
         | RuntimeValue::Missing
         | RuntimeValue::Scalar(_)
-        | RuntimeValue::ScalarCell(_) => Shape::new(1, 1).map_err(|_| ScalarError::Value),
+        | RuntimeValue::ScalarCell(_)
+        | RuntimeValue::SourceReference => Shape::new(1, 1).map_err(|_| ScalarError::Value),
     }
 }
 
@@ -366,6 +375,9 @@ where
             charge_working_text(evaluator, value)?;
             Ok(classify_working(value))
         },
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -569,6 +581,11 @@ where
         | RuntimeValue::Missing
         | RuntimeValue::Scalar(_)
         | RuntimeValue::ScalarCell(_) => Shape::new(1, 1)?,
+        RuntimeValue::SourceReference => {
+            return Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            ));
+        },
     };
     Ok(QueryValue { value, shape })
 }
@@ -661,6 +678,11 @@ where
             RuntimeValue::Array(_) | RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => {
                 RuntimeElement::Present(WorkingValue::Error(ScalarError::Value))
             },
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
+            },
         });
     }
     Ok(RuntimeValue::Array(RuntimeArrayValue {
@@ -720,6 +742,9 @@ where
             )?;
             classify_query_read(evaluator, read)
         },
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -990,7 +1015,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Areas(_) => {},
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => {},
         }
     }
     Ok(None)

@@ -1,0 +1,37 @@
+[package]
+name        = "litchi-core"
+description = "Common types, traits, and utilities for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+base64          = { workspace = true }
+chrono          = { workspace = true }
+fast-float2     = { workspace = true }
+once_cell       = { workspace = true }
+rand            = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+sha2            = { workspace = true }
+smallvec        = { workspace = true }
+thiserror       = { workspace = true }
+zerocopy        = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

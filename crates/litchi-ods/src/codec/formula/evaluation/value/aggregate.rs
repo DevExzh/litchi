@@ -109,6 +109,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
     if function.is_pair() && arguments.len() != 2 {
         if let Some(error) = direct_formula_error(evaluator, &arguments)? {
             return Ok(formula_error(error));
@@ -179,6 +187,11 @@ where
             RuntimeValue::Missing => fold.push_formula_error(ScalarError::Value),
             RuntimeValue::Scalar(value) => {
                 fold_scalar_working(evaluator, &mut fold, value)?;
+            },
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
             },
         }
     }
@@ -277,6 +290,9 @@ where
         RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Err(
             EvaluationFailure::InvalidExpression("sequence scalar projection remained array-like"),
         ),
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -615,7 +631,8 @@ fn matrix_shape(value: &RuntimeValue<'_>) -> Result<Shape, ScalarError> {
         RuntimeValue::Empty
         | RuntimeValue::Missing
         | RuntimeValue::Scalar(_)
-        | RuntimeValue::ScalarCell(_) => Shape::new(1, 1).map_err(|_| ScalarError::Value),
+        | RuntimeValue::ScalarCell(_)
+        | RuntimeValue::SourceReference => Shape::new(1, 1).map_err(|_| ScalarError::Value),
     }
 }
 
@@ -644,7 +661,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::Areas(_)
-            | RuntimeValue::ScalarCell(_) => {},
+            | RuntimeValue::ScalarCell(_)
+            | RuntimeValue::SourceReference => {},
         }
     }
     Ok(None)
@@ -749,6 +767,9 @@ where
             )?;
             evaluator.read_to_element(read)
         },
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 

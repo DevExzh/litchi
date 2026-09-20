@@ -54,6 +54,12 @@
 //! 1930-based two-digit-year window. Accepted dates span 1899-12-30 through
 //! 9999-12-31. Document locale and calendar settings are not read implicitly.
 //! `NUMBERVALUE` accepts explicit separators, defaulting to `.` and `,`.
+//! The resolver-backed value API also evaluates `AREAS`, `COLUMN`, `COLUMNS`,
+//! `ISREF`, `ROW`, `ROWS`, `SHEET`, and `SHEETS` from reference geometry and
+//! workbook metadata. Direct reference arguments are not dereferenced by
+//! these functions. The scalar API supports their context-free cases and
+//! returns a typed reference capability refusal when a workbook or current
+//! cell is required; it never supplies an implicit global workbook.
 //! It also
 //! carries the complete section 6.8 complex-number family as a distinguished
 //! scalar value, the complete
@@ -186,6 +192,7 @@ pub(super) mod numerics;
 mod order;
 mod paired;
 mod radix;
+mod reference_metadata;
 mod roman;
 mod rounding;
 mod statistical;
@@ -992,6 +999,13 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if let Some(function) = reference_metadata::Function::from_name(name) {
+            if !function.valid_arity(node.child_count()) {
+                return self.push_value(WorkingValue::Error(ScalarError::Value));
+            }
+            return self.schedule_eager_function(node);
+        }
+
         if inspection::is_inspection_function(name) {
             if inspection::Function::from_name(name)
                 .is_some_and(|function| !function.valid_arity(node.child_count()))
@@ -1118,6 +1132,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if discrete::is_discrete_function(name) {
             return discrete::apply(self, node, name);
+        }
+        if reference_metadata::is_reference_metadata_function(name) {
+            return reference_metadata::apply(self, node, name);
         }
         if inspection::is_inspection_function(name) {
             return inspection::apply(self, node, name);

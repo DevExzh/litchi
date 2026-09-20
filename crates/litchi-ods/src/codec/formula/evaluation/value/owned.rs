@@ -518,6 +518,9 @@ impl<'a> Measure<'a> {
         match value {
             RuntimeValue::Empty | RuntimeValue::Missing => Ok(()),
             RuntimeValue::Scalar(value) => self.working(value, true),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            )),
             RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::InvalidExpression(
                 "scalar cell token escaped evaluation",
             )),
@@ -698,6 +701,9 @@ fn copy_value(
         RuntimeValue::Empty => Ok(OwnedValue::Empty),
         RuntimeValue::Missing => Ok(OwnedValue::Error(ScalarError::Value)),
         RuntimeValue::Scalar(value) => copy_working(value, execution, limits),
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
         RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::InvalidExpression(
             "scalar cell token escaped evaluation",
         )),

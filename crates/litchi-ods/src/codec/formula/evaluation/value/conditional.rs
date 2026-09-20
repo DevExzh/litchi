@@ -121,6 +121,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
     if let Some(error) = direct_formula_error(evaluator, arguments)? {
         return Ok(formula_error(error));
     }
@@ -432,6 +440,7 @@ fn reference_argument<'a, 'expr>(
         Some(RuntimeValue::Empty | RuntimeValue::Missing | RuntimeValue::Scalar(_))
         | Some(RuntimeValue::Array(_))
         | Some(RuntimeValue::ScalarCell(_))
+        | Some(RuntimeValue::SourceReference)
         | None => Err(ScalarError::Value),
     }
 }
@@ -477,6 +486,11 @@ where
             return Ok(compile_criterion(evaluator, value)?.map(CompiledCriterion::Reference));
         },
         RuntimeValue::Areas(_) => return Ok(Err(ScalarError::Value)),
+        RuntimeValue::SourceReference => {
+            return Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            ));
+        },
         other => CriterionValue::from_runtime_value(other),
     };
     Ok(compile_criterion(evaluator, value)?.map(CompiledCriterion::Argument))
@@ -782,7 +796,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Areas(_) => {},
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::SourceReference => {},
         }
     }
     Ok(None)

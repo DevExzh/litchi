@@ -51,6 +51,19 @@ where
         reference: &'expr Reference,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
         match reference {
+            Reference::Source { .. } if self.reference_kind_only => {
+                // ISREF is defined on the reference kind and must not ask an
+                // external provider to resolve the source. Preserve a
+                // distinct descriptor marker so an enclosing IFERROR cannot
+                // mistake it for a formula #VALUE!.
+                Ok(RuntimeValue::SourceReference)
+            },
+            Reference::Source { .. } if self.reject_source_reference => {
+                // SHEET/SHEETS apply their source-location constraint after
+                // the complete selected argument is produced. Keep the
+                // marker distinct from formula errors until that boundary.
+                Ok(RuntimeValue::SourceReference)
+            },
             Reference::Source { .. } => Err(EvaluationFailure::Unsupported(
                 super::super::UnsupportedKind::Reference,
             )),
@@ -661,7 +674,8 @@ where
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
             | RuntimeValue::ScalarCell(_)
-            | RuntimeValue::Array(_) => Err(EvaluationFailure::Unsupported(
+            | RuntimeValue::Array(_)
+            | RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
                 super::super::UnsupportedKind::ReferenceOperator,
             )),
         }

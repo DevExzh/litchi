@@ -100,6 +100,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
 
     // A direct formula error is an argument value and must retain its source
     // order before shape or header preparation starts. Errors in records are
@@ -209,6 +217,9 @@ impl<'source, 'expr> RectSource<'source, 'expr> {
             RuntimeValue::Scalar(_) => Ok(Some(Self::Scalar(value))),
             RuntimeValue::Empty | RuntimeValue::Missing => Ok(None),
             RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            )),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
                 super::super::UnsupportedKind::Reference,
             )),
         }
@@ -626,6 +637,11 @@ where
         RuntimeValue::Scalar(WorkingValue::Complex(_)) => DbCell::Complex,
         RuntimeValue::Array(_) | RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => {
             return Ok(Err(ScalarError::Value));
+        },
+        RuntimeValue::SourceReference => {
+            return Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            ));
         },
     };
     match value {

@@ -52,9 +52,10 @@ impl<'a> CriterionValue<'a> {
             },
             RuntimeValue::Scalar(WorkingValue::Error(error)) => CriterionValue::Error(*error),
             RuntimeValue::Scalar(WorkingValue::Complex(_)) => CriterionValue::Complex,
-            RuntimeValue::Array(_) | RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => {
-                CriterionValue::Error(ScalarError::Value)
-            },
+            RuntimeValue::Array(_)
+            | RuntimeValue::Areas(_)
+            | RuntimeValue::ScalarCell(_)
+            | RuntimeValue::SourceReference => CriterionValue::Error(ScalarError::Value),
         }
     }
 

@@ -382,6 +382,11 @@ where
                 return Ok(formula_error(ScalarError::Value));
             },
             RuntimeValue::Empty => 0.0,
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
+            },
             RuntimeValue::Array(_) | RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => {
                 return Err(EvaluationFailure::InvalidExpression(
                     "MUNIT scalar projection remained array-like",
@@ -492,6 +497,9 @@ where
             RuntimeValue::Empty => self.single_cell(RuntimeElement::Empty),
             RuntimeValue::Missing => self.single_cell(RuntimeElement::Missing),
             RuntimeValue::Scalar(value) => self.single_cell(RuntimeElement::Present(value)),
+            RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+                super::super::UnsupportedKind::Reference,
+            )),
             RuntimeValue::Areas(_) | RuntimeValue::ScalarCell(_) => Err(
                 EvaluationFailure::InvalidExpression("matrix argument remained a reference"),
             ),

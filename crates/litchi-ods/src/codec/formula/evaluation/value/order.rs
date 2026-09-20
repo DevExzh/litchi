@@ -400,6 +400,7 @@ fn direct_parameter(value: &RuntimeValue<'_>) -> ParameterValue {
         RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
             ParameterValue::Generated(ScalarError::Value)
         },
+        RuntimeValue::SourceReference => ParameterValue::Generated(ScalarError::Value),
     }
 }
 
@@ -494,6 +495,14 @@ where
             super::super::UnsupportedKind::Function,
         ));
     };
+    if arguments
+        .iter()
+        .any(|value| matches!(value, RuntimeValue::SourceReference))
+    {
+        return Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        ));
+    }
     if !function.valid_arity(arguments.len()) {
         return Ok(formula_error(ScalarError::Value));
     }
@@ -748,6 +757,11 @@ fn admitted_value_limit<R: Resolver + ?Sized>(
             RuntimeValue::Array(array) => array.cells.len(),
             RuntimeValue::ScalarCell(_) | RuntimeValue::Empty | RuntimeValue::Missing => 1,
             RuntimeValue::Scalar(_) => 1,
+            RuntimeValue::SourceReference => {
+                return Err(EvaluationFailure::Unsupported(
+                    super::super::UnsupportedKind::Reference,
+                ));
+            },
         };
         total = total.checked_add(count).ok_or_else(|| {
             EvaluationFailure::ResourceLimit(evaluator.local_limit(
@@ -792,6 +806,9 @@ fn observe_data<'expr, R: Resolver + ?Sized>(
             evaluator.scalar.charge_work(1)?;
             observe_working(evaluator, state, argument, value)
         },
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
@@ -933,6 +950,9 @@ fn normalize_parameter<'expr, R: Resolver + ?Sized>(
             ScalarError::Value,
         ))),
         RuntimeValue::Scalar(value) => Ok(Parameter::Scalar(parameter_working(evaluator, value)?)),
+        RuntimeValue::SourceReference => Err(EvaluationFailure::Unsupported(
+            super::super::UnsupportedKind::Reference,
+        )),
     }
 }
 
