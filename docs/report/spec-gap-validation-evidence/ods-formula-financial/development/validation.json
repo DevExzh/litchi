@@ -1,0 +1,19 @@
+{
+  "schema": "financial-development-validation-v1",
+  "scope": "Isolated twenty-function implementation; final freeze, full gates, adapter review and performance remain pending.",
+  "candidate_commit": "4ba61389b66c8f6a579d824f365f02f1e660815b",
+  "library_clippy": {
+    "command": "cargo clippy --locked --offline -p litchi-ods --lib -- -D warnings",
+    "exit_code": 0
+  },
+  "library_and_integration_tests": {
+    "command": "cargo test --locked --offline -p litchi-ods --lib --tests -- --quiet",
+    "exit_code": 0,
+    "groups": 132,
+    "passed": 1813,
+    "failed": 0,
+    "log": "full-tests.log",
+    "sha256": "1924ad5347aa45d19b10ff1ca9c5e4bd1426ba58e5d410bd3a3b6e965e0aa415"
+  },
+  "lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+}
