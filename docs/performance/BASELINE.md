@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0720 — DOCX structural scan qualification
+
+[0720](0720-docx-structural-scan-qualification.md) adds an untimed diagnostic
+of the actual `DocumentBody::from_xml` boundary and an independent dual-state
+fusion review. It preserves two ordered MCE calls and identifies namespace,
+capture suppression, depth and error-precedence constraints. No production
+optimization or performance improvement is claimed; a fresh differential and
+native pilot remains necessary. The program remains active.
+[Evidence packet](results/change-0720/README.md).
+
 ## 0719 — producer XLSX edit/save output oracle
 
 [0719](0719-producer-edit-output-oracle.md) strengthens the existing producer

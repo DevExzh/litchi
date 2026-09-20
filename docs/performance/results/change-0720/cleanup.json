@@ -1,0 +1,13 @@
+{
+  "removed_paths": [
+    "/home/zhuhe/code/litchi-target-0720",
+    "/home/zhuhe/code/litchi-scratch-0720"
+  ],
+  "trace_binary": {
+    "path": "/home/zhuhe/code/litchi-target-0720/debug/docx-active-offset-oracle-0720",
+    "bytes": 118761640,
+    "sha256": "42caeab7ae8ff62760930b36157b724919c86cbb3a5068f2882e523a59481e6e"
+  },
+  "baseline_binary_disposition": "replaced by successful trace build after its baseline capture",
+  "production_source_restored": true
+}

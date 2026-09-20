@@ -1,0 +1,20 @@
+{
+  "stage": "trace-build",
+  "argv": [
+    "cargo",
+    "build",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0720/oracle/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 101,
+  "elapsed_seconds": 1.8547677993774414,
+  "source_sha256": "169cffd03e6a85f7f942875ff78f690af8c2cc91e8a9fd77355af1f20a19e73a",
+  "binary_sha256": "5b3e1f648e06c17f7919be98faaa87928d52baaa0295931eae129b20746c45e4",
+  "oracle_source_sha256": "49a9140f56a9263351a4f8ff2a5c153c21395f8d8389f3e402f123a9e017662e",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "9a88a60d1030877d77a807ea8ba38a8855b02eb8b4c949596c8cd92d1c85132c",
+  "target": "/home/zhuhe/code/litchi-target-0720",
+  "cargo_build_jobs": 4
+}

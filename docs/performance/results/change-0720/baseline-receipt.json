@@ -1,0 +1,19 @@
+{
+  "stage": "baseline",
+  "argv": [
+    "/home/zhuhe/code/litchi-target-0720/debug/docx-active-offset-oracle-0720",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0720/baseline.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "elapsed_seconds": 0.36351943016052246,
+  "source_sha256": "9f6de4ed3f51882f1cf53bdf0fe238df8daec38bee8b1ed47d88d3a87b62d4d7",
+  "binary_sha256": "5b3e1f648e06c17f7919be98faaa87928d52baaa0295931eae129b20746c45e4",
+  "oracle_source_sha256": "49a9140f56a9263351a4f8ff2a5c153c21395f8d8389f3e402f123a9e017662e",
+  "stdout_sha256": "d38bf0bae3edf86f1912753f618c8e4466bb6be4d5e8daa7aac40e819bc3d05b",
+  "stderr_sha256": "9fd9f00e778e4e927eda9d08a179549d7bbbc7e9dc48017d1771ac029ea4c340",
+  "target": "/home/zhuhe/code/litchi-target-0720",
+  "cargo_build_jobs": 4,
+  "report_sha256": "2f50d0b4ca4d41685ae53d7250351a760571a1a91c5f1098c9ca907b50dd526b"
+}

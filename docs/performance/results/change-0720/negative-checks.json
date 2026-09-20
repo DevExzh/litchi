@@ -1,0 +1,18 @@
+[
+  {
+    "mutation": "missing_mce",
+    "rejected": true
+  },
+  {
+    "mutation": "wrong_offset",
+    "rejected": true
+  },
+  {
+    "mutation": "unequal_events",
+    "rejected": true
+  },
+  {
+    "mutation": "wrong_source",
+    "rejected": true
+  }
+]

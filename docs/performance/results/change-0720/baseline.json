@@ -1,0 +1,1152 @@
+{
+  "schema": "litchi.docx-active-offset-oracle-0720.v1",
+  "oracle": "public-alt-active-and-document-mut-diagnostic-matrix",
+  "case_count": 19,
+  "cases": [
+    {
+      "name": "transitional-no-alt-plain-blocks",
+      "xml_sha256": "d5f2eabe0b955e6923962dc761074beb29d3dd8aa98d90192460ea6ffd7ea8cf",
+      "xml_bytes": 211,
+      "ids": [],
+      "known_body_block_starts": [
+        169,
+        175,
+        183
+      ],
+      "alt_chunk_starts": [],
+      "note": "No altChunk exists: scan is empty, while active still receives p/tbl starts.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 3,
+        "input_sha256": "758828ea236788b7f18cb025b91d00d12667ec1aeb25147748cc57722439b6ea",
+        "input_offsets": [
+          169,
+          175,
+          183
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            169,
+            175,
+            183
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "strict-no-alt-plain-blocks",
+      "xml_sha256": "27fc2c34edc9f876914490b6a2efd9b92836a4dbb1ae51eaac63b7f97f0da53b",
+      "xml_bytes": 187,
+      "ids": [],
+      "known_body_block_starts": [
+        145,
+        151,
+        159
+      ],
+      "alt_chunk_starts": [],
+      "note": "Strict namespace spelling with no altChunk.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 3,
+        "input_sha256": "d970ed222121c9f5845ee5d052d6116faed04bfa00ece5c5d63a4a4eaff02ec1",
+        "input_offsets": [
+          145,
+          151,
+          159
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            145,
+            151,
+            159
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "valid-fallback-no-alt-blocks",
+      "xml_sha256": "0090ca1e893d960686ec7b3bc3778443e18c8a5c3181df58a47dce8f850e4323",
+      "xml_bytes": 428,
+      "ids": [],
+      "known_body_block_starts": [
+        311,
+        317,
+        350,
+        356,
+        400
+      ],
+      "alt_chunk_starts": [],
+      "note": "A valid MCE fallback selects only its p/tbl starts even though scan has zero chunks.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 5,
+        "input_sha256": "75465e0db9f02c0fbe711c5a73338d8f075237d09989ecf5f9acb07007f8a119",
+        "input_offsets": [
+          311,
+          317,
+          350,
+          356,
+          400
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            350,
+            356,
+            400
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "malformed-alternate-content-no-choice-no-alt",
+      "xml_sha256": "c98998bbdb37306324d11e8975beab3b9e266a6f585cfafd3fa3672f0724eee1",
+      "xml_bytes": 351,
+      "ids": [],
+      "known_body_block_starts": [
+        287,
+        293,
+        323
+      ],
+      "alt_chunk_starts": [],
+      "note": "Structurally valid XML with malformed MCE: no Choice. Empty offsets fast-path; full offsets must diagnose it.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 3,
+        "input_sha256": "64d6ce4697d5850df171147f7d28e5c387b6d201d14ea36cfe91702d16001fee",
+        "input_offsets": [
+          287,
+          293,
+          323
+        ],
+        "outcome": {
+          "kind": "error",
+          "display": "DOCX markup compatibility error: non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+          "debug": "Mce(NonConformant(\"non-ignorable AlternateContent child\"))"
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "DOCX markup compatibility error: non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+        "debug": "Mce(NonConformant(\"non-ignorable AlternateContent child\"))"
+      }
+    },
+    {
+      "name": "unknown-must-understand-no-alt",
+      "xml_sha256": "309708798c9c1401e408971206bd26960c13d41253ffe982269fde704c1216f4",
+      "xml_bytes": 324,
+      "ids": [],
+      "known_body_block_starts": [
+        288,
+        294
+      ],
+      "alt_chunk_starts": [],
+      "note": "Unknown MustUnderstand namespace with no altChunk; the writer still has p/tbl ranges to select.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 2,
+        "input_sha256": "2b0f1add833d6333128e5e1d9638b577617c27766e82cf6e6c23296fa4b30f9a",
+        "input_offsets": [
+          288,
+          294
+        ],
+        "outcome": {
+          "kind": "error",
+          "display": "DOCX markup compatibility error: unsupported namespace required by MustUnderstand: urn:unsupported",
+          "debug": "Mce(MustUnderstand(\"urn:unsupported\"))"
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "DOCX markup compatibility error: unsupported namespace required by MustUnderstand: urn:unsupported",
+        "debug": "Mce(MustUnderstand(\"urn:unsupported\"))"
+      }
+    },
+    {
+      "name": "valid-fallback-with-inactive-anchor",
+      "xml_sha256": "856de797954910dabbb11d5b4cb38a34f57ea757d41e04341b1bba54da646fc3",
+      "xml_bytes": 486,
+      "ids": [
+        "inactive-choice",
+        "active-fallback"
+      ],
+      "known_body_block_starts": [
+        311,
+        347,
+        378,
+        414,
+        458
+      ],
+      "alt_chunk_starts": [
+        311,
+        378
+      ],
+      "note": "Unsupported Choice is suppressed; fallback anchor and blocks remain active.",
+      "scan": {
+        "kind": "success",
+        "chunks": [
+          {
+            "offset": 378,
+            "relationship": "active-fallback",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"active-fallback\"), match_source: None }"
+          }
+        ]
+      },
+      "active_full": {
+        "input_count": 5,
+        "input_sha256": "e18fbc844457d80898eb6a117116b67cd2022ae45edec6ac06fc5b135b63b3bb",
+        "input_offsets": [
+          311,
+          347,
+          378,
+          414,
+          458
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            378,
+            414,
+            458
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 2,
+        "input_sha256": "b40e33739f1c8822ef21f587f22a5da4a21dc4a0bf140d5e8d95246cee857121",
+        "input_offsets": [
+          311,
+          378
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            378
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 1
+      }
+    },
+    {
+      "name": "valid-choice-with-inactive-fallback",
+      "xml_sha256": "8de8b5d6c1b15488840becedede63b34c495325e57f29a4ec1ff8747927bbf1d",
+      "xml_bytes": 486,
+      "ids": [
+        "active-choice",
+        "inactive-fallback"
+      ],
+      "known_body_block_starts": [
+        311,
+        345,
+        376,
+        414,
+        458
+      ],
+      "alt_chunk_starts": [
+        311,
+        376
+      ],
+      "note": "The baseline Word namespace satisfies Requires=w; the fallback anchor is inactive.",
+      "scan": {
+        "kind": "success",
+        "chunks": [
+          {
+            "offset": 311,
+            "relationship": "active-choice",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"active-choice\"), match_source: None }"
+          }
+        ]
+      },
+      "active_full": {
+        "input_count": 5,
+        "input_sha256": "0adde2efb3c113ac3124d6995d83dd6c55b0dae344f98e505069c7ac2f2b6703",
+        "input_offsets": [
+          311,
+          345,
+          376,
+          414,
+          458
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            311,
+            345,
+            458
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 2,
+        "input_sha256": "7bd8b8a3857b8f2190c506c5094115aea9182887d0241c5b679bcaef97d083a7",
+        "input_offsets": [
+          311,
+          376
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            311
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 1
+      }
+    },
+    {
+      "name": "strict-valid-fallback-with-inactive-anchor",
+      "xml_sha256": "0f870bd790dd122ec5a6f3b72012b31d63eeb5adf256e6fd2ea7042574f3d217",
+      "xml_bytes": 454,
+      "ids": [
+        "strict-inactive",
+        "strict-active"
+      ],
+      "known_body_block_starts": [
+        287,
+        323,
+        354,
+        388
+      ],
+      "alt_chunk_starts": [
+        287,
+        354
+      ],
+      "note": "Strict Word and relationship namespaces use the same active fallback semantics.",
+      "scan": {
+        "kind": "success",
+        "chunks": [
+          {
+            "offset": 354,
+            "relationship": "strict-active",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"strict-active\"), match_source: None }"
+          }
+        ]
+      },
+      "active_full": {
+        "input_count": 4,
+        "input_sha256": "7d433a8f9a40f25fb0b799c9aa713d693b7a9e229609d743bec2246512d333b2",
+        "input_offsets": [
+          287,
+          323,
+          354,
+          388
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            354,
+            388
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 2,
+        "input_sha256": "b4c87c89cb56a99505bf59de14f18f68f55c31a6fc189b76666bc0554f674f86",
+        "input_offsets": [
+          287,
+          354
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            354
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 1
+      }
+    },
+    {
+      "name": "nested-alt-in-paragraph",
+      "xml_sha256": "18059d13a470a87b49382a0b4f5090377d82e8e2f653231d13c8025348ac248d",
+      "xml_bytes": 269,
+      "ids": [
+        "nested-paragraph",
+        "top-level"
+      ],
+      "known_body_block_starts": [
+        169,
+        174,
+        217
+      ],
+      "alt_chunk_starts": [
+        174,
+        217
+      ],
+      "note": "active sees both source starts; the writer's range scanner captures the outer p and suppresses nested target ranges.",
+      "scan": {
+        "kind": "success",
+        "chunks": [
+          {
+            "offset": 174,
+            "relationship": "nested-paragraph",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"nested-paragraph\"), match_source: None }"
+          },
+          {
+            "offset": 217,
+            "relationship": "top-level",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"top-level\"), match_source: None }"
+          }
+        ]
+      },
+      "active_full": {
+        "input_count": 3,
+        "input_sha256": "6bd75789e4fc851a6c1a36c02902c1e6ba681610329967851a428fc8bb576d21",
+        "input_offsets": [
+          169,
+          174,
+          217
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            169,
+            174,
+            217
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 2,
+        "input_sha256": "f1a316267d345ca17fa53d484c5bd83b948a23df84bb6fed6c9d274499ecc53c",
+        "input_offsets": [
+          174,
+          217
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            174,
+            217
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 1
+      }
+    },
+    {
+      "name": "nested-alt-in-table",
+      "xml_sha256": "61ad2c26052e0f429c237dbe289667f6d1cd3032611c7b5f8223413cd4bf6daf",
+      "xml_bytes": 301,
+      "ids": [
+        "nested-table",
+        "top-level"
+      ],
+      "known_body_block_starts": [
+        169,
+        188,
+        194,
+        249
+      ],
+      "alt_chunk_starts": [
+        194,
+        249
+      ],
+      "note": "active sees nested table content; the writer's range scanner captures the outer tbl and suppresses nested targets.",
+      "scan": {
+        "kind": "success",
+        "chunks": [
+          {
+            "offset": 194,
+            "relationship": "nested-table",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"nested-table\"), match_source: None }"
+          },
+          {
+            "offset": 249,
+            "relationship": "top-level",
+            "match_source": null,
+            "debug": "Chunk { relationship: Rel(\"top-level\"), match_source: None }"
+          }
+        ]
+      },
+      "active_full": {
+        "input_count": 4,
+        "input_sha256": "043f380b08592ba8928640ba34fd505449f0d0eb091e63bda95686348a1c05cb",
+        "input_offsets": [
+          169,
+          188,
+          194,
+          249
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            169,
+            188,
+            194,
+            249
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 2,
+        "input_sha256": "96655b00ea2485c75936c3a1509ac1dd1f56616d9e51240b0a660f9e5a1c14d1",
+        "input_offsets": [
+          194,
+          249
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            194,
+            249
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 1
+      }
+    },
+    {
+      "name": "active-offset-count-overflow",
+      "xml_sha256": "a056b2cae07745074ffabb043bd28bc3e2cef8e3b0559a9c8c11a3471193f4c8",
+      "xml_bytes": 205,
+      "ids": [],
+      "known_body_block_starts": [
+        169,
+        175
+      ],
+      "alt_chunk_starts": [],
+      "note": "The full probe intentionally supplies OFFSET_LIMIT+1 repeated offsets; the public constant is crate-private, so the observed boundary is recorded explicitly.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 1000001,
+        "input_sha256": "85c754b2b4f90e75ac03ebd7f93b4da09bc66b2969954109e0ea242e2915a2ad",
+        "input_offsets": null,
+        "outcome": {
+          "kind": "error",
+          "display": "DOCX markup compatibility error: markup compatibility resource limit exceeded: active-offset count",
+          "debug": "Mce(LimitExceeded(\"active-offset count\"))"
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "bom-plain",
+      "xml_sha256": "670b6155a337b79c52a1da9ca75a50c7b8d1eee835493c8562b151ccdee5f076",
+      "xml_bytes": 200,
+      "ids": [],
+      "known_body_block_starts": [
+        172
+      ],
+      "alt_chunk_starts": [],
+      "note": "Offsets must address the BOM-stripped body input.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "8eeb772b34c1bb487f9670fccb46de75f970a3d037862ef8131e094f5544fc00",
+        "input_offsets": [
+          172
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            172
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "marker-text",
+      "xml_sha256": "2a333f3ea3ad2e027aafa1a6bbababecc74bfc48619346345f1721dfe365ea6b",
+      "xml_bytes": 262,
+      "ids": [],
+      "known_body_block_starts": [
+        169
+      ],
+      "alt_chunk_starts": [],
+      "note": "Marker-like source text must survive selection.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "234f3db4e7f169f0a5e5f0f1f227f564549474dae6748451d5a3359d73e036bc",
+        "input_offsets": [
+          169
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            169
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "foreign-lookalikes",
+      "xml_sha256": "0de2e4a8de9bcb74031f6b611da01136f49a5d477b8f4f0cdafc1bf9a0f5d799",
+      "xml_bytes": 265,
+      "ids": [],
+      "known_body_block_starts": [
+        196
+      ],
+      "alt_chunk_starts": [],
+      "note": "Foreign names do not become Word targets.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "e2893c3b4596774161caeb4c06812b4c6055b844686f72690f926dd69a9c13e3",
+        "input_offsets": [
+          196
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            196
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "success",
+        "alt_count": 0
+      }
+    },
+    {
+      "name": "range-depth-only",
+      "xml_sha256": "8e19480a3df18a031e57e558b130cc0ba0f649833c34296d8eae73de99faef39",
+      "xml_bytes": 2864,
+      "ids": [],
+      "known_body_block_starts": [
+        1439
+      ],
+      "alt_chunk_starts": [],
+      "note": "Range depth 128 fails before alt depth 256.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "df3ab3bd342aacbc5ba3cf198e7e1ab12cfa52f8c9b1811524f54748e0e9b366",
+        "input_offsets": [
+          1439
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            1439
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "invalid DOCX format: Word XML nesting exceeds the 128 depth limit",
+        "debug": "InvalidFormat(\"Word XML nesting exceeds the 128 depth limit\")"
+      }
+    },
+    {
+      "name": "range-depth-before-bad-alt",
+      "xml_sha256": "57572f6f359be2a8b88773f5f6e2e1aaa46478d0e98f77090742a646c9c55972",
+      "xml_bytes": 2871,
+      "ids": [],
+      "known_body_block_starts": [
+        2836
+      ],
+      "alt_chunk_starts": [
+        2836
+      ],
+      "note": "Later alt relationship error must precede earlier range depth error.",
+      "scan": {
+        "kind": "error",
+        "display": "invalid DOCX data: altChunk lacks a relationship ID",
+        "debug": "Invalid(\"altChunk lacks a relationship ID\")"
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "4b4c913fcba930e36ab12d6d2122c32a6f2e275f5527ae87c737499dca382b3c",
+        "input_offsets": [
+          2836
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            2836
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 1,
+        "input_sha256": "4b4c913fcba930e36ab12d6d2122c32a6f2e275f5527ae87c737499dca382b3c",
+        "input_offsets": [
+          2836
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            2836
+          ]
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "invalid DOCX data: altChunk lacks a relationship ID",
+        "debug": "Invalid(\"altChunk lacks a relationship ID\")"
+      }
+    },
+    {
+      "name": "empty-at-depth-256",
+      "xml_sha256": "6b698b5dbd17e7c5237930323f20d7bd2d398163abe15230baf07230310b6f82",
+      "xml_bytes": 5536,
+      "ids": [],
+      "known_body_block_starts": [],
+      "alt_chunk_starts": [],
+      "note": "Alt counts Empty depth; range scanner only counts Start nesting.",
+      "scan": {
+        "kind": "error",
+        "display": "invalid DOCX data: alternative-format XML exceeds 256 nesting levels",
+        "debug": "Invalid(\"alternative-format XML exceeds 256 nesting levels\")"
+      },
+      "active_full": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "invalid DOCX data: alternative-format XML exceeds 256 nesting levels",
+        "debug": "Invalid(\"alternative-format XML exceeds 256 nesting levels\")"
+      }
+    },
+    {
+      "name": "unbound-fragment",
+      "xml_sha256": "946735c4d68cc33a66bc75103fb28da75a9c160b533211149704f4f75bc13abc",
+      "xml_bytes": 49,
+      "ids": [],
+      "known_body_block_starts": [],
+      "alt_chunk_starts": [],
+      "note": "Range fragment heuristic differs from alt URI matching.",
+      "scan": {
+        "kind": "success",
+        "chunks": []
+      },
+      "active_full": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "invalid DOCX format: active altChunk range lacks parsed anchor metadata",
+        "debug": "InvalidFormat(\"active altChunk range lacks parsed anchor metadata\")"
+      }
+    },
+    {
+      "name": "malformed-tail",
+      "xml_sha256": "162b51285db41ed23082930387435c94bbba0065f1e4aaba0b2be0c5277a3517",
+      "xml_bytes": 196,
+      "ids": [],
+      "known_body_block_starts": [
+        169
+      ],
+      "alt_chunk_starts": [],
+      "note": "Malformed XML error remains observable.",
+      "scan": {
+        "kind": "error",
+        "display": "invalid DOCX XML: ill-formed document: expected `</w:p>`, but `</w:body>` was found",
+        "debug": "Xml(\"ill-formed document: expected `</w:p>`, but `</w:body>` was found\")"
+      },
+      "active_full": {
+        "input_count": 1,
+        "input_sha256": "234f3db4e7f169f0a5e5f0f1f227f564549474dae6748451d5a3359d73e036bc",
+        "input_offsets": [
+          169
+        ],
+        "outcome": {
+          "kind": "success",
+          "offsets": [
+            169
+          ]
+        }
+      },
+      "active_all_alt": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "active_empty": {
+        "input_count": 0,
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_offsets": [],
+        "outcome": {
+          "kind": "success",
+          "offsets": []
+        }
+      },
+      "document_mut": {
+        "kind": "error",
+        "stage": "document_mut",
+        "display": "invalid DOCX XML: ill-formed document: expected `</w:p>`, but `</w:body>` was found",
+        "debug": "Xml(\"ill-formed document: expected `</w:p>`, but `</w:body>` was found\")"
+      }
+    }
+  ],
+  "packages": [
+    {
+      "archive_bytes": 9051,
+      "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+      "name": "generated-medium",
+      "outcome": "Ok(alts=0)"
+    },
+    {
+      "archive_bytes": 55519,
+      "archive_sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "name": "numbered-list",
+      "outcome": "Ok(alts=0)"
+    }
+  ]
+}
