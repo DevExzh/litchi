@@ -1,0 +1,6 @@
+{
+  "revision": "9c16221faec48da33ae827b96cb08ffae86c000e",
+  "previous_goal_turn": "progress: rejected 0715 candidate committed, exact source restored",
+  "scope": "Fixed baseline-only between-child and within-child stationarity diagnostic",
+  "created_utc": "2026-09-20T11:05:08.971170+00:00"
+}

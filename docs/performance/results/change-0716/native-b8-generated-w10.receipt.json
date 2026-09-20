@@ -1,0 +1,70 @@
+{
+  "job": {
+    "name": "native-b8-generated-w10",
+    "block": 8,
+    "position": 1,
+    "order_index": 29,
+    "corpus": {
+      "id": "generated",
+      "label": "generated-medium",
+      "origin": "generated-harness-corpus",
+      "path": null,
+      "sha256": null,
+      "bytes": null,
+      "expected_edit_admitted": true
+    },
+    "warmup": 10,
+    "samples": 200,
+    "phase": "counting_publish",
+    "case": "docx_ordinary_save_counting_publish"
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0716-bin/current-native",
+    "--warmup",
+    "10",
+    "--samples",
+    "200",
+    "--case",
+    "docx_ordinary_save_counting_publish",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0716/native-b8-generated-w10.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0716-fs"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-20T11:13:17.954588+00:00",
+  "seconds": 0.48699216498062015,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0716-bin/current-native",
+    "sha256": "6907faf040e7588cc5b1295e53341f2604d597704af6a9017a37e9e7ce6402fd",
+    "bytes": 62887448
+  },
+  "source_before": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "source_after": "cc9d4f6289f01e1cea5fec44d33c5a0b6f0198ab0419c3692198f2ff7460e749",
+  "fixture_before": null,
+  "fixture_after": null,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "source_manifest_sha256": "19776d4572049c750d6e0766c48a6b9cb9af4c5ba59b13082ae2367cecdb9cfe",
+  "build_sha256": "f3fe174106fcbda20fb11b8266d952821c974fb0829666461581c4b8b2846da5",
+  "plan_sha256": "3f102333c67e711bba23caee50285dd1b284d42af0e318dd34c9729c3998b8db",
+  "script_sha256": "73f698890bfe5c10bbb8f84b6e69733870e0a1d95b46a5d2d62895270a89b94b",
+  "artifacts": {
+    "native-b8-generated-w10.context.json": "3e97faf34d8b6598c43c4e9859d0332b624d6af940326dd428c189168acca145",
+    "native-b8-generated-w10.json": "d5ea3477454acf261c6e9dbf9cef7366e6357b60f7dcb088537c0f2020c02782",
+    "native-b8-generated-w10.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-b8-generated-w10.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

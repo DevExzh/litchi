@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0716 — unchanged DOCX baseline process variation
+
+[0716](0716-docx-baseline-process-variation.md) retains 32 fixed baseline-only
+children and 6,400 serialization samples. Generated p50 spans 11.08–13.79%
+across processes; NumberedList/w100 spans 47.22%, including a sustained slow
+child despite longer warmup. Twelve group metrics and twelve within-child
+four-block spans exceed 5%. Whole-process fault counts accompany the shift but
+do not identify its cause. All output parity checks pass; production and Rust
+harness source are unchanged. The 0715 candidate remains rejected. Next work
+is phase-scoped process-state diagnostics, not rerunning its acceptance gate.
+[Evidence packet](results/change-0716/README.md). The non-iWork goal remains active.
+
 ## 0715 — rejected DOCX section-collection fusion
 
 [0715](0715-docx-section-publication-collection.md) profiles duplicate section

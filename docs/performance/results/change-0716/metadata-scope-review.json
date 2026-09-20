@@ -1,0 +1,18 @@
+{
+  "reviewer": "/root/stationarity_design_0716",
+  "finding": "Generic top-level filesystem_fresh_child_per_sample and filesystem_process_isolated are unconditionally true, but do not describe ordinary_save in-process samples.",
+  "evidence": {
+    "configuration_declaration": "tools/perf-baseline/src/lib.rs:4375",
+    "unconditional_true": "tools/perf-baseline/src/lib.rs:12163",
+    "dedicated_filesystem_empty": "tools/perf-baseline/src/filesystem.rs:1212",
+    "ordinary_save_in_process_loop": "tools/perf-baseline/src/ordinary_save.rs:1230",
+    "filesystem_evidence_omission": "tools/perf-baseline/src/lib.rs:12275"
+  },
+  "files": {
+    "tools/perf-baseline/src/lib.rs": "053ab3033f20a88afdabb633c57efb59f7688c346c8c1b6ab73ae3ff40d0a5b6",
+    "tools/perf-baseline/src/filesystem.rs": "5054a6ac99803f42f181012188f2215cb29cba34ad45418613bb915078c20f1a",
+    "tools/perf-baseline/src/ordinary_save.rs": "28c6cdddf0332b2c8003517a096bf434766c0d8f2624e081f46fd68664a3ae21"
+  },
+  "disposition": "Explicitly excluded from 0716 isolation claims; frozen Rust source remains unchanged.",
+  "followup": "Add explicit filesystem configuration scope to harness metadata and comparison policy tests, without pretending these generic flags describe ordinary_save."
+}

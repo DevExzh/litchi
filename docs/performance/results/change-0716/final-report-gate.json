@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/check_report_claim_classification.py",
+    "--registry",
+    "docs/performance/report-claim-classification-v1.json",
+    "--repo-root",
+    "."
+  ],
+  "exit_code": 0,
+  "seconds": 0.051958217984065413,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "docs": {
+    "docs/performance/0716-docx-baseline-process-variation.md": "0c7f4bbbedad72f0e33c8b337eb7de4119c9ab9a257968acb3896e201346f3b0",
+    "docs/performance/BASELINE.md": "dbd594cc9343ffc43bdfd2964f0ffe4284d82780487ee7f6a2f64a30818288de",
+    "docs/performance/HOTSPOTS.md": "dca509f947d8ff7c7f33b8cf042dc067181f758568e8a5394a8598eadf7ab062",
+    "docs/performance/GOAL_AUDIT.md": "b48127bb5f15f44c25ffdfbcb821335387c410390eb316584a5dc20053972479",
+    "docs/performance/REPORT.md": "ad95e8790b77046683cc363e82131904637732860778ca65dcb5c9cd8b62d773",
+    "docs/performance/results/change-0716/README.md": "f114af16490a8cb1316ba21ef2794afcb9d210da506a68e685dc77aed87cb552"
+  }
+}
