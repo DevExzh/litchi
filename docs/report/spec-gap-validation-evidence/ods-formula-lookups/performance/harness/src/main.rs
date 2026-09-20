@@ -2477,7 +2477,6 @@ fn conditional_sum(
 }
 
 const METADATA_CASE_PREFIX: &str = "reference-metadata-";
-const METADATA_CONTROL_PREFIX: &str = "reference-control-";
 
 fn metadata_case(name: &str, source: &str, shape: Shape, expectation: Expectation) -> Case {
     // Reference metadata is evaluated through the value path even for scalar
@@ -2494,7 +2493,15 @@ fn metadata_case(name: &str, source: &str, shape: Shape, expectation: Expectatio
 }
 
 fn is_metadata_case(case: &Case) -> bool {
-    case.name.starts_with(METADATA_CASE_PREFIX) || case.name.starts_with(METADATA_CONTROL_PREFIX)
+    case.name.starts_with(METADATA_CASE_PREFIX)
+        || matches!(
+            case.name.as_str(),
+            "reference-control-rows-descriptor"
+                | "reference-control-isref-descriptor"
+                | "reference-control-rows-projected"
+                | "reference-control-isref-projected"
+                | "reference-control-row-projected"
+        )
 }
 
 fn metadata_cases() -> Vec<Case> {
