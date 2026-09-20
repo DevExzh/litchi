@@ -57,6 +57,8 @@ PENDING_FUNCTIONS = ("IRR", "RATE", "XIRR")
 NUM = "#NUM!"
 VALUE = "#VALUE!"
 DIV0 = "#DIV/0!"
+F64_EPSILON = Decimal(2) ** Decimal(-52)
+FORWARD_ERROR_MULTIPLIER = Decimal(16)
 
 
 class OracleError(Exception):
@@ -533,6 +535,38 @@ def canonical(value: Decimal) -> str:
     return text
 
 
+def conditioned_forward_error(ident: str) -> dict[str, str] | None:
+    """Return the narrow cancellation bound for the three near-zero rows.
+
+    This is an acceptance bound for finite binary64 forward evaluation.  It
+    uses the same absolute-term scale as the contract's residual analysis,
+    but does not claim that the solver residual rule governs these reducers.
+    All other vectors retain zero absolute tolerance and the common relative
+    tolerance.
+    """
+
+    if ident in {"npv.basic", "npv.split_argument_order"}:
+        rate = decimal_literal("0.1")
+        terms = (
+            decimal_literal("-100") / number_power(1 + rate, Decimal(1)),
+            decimal_literal("110") / number_power(1 + rate, Decimal(2)),
+        )
+    elif ident == "xnpv.basic":
+        rate = decimal_literal("0.1")
+        terms = (
+            decimal_literal("-100"),
+            decimal_literal("110") / number_power(1 + rate, Decimal(1)),
+        )
+    else:
+        return None
+    term_scale = sum((abs(term) for term in terms), Decimal(0))
+    absolute = FORWARD_ERROR_MULTIPLIER * F64_EPSILON * term_scale
+    return {
+        "term_scale": canonical(term_scale),
+        "absolute": canonical(absolute),
+    }
+
+
 def vector(
     ident: str,
     function: str,
@@ -542,6 +576,7 @@ def vector(
     basis: str,
 ) -> dict[str, Any]:
     outcome = evaluate(function, inputs)
+    conditioned_bound = conditioned_forward_error(ident)
     if isinstance(outcome, OracleError):
         expected: dict[str, Any] = {
             "kind": "error",
@@ -553,9 +588,12 @@ def vector(
             "kind": "number",
             "value": canonical(outcome),
             "subtype": "Number",
-            "tolerance": {"absolute": "0", "relative": "1e-12"},
+            "tolerance": {
+                "absolute": conditioned_bound["absolute"] if conditioned_bound else "0",
+                "relative": "1e-12",
+            },
         }
-    return {
+    row = {
         "id": ident,
         "function": function,
         "formula": formula,
@@ -564,6 +602,15 @@ def vector(
         "tags": tags,
         "oracle_basis": basis,
     }
+    if conditioned_bound is not None:
+        row["tolerance_basis"] = {
+            "model": "16 * f64_epsilon * sum(abs(discounted_terms))",
+            "f64_epsilon": canonical(F64_EPSILON),
+            "term_scale": conditioned_bound["term_scale"],
+            "absolute_bound": conditioned_bound["absolute"],
+            "scope": "finite reducer forward evaluation only; solver residual tolerances do not govern this row",
+        }
+    return row
 
 
 def vector_specs() -> list[dict[str, Any]]:
@@ -989,8 +1036,9 @@ def document() -> dict[str, Any]:
             "decimal_digits": PRECISION,
             "rounding": "ROUND_HALF_EVEN during independent arithmetic",
             "input_model": "formula literals are converted with IEEE-754 binary64 float() and Decimal.from_float before Decimal arithmetic",
-            "comparison": "per-vector absolute tolerance is zero; finite evaluator outputs use a 1e-12 relative tolerance without a unit-scale floor",
+            "comparison": "all rows use a 1e-12 relative tolerance without a unit-scale floor; absolute tolerance is zero by default, with only the three named cancellation rows using their recorded conditioned forward-error bound",
             "cancellation": "rate-zero NPV/XNPV and MIRR mask sums use exact rational accumulation of the converted binary64 Decimal inputs before Decimal serialization",
+            "conditioned_forward_error": "Only npv.basic, npv.split_argument_order, and xnpv.basic add 16 * f64_epsilon * sum(abs(discounted_terms)) as a row-specific absolute bound for finite rounded reducer evaluation; this does not alter the solver residual rule",
         },
         "profile": {
             "integer_conversion": "CUM Start/End/Type truncate toward zero; Type then requires exact 0 or 1",

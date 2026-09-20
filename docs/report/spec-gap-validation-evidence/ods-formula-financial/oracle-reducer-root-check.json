@@ -3,8 +3,8 @@
   "scope": "Independent six-function oracle corpus only; Rust replay/resource/native/performance pending.",
   "files": {
     "contract.md": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
-    "oracle_reducers.py": "059f0357e4249c6c2091bb2936580de0e06b76e60db5bff4302516750d4a98b6",
-    "oracle-reducer-vectors.json": "9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26"
+    "oracle_reducers.py": "09979cdcce7f6b03bbea4d8fd8d5cc9dc0b902ac69d21aec179cc9b5825d8813",
+    "oracle-reducer-vectors.json": "e878e29b15cc694a565796b7957f4338b7a22caef8d0fdfffeab05be5fa7d218"
   },
   "command": "python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/oracle_reducers.py --check",
   "exit_code": 0,
@@ -14,5 +14,10 @@
     "expected": "rejected",
     "contract": "rejected",
     "missing": "rejected"
-  }
+  },
+  "conditioned_tolerance_rows": [
+    "npv.basic",
+    "npv.split_argument_order",
+    "xnpv.basic"
+  ]
 }
