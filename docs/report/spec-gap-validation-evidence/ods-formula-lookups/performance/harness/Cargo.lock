@@ -791,7 +791,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ods-formula-reference-metadata-performance"
+name = "ods-formula-lookups-performance"
 version = "0.0.0"
 dependencies = [
  "litchi-core",
