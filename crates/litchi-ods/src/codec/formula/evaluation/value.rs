@@ -3261,6 +3261,13 @@ where
                 | super::Kind::Array(_)
                 | super::Kind::ArrayRow => {
                     if let super::Kind::Function { name } = node.kind() {
+                        // A scalar text consumer inside a reducer can select
+                        // a different reference cell at each projected output
+                        // coordinate. Keep computed text reductions out of
+                        // this cache even when their reference geometry is fixed.
+                        if super::text::is_text_function(name) {
+                            return Ok(false);
+                        }
                         if order::is_order_function(name)
                             || matches!(Self::matrix_function(name), Some(MatrixFunction::Unit))
                         {

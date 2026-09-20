@@ -386,7 +386,7 @@ fn is_clean_removed(character: char) -> bool {
     unicode::is_clean_removed(character)
 }
 
-fn text_slice<'a>(value: TextValue<'a>, start: usize, end: usize) -> TextValue<'a> {
+pub(super) fn text_slice<'a>(value: TextValue<'a>, start: usize, end: usize) -> TextValue<'a> {
     let length = end.saturating_sub(start);
     match value.text {
         Cow::Borrowed(text) => TextValue::borrowed(&text[start..end]),
@@ -437,7 +437,7 @@ fn char_count(evaluator: &Evaluator<'_, '_, '_>, text: &str) -> EvaluationResult
     Ok(count)
 }
 
-fn floor_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
+pub(super) fn floor_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
     let value = value?;
     if !value.is_finite() {
         return Err(ScalarError::Number);
@@ -453,7 +453,7 @@ fn floor_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarErr
     })
 }
 
-fn floor_positive(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
+pub(super) fn floor_positive(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
     let value = value?;
     if !value.is_finite() {
         return Err(ScalarError::Number);
@@ -469,7 +469,7 @@ fn floor_positive(value: Result<f64, ScalarError>) -> Result<usize, ScalarError>
     })
 }
 
-fn trunc_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
+pub(super) fn trunc_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
     let value = value?;
     if !value.is_finite() {
         return Err(ScalarError::Number);
@@ -485,7 +485,7 @@ fn trunc_nonnegative(value: Result<f64, ScalarError>) -> Result<usize, ScalarErr
     })
 }
 
-fn trunc_positive(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
+pub(super) fn trunc_positive(value: Result<f64, ScalarError>) -> Result<usize, ScalarError> {
     let value = value?;
     if !value.is_finite() {
         return Err(ScalarError::Number);

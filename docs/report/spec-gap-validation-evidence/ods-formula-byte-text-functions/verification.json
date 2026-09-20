@@ -1,0 +1,33 @@
+{
+  "gates": {
+    "failed": 0,
+    "focused": {
+      "evaluation": 6,
+      "limits": 5,
+      "oracle": 2
+    },
+    "gates": 7,
+    "ignored": 0,
+    "passed": 1605,
+    "verified": true
+  },
+  "native": {
+    "ascii_matching": 7,
+    "functions": 7,
+    "nonascii_divergences": 10,
+    "rows": 19
+  },
+  "oracles": {
+    "functions": 7,
+    "observations": 1376,
+    "verified": true
+  },
+  "performance": {
+    "baseline_groups": 56,
+    "baseline_rows": 840,
+    "candidate_groups": 168,
+    "candidate_rows": 2520,
+    "frozen_lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "source_closure": "verified"
+  }
+}
