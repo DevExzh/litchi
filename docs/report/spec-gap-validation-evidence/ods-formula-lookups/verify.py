@@ -121,7 +121,10 @@ def equal(label: str, observed: Any, expected: Any) -> None:
 
 
 def command_json(command: list[str], *, cwd: Path) -> dict[str, Any]:
-    completed = subprocess.run(command, cwd=cwd, capture_output=True, text=True)
+    completed = subprocess.run(
+        command, cwd=cwd, capture_output=True, text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
     if completed.returncode:
         raise VerificationError(
             f"command failed ({completed.returncode}): {' '.join(command)}\n"

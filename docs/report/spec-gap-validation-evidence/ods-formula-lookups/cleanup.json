@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "owned_gate_temp": ".codex-tmp/ods-lookups-gates-hYbIgA",
+  "gate_checkout_removed": true,
+  "gate_target_removed": true,
+  "selected_source_archive_verified": true,
+  "selected_inputs": 62,
+  "performance_targets_removed": "recorded in retained per-capture target-cleanup.json",
+  "unrelated_temporary_paths": "untouched",
+  "performance_target_receipts_checked": 9,
+  "performance_target_paths_absent": true,
+  "performance_baseline_path_absent": true
+}

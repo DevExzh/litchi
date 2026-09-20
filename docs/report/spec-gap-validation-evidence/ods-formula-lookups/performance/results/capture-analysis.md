@@ -4,9 +4,9 @@ The authorized frozen-source run used runner session `69932`, three warmups, and
 
 ## Capture integrity
 
-Candidate preflight passed all 121 named cases and the complete per-case read contract. The retained `verify.py` passed 990 baseline and 3,630 candidate records across both phases. Source/profile hashes stayed stable before and after timing, allocator bytes balanced, all matched control accounting sets and output checksums were unchanged, and target cleanup was recorded. Baseline and candidate binaries are retained with SHA-256 `6c399d71…ac0f2b24` and `00f01f3d…498ed2b`, respectively.
+Candidate preflight passed all 121 named cases and the complete per-case read contract. The retained `verify.py` passed 990 baseline and 3,630 candidate records across both phases. Source/profile hashes stayed stable before and after timing, allocator bytes balanced, all matched control accounting sets and output checksums were unchanged, and target cleanup was recorded. Baseline and candidate binary identities are recorded with SHA-256 `6c399d71…ac0f2b24` and `00f01f3d…498ed2b`, respectively.
 
-The first launch was setup-only: a duplicated directory component made the relative freeze path invalid. It produced no build, preflight, or timed row. The command/error is retained under [`diagnostic-freeze-path-typo-20260920T1400Z/`](diagnostic-freeze-path-typo-20260920T1400Z/); the corrected single run is the 4,620-row result.
+After the five rejected harness preflights retained in the diagnostic directories, the first full-capture launch was setup-only: a duplicated directory component made the relative freeze path invalid. It produced no build, preflight, or timed row. The command/error is retained under [`diagnostic-freeze-path-typo-20260920T1400Z/`](diagnostic-freeze-path-typo-20260920T1400Z/); the corrected single run is the 4,620-row result.
 
 ## Matched controls
 
