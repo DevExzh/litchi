@@ -1,0 +1,6 @@
+{
+  "matplotlib": "3.10.7+dfsg1",
+  "status": "passed",
+  "samples_per_line": 450,
+  "interpretation": "Pooled empirical distributions for visualization only. Process pairs, not pooled samples, are the independent units for reported bootstrap intervals."
+}

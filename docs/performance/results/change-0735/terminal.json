@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "runs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0735/source-guard.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS unchanged typed-validation prefixes, source identities and accepted constraints\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0735/analyze.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS 0735 custody, exact PPT oracles, 36 native processes, 12 allocation processes, paired bootstrap statistics\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0735/audit.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS independent 0735 custody, oracle, 48-process replay, paired bootstrap, and allocation audit\n",
+      "stderr": ""
+    }
+  ],
+  "cleanup_sha256": "38cd4fee828c7e69bbe597ee15439c8c4e315081371698901ce2fcce50c39bf7",
+  "scope": "Post-cleanup measured-candidate replay, completed before production reversion.",
+  "post_cleanup_negative_checks": {
+    "status": "passed",
+    "controls": 19,
+    "sha256": "6ef5c58cf8fccec662a8f737431be263fd488674e9bf7cbc9425d5b9fc85d8d6"
+  }
+}

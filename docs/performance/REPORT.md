@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0735 — rejected candidate retained as reproducible evidence
+
+[0735](0735-ppt-record-staging-without-editor-clone.md) removes redundant
+full-editor cloning after unchanged validation, passes 1,216 candidate owner
+tests and exact output oracles, but regresses secondary paired p50 by 6.34%.
+Primary p50 improves 3.53%; allocation falls on both decks without a peak-live
+benefit. The candidate is rejected and production restored byte-for-byte.
+Both validators reject all 19 corruption controls; rejected-source replay
+keeps evidence auditable without changing the restored workspace. No samples
+were discarded or selectively repeated. [Packet](results/change-0735/README.md).
+
 ## 0734 — scoped PPT ownership optimization retained
 
 [0734](0734-ppt-owned-stream-handoff.md) removes five redundant writer payload

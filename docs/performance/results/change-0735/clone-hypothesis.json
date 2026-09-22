@@ -1,0 +1,20 @@
+{
+  "status": "prospective_lower_bound_not_measurement",
+  "source": "Editor derives Clone; ordinary removal opens records and stages one Document replacement; Vec payload copies include streams, document and current_user. Paths/maps and outer Vec allocation are additional.",
+  "cases": [
+    {
+      "case": "primary",
+      "source_stream_payload_bytes": 379655,
+      "document_bytes": 311524,
+      "current_user_bytes": 4096,
+      "minimum_cloned_payload_bytes": 695275
+    },
+    {
+      "case": "secondary",
+      "source_stream_payload_bytes": 260771,
+      "document_bytes": 68784,
+      "current_user_bytes": 59,
+      "minimum_cloned_payload_bytes": 329614
+    }
+  ]
+}

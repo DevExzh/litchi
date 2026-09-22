@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0735-bin/baseline-ole_format_save_probe",
+    "--case",
+    "ppt45543",
+    "--input",
+    "test-data/poi/test-data/slideshow/45543.ppt",
+    "--operation",
+    "format",
+    "--samples",
+    "50",
+    "--warmups",
+    "3"
+  ],
+  "exit_code": 0,
+  "output": "qualification-raw/baseline-primary-native.json",
+  "sha256": "178f186d2f892194ab35b73169a1dd3adcdae0626692b1ad7593867e1039266b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

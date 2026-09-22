@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0735/preflight.py", line 389, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0735/preflight.py", line 367, in main
+    run_validators(packet)
+    ~~~~~~~~~~~~~~^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0735/preflight.py", line 345, in run_validators
+    analyzer.main()
+    ~~~~~~~~~~~~~^^
+  File "/tmp/litchi-0735-preflight-9tgqkoym/isolated/results/change-0735/analyze.py", line 898, in main
+  File "/tmp/litchi-0735-preflight-9tgqkoym/isolated/results/change-0735/analyze.py", line 405, in verify_source_review
+  File "/tmp/litchi-0735-preflight-9tgqkoym/isolated/results/change-0735/analyze.py", line 50, in require
+change0735_preflight_analyzer.Failure: source review equivalence changed

@@ -1,0 +1,300 @@
+{
+  "status": "passed",
+  "kind": "actual-analyzer-corruption-controls",
+  "control_count": 19,
+  "rejection_count": 19,
+  "checks": [
+    {
+      "name": "complete packet accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "semantic output hash",
+      "category": "semantic",
+      "expected_rejection": "output identity changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: native/c0/r0/primary/baseline: sample 0 output identity changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: native/primary: sample 0 identity",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "semantic oracle witness",
+      "category": "semantic",
+      "expected_rejection": "semantic oracle changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: native/c0/r0/primary/baseline: sample 0 semantic oracle changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: native/primary: sample 0 identity",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "missing semantic control",
+      "category": "semantic-controls",
+      "expected_rejection": "oracle_controls changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: native/c0/r0/primary/baseline: static field oracle_controls changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: native/primary: static field oracle_controls changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "source hash",
+      "category": "semantic-custody",
+      "expected_rejection": "static field source_sha256 changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: native/c0/r0/primary/baseline: static field source_sha256 changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: native/primary: static field source_sha256 changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "report case identity",
+      "category": "semantic-identity",
+      "expected_rejection": "static field case changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: native/c0/r0/primary/baseline: static field case changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: native/primary: static field case changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "allocation negative bytes",
+      "category": "allocation",
+      "expected_rejection": "allocated_bytes",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: allocation/c0/r0/primary/baseline: allocated_bytes is below 0",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: allocated_bytes: below 0",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "allocation missing witness",
+      "category": "allocation",
+      "expected_rejection": "allocation sample shape changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: allocation/c0/r0/primary/baseline: allocation sample shape changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: allocation/primary: allocation schema",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "reordered schedule",
+      "category": "schedule",
+      "expected_rejection": "capture schedule changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: capture schedule changed at row 0",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: capture row 0: schedule changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "missing schedule row",
+      "category": "schedule",
+      "expected_rejection": "capture process count changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: capture process count changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: capture count changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "wrong capture command",
+      "category": "schedule",
+      "expected_rejection": "capture command changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: capture command changed at row 0",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: capture row 0: command changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "raw report digest",
+      "category": "capture-custody",
+      "expected_rejection": "capture output digest changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: capture output digest changed at row 0",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: capture row 0: raw hash changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "raw stderr digest",
+      "category": "capture-custody",
+      "expected_rejection": "capture stderr digest changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: capture stderr digest changed at row 0",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: capture row 0: raw hash changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "frozen input digest",
+      "category": "freeze-custody",
+      "expected_rejection": "frozen input changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: frozen input changed: <packet>/plan.json",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: frozen input changed: <packet>/plan.json",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "preflight script digest",
+      "category": "preflight-custody",
+      "expected_rejection": "preflight script binding changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: preflight script binding changed: analyze.py",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: preflight script changed: analyze.py",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "build source digest",
+      "category": "build-custody",
+      "expected_rejection": "candidate source changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: candidate source changed or missing: Cargo.lock",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: candidate source: changed Cargo.lock",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "candidate binary digest",
+      "category": "build-custody",
+      "expected_rejection": "binary identity changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: binary identity changed: <workspace>-0735-bin/candidate-ole_format_save_probe",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: binary changed: <workspace>-0735-bin/candidate-ole_format_save_probe",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "quality command",
+      "category": "quality-custody",
+      "expected_rejection": "quality command 0 changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: candidate quality command 0 changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: candidate: quality command 0 changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "quality output digest",
+      "category": "quality-custody",
+      "expected_rejection": "quality output 0 digest changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: candidate quality output 0 digest changed",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: candidate: quality output changed",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    },
+    {
+      "name": "qualification output digest",
+      "category": "qualification-custody",
+      "expected_rejection": "candidate qualification file changed",
+      "accepted": false,
+      "expected": false,
+      "analyzer_accepted": false,
+      "analyzer_rejection": "Failure: candidate qualification file changed: qualification-raw/baseline-primary-native.json",
+      "audit_accepted": false,
+      "audit_rejection": "AuditError: qualification: file changed: qualification-raw/baseline-primary-native.json",
+      "rejection_coverage": [
+        "analyzer",
+        "audit"
+      ]
+    }
+  ],
+  "analyzer_sha256": "1707d408fe9ef3565ecddfd395a7665d21919d9909fffc8e74e956eb1576f722",
+  "script_sha256": "bb1aadfa816356dcf162f26b0fdc2696f2a437febf07f22e47d73783363f2eb0"
+}

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0735 — staging clone removal rejected on secondary regression
+
+[0735](0735-ppt-record-staging-without-editor-clone.md) measures a smaller
+record-staging transition without a full Editor clone. Primary paired p50
+improves 3.53%, but secondary regresses 6.34% (bootstrap 95%: +5.40–6.61%);
+eight of nine secondary pairs exceed 5%. Allocated bytes fall 696,415/331,274,
+but peak live bytes are unchanged. All 48 processes satisfy the exact oracle.
+Reject and restore production; retain the candidate, all observations and
+19 corruption controls. [Evidence](results/change-0735/README.md). These are
+scoped probe-lifecycle results, not an established explanation of the regression.
+
 ## 0734 — retained PPT owned payload handoff
 
 [0734](0734-ppt-owned-stream-handoff.md) compares 36 native and 12 allocation
