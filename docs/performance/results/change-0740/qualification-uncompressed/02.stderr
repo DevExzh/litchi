@@ -1,0 +1,2 @@
+[ perf record: Woken up 35 times to write data ]
+[ perf record: Captured and wrote 8.466 MB /home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/02.perf.data (532 samples) ]

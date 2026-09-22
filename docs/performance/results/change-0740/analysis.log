@@ -1,0 +1,18 @@
+{
+  "pptx_cross_copy_media_rich_lifecycle": {
+    "processes": 3,
+    "generated_deflate_pct_strict_plan_period": {
+      "min": 78.79092982303861,
+      "median": 78.93642963496087,
+      "max": 79.54071985256236
+    }
+  },
+  "pptx_cross_copy_plain_lifecycle": {
+    "processes": 3,
+    "generated_deflate_pct_strict_plan_period": {
+      "min": 1.7728814470913308,
+      "median": 2.1151284838504245,
+      "max": 2.440240586996114
+    }
+  }
+}

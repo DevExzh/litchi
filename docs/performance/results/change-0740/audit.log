@@ -1,0 +1,3 @@
+PASS audit: six formal receipts, independent stacks, oracle/build/hash checks
+PASS audit: samples=27440 period=112048746192 strict_plan_period=43712545990
+PASS audit: negative_controls=9 gzip_replays=6

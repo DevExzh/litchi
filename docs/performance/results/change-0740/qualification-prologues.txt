@@ -1,0 +1,145 @@
+
+/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002930ad0 <_ZN11litchi_pptx6opened15cross_copy_plan15build_candidate17h7f61b46214808b1fE>:
+ 2930ad0:	55                   	push   %rbp
+ 2930ad1:	41 57                	push   %r15
+ 2930ad3:	41 56                	push   %r14
+ 2930ad5:	41 55                	push   %r13
+ 2930ad7:	41 54                	push   %r12
+ 2930ad9:	53                   	push   %rbx
+ 2930ada:	48 81 ec e8 06 00 00 	sub    $0x6e8,%rsp
+ 2930ae1:	4c 89 4c 24 30       	mov    %r9,0x30(%rsp)
+ 2930ae6:	4c 89 c3             	mov    %r8,%rbx
+ 2930ae9:	48 89 cd             	mov    %rcx,%rbp
+ 2930aec:	48 89 54 24 28       	mov    %rdx,0x28(%rsp)
+ 2930af1:	49 89 f6             	mov    %rsi,%r14
+ 2930af4:	49 89 ff             	mov    %rdi,%r15
+ 2930af7:	4c 8b a4 24 60 07 00 	mov    0x760(%rsp),%r12
+ 2930afe:	00 
+ 2930aff:	64 48 8b 04 25 00 00 	mov    %fs:0x0,%rax
+ 2930b06:	00 00 
+ 2930b08:	48 8d 80 c8 ff ff ff 	lea    -0x38(%rax),%rax
+ 2930b0f:	49 89 c5             	mov    %rax,%r13
+ 2930b12:	80 78 10 01          	cmpb   $0x1,0x10(%rax)
+ 2930b16:	0f 85 e2 00 00 00    	jne    2930bfe <_ZN11litchi_pptx6opened15cross_copy_plan15build_candidate17h7f61b46214808b1fE+0x12e>
+ 2930b1c:	49 8b 45 00          	mov    0x0(%r13),%rax
+ 2930b20:	49 8b 55 08          	mov    0x8(%r13),%rdx
+ 2930b24:	48 8d 48 01          	lea    0x1(%rax),%rcx
+ 2930b28:	49 89 4d 00          	mov    %rcx,0x0(%r13)
+ 2930b2c:	0f                   	.byte 0xf
+ 2930b2d:	10                   	.byte 0x10
+ 2930b2e:	05                   	.byte 0x5
+ 2930b2f:	75                   	.byte 0x75
+
+
+/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000293b800 <_ZN11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides17h9d3a969aab5e9525E>:
+ 293b800:	41 57                	push   %r15
+ 293b802:	41 56                	push   %r14
+ 293b804:	53                   	push   %rbx
+ 293b805:	48 81 ec b0 05 00 00 	sub    $0x5b0,%rsp
+ 293b80c:	48 89 fb             	mov    %rdi,%rbx
+ 293b80f:	0f 28 84 24 d0 05 00 	movaps 0x5d0(%rsp),%xmm0
+ 293b816:	00 
+ 293b817:	0f 11 04 24          	movups %xmm0,(%rsp)
+ 293b81b:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+ 293b820:	e8 9b 00 00 00       	call   293b8c0 <_ZN11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides17hc490e72aff21d386E>
+ 293b825:	31 c0                	xor    %eax,%eax
+ 293b827:	48 3b 44 24 10       	cmp    0x10(%rsp),%rax
+ 293b82c:	71 3c                	jno    293b86a <_ZN11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides17h9d3a969aab5e9525E+0x6a>
+ 293b82e:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 293b835:	00 00 80 
+ 293b838:	48 8b 4c 24 58       	mov    0x58(%rsp),%rcx
+ 293b83d:	48 89 4b 48          	mov    %rcx,0x48(%rbx)
+ 293b841:	0f 10 44 24 18       	movups 0x18(%rsp),%xmm0
+ 293b846:	0f 10 4c 24 28       	movups 0x28(%rsp),%xmm1
+ 293b84b:	0f 10 54 24 38       	movups 0x38(%rsp),%xmm2
+ 293b850:	0f 10 5c 24 48       	movups 0x48(%rsp),%xmm3
+ 293b855:	0f 11 5b 38          	movups %xmm3,0x38(%rbx)
+ 293b859:	0f 11 53 28          	movups %xmm2,0x28(%rbx)
+ 293b85d:	0f                   	.byte 0xf
+ 293b85e:	11                   	.byte 0x11
+ 293b85f:	4b                   	rex.WXB
+
+
+/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000db5440 <_ZN20litchi_perf_baseline29run_pptx_cross_copy_lifecycle17h2bdbf27a4a5ed744E>:
+  db5440:	55                   	push   %rbp
+  db5441:	41 57                	push   %r15
+  db5443:	41 56                	push   %r14
+  db5445:	41 55                	push   %r13
+  db5447:	41 54                	push   %r12
+  db5449:	53                   	push   %rbx
+  db544a:	49 89 e3             	mov    %rsp,%r11
+  db544d:	49 81 eb 00 f0 00 00 	sub    $0xf000,%r11
+  db5454:	48 81 ec 00 10 00 00 	sub    $0x1000,%rsp
+  db545b:	48 c7 04 24 00 00 00 	movq   $0x0,(%rsp)
+  db5462:	00 
+  db5463:	4c 39 dc             	cmp    %r11,%rsp
+  db5466:	75 ec                	jne    db5454 <_ZN20litchi_perf_baseline29run_pptx_cross_copy_lifecycle17h2bdbf27a4a5ed744E+0x14>
+  db5468:	48 81 ec d8 0c 00 00 	sub    $0xcd8,%rsp
+  db546f:	49 89 ff             	mov    %rdi,%r15
+  db5472:	8d 46 af             	lea    -0x51(%rsi),%eax
+  db5475:	66 83 f8 02          	cmp    $0x2,%ax
+  db5479:	73 2d                	jae    db54a8 <_ZN20litchi_perf_baseline29run_pptx_cross_copy_lifecycle17h2bdbf27a4a5ed744E+0x68>
+  db547b:	4c 89 c3             	mov    %r8,%rbx
+  db547e:	49 89 cd             	mov    %rcx,%r13
+  db5481:	48 89 d5             	mov    %rdx,%rbp
+  db5484:	89 f7                	mov    %esi,%edi
+  db5486:	e8 f5 e5 13 00       	call   ef3a80 <_ZN20litchi_perf_baseline4Case4name17h62bb1233fd16a6b3E>
+  db548b:	48 39 55 10          	cmp    %rdx,0x10(%rbp)
+  db548f:	75 17                	jne    db54a8 <_ZN20litchi_perf_baseline29run_pptx_cross_copy_lifecycle17h2bdbf27a4a5ed744E+0x68>
+  db5491:	49 89 c4             	mov    %rax,%r12
+  db5494:	49 89 d6             	mov    %rdx,%r14
+  db5497:	48 8b 7d 08          	mov    0x8(%rbp),%rdi
+  db549b:	48 89 c6             	mov    %rax,%rsi
+  db549e:	ff                   	.byte 0xff
+  db549f:	15                   	.byte 0x15
+
+
+/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000003203220 <_ZN7zlib_rs7deflate9algorithm6medium14deflate_medium17hcf5c71987d624592E>:
+ 3203220:	55                   	push   %rbp
+ 3203221:	41 57                	push   %r15
+ 3203223:	41 56                	push   %r14
+ 3203225:	41 55                	push   %r13
+ 3203227:	41 54                	push   %r12
+ 3203229:	53                   	push   %rbx
+ 320322a:	48 83 ec 38          	sub    $0x38,%rsp
+ 320322e:	89 74 24 2c          	mov    %esi,0x2c(%rsp)
+ 3203232:	48 89 fb             	mov    %rdi,%rbx
+ 3203235:	4c 8b 6f 38          	mov    0x38(%rdi),%r13
+ 3203239:	41 0f b6 45 04       	movzbl 0x4(%r13),%eax
+ 320323e:	88 44 24 1f          	mov    %al,0x1f(%rsp)
+ 3203242:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+ 3203249:	00 00 
+ 320324b:	48 c7 44 24 10 00 00 	movq   $0x0,0x10(%rsp)
+ 3203252:	00 00 
+ 3203254:	45 31 e4             	xor    %r12d,%r12d
+ 3203257:	48 c7 44 24 08 00 00 	movq   $0x0,0x8(%rsp)
+ 320325e:	00 00 
+ 3203260:	eb 12                	jmp    3203274 <_ZN7zlib_rs7deflate9algorithm6medium14deflate_medium17hcf5c71987d624592E+0x54>
+ 3203262:	49 29 71 38          	sub    %rsi,0x38(%r9)
+ 3203266:	66 2e 0f 1f 84 00 00 	cs nopw 0x0(%rax,%rax,1)
+ 320326d:	00 00 00 
+ 3203270:	4c 8b 6b 38          	mov    0x38(%rbx),%r13
+ 3203274:	49 8b 45 38          	mov    0x38(%r13),%rax
+ 3203278:	48 3d 05 01 00 00    	cmp    $0x105,%rax
+ 320327e:	0f                   	.byte 0xf
+ 320327f:	87                   	.byte 0x87

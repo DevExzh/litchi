@@ -1,0 +1,5 @@
+000000000292c400 t litchi_pptx::opened::cross_copy_plan::apply_plan
+000000000293b800 T litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+000000000293b8c0 t litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides
+000000000293e8b0 t litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides::{{closure}}
+0000000000db5440 t litchi_perf_baseline::run_pptx_cross_copy_lifecycle

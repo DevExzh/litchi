@@ -1,0 +1,93 @@
+[
+  {
+    "mode": "native",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification/00.json"
+    ],
+    "started": 1790091489.6729136,
+    "ended": 1790091490.061503,
+    "exit": 0,
+    "files": {
+      "00.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.json": "b4dc894fdf8e76c10233080f13ffbac8489edbfe38e34a9496877178796bc026"
+    }
+  },
+  {
+    "mode": "native",
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification/01.json"
+    ],
+    "started": 1790091490.0634007,
+    "ended": 1790091493.3800118,
+    "exit": 0,
+    "files": {
+      "01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "01.json": "be02295856fc46d5f08ae64793e8512ea74a9b450c1058258af9c1494bc36f7b",
+      "01.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "mode": "profile",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 20,
+    "warmups": 0,
+    "command": [
+      "perf",
+      "record",
+      "--compression-level=1",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification/02.perf.data",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "20",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification/02.json"
+    ],
+    "started": 1790091493.3820093,
+    "ended": 1790091494.529858,
+    "exit": 0
+  }
+]

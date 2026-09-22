@@ -1,0 +1,2 @@
+[ perf record: Woken up 8 times to write data ]
+[ perf record: Captured and wrote 1.685 MB /home/zhuhe/code/litchi/docs/performance/results/change-0740/formal/02.perf.data (7809 samples) ]

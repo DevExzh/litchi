@@ -1,0 +1,68 @@
+command: ['objdump', '-d', '-C', '--start-address=0x2800890', '--stop-address=0x2800960', '/home/zhuhe/code/litchi-target-0740-fp/release/litchi-perf-baseline']
+
+/home/zhuhe/code/litchi-target-0740-fp/release/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002800890 <litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides>:
+ 2800890:	55                   	push   %rbp
+ 2800891:	48 89 e5             	mov    %rsp,%rbp
+ 2800894:	41 57                	push   %r15
+ 2800896:	41 56                	push   %r14
+ 2800898:	53                   	push   %rbx
+ 2800899:	48 81 ec b8 05 00 00 	sub    $0x5b8,%rsp
+ 28008a0:	48 89 fb             	mov    %rdi,%rbx
+ 28008a3:	0f 28 45 10          	movaps 0x10(%rbp),%xmm0
+ 28008a7:	0f 11 04 24          	movups %xmm0,(%rsp)
+ 28008ab:	48 8d bd 40 fb ff ff 	lea    -0x4c0(%rbp),%rdi
+ 28008b2:	e8 a9 00 00 00       	call   2800960 <litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides>
+ 28008b7:	31 c0                	xor    %eax,%eax
+ 28008b9:	48 3b 85 40 fb ff ff 	cmp    -0x4c0(%rbp),%rax
+ 28008c0:	71 46                	jno    2800908 <litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides+0x78>
+ 28008c2:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 28008c9:	00 00 80 
+ 28008cc:	48 8b 8d 88 fb ff ff 	mov    -0x478(%rbp),%rcx
+ 28008d3:	48 89 4b 48          	mov    %rcx,0x48(%rbx)
+ 28008d7:	0f 10 85 48 fb ff ff 	movups -0x4b8(%rbp),%xmm0
+ 28008de:	0f 10 8d 58 fb ff ff 	movups -0x4a8(%rbp),%xmm1
+ 28008e5:	0f 10 95 68 fb ff ff 	movups -0x498(%rbp),%xmm2
+ 28008ec:	0f 10 9d 78 fb ff ff 	movups -0x488(%rbp),%xmm3
+ 28008f3:	0f 11 5b 38          	movups %xmm3,0x38(%rbx)
+ 28008f7:	0f 11 53 28          	movups %xmm2,0x28(%rbx)
+ 28008fb:	0f 11 4b 18          	movups %xmm1,0x18(%rbx)
+ 28008ff:	0f 11 43 08          	movups %xmm0,0x8(%rbx)
+ 2800903:	48 89 03             	mov    %rax,(%rbx)
+ 2800906:	eb 3a                	jmp    2800942 <litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides+0xb2>
+ 2800908:	48 8d b5 40 fb ff ff 	lea    -0x4c0(%rbp),%rsi
+ 280090f:	4c 8b 3d 02 5d 9c 00 	mov    0x9c5d02(%rip),%r15        # 31c6618 <memcpy@GLIBC_2.14>
+ 2800916:	ba b0 03 00 00       	mov    $0x3b0,%edx
+ 280091b:	48 89 df             	mov    %rbx,%rdi
+ 280091e:	41 ff d7             	call   *%r15
+ 2800921:	48 8d b5 f0 fe ff ff 	lea    -0x110(%rbp),%rsi
+ 2800928:	4c 8d b5 48 fa ff ff 	lea    -0x5b8(%rbp),%r14
+ 280092f:	ba f8 00 00 00       	mov    $0xf8,%edx
+ 2800934:	4c 89 f7             	mov    %r14,%rdi
+ 2800937:	41 ff d7             	call   *%r15
+ 280093a:	4c 89 f7             	mov    %r14,%rdi
+ 280093d:	e8 3e 70 02 00       	call   2827980 <core::ptr::drop_in_place<litchi_opc::package::OpcPackage>>
+ 2800942:	48 89 d8             	mov    %rbx,%rax
+ 2800945:	48 81 c4 b8 05 00 00 	add    $0x5b8,%rsp
+ 280094c:	5b                   	pop    %rbx
+ 280094d:	41 5e                	pop    %r14
+ 280094f:	41 5f                	pop    %r15
+ 2800951:	5d                   	pop    %rbp
+ 2800952:	c3                   	ret
+ 2800953:	cc                   	int3
+ 2800954:	cc                   	int3
+ 2800955:	cc                   	int3
+ 2800956:	cc                   	int3
+ 2800957:	cc                   	int3
+ 2800958:	cc                   	int3
+ 2800959:	cc                   	int3
+ 280095a:	cc                   	int3
+ 280095b:	cc                   	int3
+ 280095c:	cc                   	int3
+ 280095d:	cc                   	int3
+ 280095e:	cc                   	int3
+ 280095f:	cc                   	int3

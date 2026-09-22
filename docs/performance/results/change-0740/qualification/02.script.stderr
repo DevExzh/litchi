@@ -1,0 +1,3 @@
+failed to decompress (B): 81008 -> 528384, dst_size 528384 : Data corruption detected
+Couldn't decompress data
+0x80e20 [0x3c80]: failed to process type: 83 [Operation not permitted]

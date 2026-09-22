@@ -1,0 +1,6 @@
+PASS formal 1/6 profile pptx_cross_copy_plain_lifecycle
+PASS formal 2/6 profile pptx_cross_copy_media_rich_lifecycle
+PASS formal 3/6 profile pptx_cross_copy_media_rich_lifecycle
+PASS formal 4/6 profile pptx_cross_copy_plain_lifecycle
+PASS formal 5/6 profile pptx_cross_copy_plain_lifecycle
+PASS formal 6/6 profile pptx_cross_copy_media_rich_lifecycle

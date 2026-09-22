@@ -1,0 +1,106 @@
+[
+  {
+    "raw": "formal/00.perf.data",
+    "raw_bytes": 322816,
+    "raw_sha256": "61705bd2eca246d7103659ee8ce9f0172f9425c87b92f3918df9a841391b1393",
+    "archive": "formal/00.perf.data.gz",
+    "archive_bytes": 37426,
+    "archive_sha256": "912649460424c9242c53e5a68a92420f1c0a7cec62e63a048d518ff53994f4af"
+  },
+  {
+    "raw": "formal/01.perf.data",
+    "raw_bytes": 1786400,
+    "raw_sha256": "62a8622a257789fc05c4304acfdedcea03c347ad47c9de00e4e6388d70415314",
+    "archive": "formal/01.perf.data.gz",
+    "archive_bytes": 144649,
+    "archive_sha256": "483d3c0967b854c1320375e85e0890652be3e28b8a6d790cf4b0e103a83be72e"
+  },
+  {
+    "raw": "formal/02.perf.data",
+    "raw_bytes": 1808216,
+    "raw_sha256": "271a82bdca7530e11393df17fe2abbc2a6f12dc2ac2ed44504e9146a89bc4c1b",
+    "archive": "formal/02.perf.data.gz",
+    "archive_bytes": 147335,
+    "archive_sha256": "d8ac726941fb36b48ea07f2a30fb4f0c59d58e4fdb2ca678598478420a68f52d"
+  },
+  {
+    "raw": "formal/03.perf.data",
+    "raw_bytes": 325736,
+    "raw_sha256": "b3b8d1005378488b4a477d46121f5e82914fb7ecbcb7993176694c1cef0cef79",
+    "archive": "formal/03.perf.data.gz",
+    "archive_bytes": 37786,
+    "archive_sha256": "df69f0318dbe0ad18c2bb4afd30f491616136863bd0fe2594d13a7622023c259"
+  },
+  {
+    "raw": "formal/04.perf.data",
+    "raw_bytes": 322912,
+    "raw_sha256": "349d27f790430e3dbaf45bd039aea976d3d65ccc272ef45c6b7f5fe2006694f0",
+    "archive": "formal/04.perf.data.gz",
+    "archive_bytes": 37890,
+    "archive_sha256": "cb6d8df674ed3ac38b64832dff09482b9cdc5945d3be7da9cd6d5db7c6e08892"
+  },
+  {
+    "raw": "formal/05.perf.data",
+    "raw_bytes": 1789408,
+    "raw_sha256": "6d092f448039f6926a06326c03cc19c53e168f4e08443f475ac1f179e6ade80b",
+    "archive": "formal/05.perf.data.gz",
+    "archive_bytes": 144799,
+    "archive_sha256": "19c7de29f41abb69198986d2c4a559321c6e453470f64336ff72171e9e58f67e"
+  },
+  {
+    "raw": "qualification/02.perf.data",
+    "raw_bytes": 827652,
+    "raw_sha256": "4174583b897d365c5fa940e2b2c2410fb810b20ac03ed0c92e9e451bd494b06e",
+    "archive": "qualification/02.perf.data.gz",
+    "archive_bytes": 785249,
+    "archive_sha256": "cb432cc4a327b65d653792df6c21dcc8bbc0480df71ba68e39dc0e7aabd4cb57"
+  },
+  {
+    "raw": "qualification-fp/02.perf.data",
+    "raw_bytes": 147008,
+    "raw_sha256": "906f0818f07028f378cb9aab654991c73bf92b95beea45b812de53bb233c96ae",
+    "archive": "qualification-fp/02.perf.data.gz",
+    "archive_bytes": 18073,
+    "archive_sha256": "b4fae52c8ed549164e8077e80615f35bfd16a3ceb7a6178e389c947393fd6d24"
+  },
+  {
+    "raw": "qualification-fp/03.perf.data",
+    "raw_bytes": 887496,
+    "raw_sha256": "eb7110e2fc8beb9dbbfa63e5e75675c2cdcfc86dddf882a31bb4180f45889f6f",
+    "archive": "qualification-fp/03.perf.data.gz",
+    "archive_bytes": 73024,
+    "archive_sha256": "708633af5c7df8dc520621f01b917d2467b784b259b913ab4eef9634e8300ce2"
+  },
+  {
+    "raw": "qualification-uncompressed/02.perf.data",
+    "raw_bytes": 8917776,
+    "raw_sha256": "1bfa0e673d20159995bf3f97e7dc3daef9945eb0dd1db05761f576d26b1dd58b",
+    "archive": "qualification-uncompressed/02.perf.data.gz",
+    "archive_bytes": 888700,
+    "archive_sha256": "8e7b60ea59e2bfadaaaa3f51d26136da055735a354d6d556e9d07dc29c4faba4"
+  },
+  {
+    "raw": "qualification-uncompressed/03.perf.data",
+    "raw_bytes": 61581176,
+    "raw_sha256": "3bfe352babdc2f1f18db5a89fae83c1b04c5e90820eabba1dc3ec50c58dad143",
+    "archive": "qualification-uncompressed/03.perf.data.gz",
+    "archive_bytes": 4443630,
+    "archive_sha256": "35a2f6240ec5a6ddcf2beb56cf2c5cc9a8d74af921113a94574d6b3b35ed01d8"
+  },
+  {
+    "raw": "qualification-wide/00.perf.data",
+    "raw_bytes": 35201072,
+    "raw_sha256": "16a258c215cb4292ab9addc020e273af31eb7ddb8f15b98fccf29656cf9a877b",
+    "archive": "qualification-wide/00.perf.data.gz",
+    "archive_bytes": 5348173,
+    "archive_sha256": "80557e3a8e5c6b3c8031ad74fa3755c1d6bd843355c89e5d94094938e14c41f4"
+  },
+  {
+    "raw": "qualification-wide/01.perf.data",
+    "raw_bytes": 240410464,
+    "raw_sha256": "e9a6e648089b5d6dba74039418208a8d1e5fc55d831ef44b4cc472c985b36825",
+    "archive": "qualification-wide/01.perf.data.gz",
+    "archive_bytes": 81407561,
+    "archive_sha256": "bb806e19426cd7a351b87a90378ee45608f1cf9805178cf5ec7b2b6a8bf7e6ad"
+  }
+]

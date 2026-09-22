@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "formal_processes": 6,
+  "archived_raw_captures": 13,
+  "context_controls": [
+    "strict",
+    "missing_root",
+    "missing_plan",
+    "apply_conflict",
+    "public_apply_conflict",
+    "root_only",
+    "unknown",
+    "empty",
+    "reversed",
+    "depth_limit"
+  ],
+  "malformed_controls": [
+    "bad_header",
+    "bad_frame",
+    "lost"
+  ],
+  "scope": "separate replay of all formal bucket/stage periods and diagnostic percentages; exact frozen scripts, report and raw artifact custody"
+}
