@@ -1,0 +1,3 @@
+PASS 138 exact captures, 4518 native samples, eight native and eight allocation comparisons
+PASS independent 0737 custody, schedule, 4518-sample replay, native bootstrap, and allocation audit
+PASS synthetic 138-process preflight and independent altered-statistic rejection

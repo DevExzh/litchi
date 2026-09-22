@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0737 — legacy observer control blocks timing transfer
+
+[0737](0737-ppt-oracle-lifecycle-controls.md) completes 138 unchanged-owner
+processes and 4,518 native samples with exact preservation and independent
+statistical replay. Revised legacy secondary p50 is +6.67% versus the original
+probe; duplicate legacy A/A remains small. Matched witness draining changes
+primary p50 by +10.10%. Endpoint drift falls near zero, but interior bands
+persist. Owner allocation fields are identical throughout. Keep the new probe
+diagnostic-only and qualify the original Sample layout/serialization path
+before retrying the rejected candidate. Production and the 0735 rejection
+remain unchanged; the broader non-iWork goal stays active.
+
 ## 0736 — qualify sample lifecycle on both PPT fixtures
 
 [0736](0736-ppt-sample-order-and-oracle-lifecycle.md) preserves the 0735 rejection

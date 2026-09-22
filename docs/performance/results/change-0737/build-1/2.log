@@ -1,0 +1,13 @@
+    Checking ole-format-save-probe-0737 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0737/probe)
+error: `Box::new(_)` of default value
+    --> src/lib.rs:3487:52
+     |
+3487 |             semantic_witness: SemanticWitness::Ppt(Box::new(PptSemanticWitness::default())),
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `Box::default()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#box_default
+     = note: `-D clippy::box-default` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::box_default)]`
+
+error: could not compile `ole-format-save-probe-0737` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

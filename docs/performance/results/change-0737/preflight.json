@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "synthetic_processes": 138,
+  "synthetic_native_samples": 4518,
+  "freeze_sha256": "938d8c1ac5eb9bdaf4d066d7a25203ed8d41dc3e602df058648526cae74bec94",
+  "analyzer_sha256": "41094df95729b98890c3c32adf97615e4a493b42e22bc8fc5bf3b4596110a124",
+  "audit_sha256": "d0180de6ff231ebfe3ee0b9559ca8f248b9129a918cf330c27c3a8db278eb1cc",
+  "corrupted_statistic_rejected": true,
+  "temporary_packet_removed": true,
+  "scope": "Schema and statistical integration only; no native timing evidence."
+}

@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "scope": "Post-cleanup analyzer, independent audit and17report-corruption controls; unchanged production source guard.",
+  "analysis_sha256": "0a375d7b6b52fa5495ca882dbb17a7eb7902da27a759902c0f5426d754bbb112",
+  "audit_sha256": "3b3fc10027aef727396f3c586b86c6201395caa1c3c134f6adf4547385f2aa2c",
+  "negative_contract_sha256": "d7ac0e425772095735cb965f570cf17ef9b7692cd1dae6598d2c83f8210ff780",
+  "cleanup_sha256": "8e752cd7528738e23d1679fe4259566ff73d79e702f2b0cc16c09b7319a0b3e3",
+  "source_files": 7206,
+  "native_processes": 108,
+  "allocation_processes": 30,
+  "strict_warmup_receipts": 198
+}

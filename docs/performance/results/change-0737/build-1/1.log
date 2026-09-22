@@ -1,0 +1,16 @@
+   Compiling ole-format-save-probe-0737 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0737/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.37s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0737/release/deps/ole_format_save_probe_0737-9a5ee6801cad8ca5)
+
+running 8 tests
+test tests::invalid_lifecycle_and_unsupported_scope_fail_closed ... ok
+test tests::oracle_control_rejects_metadata_change ... ok
+test tests::oracle_control_rejects_missing_stream ... ok
+test tests::retained_witness_count_is_explicit_for_each_lifecycle ... ok
+test tests::oracle_control_rejects_wrong_doc_target ... ok
+test tests::oracle_control_rejects_wrong_ppt_slide_identity ... ok
+test tests::strict_receipt_requires_full_oracle_and_serializes_visible_sample ... ok
+test tests::strict_receipt_path_is_identical_for_retained_and_drained_collections ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
