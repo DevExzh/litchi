@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0736 — qualify sample lifecycle on both PPT fixtures
+
+[0736](0736-ppt-sample-order-and-oracle-lifecycle.md) preserves the 0735 rejection
+and exposes repeatable sample-position effects: the primary baseline's final-ten
+p50 exceeds its first-ten p50 by 15.89–19.53% in every process. Secondary
+regression persists in both process-order strata. Warmups drop outputs while
+the measured loop runs and retains full oracle witnesses between timed edits.
+This is a control-design finding, not a causal attribution. Next qualify warmup
+cadence and witness lifetime on both fixtures, preserving all validation and
+the original control lane. Production is unchanged; the non-iWork goal is active.
+
 ## 0735 — resolve the staging regression before retrying
 
 [0735](0735-ppt-record-staging-without-editor-clone.md) disproves unconditional

@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "analysis_replay_identical": true,
+  "analysis_sha256": "9968b78850f0d546988d805a889ad75a8d359804afb47cc1d9bada14def9f3a2",
+  "stdout": "{\"status\": \"passed\", \"processes\": 36, \"samples\": 1800, \"pairs\": 18}\n",
+  "stderr": "",
+  "new_native_or_cargo_runs": 0,
+  "plot_replay_identical": true,
+  "plot_sha256": "ca95b119608744133065e8535aaee6926ab108f5706c38eb57305c62ed81e855"
+}
