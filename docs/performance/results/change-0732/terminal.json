@@ -1,0 +1,63 @@
+{
+  "status": "passed",
+  "post_cleanup": true,
+  "constraint_count": 34,
+  "stable_replays": {
+    "analysis.json": "52e711eec51be6f3f56f01d86068e820e2f0ec6a2575af860df86a2cacdb2eb9",
+    "negative-checks.json": "247507bfc255798e5a2590adb4230e717c639ee87f8b1fcc0a5361c7d7e0ebc2",
+    "report-stats.json": "c0a5f444d9080ea7a4199b8cd7492b5324a5835e7e52adc5645d3776a63cba0e"
+  },
+  "runs": [
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0732/source-guard.py"
+      ],
+      "exit_code": 0,
+      "output": "terminal/source-guard.py.log",
+      "sha256": "05993e4ac1474c8e7ded5674405f079ba23d21329b2b9506974eec310a68829b"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0732/analyze.py"
+      ],
+      "exit_code": 0,
+      "output": "terminal/analyze.py.log",
+      "sha256": "ee32b335cf524eb124460694b9a0bd3a35758a85bc6374f1e4152fc860ce2a13"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0732/audit.py"
+      ],
+      "exit_code": 0,
+      "output": "terminal/audit.py.log",
+      "sha256": "f6e9afd8f45e5513e4a2aafc521737806873f088e3d741901c20e687a752e511"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0732/negative-checks.py"
+      ],
+      "exit_code": 0,
+      "output": "terminal/negative-checks.py.log",
+      "sha256": "5b91fbe8ba6e41e2dd4012b62560e865da644d37e869c1e9454abf0a0c29003d"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0732/report-stats.py"
+      ],
+      "exit_code": 0,
+      "output": "terminal/report-stats.py.log",
+      "sha256": "070996a624e3db0d082ee8ef35313bfb997628c5efb4bd0437b1677ebbf1695d"
+    }
+  ],
+  "reports": {
+    "docs/performance/0732-ppt-native-phase-attribution.md": "c08555f62a39fd24112624992f7b23063737e62e8fe62ce0b0e8bd41f2ca414e",
+    "docs/performance/BASELINE.md": "ad1f4221342936f0eb907b0ea5d9636d35d0547230186617c1742f539a0a7d25",
+    "docs/performance/HOTSPOTS.md": "a28f746abde9c949af3f3755e87f5dafa1d0e2ac77c3068c256c3bd7b1abf664",
+    "docs/performance/REPORT.md": "34e4f2847fc6a03131c107252e598a588c0d2f42fa0bdb54d17d6893c8d7ec03"
+  }
+}

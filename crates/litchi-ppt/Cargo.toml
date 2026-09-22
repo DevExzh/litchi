@@ -10,6 +10,8 @@ rust-version.workspace = true
 
 [features]
 default = []
+# Runtime-neutral phase callbacks for reproducible native commit attribution.
+performance-diagnostics = []
 sign = ["dep:litchi-sign", "litchi-opc/sign"]
 encryption = ["dep:litchi-crypto", "dep:rand"]
 vba-inspection = ["dep:litchi-vba"]

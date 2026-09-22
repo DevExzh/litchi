@@ -1,0 +1,8 @@
+{
+  "case": "ppt45543",
+  "format": "ppt",
+  "path": "test-data/poi/test-data/slideshow/45543.ppt",
+  "edit": "remove slide1",
+  "bytes": 385024,
+  "sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+}

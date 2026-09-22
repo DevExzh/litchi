@@ -1,0 +1,17 @@
+   Compiling ole-format-save-probe-0732 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0732/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.94s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0732/release/deps/ole_format_save_probe_0732-23a2a365885d58a0)
+
+running 9 tests
+test ppt_phase::tests::ppt_split_residual_is_saturating_and_never_negative ... ok
+test ppt_phase::tests::ppt_trace_accepts_the_complete_changed_commit_sequence ... ok
+test tests::oracle_control_rejects_wrong_doc_target ... ok
+test tests::oracle_control_rejects_missing_stream ... ok
+test ppt_phase::tests::ppt_trace_rejects_a_balanced_but_reordered_event_sequence ... ok
+test ppt_phase::tests::ppt_trace_rejects_an_error_outcome ... ok
+test ppt_phase::tests::ppt_trace_rejects_a_missing_event ... ok
+test tests::oracle_control_rejects_wrong_ppt_slide_identity ... ok
+test tests::oracle_control_rejects_metadata_change ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

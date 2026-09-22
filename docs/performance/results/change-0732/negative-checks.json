@@ -1,0 +1,199 @@
+{
+  "status": "passed",
+  "kind": "actual-analyzer-corruption-controls",
+  "control_count": 23,
+  "rejection_count": 23,
+  "checks": [
+    {
+      "name": "complete packet accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "missing diagnostic event",
+      "category": "diagnostic-sequence",
+      "expected_rejection": "event count changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: diagnostic event count changed"
+    },
+    {
+      "name": "reordered diagnostic event",
+      "category": "diagnostic-sequence",
+      "expected_rejection": "sequence/outcome changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: event 0 sequence/outcome changed"
+    },
+    {
+      "name": "failed diagnostic outcome",
+      "category": "diagnostic-outcome",
+      "expected_rejection": "sequence/outcome changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: event 1 sequence/outcome changed"
+    },
+    {
+      "name": "nonmonotonic diagnostic timestamp",
+      "category": "diagnostic-timestamp",
+      "expected_rejection": "timestamps are not monotonic",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: event timestamps are not monotonic"
+    },
+    {
+      "name": "event outside commit window",
+      "category": "diagnostic-window",
+      "expected_rejection": "escapes commit window",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: diagnostic event escapes commit window"
+    },
+    {
+      "name": "span duration arithmetic",
+      "category": "diagnostic-arithmetic",
+      "expected_rejection": "span 0 duration changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-clock sample 0 c0r0: span 0 duration changed"
+    },
+    {
+      "name": "split sum arithmetic",
+      "category": "split-arithmetic",
+      "expected_rejection": "split_sum_ns differs from phase sum",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: profiled-empty sample 0 c0r0: split_sum_ns differs from phase sum"
+    },
+    {
+      "name": "zero whole duration",
+      "category": "timing-arithmetic",
+      "expected_rejection": "whole_ns is invalid",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: ordinary-opaque sample 0 c0r0: whole_ns is invalid"
+    },
+    {
+      "name": "false semantic oracle",
+      "category": "semantic-oracle",
+      "expected_rejection": "semantic oracle changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: ordinary-opaque sample 0 c0r0: semantic oracle changed"
+    },
+    {
+      "name": "missing corruption control",
+      "category": "semantic-controls",
+      "expected_rejection": "oracle_controls differs",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: c0-r0-ordinary-opaque: oracle_controls differs from oracle"
+    },
+    {
+      "name": "source hash",
+      "category": "report-custody",
+      "expected_rejection": "source_sha256 differs",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: c0-r0-ordinary-opaque: source_sha256 differs from oracle"
+    },
+    {
+      "name": "wrong report route",
+      "category": "route-identity",
+      "expected_rejection": "report route differs from manifest",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: c0-r0-ordinary-opaque: report route differs from manifest"
+    },
+    {
+      "name": "wrong sample route",
+      "category": "route-identity",
+      "expected_rejection": "sample route changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: ordinary-opaque sample 0 c0r0: sample route changed"
+    },
+    {
+      "name": "output hash",
+      "category": "report-custody",
+      "expected_rejection": "output digest changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: ordinary-opaque sample 0 c0r0: output digest changed"
+    },
+    {
+      "name": "wrong command",
+      "category": "capture-command",
+      "expected_rejection": "command or exit status changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: capture row 0 command or exit status changed"
+    },
+    {
+      "name": "reordered schedule",
+      "category": "capture-schedule",
+      "expected_rejection": "changed schedule order",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: capture row 0 changed schedule order"
+    },
+    {
+      "name": "missing capture row",
+      "category": "capture-completeness",
+      "expected_rejection": "capture process count changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: capture process count changed"
+    },
+    {
+      "name": "raw report digest",
+      "category": "capture-custody",
+      "expected_rejection": "capture output",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: capture output 3 digest changed"
+    },
+    {
+      "name": "raw stderr digest",
+      "category": "capture-custody",
+      "expected_rejection": "capture stderr",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: capture stderr 3 digest changed"
+    },
+    {
+      "name": "frozen input digest",
+      "category": "freeze-custody",
+      "expected_rejection": "frozen input changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: frozen input changed: <packet>/plan.json"
+    },
+    {
+      "name": "preflight script digest",
+      "category": "preflight-custody",
+      "expected_rejection": "preflight script changed",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: preflight script changed: analyze.py"
+    },
+    {
+      "name": "build source digest",
+      "category": "build-custody",
+      "expected_rejection": "build source",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: build source changed: Cargo.lock"
+    },
+    {
+      "name": "quality output digest",
+      "category": "quality-custody",
+      "expected_rejection": "quality output",
+      "accepted": false,
+      "expected": false,
+      "rejection": "Failure: quality output 0 digest changed"
+    }
+  ],
+  "analyzer_sha256": "067f3cf7121ca846e3838e1a9133e309295b44f24a04ecd0c24f5ab54b5df7d5",
+  "script_sha256": "cfc1b5d1f8b2d07eaeec82e4b4741de643f25bb7fae5f73dc3919c35766c4a0c"
+}

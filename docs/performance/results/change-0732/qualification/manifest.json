@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "runs": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0732-bin/ppt_phase_probe",
+        "--route",
+        "ordinary-opaque",
+        "--input",
+        "test-data/poi/test-data/slideshow/45543.ppt",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.027481912984512746,
+      "output": "ordinary-opaque.json",
+      "sha256": "bd2b1e230987012b839ccb16ec65e510a111cef97109b0d7892e939094b8d295",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "route": "ordinary-opaque"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0732-bin/ppt_phase_probe",
+        "--route",
+        "ordinary-split",
+        "--input",
+        "test-data/poi/test-data/slideshow/45543.ppt",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.026848691049963236,
+      "output": "ordinary-split.json",
+      "sha256": "e03beb005a18918b4d24b2f068fd3a3aaa3b31957f737dca8497eb4797b7a24a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "route": "ordinary-split"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0732-bin/ppt_phase_probe",
+        "--route",
+        "profiled-empty",
+        "--input",
+        "test-data/poi/test-data/slideshow/45543.ppt",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.02659703907556832,
+      "output": "profiled-empty.json",
+      "sha256": "b8b7d72c5a1759ab8059d8c46d7be835285a0c89a6af8499851b5e925691392d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "route": "profiled-empty"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0732-bin/ppt_phase_probe",
+        "--route",
+        "profiled-clock",
+        "--input",
+        "test-data/poi/test-data/slideshow/45543.ppt",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.026669619022868574,
+      "output": "profiled-clock.json",
+      "sha256": "57e4d67eaa1b9e8c49e56e97853459a8c955edba554b3e3e3af326c2b21a016a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "route": "profiled-clock"
+    }
+  ]
+}

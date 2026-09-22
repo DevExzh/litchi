@@ -361,6 +361,92 @@ impl From<crate::text_edit::Error> for Error {
 /// Result type for source-checked slide-order operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A deterministic phase boundary exposed by the opt-in performance
+/// diagnostics seam.
+///
+/// The phases describe format-owned work at the existing commit expression
+/// boundaries. They carry no source content, physical identifiers, byte
+/// offsets, clocks, or other ambient runtime state.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticPhase {
+    /// Commits the staged live-document transaction.
+    DocumentCommit,
+    /// Captures the persisted slide payloads before package publication.
+    BeforePayloadCapture,
+    /// Opens the append-only package editor over the working source.
+    EmbeddedOpen,
+    /// Reads the live document record and checks source consistency before
+    /// replacement.
+    LiveDocumentRead,
+    /// Finishes the append-only package editor.
+    EmbeddedFinish,
+    /// Checks that unrelated package streams were preserved.
+    UnrelatedStreamValidation,
+    /// Reopens the finished package through the public snapshot owner.
+    PublicReopen,
+    /// Captures persisted slide payloads after public reopen. The expected
+    /// payload comparison remains explicit residual commit work.
+    AfterPayloadCapture,
+    /// Computes the structural artifact digest before publication.
+    ArtifactHashBefore,
+    /// Computes the structural artifact digest after publication.
+    ArtifactHashAfter,
+    /// The staged live-document commit was an exact structural no-op; other
+    /// formatting owners may still have staged changes in the root
+    /// transaction.
+    StructuralNoOp,
+}
+
+/// Result class attached to a completed diagnostic phase.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticOutcome {
+    /// The phase completed and its enclosing operation continued.
+    Success,
+    /// The phase returned an ordinary typed operation error.
+    Error,
+}
+
+/// One ordered, content-free phase event emitted by a profiled operation.
+///
+/// Every started phase has one matching finished event, including phases that
+/// return an error. The observer is called synchronously in operation order;
+/// the library neither timestamps events nor consults ambient runtime state.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticEvent {
+    /// A phase is about to run.
+    Started { phase: DiagnosticPhase },
+    /// A phase has returned to its caller.
+    Finished {
+        phase: DiagnosticPhase,
+        outcome: DiagnosticOutcome,
+    },
+}
+
+#[cfg(feature = "performance-diagnostics")]
+fn observe_phase<T, Operation>(
+    observer: &mut impl FnMut(DiagnosticEvent),
+    phase: DiagnosticPhase,
+    operation: Operation,
+) -> Result<T>
+where
+    Operation: FnOnce() -> Result<T>,
+{
+    observer(DiagnosticEvent::Started { phase });
+    let result = operation();
+    observer(DiagnosticEvent::Finished {
+        phase,
+        outcome: if result.is_ok() {
+            DiagnosticOutcome::Success
+        } else {
+            DiagnosticOutcome::Error
+        },
+    });
+    result
+}
+
 #[derive(Clone, PartialEq, Eq)]
 struct Lineage(Arc<[u8]>);
 
@@ -2013,6 +2099,176 @@ impl Transaction {
             formatting_first: true,
             structural_before_artifact: artifact_hash(working.bytes()),
             structural_after_artifact: artifact_hash(snapshot.bytes()),
+        };
+        Ok(Commit { snapshot, patch })
+    }
+
+    /// Publishes the transaction while reporting deterministic, content-free
+    /// phase boundaries to an external observer.
+    ///
+    /// This is an opt-in diagnostic equivalent of [`Self::commit`]. It keeps
+    /// the ordinary commit implementation and all of its validation and
+    /// ownership rules unchanged. The observer is called synchronously in
+    /// operation order; this method does not timestamp events, retain event
+    /// data, or consult ambient runtime state. Each started phase is closed by
+    /// one matching finished event, including a phase that returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed error as [`Self::commit`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+        let document_commit = if self.structural.is_empty()
+            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+        {
+            observe_phase(&mut observer, DiagnosticPhase::DocumentCommit, || {
+                Ok(self.document.commit()?)
+            })?
+        } else {
+            observe_phase(&mut observer, DiagnosticPhase::DocumentCommit, || {
+                let mut rebased = self.working.document.edit();
+                replay_structural_changes(&mut rebased, &self.structural)?;
+                Ok(rebased.commit()?)
+            })?
+        };
+        let source = self.source;
+        let working = self.working;
+
+        if document_commit.patch().is_empty() {
+            observe_phase(&mut observer, DiagnosticPhase::StructuralNoOp, || Ok(()))?;
+            let patch = Patch {
+                before: source,
+                after: working.clone(),
+                changes: self.changes,
+                structural: self.structural,
+                visibility_changes: self.visibility_changes,
+                advance_changes: self.advance_changes,
+                transition_visual_changes: self.transition_visual_changes,
+                text_changes: self.text_changes,
+                anchor_changes: self.anchor_changes,
+                media_path_changes: self.media_path_changes,
+                media_playback_changes: self.media_playback_changes,
+                formatting: self.formatting,
+                formatting_first: true,
+                structural_before_artifact: observe_phase(
+                    &mut observer,
+                    DiagnosticPhase::ArtifactHashBefore,
+                    || Ok(artifact_hash(working.bytes())),
+                )?,
+                structural_after_artifact: observe_phase(
+                    &mut observer,
+                    DiagnosticPhase::ArtifactHashAfter,
+                    || Ok(artifact_hash(working.bytes())),
+                )?,
+            };
+            return Ok(Commit {
+                snapshot: working,
+                patch,
+            });
+        }
+
+        let before_slides =
+            observe_phase(&mut observer, DiagnosticPhase::BeforePayloadCapture, || {
+                persisted_slides(&working.bytes, &working.document)
+            })?;
+        let mut editor = observe_phase(&mut observer, DiagnosticPhase::EmbeddedOpen, || {
+            Ok(
+                crate::embedded::object::Editor::open_records_arc_with_limit(
+                    working.bytes.clone(),
+                    source.limits.max_package_bytes,
+                )?,
+            )
+        })?;
+        let _live = observe_phase(&mut observer, DiagnosticPhase::LiveDocumentRead, || {
+            let live = editor.persisted_record(source.document_persist_id)?;
+            if live.as_slice() != working.document.bytes() {
+                return Err(PackageError::Corrupted(
+                    "PPT slide-order transaction source changed before publication".into(),
+                )
+                .into());
+            }
+            Ok(live)
+        })?;
+        for (persist_id, record) in &self.inserted_records {
+            editor.insert_persisted_record(*persist_id, record.clone())?;
+        }
+        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let picture_stream = if self.inserted_pictures.is_empty() {
+            None
+        } else {
+            let (rewritten, pictures) =
+                append_transferred_pictures(&working, &document_bytes, &self.inserted_pictures)?;
+            document_bytes = rewritten;
+            Some(pictures)
+        };
+        editor.replace_persisted_record(source.document_persist_id, document_bytes)?;
+        if let Some(pictures) = picture_stream {
+            editor.replace_stream_by_name("Pictures", pictures)?;
+        }
+        let bytes = observe_phase(&mut observer, DiagnosticPhase::EmbeddedFinish, || {
+            Ok(editor.finish()?)
+        })?;
+        observe_phase(
+            &mut observer,
+            DiagnosticPhase::UnrelatedStreamValidation,
+            || {
+                if self.inserted_pictures.is_empty() {
+                    crate::font::validate_unrelated_streams(working.bytes(), &bytes)?;
+                } else {
+                    validate_unrelated_picture_publication(working.bytes(), &bytes)?;
+                }
+                Ok(())
+            },
+        )?;
+        let snapshot = observe_phase(&mut observer, DiagnosticPhase::PublicReopen, || {
+            Snapshot::from_bytes_with_limits(bytes, source.limits)
+        })?;
+        if snapshot.document.slides() != document_commit.snapshot().slides() {
+            return Err(PackageError::Corrupted(
+                "published PPT slide order did not round-trip through the live document".into(),
+            )
+            .into());
+        }
+        let after_slides =
+            observe_phase(&mut observer, DiagnosticPhase::AfterPayloadCapture, || {
+                persisted_slides(&snapshot.bytes, &snapshot.document)
+            })?;
+        let expected_slides = expected_persisted_slides(
+            document_commit.snapshot().slides(),
+            &before_slides,
+            &self.inserted_records,
+        )?;
+        if after_slides != expected_slides {
+            return Err(PackageError::Corrupted(
+                "PPT slide-order publication changed a slide payload record".into(),
+            )
+            .into());
+        }
+        validate_transferred_pictures(&snapshot, &self.inserted_pictures)?;
+        let patch = Patch {
+            before: source,
+            after: snapshot.clone(),
+            changes: self.changes,
+            structural: self.structural,
+            visibility_changes: self.visibility_changes,
+            advance_changes: self.advance_changes,
+            transition_visual_changes: self.transition_visual_changes,
+            text_changes: self.text_changes,
+            anchor_changes: self.anchor_changes,
+            media_path_changes: self.media_path_changes,
+            media_playback_changes: self.media_playback_changes,
+            formatting: self.formatting,
+            formatting_first: true,
+            structural_before_artifact: observe_phase(
+                &mut observer,
+                DiagnosticPhase::ArtifactHashBefore,
+                || Ok(artifact_hash(working.bytes())),
+            )?,
+            structural_after_artifact: observe_phase(
+                &mut observer,
+                DiagnosticPhase::ArtifactHashAfter,
+                || Ok(artifact_hash(snapshot.bytes())),
+            )?,
         };
         Ok(Commit { snapshot, patch })
     }
@@ -7677,5 +7933,262 @@ mod tests {
         ));
         assert!(edit.slide_advance_changes().is_empty());
         assert_eq!(edit.commit().unwrap().snapshot(), &source);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn started_phases(events: &[DiagnosticEvent]) -> Vec<DiagnosticPhase> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                DiagnosticEvent::Started { phase } => Some(*phase),
+                DiagnosticEvent::Finished { .. } => None,
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn assert_balanced_events(events: &[DiagnosticEvent]) {
+        assert_eq!(events.len() % 2, 0);
+        for pair in events.chunks_exact(2) {
+            let DiagnosticEvent::Started { phase } = pair[0] else {
+                panic!("diagnostic phase must start with Started")
+            };
+            let DiagnosticEvent::Finished {
+                phase: finished,
+                outcome: _,
+            } = pair[1]
+            else {
+                panic!("diagnostic phase must end with Finished")
+            };
+            assert_eq!(phase, finished);
+        }
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_commit_reports_the_fixed_phase_order_for_a_real_edit() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let mut ordinary_edit = source.edit().unwrap();
+        ordinary_edit
+            .remove_slide(Position::new(1))
+            .expect("fixture must have a second slide");
+        let ordinary = ordinary_edit.commit().unwrap();
+
+        let mut profiled_edit = source.edit().unwrap();
+        profiled_edit
+            .remove_slide(Position::new(1))
+            .expect("fixture must have a second slide");
+        let mut events = Vec::new();
+        let profiled = profiled_edit
+            .commit_profiled(|event| events.push(event))
+            .unwrap();
+
+        assert_balanced_events(&events);
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::BeforePayloadCapture,
+                DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::LiveDocumentRead,
+                DiagnosticPhase::EmbeddedFinish,
+                DiagnosticPhase::UnrelatedStreamValidation,
+                DiagnosticPhase::PublicReopen,
+                DiagnosticPhase::AfterPayloadCapture,
+                DiagnosticPhase::ArtifactHashBefore,
+                DiagnosticPhase::ArtifactHashAfter,
+            ]
+        );
+        assert!(events.iter().all(|event| {
+            matches!(
+                event,
+                DiagnosticEvent::Started { .. }
+                    | DiagnosticEvent::Finished {
+                        outcome: DiagnosticOutcome::Success,
+                        ..
+                    }
+            )
+        }));
+        assert_eq!(profiled, ordinary);
+        assert_eq!(
+            profiled.patch().apply(&source).unwrap(),
+            *profiled.snapshot()
+        );
+        assert_eq!(
+            profiled
+                .patch()
+                .inverse()
+                .apply(profiled.snapshot())
+                .unwrap(),
+            source
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_commit_preserves_formatting_only_output_and_patch() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let original = source.slide_hidden(Position::new(0)).unwrap();
+
+        let mut ordinary_edit = source.edit().unwrap();
+        ordinary_edit
+            .set_slide_hidden(Position::new(0), !original)
+            .unwrap();
+        let ordinary = ordinary_edit.commit().unwrap();
+
+        let mut profiled_edit = source.edit().unwrap();
+        profiled_edit
+            .set_slide_hidden(Position::new(0), !original)
+            .unwrap();
+        let mut events = Vec::new();
+        let profiled = profiled_edit
+            .commit_profiled(|event| events.push(event))
+            .unwrap();
+
+        assert_balanced_events(&events);
+        assert_eq!(profiled, ordinary);
+        assert_eq!(
+            profiled.patch().apply(&source).unwrap(),
+            *profiled.snapshot()
+        );
+        assert_eq!(
+            profiled
+                .patch()
+                .inverse()
+                .apply(profiled.snapshot())
+                .unwrap(),
+            source
+        );
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::StructuralNoOp,
+                DiagnosticPhase::ArtifactHashBefore,
+                DiagnosticPhase::ArtifactHashAfter,
+            ]
+        );
+        assert_ne!(profiled.snapshot().bytes(), source.bytes());
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_structural_noop_keeps_source_allocation_and_hash_behavior() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let ordinary = source.edit().unwrap().commit().unwrap();
+        let mut events = Vec::new();
+        let profiled = source
+            .edit()
+            .unwrap()
+            .commit_profiled(|event| events.push(event))
+            .unwrap();
+
+        assert_balanced_events(&events);
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::StructuralNoOp,
+                DiagnosticPhase::ArtifactHashBefore,
+                DiagnosticPhase::ArtifactHashAfter,
+            ]
+        );
+        assert_eq!(profiled, ordinary);
+        assert!(std::ptr::eq(
+            source.bytes().as_ptr(),
+            profiled.snapshot().bytes().as_ptr()
+        ));
+        assert_eq!(source.bytes().len(), profiled.snapshot().bytes().len());
+        assert!(profiled.patch().is_empty());
+        assert_eq!(
+            profiled.patch().apply(&source).unwrap(),
+            *profiled.snapshot()
+        );
+        assert_eq!(
+            profiled
+                .patch()
+                .inverse()
+                .apply(profiled.snapshot())
+                .unwrap(),
+            source
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_failure_closes_live_read_with_the_existing_typed_error() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        // Keep the staged document candidate while leaving the package bytes
+        // at the source artifact. This exercises the existing optimistic
+        // live-document guard.
+        edit.working.document = edit.document.snapshot().unwrap();
+        let mut events = Vec::new();
+        let error = edit
+            .commit_profiled(|event| events.push(event))
+            .unwrap_err();
+
+        assert_balanced_events(&events);
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::BeforePayloadCapture,
+                DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::LiveDocumentRead,
+            ]
+        );
+        assert!(matches!(
+            events.last(),
+            Some(DiagnosticEvent::Finished {
+                phase: DiagnosticPhase::LiveDocumentRead,
+                outcome: DiagnosticOutcome::Error,
+            })
+        ));
+        assert!(matches!(
+            error,
+            Error::Package(PackageError::Corrupted(message))
+                if message.contains("source changed before publication")
+        ));
+    }
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_missing_record_preserves_ordinary_error_and_closes_phase() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        // Inject an absent document record at the actual persisted read boundary.
+        // The working package and slide payloads remain valid.
+        edit.source.document_persist_id = u32::MAX;
+        let ordinary = edit.clone().commit().unwrap_err();
+        let mut events = Vec::new();
+        let profiled = edit
+            .commit_profiled(|event| events.push(event))
+            .unwrap_err();
+        assert_eq!(ordinary.to_string(), profiled.to_string());
+        for error in [ordinary, profiled] {
+            assert!(
+                matches!(error, Error::Package(PackageError::Corrupted(message))
+                if message == format!("unknown persist ID {}", u32::MAX))
+            );
+        }
+        assert_balanced_events(&events);
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::BeforePayloadCapture,
+                DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::LiveDocumentRead,
+            ]
+        );
+        assert_eq!(
+            events.last(),
+            Some(&DiagnosticEvent::Finished {
+                phase: DiagnosticPhase::LiveDocumentRead,
+                outcome: DiagnosticOutcome::Error,
+            })
+        );
     }
 }

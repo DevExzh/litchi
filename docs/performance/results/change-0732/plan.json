@@ -1,0 +1,214 @@
+{
+  "base_head": "5655594bf9452e533b8b6f09ee192d396be6c50d",
+  "cpu": 12,
+  "cycles": 3,
+  "repeats": 3,
+  "routes": [
+    "ordinary-opaque",
+    "ordinary-split",
+    "profiled-empty",
+    "profiled-clock"
+  ],
+  "samples": 50,
+  "warmups": 3,
+  "processes": 36,
+  "measured_lifecycles": 1800,
+  "observer_flag_percent": 5,
+  "schedule": [
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "route": "profiled-clock"
+    }
+  ],
+  "comparisons": [
+    [
+      "ordinary-opaque",
+      "ordinary-split"
+    ],
+    [
+      "ordinary-split",
+      "profiled-empty"
+    ],
+    [
+      "profiled-empty",
+      "profiled-clock"
+    ]
+  ],
+  "disposition": "native phase attribution only; no production optimization or speedup claim"
+}

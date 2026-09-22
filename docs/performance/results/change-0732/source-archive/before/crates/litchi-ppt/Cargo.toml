@@ -1,0 +1,52 @@
+[package]
+name = "litchi-ppt"
+description = "Typed legacy Microsoft PowerPoint reader and writer for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+sign = ["dep:litchi-sign", "litchi-opc/sign"]
+encryption = ["dep:litchi-crypto", "dep:rand"]
+vba-inspection = ["dep:litchi-vba"]
+formula = ["dep:litchi-formula"]
+fonts = ["dep:litchi-fonts"]
+font-subset = ["fonts", "litchi-fonts/subset"]
+font-discovery = ["fonts", "litchi-fonts/discovery"]
+automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
+
+[dependencies]
+bitflags           = { workspace = true }
+chrono             = { workspace = true }
+flate2             = { workspace = true }
+litchi-cfb         = { workspace = true }
+litchi-codepage    = { workspace = true }
+litchi-core        = { workspace = true }
+litchi-crypto      = { workspace = true, optional = true }
+litchi-formula     = { workspace = true, optional = true }
+litchi-fonts       = { workspace = true, optional = true }
+litchi-odraw       = { workspace = true }
+litchi-ograph      = { workspace = true }
+litchi-ole-common  = { workspace = true }
+litchi-opc         = { workspace = true }
+litchi-sign        = { workspace = true, optional = true }
+litchi-vba         = { workspace = true, optional = true }
+once_cell          = { workspace = true }
+quick-xml          = { workspace = true }
+rand               = { workspace = true, optional = true }
+serde_json         = { workspace = true }
+url                = { workspace = true }
+zerocopy           = { workspace = true }
+zerocopy-derive    = { workspace = true }
+zeroize            = { workspace = true }
+
+[dev-dependencies]
+sha1 = { workspace = true }
+soapberry-zip = { workspace = true }
+
+[lints]
+workspace = true

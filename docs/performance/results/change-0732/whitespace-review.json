@@ -1,0 +1,13 @@
+{
+  "status": "passed with raw-log exceptions",
+  "reason": "Preserve exact hashed Cargo output, including terminal blank lines; no log normalization.",
+  "raw_log_exceptions": [
+    "docs/performance/results/change-0732/quality-0/2.log:1607: new blank line at EOF.",
+    "docs/performance/results/change-0732/quality-1/2.log:1517: new blank line at EOF.",
+    "docs/performance/results/change-0732/quality-2/2.log:1516: new blank line at EOF.",
+    "docs/performance/results/change-0732/quality-2/7.log:17: new blank line at EOF.",
+    "docs/performance/results/change-0732/quality-3/2.log:1516: new blank line at EOF.",
+    "docs/performance/results/change-0732/quality-3/7.log:17: new blank line at EOF."
+  ],
+  "all_other_staged_files_check_exit": 0
+}
