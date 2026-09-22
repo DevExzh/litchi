@@ -199,6 +199,33 @@ fn preserves_opaque_fields_unknown_obj_subrecords_padding_and_record_order() {
     );
 }
 
+/// Several comment objects without a NOTE are refused by naming the lowest
+/// object id, on every open: the choice must not follow hash iteration order.
+#[test]
+fn unmatched_comment_objects_are_refused_deterministically() {
+    fn complete_object(collector: &mut CommentCollector, object_id: u16) {
+        collector.feed_record(OBJ_TYPE, &obj(object_id)).unwrap();
+        collector
+            .feed_record(MSODRAWING_TYPE, &client_textbox())
+            .unwrap();
+        collector.feed_record(TXO_TYPE, &txo(1, 16)).unwrap();
+        collector.feed_record(CONTINUE_TYPE, b"\0A").unwrap();
+        collector.feed_record(CONTINUE_TYPE, &runs(1)).unwrap();
+    }
+    for _ in 0..32 {
+        let mut collector = CommentCollector::new();
+        for object_id in [40, 9, 23, 17] {
+            complete_object(&mut collector, object_id);
+        }
+        collector.feed_record(RECORD_TYPE, &note(23, 0)).unwrap();
+        let error = collector.finish().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid data: comment OBJ 9 has no matching NOTE"
+        );
+    }
+}
+
 #[test]
 fn enforces_record_and_opaque_payload_bounds() {
     assert!(CommentRecord::new(RecordKind::Note, &vec![0; MAX_RECORD_BYTES + 1]).is_err());
