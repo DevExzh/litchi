@@ -1,0 +1,44 @@
+[
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--mode",
+      "structural"
+    ],
+    "exit": 0,
+    "started": 1790090718.926552,
+    "ended": 1790090718.9726925,
+    "log": "gate-0.log",
+    "log_sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_report_claim_classification.py"
+    ],
+    "exit": 0,
+    "started": 1790090718.9727924,
+    "ended": 1790090719.0254,
+    "log": "gate-1.log",
+    "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "exit": 0,
+    "started": 1790090719.0254993,
+    "ended": 1790090719.072007,
+    "log": "gate-2.log",
+    "log_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d"
+  }
+]

@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 0739 — owned cross-copy lifecycle observations, no index promotion
+
+[0739](0739-pptx-cross-copy-current-baseline.md) supplies fresh descriptive
+plain/media-rich **owned** PPTX lifecycle and allocation observations. The
+index's cross-document rows instead map source-backed selectors plus a
+non-lifecycle media selector. Those correctness-only rows remain unchanged;
+this packet does not establish their timing contract, independent Office
+compatibility, or complete cross-document CRUD coverage.
+
 ## 0681: current selector inventory supersedes the 0587 missing-selector list
 
 The historical 0587 section below describes its own revision. Source inspection

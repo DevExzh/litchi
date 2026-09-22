@@ -1,0 +1,15 @@
+{
+  "removed": "/home/zhuhe/code/litchi-target-0739",
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline",
+      "sha256": "0547de51f141a09cc24bd91cdaddf3926a52d8303bbff6f447de5eba12e74c11",
+      "bytes": 62939968
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline-alloc",
+      "sha256": "4489face978f34bc9428874c2853027afca2624720350c6aa536696a75667709",
+      "bytes": 62828536
+    }
+  ]
+}
