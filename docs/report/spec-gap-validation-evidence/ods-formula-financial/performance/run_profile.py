@@ -170,10 +170,14 @@ def source_files(source_root: Path) -> list[Path]:
 
 
 def source_snapshot(source_root: Path, profile_hashes: dict[str, str]) -> dict[str, Any]:
+    example = source_root / EXAMPLE_REL
+    if not example.is_file():
+        raise RuntimeError(f"financial profile example is missing from source snapshot: {example}")
     selected = {
         str(path.relative_to(source_root)): digest(path)
         for path in source_files(source_root)
     }
+    selected[str(EXAMPLE_REL)] = digest(example)
     return {
         "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source_root, text=True).strip(),
         "source_sha256": selected,
@@ -183,34 +187,52 @@ def source_snapshot(source_root: Path, profile_hashes: dict[str, str]) -> dict[s
 
 
 def stage_example(source_root: Path) -> Path | None:
+    source = ROOT / EXAMPLE_REL
+    if not source.is_file():
+        raise RuntimeError(f"financial profile example is missing from root: {source}")
     destination = source_root / EXAMPLE_REL
-    if destination.is_file():
+    if destination.exists() or destination.is_symlink():
+        if not destination.is_file():
+            raise RuntimeError(f"financial profile example destination is not a file: {destination}")
+        expected = digest(source)
+        observed = digest(destination)
+        if observed != expected:
+            raise RuntimeError(
+                f"existing financial profile example differs from root: {destination}"
+            )
         return None
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / EXAMPLE_REL, destination)
+    shutil.copy2(source, destination)
+    if digest(destination) != digest(source):
+        destination.unlink(missing_ok=True)
+        raise RuntimeError(f"staged financial profile example failed hash verification: {destination}")
     return destination
 
 
 def build_binary(source_root: Path, label: str, output_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
-    staged = stage_example(source_root)
-    target = Path(tempfile.mkdtemp(prefix=f"litchi-ods-financial-{label}-", dir="/var/tmp"))
-    env = os.environ.copy()
-    env.update({"CARGO_TARGET_DIR": str(target), "CARGO_TERM_COLOR": "never"})
-    manifest = source_root / "crates/litchi-ods/Cargo.toml"
-    command = [
-        "cargo", "build", "--locked", "--offline", "--manifest-path", str(manifest),
-        "--example", "ods_formula_financial_profile", "--release",
-    ]
-    log = output_dir / f"{label}-build.log"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    staged: Path | None = None
+    target: Path | None = None
+    succeeded = False
     try:
+        staged = stage_example(source_root)
+        target = Path(tempfile.mkdtemp(prefix=f"litchi-ods-financial-{label}-", dir="/var/tmp"))
+        env = os.environ.copy()
+        env.update({"CARGO_TARGET_DIR": str(target), "CARGO_TERM_COLOR": "never"})
+        manifest = source_root / "crates/litchi-ods/Cargo.toml"
+        command = [
+            "cargo", "build", "--locked", "--offline", "--manifest-path", str(manifest),
+            "--example", "ods_formula_financial_profile", "--release",
+        ]
+        log = output_dir / f"{label}-build.log"
+        output_dir.mkdir(parents=True, exist_ok=True)
         with log.open("w", encoding="utf-8") as stream:
             completed = subprocess.run(command, cwd=source_root, env=env, stdout=stream, stderr=subprocess.STDOUT)
         if completed.returncode != 0:
             raise RuntimeError(f"{label} build failed ({completed.returncode}); see {log}")
-        binary = target / "release" / BINARY_NAME
+        binary = target / "release" / "examples" / BINARY_NAME
         if not binary.is_file():
             raise RuntimeError(f"{label} build omitted {binary}")
+        succeeded = True
         return binary, target, {
             "command": command,
             "cwd": str(source_root),
@@ -219,6 +241,8 @@ def build_binary(source_root: Path, label: str, output_dir: Path) -> tuple[Path,
             "build_log": str(log.relative_to(output_dir)),
         }
     finally:
+        if not succeeded and target is not None:
+            shutil.rmtree(target, ignore_errors=True)
         if staged is not None:
             staged.unlink(missing_ok=True)
 
@@ -282,6 +306,7 @@ def preflight(binary: Path, source_root: Path, rows: list[dict[str, Any]], outpu
 
 def rss_kib(path: Path) -> int | None:
     for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
         if line.startswith("Maximum resident set size (kbytes):"):
             return int(line.split(":", 1)[1].strip())
     return None
