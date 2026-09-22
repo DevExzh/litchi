@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "shared_scalar_statistics": 532,
+  "tolerance": 1e-10,
+  "processes": 36,
+  "samples": 1800,
+  "pairs": 18
+}
