@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "meaning": "Fresh 0735 before allocation counters agree with retained 0734 candidate qualification counters. This is a continuity check, not a cumulative latency claim.",
+  "cases": [
+    {
+      "case": "primary",
+      "allocation_counters_identical": true,
+      "counters": {
+        "allocated_bytes": 11391768,
+        "deallocated_bytes": 11001624,
+        "allocation_calls": 5658,
+        "peak_live_bytes": 1992885,
+        "retained_bytes": 390144
+      }
+    },
+    {
+      "case": "secondary",
+      "allocation_counters_identical": true,
+      "counters": {
+        "allocated_bytes": 10444631,
+        "deallocated_bytes": 10159447,
+        "allocation_calls": 18662,
+        "peak_live_bytes": 1976223,
+        "retained_bytes": 285184
+      }
+    }
+  ]
+}

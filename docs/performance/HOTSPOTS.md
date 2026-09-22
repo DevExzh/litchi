@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0735 — resolve the staging regression before retrying
+
+[0735](0735-ppt-record-staging-without-editor-clone.md) disproves unconditional
+retention of clone-free record staging under the measured two-fixture workload:
+primary paired p50 −3.53%, secondary +6.34%, no peak-memory improvement.
+The allocation reduction is real, but it does not establish an overall latency
+win. Production is restored without fixture-specific behavior. Next qualify
+native-phase and allocator-lifecycle/oracle-cadence controls on the secondary;
+the crossing distributions do not by themselves prove any causal mechanism.
+Insertion throughput and multi-record scaling remain unmeasured. The broader
+non-iWork goal stays active.
+
 ## 0734 — PPT writer payload copies removed
 
 [0734](0734-ppt-owned-stream-handoff.md) retains existing-vector handoff into

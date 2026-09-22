@@ -1,0 +1,11 @@
+{
+  "analysis_identical": true,
+  "audit_statistics_identical": true,
+  "captures": 97,
+  "constraints": 34,
+  "fixtures": 2,
+  "reversion": "verified",
+  "shadow_removed": true,
+  "source_files": 7206,
+  "status": "passed"
+}

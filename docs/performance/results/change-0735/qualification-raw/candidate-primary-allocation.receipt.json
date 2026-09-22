@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0735-bin/candidate-ole_format_save_probe_alloc",
+    "--case",
+    "ppt45543",
+    "--input",
+    "test-data/poi/test-data/slideshow/45543.ppt",
+    "--operation",
+    "format",
+    "--samples",
+    "1",
+    "--warmups",
+    "0"
+  ],
+  "exit_code": 0,
+  "output": "qualification-raw/candidate-primary-allocation.json",
+  "sha256": "d97265c270fa4e51f0c0ce79d3ae0925e8b4caa3c3ef80d9e61ae5f0220b7a88",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

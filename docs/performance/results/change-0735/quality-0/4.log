@@ -1,0 +1,30 @@
+    Finished `release` profile [optimized] target(s) in 0.11s
+   Doc-tests litchi_ppt
+
+running 22 tests
+test crates/litchi-ppt/src/lib.rs - (line 2) - compile ... ok
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_geometry_rect (line 253) ... ignored
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_vertices (line 315) ... ignored
+test crates/litchi-ppt/src/shapes/picture.rs - shapes::picture::PictureShape (line 39) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new (line 521) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new_borrowed (line 561) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::set_text_margins (line 647) ... ignored
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation (line 120) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::presentation (line 144) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_reader (line 56) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-ppt/src/package/model.rs - package::model::Package (line 246) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation::images (line 1278) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 108) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 6.83s; merged doctests compilation took 6.82s

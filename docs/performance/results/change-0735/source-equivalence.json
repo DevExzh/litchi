@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "before_sha256": "06ec08f367a1d1f72544d91cac5f4764f7c8b5ef0f869c1aeb3f445a59f5940e",
+  "after_sha256": "858bd401710d8aa780222b6edde3d0538f6d884252c4dd83300cc0bc723a0b69",
+  "functions": [
+    {
+      "function": "replace_persisted_record",
+      "validation_prefix_bytes": 602,
+      "validation_prefix_sha256": "2a27f2b8c78a8e57f59e480249a08225d8ccf608213ca663c722b36d06c33a4d",
+      "byte_identical": true
+    },
+    {
+      "function": "insert_persisted_record",
+      "validation_prefix_bytes": 704,
+      "validation_prefix_sha256": "72b9d4232341c8d69d0703528ffb06b08157d49417ff05aa3d0c05529ed5e7ec",
+      "byte_identical": true
+    }
+  ],
+  "interpretation": "Every typed validation branch and its ordering is byte-identical; only the post-validation ownership transition changes. Allocation abort/panic is not a recoverable Result."
+}

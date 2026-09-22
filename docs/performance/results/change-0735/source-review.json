@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "status": "approved_for_measurement",
+  "blocking_findings": [],
+  "findings": [
+    {
+      "id": "validation-order",
+      "severity": "pass",
+      "summary": "Replacement and insertion retain their identity, removal, range, size, and complete-framing checks in the baseline order, with all typed refusals before editor mutation."
+    },
+    {
+      "id": "post-validation-work",
+      "severity": "pass",
+      "summary": "After validation each function only transfers the owned Vec into BTreeMap::insert, updates the changed bool, and returns Ok; no fallible Result operation or publication work remains."
+    },
+    {
+      "id": "allocation-and-panic-model",
+      "severity": "advisory",
+      "summary": "Map insertion can still encounter process-level allocation failure, as could the old clone path; the candidate neither promises panic recovery nor relabels this as Error::AllocationFailed."
+    },
+    {
+      "id": "callsite-atomicity",
+      "severity": "pass",
+      "summary": "Public staging intentionally mutates its transaction-local Editor on success; traced internal callers use local or cloned candidates and preserve source publication atomicity when later typed work fails."
+    },
+    {
+      "id": "focused-refusal-coverage",
+      "severity": "pass",
+      "summary": "Focused tests exercise unknown, removed, unavailable, too-short, malformed, trailing, and oversized refusals with exhaustive editor-state comparisons, plus successful old-transition and output-byte comparisons."
+    }
+  ],
+  "base_head": "fdd63ee3867c4a4ab4c7b96c5374e68284f22319",
+  "files": {
+    "baseline": {
+      "path": "docs/performance/results/change-0735/source-archive/before/crates/litchi-ppt/src/embedded/object/editor/mutation/records.rs",
+      "sha256": "06ec08f367a1d1f72544d91cac5f4764f7c8b5ef0f869c1aeb3f445a59f5940e"
+    },
+    "candidate": {
+      "path": "docs/performance/results/change-0735/candidate/crates/litchi-ppt/src/embedded/object/editor/mutation/records.rs",
+      "sha256": "0fe5168733248170e4d7bbedea39d348bae402177431649f430118c808f30264"
+    },
+    "live_formatted": {
+      "path": "crates/litchi-ppt/src/embedded/object/editor/mutation/records.rs",
+      "sha256": "858bd401710d8aa780222b6edde3d0538f6d884252c4dd83300cc0bc723a0b69"
+    },
+    "after_archive": {
+      "path": "docs/performance/results/change-0735/source-archive/after/crates/litchi-ppt/src/embedded/object/editor/mutation/records.rs",
+      "sha256": "858bd401710d8aa780222b6edde3d0538f6d884252c4dd83300cc0bc723a0b69"
+    },
+    "source_equivalence": {
+      "path": "docs/performance/results/change-0735/source-equivalence.json",
+      "sha256": "311f5bb42125529c243cddb1a079cb5f3454d4f3d5f4925e1392f717f6658761"
+    },
+    "source_guard": {
+      "path": "docs/performance/results/change-0735/source-guard.py",
+      "sha256": "112b24f41f3fc5140de6339cc516bdc984c175a3e5be0ecb37993c3e9aa5e2cf"
+    },
+    "implementation_notes": {
+      "path": "docs/performance/results/change-0735/candidate/implementation-notes.md",
+      "sha256": "9d62167489ef938475dec98f4e8feb9d873114f6358d8d1d23a5553f0b9cf1aa"
+    }
+  },
+  "source_equivalence": {
+    "production_files_reviewed": 1,
+    "production_files_edited_by_reviewer": 0,
+    "after_archive_matches_live": true,
+    "live_matches_candidate_after_rustfmt": true
+  },
+  "adr_hashes": {
+    "docs/adr/0001-priorities-and-api-layers.md": "813bf4faf62cedac56fbfa3bf9b7600121b42a3ed5d4cec0028f8c8f2ac2798e",
+    "docs/adr/0002-crate-topology.md": "73f4372ef6948f5a36c83fbf27a96f0b1f680225f331f201c470e04913417719",
+    "docs/adr/0003-snapshots-edits-and-patches.md": "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+    "docs/adr/0005-io-memory-and-performance.md": "bf18abe9b3cebf9602db31e7da6ddf3c23c0c8e35a4e302897d3b678c23bb397",
+    "docs/adr/0006-validation-security-and-compatibility.md": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+    "docs/adr/0008-migration-and-verification.md": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+    "docs/adr/0010-facade-archive-ownership.md": "4e1af2c4019842d187804f8356299aa80ba8a6abd8d35a4a021e1bce3c2a6590",
+    "docs/adr/0011-ooxml-physical-package-ownership.md": "3a1644536af0b66fed47c1a154e829c0e0008cccb89dec679a0328036d305e04",
+    "docs/adr/0024-current-topology.md": "bdeefc52ba2486ca307c378e1081baafac5565c327b622981782f1aed74c55ce"
+  },
+  "constraints_sha256": "13fbdce87065a406b83b58f85ca2f32668a49f4b8306f5012afd2a3092a20863"
+}
