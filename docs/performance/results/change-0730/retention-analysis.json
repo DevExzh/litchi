@@ -1,0 +1,710 @@
+{
+  "processes": [
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 587776,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": 587776,
+          "after": 587776,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 587776,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 36864,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": 36864,
+          "after": 36864,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 36864,
+      "allocation": null
+    },
+    {
+      "lane": "ordinary",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": null
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 15512580,
+        "deallocated_bytes": 15170052,
+        "allocation_calls": 15756,
+        "peak_live_bytes": 3128190,
+        "retained_bytes": 342528
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 587776,
+      "allocation": {
+        "allocated_bytes": 14115027,
+        "deallocated_bytes": 13772499,
+        "allocation_calls": 15141,
+        "peak_live_bytes": 3128190,
+        "retained_bytes": 342528
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 15512580,
+        "deallocated_bytes": 15170052,
+        "allocation_calls": 15756,
+        "peak_live_bytes": 3128190,
+        "retained_bytes": 342528
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 18795707,
+        "deallocated_bytes": 18442427,
+        "allocation_calls": 18380,
+        "peak_live_bytes": 3182172,
+        "retained_bytes": 353280
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": 587776,
+          "after": 587776,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 587776,
+      "allocation": {
+        "allocated_bytes": 17387098,
+        "deallocated_bytes": 17033818,
+        "allocation_calls": 17765,
+        "peak_live_bytes": 3714077,
+        "retained_bytes": 353280
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": 587776,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 18795707,
+        "deallocated_bytes": 18442427,
+        "allocation_calls": 18380,
+        "peak_live_bytes": 3182172,
+        "retained_bytes": 353280
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 1061429,
+        "deallocated_bytes": 1033781,
+        "allocation_calls": 1907,
+        "peak_live_bytes": 209515,
+        "retained_bytes": 27648
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 36864,
+      "allocation": {
+        "allocated_bytes": 936223,
+        "deallocated_bytes": 908575,
+        "allocation_calls": 1658,
+        "peak_live_bytes": 209515,
+        "retained_bytes": 27648
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 0,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 1061429,
+        "deallocated_bytes": 1033781,
+        "allocation_calls": 1907,
+        "peak_live_bytes": 209515,
+        "retained_bytes": 27648
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "zero",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": null,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": null,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 1343516,
+        "deallocated_bytes": 1314844,
+        "allocation_calls": 2447,
+        "peak_live_bytes": 236249,
+        "retained_bytes": 28672
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "default",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": 36864,
+          "after": 36864,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": 36864,
+      "allocation": {
+        "allocated_bytes": 1217121,
+        "deallocated_bytes": 1188449,
+        "allocation_calls": 2198,
+        "peak_live_bytes": 273113,
+        "retained_bytes": 28672
+      }
+    },
+    {
+      "lane": "allocation",
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "release",
+      "stages": [
+        {
+          "stage": 1,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        },
+        {
+          "stage": 2,
+          "before": null,
+          "after": 36864,
+          "after_release": null
+        }
+      ],
+      "final_retained_before_commit": null,
+      "allocation": {
+        "allocated_bytes": 1343516,
+        "deallocated_bytes": 1314844,
+        "allocation_calls": 2447,
+        "peak_live_bytes": 236249,
+        "retained_bytes": 28672
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "default",
+      "percent_changes": {
+        "allocated_bytes": -9.009159018035684,
+        "deallocated_bytes": -9.212578836249207,
+        "allocation_calls": -3.903274942878898,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    },
+    {
+      "case": "docfloat",
+      "edits": "one",
+      "retention": "release",
+      "percent_changes": {
+        "allocated_bytes": 0.0,
+        "deallocated_bytes": 0.0,
+        "allocation_calls": 0.0,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    },
+    {
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "default",
+      "percent_changes": {
+        "allocated_bytes": -7.4943123980385495,
+        "deallocated_bytes": -7.637872173765414,
+        "allocation_calls": -3.346028291621328,
+        "peak_live_bytes": 16.715155560415962,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": true
+    },
+    {
+      "case": "docfloat",
+      "edits": "two",
+      "retention": "release",
+      "percent_changes": {
+        "allocated_bytes": 0.0,
+        "deallocated_bytes": 0.0,
+        "allocation_calls": 0.0,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    },
+    {
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "default",
+      "percent_changes": {
+        "allocated_bytes": -11.795984469992815,
+        "deallocated_bytes": -12.111462679232831,
+        "allocation_calls": -13.057157839538547,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    },
+    {
+      "case": "docnohf",
+      "edits": "one",
+      "retention": "release",
+      "percent_changes": {
+        "allocated_bytes": 0.0,
+        "deallocated_bytes": 0.0,
+        "allocation_calls": 0.0,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    },
+    {
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "default",
+      "percent_changes": {
+        "allocated_bytes": -9.40777780093427,
+        "deallocated_bytes": -9.612927465159359,
+        "allocation_calls": -10.175725378013901,
+        "peak_live_bytes": 15.603875571960103,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": true
+    },
+    {
+      "case": "docnohf",
+      "edits": "two",
+      "retention": "release",
+      "percent_changes": {
+        "allocated_bytes": 0.0,
+        "deallocated_bytes": 0.0,
+        "allocation_calls": 0.0,
+        "peak_live_bytes": 0.0,
+        "retained_bytes": 0.0
+      },
+      "peak_live_flag_over_5pct": false
+    }
+  ]
+}

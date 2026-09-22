@@ -528,19 +528,231 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
         sequential
     );
 
+    let mut rendered_editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("rendered editor should open");
+    let rendered = rendered_editor
+        .put_streams_shared_with_rendered([
+            (word_path.as_slice(), Arc::clone(&word)),
+            (preview_path.as_slice(), Arc::clone(&preview)),
+        ])
+        .expect("rendered batch should commit")
+        .expect("effective batch should return rendered bytes");
+    assert_eq!(
+        rendered,
+        rendered_editor
+            .clone()
+            .finish()
+            .expect("rendered editor should finish")
+    );
+    assert!(Arc::ptr_eq(
+        &word,
+        &rendered_editor
+            .stream_shared(&word_path)
+            .expect("rendered WordDocument should remain available")
+    ));
+    assert!(Arc::ptr_eq(
+        &preview,
+        &rendered_editor
+            .stream_shared(&preview_path)
+            .expect("rendered preview should remain available")
+    ));
+
+    let current_word = rendered_editor
+        .stream_shared(&word_path)
+        .expect("current WordDocument should be available");
+    assert!(
+        rendered_editor
+            .put_streams_shared_with_rendered([(word_path.as_slice(), Arc::clone(&current_word),)])
+            .expect("all-no-op rendered batch should succeed")
+            .is_none()
+    );
+    assert!(rendered_editor.is_changed());
+
     let missing_path = vec!["missing".to_string()];
     let mut failed = Editor::open(original.clone(), selected, Limits::default())
         .expect("second editor should open");
+    let failed_word = failed
+        .stream_shared(&word_path)
+        .expect("failed editor WordDocument should be available");
     assert!(
         failed
-            .put_streams_shared([
+            .put_streams_shared_with_rendered([
                 (word_path.as_slice(), Arc::clone(&word)),
                 (missing_path.as_slice(), Arc::clone(&preview)),
             ])
             .is_err()
     );
     assert!(!failed.is_changed());
+    assert!(Arc::ptr_eq(
+        &failed_word,
+        &failed
+            .stream_shared(&word_path)
+            .expect("failed batch must preserve WordDocument")
+    ));
     assert_eq!(failed.finish().expect("failed batch stays exact"), original);
+}
+
+#[test]
+fn rendered_batch_preserves_repeated_path_last_value() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let word_path = vec!["WordDocument".to_string()];
+    let first: Arc<[u8]> = Arc::from(&b"first repeated value"[..]);
+    let second: Arc<[u8]> = Arc::from(&b"last repeated value"[..]);
+    let mut editor =
+        Editor::open(original, Targets::default(), Limits::default()).expect("editor should open");
+
+    let rendered = editor
+        .put_streams_shared_with_rendered([
+            (word_path.as_slice(), Arc::clone(&first)),
+            (word_path.as_slice(), Arc::clone(&second)),
+        ])
+        .expect("repeated-path batch should commit")
+        .expect("effective repeated-path batch should render");
+
+    assert_eq!(editor.stream(&word_path), Some(second.as_ref()));
+    assert!(Arc::ptr_eq(
+        &second,
+        &editor
+            .stream_shared(&word_path)
+            .expect("last repeated value should be installed")
+    ));
+    assert_eq!(
+        rendered,
+        editor
+            .clone()
+            .finish()
+            .expect("repeated-path editor should finish")
+    );
+
+    let mut restored = Editor::open(
+        doc_with_object(&[0, 0, 0, 0]),
+        Targets::default(),
+        Limits::default(),
+    )
+    .expect("restored editor should open");
+    let original_word = restored
+        .stream_shared(&word_path)
+        .expect("restored editor WordDocument should be available");
+    let rendered = restored
+        .put_streams_shared_with_rendered([
+            (word_path.as_slice(), Arc::clone(&first)),
+            (word_path.as_slice(), Arc::clone(&original_word)),
+        ])
+        .expect("restore batch should succeed");
+    assert!(rendered.is_some());
+    assert!(restored.is_changed());
+    assert!(Arc::ptr_eq(
+        &original_word,
+        &restored
+            .stream_shared(&word_path)
+            .expect("restored value should be installed")
+    ));
+}
+
+#[test]
+fn rendered_batch_empty_and_equal_inputs_return_none_without_publication() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let word_path = vec!["WordDocument".to_string()];
+    let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
+        .expect("editor should open");
+    let original_word = editor
+        .stream_shared(&word_path)
+        .expect("original WordDocument should be available");
+
+    assert!(
+        editor
+            .put_streams_shared_with_rendered(std::iter::empty::<(&[String], Arc<[u8]>)>())
+            .expect("empty batch should succeed")
+            .is_none()
+    );
+    assert!(!editor.is_changed());
+    assert!(Arc::ptr_eq(
+        &original_word,
+        &editor
+            .stream_shared(&word_path)
+            .expect("empty batch should preserve WordDocument")
+    ));
+
+    assert!(
+        editor
+            .put_streams_shared_with_rendered([(word_path.as_slice(), Arc::clone(&original_word))])
+            .expect("equal batch should succeed")
+            .is_none()
+    );
+    assert!(!editor.is_changed());
+    assert!(Arc::ptr_eq(
+        &original_word,
+        &editor
+            .stream_shared(&word_path)
+            .expect("equal batch should preserve WordDocument")
+    ));
+    assert_eq!(
+        editor.finish().expect("no-op batch should stay exact"),
+        original
+    );
+}
+
+#[test]
+fn rendered_batch_checks_max_streams_before_equal_repeated_items() {
+    let original = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], b"source")
+            .expect("source stream should write");
+    });
+    let limits = Limits {
+        max_streams: 1,
+        ..Limits::default()
+    };
+    let path = vec!["A".to_string()];
+    let mut editor = Editor::open(original.clone(), Targets::default(), limits)
+        .expect("bounded editor should open");
+    let current = editor
+        .stream_shared(&path)
+        .expect("bounded source stream should be available");
+
+    assert!(
+        editor
+            .put_streams_shared_with_rendered([
+                (path.as_slice(), Arc::clone(&current)),
+                (path.as_slice(), Arc::clone(&current)),
+            ])
+            .is_err()
+    );
+    assert!(!editor.is_changed());
+    assert!(Arc::ptr_eq(
+        &current,
+        &editor
+            .stream_shared(&path)
+            .expect("count failure should preserve source stream")
+    ));
+    assert_eq!(
+        editor.finish().expect("count failure should stay exact"),
+        original
+    );
+}
+
+#[test]
+fn rendered_batch_matches_recomputed_output_under_both_layout_policies() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let path = vec!["WordDocument".to_string()];
+    let replacement: Arc<[u8]> = Arc::from(&b"layout policy replacement"[..]);
+
+    for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
+        let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
+            .expect("editor should open");
+        editor.set_sector_layout_policy(policy);
+        let rendered = editor
+            .put_streams_shared_with_rendered([(path.as_slice(), Arc::clone(&replacement))])
+            .expect("layout-policy batch should commit")
+            .expect("effective layout-policy batch should render");
+        assert_eq!(
+            rendered,
+            editor
+                .clone()
+                .finish()
+                .expect("layout-policy editor should finish")
+        );
+    }
 }
 
 #[test]

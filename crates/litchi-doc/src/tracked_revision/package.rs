@@ -881,6 +881,22 @@ fn containing_papx(runs: &[PapxRun], fc: u32) -> Option<&PapxRun> {
     runs.get(index).filter(|run| fc < run.end)
 }
 
+/// A rendered CFB handoff retained by the owning DOC transaction.
+///
+/// Cloning a revision editor deliberately drops this value.  Every mutation
+/// is clone-first, so a candidate can never inherit a render belonging to the
+/// source state, and cloning an editor never copies or shares a caller-owned
+/// retention token.
+#[derive(Default)]
+struct RetainedRender(Option<Vec<u8>>);
+
+impl Clone for RetainedRender {
+    fn clone(&self) -> Self {
+        let _had_render = self.0.is_some();
+        Self(None)
+    }
+}
+
 #[derive(Clone)]
 pub struct RevisionEditor {
     package: ObjectEditor,
@@ -899,6 +915,8 @@ pub struct RevisionEditor {
     main_ccp: u32,
     data_changed: bool,
     changed: bool,
+    retained_render_limit: usize,
+    retained_render: RetainedRender,
 }
 
 impl RevisionEditor {
@@ -1037,6 +1055,8 @@ impl RevisionEditor {
             main_ccp,
             data_changed: false,
             changed: false,
+            retained_render_limit: 0,
+            retained_render: RetainedRender::default(),
         };
         if editor.revisions()?.len() > MAX_REVISIONS {
             return Err(corrupted("revision count exceeds resource limit"));
@@ -1047,6 +1067,33 @@ impl RevisionEditor {
     #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// Configures the finite owner-side ceiling for one already-rendered
+    /// handoff. A zero ceiling releases any held render and disables
+    /// retention. The ordinary tracked-revision API leaves this at zero.
+    pub(crate) fn set_retained_render_limit(&mut self, limit: usize) {
+        self.retained_render_limit = limit;
+        if limit == 0
+            || self
+                .retained_render
+                .0
+                .as_ref()
+                .is_some_and(|rendered| rendered.capacity() > limit)
+        {
+            self.retained_render.0 = None;
+        }
+    }
+
+    /// Returns the allocation capacity held by the validated render, if any.
+    #[must_use]
+    pub(crate) fn retained_render_capacity(&self) -> Option<usize> {
+        self.retained_render.0.as_ref().map(Vec::capacity)
+    }
+
+    /// Releases the retained render without changing the editor's meaning.
+    pub(crate) fn release_retained_render(&mut self) {
+        self.retained_render.0 = None;
     }
 
     #[must_use]
@@ -1799,7 +1846,7 @@ impl RevisionEditor {
         start: u32,
         end: u32,
         graph: &PictureGraph,
-    ) -> Result<PictureGraph> {
+    ) -> Result<Option<PictureGraph>> {
         validate_range(start, end, self.main_ccp)?;
         self.reject_destructive_interactions(start, end)?;
         if !self.has_empty_picture_graph()? {
@@ -1880,13 +1927,16 @@ impl RevisionEditor {
                 &graph.dgg_info,
             )?;
         }
-        candidate.patch_sizes()?;
-        candidate.commit()?;
-        *self = candidate;
         let mut installed = graph.clone();
         installed.replaced_grpprl = Some(replaced_grpprl);
         installed.data_offset = Some(picture_offset);
-        Ok(installed)
+        if graph.data_offset.is_some() && installed != *graph {
+            return Ok(None);
+        }
+        candidate.patch_sizes()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(Some(installed))
     }
 
     /// Removes one graph installed by [`Self::replace_with_picture_graph`] and
@@ -2300,7 +2350,10 @@ impl RevisionEditor {
     /// renders changed saves with its default
     /// [`litchi_cfb::SectorLayoutPolicy::Reuse`] policy. This is the ordinary tracked
     /// revision save route; callers do not need to opt into the CFB policy.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub fn finish(mut self) -> Result<Vec<u8>> {
+        if let Some(rendered) = self.retained_render.0.take() {
+            return Ok(rendered);
+        }
         self.package.finish().map_err(PackageError::from)
     }
 
@@ -2646,6 +2699,11 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
+        // The package mutation below invalidates every render for the prior
+        // editor state, including the Data-stream add path. Mutation callers
+        // are clone-first, but clearing here keeps the ownership rule local
+        // to the sole package publication boundary as well.
+        self.release_retained_render();
         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
         replacements.push((
             self.word_path.as_slice(),
@@ -2667,9 +2725,13 @@ impl RevisionEditor {
                     .map_err(PackageError::from)?;
             }
         }
-        self.package
-            .put_streams_shared(replacements)
+        let rendered = self
+            .package
+            .put_streams_shared_with_rendered(replacements)
             .map_err(PackageError::from)?;
+        self.retained_render.0 = rendered.filter(|bytes| {
+            self.retained_render_limit != 0 && bytes.capacity() <= self.retained_render_limit
+        });
         self.changed = true;
         Ok(())
     }
@@ -2824,6 +2886,28 @@ mod papx_cache_tests {
             .write_to(&mut output)
             .expect("table fixture should serialize");
         output.into_inner()
+    }
+
+    #[test]
+    fn retained_render_clone_recomputes_and_finish_moves_the_allocation() {
+        let mut editor = RevisionEditor::open(doc_with_table_state(false), Limits::default())
+            .expect("source opens");
+        assert_eq!(editor.retained_render_capacity(), None);
+        editor.set_retained_render_limit(8 * 1024 * 1024);
+        editor
+            .replace_plain_text(0, 4, "replacement")
+            .expect("edit");
+        let retained = editor.retained_render.0.as_ref().expect("held render");
+        let pointer = retained.as_ptr();
+        let capacity = retained.capacity();
+        let clone = editor.clone();
+        assert_eq!(clone.retained_render_capacity(), None);
+        assert_eq!(clone.retained_render_limit, editor.retained_render_limit);
+        let recomputed = clone.finish().expect("clone recomputes");
+        let moved = editor.finish().expect("original consumes handoff");
+        assert_eq!(moved.as_ptr(), pointer);
+        assert_eq!(moved.capacity(), capacity);
+        assert_eq!(moved, recomputed);
     }
 
     #[test]

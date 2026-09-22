@@ -1,0 +1,1817 @@
+diff --git a/crates/litchi-doc/src/body_text.rs b/crates/litchi-doc/src/body_text.rs
+index c30678efa0..751ae0f9e7 100644
+--- a/crates/litchi-doc/src/body_text.rs
++++ b/crates/litchi-doc/src/body_text.rs
+@@ -41,15 +41,23 @@ use std::sync::{Arc, OnceLock};
+ pub type History = litchi_core::patch::History<Snapshot>;
+ 
+ /// Finite limits for one body transaction.
++///
++/// The default policy retains at most 8 MiB of already-rendered output
++/// allocation capacity between an edit and its commit. [`Self::new`] disables
++/// that retention unless [`Self::with_max_retained_render_bytes`] enables it.
++/// This ceiling excludes source bytes and temporary rendering/validation
++/// allocations; it is not a bound on total process memory. An output above
++/// the ceiling is recomputed at commit without changing the result.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub struct TransactionLimits {
+     operations: usize,
+     replacement_units: usize,
+     total_units: usize,
++    retained_render_bytes: usize,
+ }
+ 
+ impl TransactionLimits {
+-    /// Creates explicit per-transaction bounds.
++    /// Creates explicit per-transaction bounds with rendered-output retention disabled.
+     #[must_use]
+     pub const fn new(
+         max_operations: usize,
+@@ -60,9 +68,21 @@ impl TransactionLimits {
+             operations: max_operations,
+             replacement_units: max_replacement_units,
+             total_units: max_total_replacement_units,
++            retained_render_bytes: 0,
+         }
+     }
+ 
++    /// Adds a finite ceiling for retaining one already-rendered DOC output.
++    ///
++    /// A zero ceiling is a supported setting that keeps no rendered handoff;
++    /// the transaction recomputes its output through the existing finish path
++    /// when it is committed.
++    #[must_use]
++    pub const fn with_max_retained_render_bytes(mut self, max_bytes: usize) -> Self {
++        self.retained_render_bytes = max_bytes;
++        self
++    }
++
+     /// Maximum staged semantic operations.
+     #[must_use]
+     pub const fn max_operations(self) -> usize {
+@@ -80,11 +100,31 @@ impl TransactionLimits {
+     pub const fn max_total_replacement_units(self) -> usize {
+         self.total_units
+     }
++
++    /// Maximum allocation capacity retained for one validated rendered DOC.
++    #[must_use]
++    pub const fn max_retained_render_bytes(self) -> usize {
++        self.retained_render_bytes
++    }
++
++    /// Intersects two finite transaction policies component by component.
++    ///
++    /// The operation that combines values must preserve the stricter member of
++    /// every policy, including the retained-render ceiling.
++    #[must_use]
++    pub fn intersect(self, other: Self) -> Self {
++        Self {
++            operations: self.operations.min(other.operations),
++            replacement_units: self.replacement_units.min(other.replacement_units),
++            total_units: self.total_units.min(other.total_units),
++            retained_render_bytes: self.retained_render_bytes.min(other.retained_render_bytes),
++        }
++    }
+ }
+ 
+ impl Default for TransactionLimits {
+     fn default() -> Self {
+-        Self::new(256, 1024 * 1024, 4 * 1024 * 1024)
++        Self::new(256, 1024 * 1024, 4 * 1024 * 1024).with_max_retained_render_bytes(8 * 1024 * 1024)
+     }
+ }
+ 
+@@ -817,6 +857,7 @@ impl Snapshot {
+         Composition {
+             source: self.clone(),
+             joined: JoinedSubEdits::new(self.lineage(), limits),
++            transaction_limits: self.transaction_limits,
+         }
+     }
+ 
+@@ -852,6 +893,7 @@ impl Snapshot {
+                 target,
+                 replacement,
+             },
++            self.transaction_limits,
+         )
+     }
+ 
+@@ -880,6 +922,7 @@ impl Snapshot {
+                 property: CharacterProperty::Bold,
+                 enabled,
+             },
++            self.transaction_limits,
+         )
+     }
+ 
+@@ -902,6 +945,7 @@ impl Snapshot {
+                 target,
+                 replacement,
+             },
++            self.transaction_limits,
+         )
+     }
+ 
+@@ -925,6 +969,7 @@ impl Snapshot {
+                 property,
+                 enabled,
+             },
++            self.transaction_limits,
+         )
+     }
+ 
+@@ -1049,12 +1094,14 @@ impl Snapshot {
+                 dependency: "structural text",
+             }));
+         }
++        let transaction_limits = self.transaction_limits;
+         let mut validation = self.edit()?;
+         validation.replace_text(destination, &value)?;
+         Ok(TransferPlan {
+             target: self.lineage(),
+             destination,
+             value,
++            transaction_limits,
+         })
+     }
+ 
+@@ -1093,11 +1140,13 @@ impl Snapshot {
+         let options = donor
+             .export_for_transfer(source_storage_id, destination_storage_id)
+             .map_err(Error::Invalid)?;
++        let transaction_limits = self.transaction_limits;
+         let mut validation = self.edit()?;
+         validation.add_embedded_object(options.clone())?;
+         Ok(EmbeddedTransferPlan {
+             target: self.lineage(),
+             options,
++            transaction_limits,
+         })
+     }
+ 
+@@ -1153,12 +1202,14 @@ impl Snapshot {
+                     dependency: DrawingDependency::UnsupportedPictureGraph,
+                 })
+             })?;
++        let transaction_limits = self.transaction_limits;
+         let mut validation = self.edit()?;
+         validation.install_picture(destination, graph.clone())?;
+         Ok(PictureTransferPlan {
+             target: self.lineage(),
+             destination,
+             graph,
++            transaction_limits,
+         })
+     }
+ 
+@@ -1177,7 +1228,16 @@ impl Snapshot {
+     }
+ 
+     fn editor(&self) -> Result<RevisionEditor> {
+-        RevisionEditor::open(self.source.as_ref().to_vec(), self.limits).map_err(Error::Invalid)
++        let mut editor = RevisionEditor::open(self.source.as_ref().to_vec(), self.limits)
++            .map_err(Error::Invalid)?;
++        editor.set_retained_render_limit(self.transaction_limits.max_retained_render_bytes());
++        Ok(editor)
++    }
++
++    fn with_transaction_limits(&self, transaction_limits: TransactionLimits) -> Self {
++        let mut snapshot = self.clone();
++        snapshot.transaction_limits = transaction_limits;
++        snapshot
+     }
+ 
+     fn lineage(&self) -> Lineage {
+@@ -1224,12 +1284,64 @@ impl Edit {
+         })
+     }
+ 
++    fn reopen_editor(&self, bytes: Vec<u8>) -> Result<RevisionEditor> {
++        let mut editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
++        editor
++            .set_retained_render_limit(self.source.transaction_limits.max_retained_render_bytes());
++        Ok(editor)
++    }
++
++    fn with_transaction_limits<T>(
++        &mut self,
++        incoming: TransactionLimits,
++        operation: impl FnOnce(&mut Self) -> Result<T>,
++    ) -> Result<T> {
++        let previous = self.source.transaction_limits;
++        let effective = previous.intersect(incoming);
++        if self.changes.len() > effective.operations {
++            return Err(Error::Refused(Refusal::OperationLimit {
++                observed: self.changes.len(),
++                limit: effective.operations,
++            }));
++        }
++        if self.replacement_units > effective.total_units {
++            return Err(Error::Refused(Refusal::ReplacementLimit {
++                observed: self.replacement_units,
++                limit: effective.total_units,
++            }));
++        }
++        self.source.transaction_limits = effective;
++        let result = operation(self);
++        if result.is_ok() {
++            self.editor.set_retained_render_limit(
++                self.source.transaction_limits.max_retained_render_bytes(),
++            );
++        } else {
++            self.source.transaction_limits = previous;
++        }
++        result
++    }
++
+     /// Immutable source snapshot that authorizes this transaction.
+     #[must_use]
+     pub const fn source(&self) -> &Snapshot {
+         &self.source
+     }
+ 
++    /// Allocation capacity held by the already-validated rendered handoff,
++    /// when the transaction's finite retention ceiling admitted it.
++    #[must_use]
++    pub fn retained_render_bytes(&self) -> Option<usize> {
++        self.editor.retained_render_capacity()
++    }
++
++    /// Releases the retained rendered handoff without changing the staged
++    /// document or any semantic transaction result. Later mutations may retain
++    /// a new output under the transaction's ceiling.
++    pub fn release_retained_render(&mut self) {
++        self.editor.release_retained_render();
++    }
++
+     /// Replaces text in one ordinary source-body paragraph.
+     ///
+     /// The replacement can change UTF-16 length. Publication appends a Unicode
+@@ -1358,7 +1470,9 @@ impl Edit {
+         if plan.target != self.source.lineage() {
+             return Err(Error::Conflict);
+         }
+-        self.replace_text(plan.destination, &plan.value)
++        self.with_transaction_limits(plan.transaction_limits, |edit| {
++            edit.replace_text(plan.destination, &plan.value)
++        })
+     }
+ 
+     /// Applies a dependency-closed embedded-object transfer prepared for this
+@@ -1367,7 +1481,9 @@ impl Edit {
+         if plan.target != self.source.lineage() {
+             return Err(Error::Conflict);
+         }
+-        self.add_embedded_object(plan.options.clone())
++        self.with_transaction_limits(plan.transaction_limits, |edit| {
++            edit.add_embedded_object(plan.options.clone())
++        })
+     }
+ 
+     /// Applies a canonical picture graph prepared for this exact receiver.
+@@ -1375,7 +1491,9 @@ impl Edit {
+         if plan.target != self.source.lineage() {
+             return Err(Error::Conflict);
+         }
+-        self.install_picture(plan.destination, plan.graph.clone())
++        self.with_transaction_limits(plan.transaction_limits, |edit| {
++            edit.install_picture(plan.destination, plan.graph.clone())
++        })
+     }
+ 
+     fn install_picture(
+@@ -1429,10 +1547,8 @@ impl Edit {
+         let installed = self
+             .editor
+             .replace_with_picture_graph(span.start_cp, span.end_cp, &graph)
+-            .map_err(Error::Invalid)?;
+-        if graph.data_offset.is_some() && installed != graph {
+-            return Err(Error::Conflict);
+-        }
++            .map_err(Error::Invalid)?
++            .ok_or(Error::Conflict)?;
+         self.replacement_units = self.replacement_units.saturating_add(actual);
+         self.changes.push(Change::Picture {
+             target,
+@@ -1516,7 +1632,7 @@ impl Edit {
+             .map_err(|error| Error::Invalid(error.into()))?
+             .snapshot()
+             .finish();
+-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
++        self.editor = self.reopen_editor(bytes)?;
+         self.changes.push(Change::EmbeddedObject {
+             storage_id,
+             before: None,
+@@ -1553,7 +1669,7 @@ impl Edit {
+             .map_err(|error| Error::Invalid(error.into()))?
+             .snapshot()
+             .finish();
+-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
++        self.editor = self.reopen_editor(bytes)?;
+         self.changes.push(Change::EmbeddedObject {
+             storage_id,
+             before: Some(before),
+@@ -1627,7 +1743,7 @@ impl Edit {
+             .map_err(|error| Error::Invalid(error.into()))?
+             .snapshot()
+             .finish();
+-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
++        self.editor = self.reopen_editor(bytes)?;
+         self.changes.push(Change::EmbeddedDisplay {
+             storage_id,
+             before,
+@@ -1915,11 +2031,15 @@ impl Patch {
+     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
+     /// with this patch's captured source snapshot.
+     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
++        let transaction_limits = source
++            .transaction_limits
++            .intersect(self.before.transaction_limits)
++            .intersect(self.after.transaction_limits);
+         if same_source_allocation(&source.source, &self.before.source) {
+             return Ok(if self.is_noop() {
+-                source.clone()
++                source.with_transaction_limits(transaction_limits)
+             } else {
+-                self.after.clone()
++                self.after.with_transaction_limits(transaction_limits)
+             });
+         }
+         if source.fingerprint() != self.before.fingerprint()
+@@ -1928,9 +2048,9 @@ impl Patch {
+             return Err(Error::Conflict);
+         }
+         Ok(if self.is_noop() {
+-            source.clone()
++            source.with_transaction_limits(transaction_limits)
+         } else {
+-            self.after.clone()
++            self.after.with_transaction_limits(transaction_limits)
+         })
+     }
+ 
+@@ -2372,6 +2492,7 @@ impl PreparedOperation {
+ /// One independently prepared body-text or formatting edit.
+ pub struct PreparedEdit {
+     inner: SubEdit<Lineage, PreparedOperation>,
++    transaction_limits: TransactionLimits,
+ }
+ 
+ impl PreparedEdit {
+@@ -2380,6 +2501,7 @@ impl PreparedEdit {
+         limits: CompositionLimits,
+         identifier: impl Into<String>,
+         operation: PreparedOperation,
++        transaction_limits: TransactionLimits,
+     ) -> Result<Self> {
+         let writes = [operation.effect()];
+         let inner = SubEdit::new(
+@@ -2390,7 +2512,10 @@ impl PreparedEdit {
+             writes,
+             operation,
+         )?;
+-        Ok(Self { inner })
++        Ok(Self {
++            inner,
++            transaction_limits,
++        })
+     }
+ 
+     /// Stable caller-selected composition identifier.
+@@ -2450,6 +2575,7 @@ impl std::fmt::Debug for JoinError {
+ pub struct Composition {
+     source: Snapshot,
+     joined: JoinedSubEdits<Lineage, PreparedOperation>,
++    transaction_limits: TransactionLimits,
+ }
+ 
+ impl Composition {
+@@ -2465,13 +2591,18 @@ impl Composition {
+         reason = "composition refusals intentionally return the rejected prepared edit to the caller"
+     )]
+     pub fn join(&mut self, incoming: PreparedEdit) -> std::result::Result<&mut Self, JoinError> {
++        let transaction_limits = incoming.transaction_limits;
+         if let Err(error) = self.joined.join(incoming.inner) {
+             let (failure, rejected) = error.into_parts();
+             return Err(JoinError {
+                 failure,
+-                rejected: PreparedEdit { inner: rejected },
++                rejected: PreparedEdit {
++                    inner: rejected,
++                    transaction_limits,
++                },
+             });
+         }
++        self.transaction_limits = self.transaction_limits.intersect(transaction_limits);
+         Ok(self)
+     }
+ 
+@@ -2494,7 +2625,8 @@ impl Composition {
+     /// Returns the same staging, publication, and full-reopen errors as an
+     /// ordinary multi-operation [`Edit`].
+     pub fn commit(self) -> Result<Commit> {
+-        let mut edit = self.source.edit()?;
++        let source = self.source.with_transaction_limits(self.transaction_limits);
++        let mut edit = source.edit()?;
+         for prepared in self.joined.into_sub_edits() {
+             match prepared.into_payload() {
+                 PreparedOperation::Text {
+@@ -2529,6 +2661,7 @@ pub struct TransferPlan {
+     target: Lineage,
+     destination: TextTarget,
+     value: String,
++    transaction_limits: TransactionLimits,
+ }
+ 
+ impl TransferPlan {
+@@ -2548,6 +2681,7 @@ impl TransferPlan {
+ pub struct EmbeddedTransferPlan {
+     target: Lineage,
+     options: crate::embedded_object::WriteOptions,
++    transaction_limits: TransactionLimits,
+ }
+ 
+ /// Canonical re-homed inline/floating picture closure prepared for one exact
+@@ -2557,6 +2691,7 @@ pub struct PictureTransferPlan {
+     target: Lineage,
+     destination: TextTarget,
+     graph: crate::tracked_revision::PictureGraph,
++    transaction_limits: TransactionLimits,
+ }
+ 
+ impl PictureTransferPlan {
+@@ -2619,6 +2754,13 @@ pub struct ThreeWayPlan {
+ 
+ impl ThreeWayPlan {
+     fn new(source: Snapshot, left: &Patch, right: &Patch) -> Self {
++        let transaction_limits = source
++            .transaction_limits
++            .intersect(left.before.transaction_limits)
++            .intersect(left.after.transaction_limits)
++            .intersect(right.before.transaction_limits)
++            .intersect(right.after.transaction_limits);
++        let source = source.with_transaction_limits(transaction_limits);
+         let mut changes = left.changes.clone();
+         let mut conflicts = Vec::new();
+         for incoming in &right.changes {
+@@ -4256,6 +4398,26 @@ mod tests {
+         assert!(events.is_empty());
+     }
+ 
++    #[cfg(feature = "performance-diagnostics")]
++    #[test]
++    fn retained_render_still_requires_independent_public_reader_validation() {
++        let source = Snapshot::parse(&doc(&["alpha"])).expect("valid source");
++        let mut edit = source.edit().expect("edit");
++        // Test-only substitution: the strict owner accepts this package, but
++        // its malformed RSID payload must fail the independent public reader.
++        edit.editor = RevisionEditor::open(public_reader_failure_doc(), Limits::default())
++            .expect("strict owner accepts the public-reader failure fixture");
++        edit.editor.set_retained_render_limit(8 * 1024 * 1024);
++        edit.replace_paragraph(Position::new(0), "replacement")
++            .expect("common candidate validates");
++        assert!(edit.retained_render_bytes().is_some());
++        assert!(matches!(edit.commit(), Err(Error::Invalid(_))));
++        assert_eq!(
++            source.paragraphs(Projection::All).expect("source intact")[0].text(),
++            "alpha"
++        );
++    }
++
+     #[cfg(feature = "performance-diagnostics")]
+     #[test]
+     fn profiled_open_public_reader_error_closes_only_public_phase() {
+@@ -5385,6 +5547,104 @@ mod tests {
+         assert_eq!(restored.revisions().expect("restored revisions").len(), 1);
+     }
+ 
++    #[test]
++    fn retained_picture_mismatch_is_atomic_and_missing_data_handoff_is_current() {
++        for floating in [false, true] {
++            let donor = Snapshot::parse(&picture_doc(floating)).expect("donor");
++            let mut package = PackageEditor::open(
++                formatted_picture_receiver_doc(),
++                Targets::default(),
++                Limits::default(),
++            )
++            .expect("receiver package");
++            package
++                .remove_stream(&["Data".to_string()])
++                .expect("remove unused Data");
++            let receiver =
++                Snapshot::parse(&package.finish().expect("receiver bytes")).expect("receiver");
++            let plan = receiver
++                .plan_picture_transfer_from(
++                    &donor,
++                    TextTarget::body_paragraph(Position::new(0)),
++                    TextTarget::body_paragraph(Position::new(0)),
++                )
++                .expect("picture plan");
++            let mut edit = receiver.edit().expect("edit");
++            edit.replace_paragraph(Position::new(1), "changed other")
++                .expect("first edit");
++            let held = edit.retained_render_bytes();
++            assert!(held.is_some());
++            let before = edit.editor.clone().finish().expect("before bytes");
++            let changes = edit.changes.len();
++            let mut mismatched = plan.clone();
++            mismatched.graph.data_offset = Some(u32::MAX);
++            assert!(matches!(
++                edit.apply_picture_transfer(&mismatched),
++                Err(Error::Conflict)
++            ));
++            assert_eq!(edit.retained_render_bytes(), held);
++            assert_eq!(edit.changes.len(), changes);
++            assert_eq!(edit.editor.clone().finish().expect("after refusal"), before);
++            edit.apply_picture_transfer(&plan)
++                .expect("valid missing-Data insertion");
++            assert!(edit.retained_render_bytes().is_some());
++            let commit = edit.commit().expect("retained commit");
++            let zero = receiver.with_transaction_limits(
++                receiver
++                    .transaction_limits
++                    .with_max_retained_render_bytes(0),
++            );
++            let mut control = zero.edit().expect("control");
++            control
++                .replace_paragraph(Position::new(1), "changed other")
++                .expect("control first");
++            control
++                .apply_picture_transfer(&plan)
++                .expect("control picture");
++            assert_eq!(control.retained_render_bytes(), None);
++            assert_eq!(
++                control.commit().expect("control commit").snapshot().bytes(),
++                commit.snapshot().bytes()
++            );
++            assert_eq!(
++                commit
++                    .patch()
++                    .inverse()
++                    .apply(commit.snapshot())
++                    .expect("inverse"),
++                receiver
++            );
++        }
++    }
++
++    #[test]
++    fn retained_render_is_cleared_by_resource_reopen_and_reenabled_for_formatting() {
++        let donor = Snapshot::parse(&embedded_doc()).expect("embedded donor");
++        let receiver = Snapshot::parse(&doc(&["placeholder", "other"])).expect("receiver");
++        let plan = receiver
++            .plan_embedded_transfer_from(&donor, 77, 88)
++            .expect("embedded plan");
++        let mut outputs = Vec::new();
++        for ceiling in [0, 8 * 1024 * 1024] {
++            let source = receiver.with_transaction_limits(
++                receiver
++                    .transaction_limits
++                    .with_max_retained_render_bytes(ceiling),
++            );
++            let mut edit = source.edit().expect("edit");
++            edit.replace_paragraph(Position::new(1), "changed other")
++                .expect("text edit");
++            assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
++            edit.apply_embedded_transfer(&plan).expect("resource edit");
++            assert_eq!(edit.retained_render_bytes(), None);
++            edit.set_paragraph_bold(Position::new(1), true)
++                .expect("format after resource reopen");
++            assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
++            outputs.push(edit.commit().expect("commit").snapshot().bytes().to_vec());
++        }
++        assert_eq!(outputs[0], outputs[1]);
++    }
++
+     #[test]
+     fn canonical_inline_and_floating_picture_graphs_transfer_and_reopen() {
+         for floating in [false, true] {
+diff --git a/crates/litchi-doc/src/tracked_revision/package.rs b/crates/litchi-doc/src/tracked_revision/package.rs
+index aca35c9236..b06cf52497 100644
+--- a/crates/litchi-doc/src/tracked_revision/package.rs
++++ b/crates/litchi-doc/src/tracked_revision/package.rs
+@@ -881,6 +881,22 @@ fn containing_papx(runs: &[PapxRun], fc: u32) -> Option<&PapxRun> {
+     runs.get(index).filter(|run| fc < run.end)
+ }
+ 
++/// A rendered CFB handoff retained by the owning DOC transaction.
++///
++/// Cloning a revision editor deliberately drops this value.  Every mutation
++/// is clone-first, so a candidate can never inherit a render belonging to the
++/// source state, and cloning an editor never copies or shares a caller-owned
++/// retention token.
++#[derive(Default)]
++struct RetainedRender(Option<Vec<u8>>);
++
++impl Clone for RetainedRender {
++    fn clone(&self) -> Self {
++        let _had_render = self.0.is_some();
++        Self(None)
++    }
++}
++
+ #[derive(Clone)]
+ pub struct RevisionEditor {
+     package: ObjectEditor,
+@@ -899,6 +915,8 @@ pub struct RevisionEditor {
+     main_ccp: u32,
+     data_changed: bool,
+     changed: bool,
++    retained_render_limit: usize,
++    retained_render: RetainedRender,
+ }
+ 
+ impl RevisionEditor {
+@@ -1037,6 +1055,8 @@ impl RevisionEditor {
+             main_ccp,
+             data_changed: false,
+             changed: false,
++            retained_render_limit: 0,
++            retained_render: RetainedRender::default(),
+         };
+         if editor.revisions()?.len() > MAX_REVISIONS {
+             return Err(corrupted("revision count exceeds resource limit"));
+@@ -1049,6 +1069,33 @@ impl RevisionEditor {
+         self.changed
+     }
+ 
++    /// Configures the finite owner-side ceiling for one already-rendered
++    /// handoff. A zero ceiling releases any held render and disables
++    /// retention. The ordinary tracked-revision API leaves this at zero.
++    pub(crate) fn set_retained_render_limit(&mut self, limit: usize) {
++        self.retained_render_limit = limit;
++        if limit == 0
++            || self
++                .retained_render
++                .0
++                .as_ref()
++                .is_some_and(|rendered| rendered.capacity() > limit)
++        {
++            self.retained_render.0 = None;
++        }
++    }
++
++    /// Returns the allocation capacity held by the validated render, if any.
++    #[must_use]
++    pub(crate) fn retained_render_capacity(&self) -> Option<usize> {
++        self.retained_render.0.as_ref().map(Vec::capacity)
++    }
++
++    /// Releases the retained render without changing the editor's meaning.
++    pub(crate) fn release_retained_render(&mut self) {
++        self.retained_render.0 = None;
++    }
++
+     #[must_use]
+     pub fn authors(&self) -> &[String] {
+         &self.authors
+@@ -1799,7 +1846,7 @@ impl RevisionEditor {
+         start: u32,
+         end: u32,
+         graph: &PictureGraph,
+-    ) -> Result<PictureGraph> {
++    ) -> Result<Option<PictureGraph>> {
+         validate_range(start, end, self.main_ccp)?;
+         self.reject_destructive_interactions(start, end)?;
+         if !self.has_empty_picture_graph()? {
+@@ -1880,13 +1927,16 @@ impl RevisionEditor {
+                 &graph.dgg_info,
+             )?;
+         }
+-        candidate.patch_sizes()?;
+-        candidate.commit()?;
+-        *self = candidate;
+         let mut installed = graph.clone();
+         installed.replaced_grpprl = Some(replaced_grpprl);
+         installed.data_offset = Some(picture_offset);
+-        Ok(installed)
++        if graph.data_offset.is_some() && installed != *graph {
++            return Ok(None);
++        }
++        candidate.patch_sizes()?;
++        candidate.commit()?;
++        *self = candidate;
++        Ok(Some(installed))
+     }
+ 
+     /// Removes one graph installed by [`Self::replace_with_picture_graph`] and
+@@ -2300,7 +2350,10 @@ impl RevisionEditor {
+     /// renders changed saves with its default
+     /// [`litchi_cfb::SectorLayoutPolicy::Reuse`] policy. This is the ordinary tracked
+     /// revision save route; callers do not need to opt into the CFB policy.
+-    pub fn finish(self) -> Result<Vec<u8>> {
++    pub fn finish(mut self) -> Result<Vec<u8>> {
++        if let Some(rendered) = self.retained_render.0.take() {
++            return Ok(rendered);
++        }
+         self.package.finish().map_err(PackageError::from)
+     }
+ 
+@@ -2646,6 +2699,11 @@ impl RevisionEditor {
+     }
+ 
+     fn commit(&mut self) -> Result<()> {
++        // The package mutation below invalidates every render for the prior
++        // editor state, including the Data-stream add path. Mutation callers
++        // are clone-first, but clearing here keeps the ownership rule local
++        // to the sole package publication boundary as well.
++        self.release_retained_render();
+         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
+         replacements.push((
+             self.word_path.as_slice(),
+@@ -2667,9 +2725,13 @@ impl RevisionEditor {
+                     .map_err(PackageError::from)?;
+             }
+         }
+-        self.package
+-            .put_streams_shared(replacements)
++        let rendered = self
++            .package
++            .put_streams_shared_with_rendered(replacements)
+             .map_err(PackageError::from)?;
++        self.retained_render.0 = rendered.filter(|bytes| {
++            self.retained_render_limit != 0 && bytes.capacity() <= self.retained_render_limit
++        });
+         self.changed = true;
+         Ok(())
+     }
+@@ -2826,6 +2888,28 @@ mod papx_cache_tests {
+         output.into_inner()
+     }
+ 
++    #[test]
++    fn retained_render_clone_recomputes_and_finish_moves_the_allocation() {
++        let mut editor = RevisionEditor::open(doc_with_table_state(false), Limits::default())
++            .expect("source opens");
++        assert_eq!(editor.retained_render_capacity(), None);
++        editor.set_retained_render_limit(8 * 1024 * 1024);
++        editor
++            .replace_plain_text(0, 4, "replacement")
++            .expect("edit");
++        let retained = editor.retained_render.0.as_ref().expect("held render");
++        let pointer = retained.as_ptr();
++        let capacity = retained.capacity();
++        let clone = editor.clone();
++        assert_eq!(clone.retained_render_capacity(), None);
++        assert_eq!(clone.retained_render_limit, editor.retained_render_limit);
++        let recomputed = clone.finish().expect("clone recomputes");
++        let moved = editor.finish().expect("original consumes handoff");
++        assert_eq!(moved.as_ptr(), pointer);
++        assert_eq!(moved.capacity(), capacity);
++        assert_eq!(moved, recomputed);
++    }
++
+     #[test]
+     fn editor_table_queries_use_cached_state_and_track_edits() {
+         let mut editor = RevisionEditor::open(doc_with_table_state(true), Limits::default())
+diff --git a/crates/litchi-ole-common/src/object/editor.rs b/crates/litchi-ole-common/src/object/editor.rs
+index 77b384c7ed..a1f0a04255 100644
+--- a/crates/litchi-ole-common/src/object/editor.rs
++++ b/crates/litchi-ole-common/src/object/editor.rs
+@@ -373,6 +373,35 @@ impl Editor {
+         &mut self,
+         replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
+     ) -> Result<(), OleError> {
++        self.put_streams_shared_with_rendered(replacements)
++            .map(|_| ())
++    }
++
++    /// Replaces existing streams in one failure-atomic CFB publication and
++    /// returns the validated candidate rendering when the batch changes it.
++    ///
++    /// Replacements are applied in iterator order to one isolated candidate.
++    /// Repeated paths therefore retain the last supplied value. The candidate
++    /// is rendered, reopened, and published only once after every replacement
++    /// has passed the configured stream and package bounds. An empty or
++    /// all-no-op batch returns `Ok(None)` without cloning or rendering. A
++    /// repeated path that changes to one value and then changes back to its
++    /// original value is still an effective two-step batch and is rendered.
++    ///
++    /// The returned bytes are the exact rendering validated while publishing
++    /// the candidate. They are handed to the caller and are not retained by
++    /// this editor.
++    ///
++    /// # Errors
++    ///
++    /// Returns an error when the batch exceeds the package stream-count bound,
++    /// a stream is missing or oversized, or the final rendered package fails
++    /// validation. Failure leaves this editor unchanged and returns no
++    /// rendered bytes.
++    pub fn put_streams_shared_with_rendered<'a>(
++        &mut self,
++        replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
++    ) -> Result<Option<Vec<u8>>, OleError> {
+         let mut candidate = None;
+         for (index, (path, data)) in replacements.into_iter().enumerate() {
+             if index >= self.limits.max_streams {
+@@ -391,9 +420,12 @@ impl Editor {
+             candidate.package.put_stream(path, data, self.limits)?;
+         }
+         if let Some(candidate) = candidate {
+-            *self = candidate.commit_candidate()?;
++            let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
++            *self = candidate;
++            Ok(Some(rendered))
++        } else {
++            Ok(None)
+         }
+-        Ok(())
+     }
+ 
+     /// Adds an opaque package stream below an existing CFB storage.
+diff --git a/crates/litchi-ole-common/tests/object.rs b/crates/litchi-ole-common/tests/object.rs
+index 5f5223f3fd..0068eaa553 100644
+--- a/crates/litchi-ole-common/tests/object.rs
++++ b/crates/litchi-ole-common/tests/object.rs
+@@ -528,21 +528,233 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
+         sequential
+     );
+ 
++    let mut rendered_editor = Editor::open(original.clone(), selected.clone(), Limits::default())
++        .expect("rendered editor should open");
++    let rendered = rendered_editor
++        .put_streams_shared_with_rendered([
++            (word_path.as_slice(), Arc::clone(&word)),
++            (preview_path.as_slice(), Arc::clone(&preview)),
++        ])
++        .expect("rendered batch should commit")
++        .expect("effective batch should return rendered bytes");
++    assert_eq!(
++        rendered,
++        rendered_editor
++            .clone()
++            .finish()
++            .expect("rendered editor should finish")
++    );
++    assert!(Arc::ptr_eq(
++        &word,
++        &rendered_editor
++            .stream_shared(&word_path)
++            .expect("rendered WordDocument should remain available")
++    ));
++    assert!(Arc::ptr_eq(
++        &preview,
++        &rendered_editor
++            .stream_shared(&preview_path)
++            .expect("rendered preview should remain available")
++    ));
++
++    let current_word = rendered_editor
++        .stream_shared(&word_path)
++        .expect("current WordDocument should be available");
++    assert!(
++        rendered_editor
++            .put_streams_shared_with_rendered([(word_path.as_slice(), Arc::clone(&current_word),)])
++            .expect("all-no-op rendered batch should succeed")
++            .is_none()
++    );
++    assert!(rendered_editor.is_changed());
++
+     let missing_path = vec!["missing".to_string()];
+     let mut failed = Editor::open(original.clone(), selected, Limits::default())
+         .expect("second editor should open");
++    let failed_word = failed
++        .stream_shared(&word_path)
++        .expect("failed editor WordDocument should be available");
+     assert!(
+         failed
+-            .put_streams_shared([
++            .put_streams_shared_with_rendered([
+                 (word_path.as_slice(), Arc::clone(&word)),
+                 (missing_path.as_slice(), Arc::clone(&preview)),
+             ])
+             .is_err()
+     );
+     assert!(!failed.is_changed());
++    assert!(Arc::ptr_eq(
++        &failed_word,
++        &failed
++            .stream_shared(&word_path)
++            .expect("failed batch must preserve WordDocument")
++    ));
+     assert_eq!(failed.finish().expect("failed batch stays exact"), original);
+ }
+ 
++#[test]
++fn rendered_batch_preserves_repeated_path_last_value() {
++    let original = doc_with_object(&[0, 0, 0, 0]);
++    let word_path = vec!["WordDocument".to_string()];
++    let first: Arc<[u8]> = Arc::from(&b"first repeated value"[..]);
++    let second: Arc<[u8]> = Arc::from(&b"last repeated value"[..]);
++    let mut editor =
++        Editor::open(original, Targets::default(), Limits::default()).expect("editor should open");
++
++    let rendered = editor
++        .put_streams_shared_with_rendered([
++            (word_path.as_slice(), Arc::clone(&first)),
++            (word_path.as_slice(), Arc::clone(&second)),
++        ])
++        .expect("repeated-path batch should commit")
++        .expect("effective repeated-path batch should render");
++
++    assert_eq!(editor.stream(&word_path), Some(second.as_ref()));
++    assert!(Arc::ptr_eq(
++        &second,
++        &editor
++            .stream_shared(&word_path)
++            .expect("last repeated value should be installed")
++    ));
++    assert_eq!(
++        rendered,
++        editor
++            .clone()
++            .finish()
++            .expect("repeated-path editor should finish")
++    );
++
++    let mut restored = Editor::open(
++        doc_with_object(&[0, 0, 0, 0]),
++        Targets::default(),
++        Limits::default(),
++    )
++    .expect("restored editor should open");
++    let original_word = restored
++        .stream_shared(&word_path)
++        .expect("restored editor WordDocument should be available");
++    let rendered = restored
++        .put_streams_shared_with_rendered([
++            (word_path.as_slice(), Arc::clone(&first)),
++            (word_path.as_slice(), Arc::clone(&original_word)),
++        ])
++        .expect("restore batch should succeed");
++    assert!(rendered.is_some());
++    assert!(restored.is_changed());
++    assert!(Arc::ptr_eq(
++        &original_word,
++        &restored
++            .stream_shared(&word_path)
++            .expect("restored value should be installed")
++    ));
++}
++
++#[test]
++fn rendered_batch_empty_and_equal_inputs_return_none_without_publication() {
++    let original = doc_with_object(&[0, 0, 0, 0]);
++    let word_path = vec!["WordDocument".to_string()];
++    let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
++        .expect("editor should open");
++    let original_word = editor
++        .stream_shared(&word_path)
++        .expect("original WordDocument should be available");
++
++    assert!(
++        editor
++            .put_streams_shared_with_rendered(std::iter::empty::<(&[String], Arc<[u8]>)>())
++            .expect("empty batch should succeed")
++            .is_none()
++    );
++    assert!(!editor.is_changed());
++    assert!(Arc::ptr_eq(
++        &original_word,
++        &editor
++            .stream_shared(&word_path)
++            .expect("empty batch should preserve WordDocument")
++    ));
++
++    assert!(
++        editor
++            .put_streams_shared_with_rendered([(word_path.as_slice(), Arc::clone(&original_word))])
++            .expect("equal batch should succeed")
++            .is_none()
++    );
++    assert!(!editor.is_changed());
++    assert!(Arc::ptr_eq(
++        &original_word,
++        &editor
++            .stream_shared(&word_path)
++            .expect("equal batch should preserve WordDocument")
++    ));
++    assert_eq!(
++        editor.finish().expect("no-op batch should stay exact"),
++        original
++    );
++}
++
++#[test]
++fn rendered_batch_checks_max_streams_before_equal_repeated_items() {
++    let original = write_cfb(|writer| {
++        writer
++            .create_stream(&["A"], b"source")
++            .expect("source stream should write");
++    });
++    let limits = Limits {
++        max_streams: 1,
++        ..Limits::default()
++    };
++    let path = vec!["A".to_string()];
++    let mut editor = Editor::open(original.clone(), Targets::default(), limits)
++        .expect("bounded editor should open");
++    let current = editor
++        .stream_shared(&path)
++        .expect("bounded source stream should be available");
++
++    assert!(
++        editor
++            .put_streams_shared_with_rendered([
++                (path.as_slice(), Arc::clone(&current)),
++                (path.as_slice(), Arc::clone(&current)),
++            ])
++            .is_err()
++    );
++    assert!(!editor.is_changed());
++    assert!(Arc::ptr_eq(
++        &current,
++        &editor
++            .stream_shared(&path)
++            .expect("count failure should preserve source stream")
++    ));
++    assert_eq!(
++        editor.finish().expect("count failure should stay exact"),
++        original
++    );
++}
++
++#[test]
++fn rendered_batch_matches_recomputed_output_under_both_layout_policies() {
++    let original = doc_with_object(&[0, 0, 0, 0]);
++    let path = vec!["WordDocument".to_string()];
++    let replacement: Arc<[u8]> = Arc::from(&b"layout policy replacement"[..]);
++
++    for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
++        let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
++            .expect("editor should open");
++        editor.set_sector_layout_policy(policy);
++        let rendered = editor
++            .put_streams_shared_with_rendered([(path.as_slice(), Arc::clone(&replacement))])
++            .expect("layout-policy batch should commit")
++            .expect("effective layout-policy batch should render");
++        assert_eq!(
++            rendered,
++            editor
++                .clone()
++                .finish()
++                .expect("layout-policy editor should finish")
++        );
++    }
++}
++
+ #[test]
+ fn add_and_remove_use_explicit_targets() {
+     let original = doc_with_object(&[0, 0, 0, 0]);
+diff --git a/crates/litchi-doc/tests/doc_render_handoff.rs b/crates/litchi-doc/tests/doc_render_handoff.rs
+new file mode 100644
+index 0000000000..255338fd30
+--- /dev/null
++++ b/crates/litchi-doc/tests/doc_render_handoff.rs
+@@ -0,0 +1,749 @@
++#![allow(
++    clippy::expect_used,
++    clippy::unwrap_used,
++    clippy::shadow_reuse,
++    clippy::shadow_unrelated,
++    reason = "integration fixtures use contextual fail-fast assertions"
++)]
++
++//! Correctness and ownership coverage for the bounded DOC rendered handoff.
++//!
++//! These tests intentionally exercise the public body-text transaction. They
++//! do not call the common-container handoff directly and do not measure
++//! elapsed time or allocator counters.
++
++use litchi_core::Position;
++use litchi_core::patch::CompositionLimits;
++use litchi_doc::Package;
++use litchi_doc::body_text::{
++    Edit, Error, Projection, Refusal, Snapshot, SubEditJoinFailure, TransactionLimits,
++};
++use litchi_doc::tracked_revision::Limits;
++use litchi_doc::writer::Writer;
++use std::io::Cursor;
++use std::path::PathBuf;
++use std::sync::Arc;
++
++const HANDOFF_REPLACEMENT: &str = "litchi copy-through baseline replacement text";
++
++fn transaction_policy(
++    operations: usize,
++    replacement_units: usize,
++    total_units: usize,
++    retained_render_bytes: usize,
++) -> TransactionLimits {
++    TransactionLimits::new(operations, replacement_units, total_units)
++        .with_max_retained_render_bytes(retained_render_bytes)
++}
++
++fn assert_transaction_policy(
++    actual: TransactionLimits,
++    expected: TransactionLimits,
++    context: &str,
++) {
++    assert_eq!(
++        actual.max_operations(),
++        expected.max_operations(),
++        "{context}: operation ceiling"
++    );
++    assert_eq!(
++        actual.max_replacement_units(),
++        expected.max_replacement_units(),
++        "{context}: per-replacement ceiling"
++    );
++    assert_eq!(
++        actual.max_total_replacement_units(),
++        expected.max_total_replacement_units(),
++        "{context}: aggregate replacement ceiling"
++    );
++    assert_eq!(
++        actual.max_retained_render_bytes(),
++        expected.max_retained_render_bytes(),
++        "{context}: retained-render ceiling"
++    );
++}
++
++fn fixture(relative: &str) -> PathBuf {
++    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++        .join("../..")
++        .join(relative)
++}
++
++fn fixture_bytes(relative: &str) -> Vec<u8> {
++    std::fs::read(fixture(relative)).expect("DOC fixture should be readable")
++}
++
++fn snapshot(bytes: &[u8], transaction_limits: TransactionLimits) -> Snapshot {
++    Snapshot::open_bounded(bytes.to_vec(), Limits::default(), transaction_limits)
++        .expect("DOC fixture should open with bounded transaction limits")
++}
++
++fn writer_document(paragraphs: &[&str]) -> Vec<u8> {
++    let mut writer = Writer::new();
++    for paragraph in paragraphs {
++        writer
++            .add_paragraph(paragraph)
++            .expect("synthetic DOC paragraph should be valid");
++    }
++    let mut output = Cursor::new(Vec::new());
++    writer
++        .write_to(&mut output)
++        .expect("synthetic DOC should serialize");
++    output.into_inner()
++}
++
++fn replacement_position(source: &Snapshot) -> Position {
++    source
++        .paragraphs(Projection::All)
++        .expect("DOC paragraphs should be available")
++        .into_iter()
++        .find(|paragraph| {
++            !paragraph.text().is_empty()
++                && !paragraph
++                    .text()
++                    .chars()
++                    .any(|character| character.is_control() && character != '\t')
++        })
++        .expect("source should contain an ordinary body paragraph")
++        .position()
++}
++
++fn staged_edit(
++    bytes: &[u8],
++    transaction_limits: TransactionLimits,
++    position: Position,
++    replacement: &str,
++) -> Edit {
++    let source = snapshot(bytes, transaction_limits);
++    let mut edit = source.edit().expect("body edit should open");
++    edit.replace_paragraph(position, replacement)
++        .expect("ordinary body replacement should stage");
++    edit
++}
++
++fn reference_output(bytes: &[u8], position: Position, replacement: &str) -> Vec<u8> {
++    let limits = TransactionLimits::default().with_max_retained_render_bytes(0);
++    let edit = staged_edit(bytes, limits, position, replacement);
++    edit.commit()
++        .expect("reference body edit should commit")
++        .snapshot()
++        .bytes()
++        .to_vec()
++}
++
++fn sequential_reference_output(bytes: &[u8], position: Position, replacements: &[&str]) -> Vec<u8> {
++    let limits = TransactionLimits::default().with_max_retained_render_bytes(0);
++    let source = snapshot(bytes, limits);
++    let mut edit = source.edit().expect("reference body edit should open");
++    for replacement in replacements {
++        edit.replace_paragraph(position, replacement)
++            .expect("reference body replacement should stage");
++    }
++    edit.commit()
++        .expect("reference body edit should commit")
++        .snapshot()
++        .bytes()
++        .to_vec()
++}
++
++fn assert_public_reopens(bytes: &[u8]) {
++    let parsed = Snapshot::parse(bytes).expect("strict DOC snapshot should reopen");
++    assert_eq!(parsed.bytes(), bytes);
++    let mut package = Package::from_reader(Cursor::new(bytes.to_vec()))
++        .expect("public DOC package should reopen");
++    package
++        .document()
++        .expect("public DOC reader should validate the candidate");
++}
++
++#[test]
++fn transaction_policy_intersection_keeps_the_stricter_retention_ceiling() {
++    let broad = TransactionLimits::default().with_max_retained_render_bytes(4096);
++    let narrow = TransactionLimits::new(3, 32, 64).with_max_retained_render_bytes(128);
++    let intersection = broad.intersect(narrow);
++    assert_eq!(intersection.max_operations(), 3);
++    assert_eq!(intersection.max_replacement_units(), 32);
++    assert_eq!(intersection.max_total_replacement_units(), 64);
++    assert_eq!(intersection.max_retained_render_bytes(), 128);
++}
++
++#[test]
++fn equal_byte_lineage_prepared_edits_meet_all_transaction_limits() {
++    let bytes = writer_document(&["alpha", "bravo", "charlie"]);
++    let broad = transaction_policy(8, 256, 512, 8 * 1024 * 1024);
++    let strict = transaction_policy(4, 64, 128, 0);
++    let broad_source = snapshot(&bytes, broad);
++    let strict_source = snapshot(&bytes, strict);
++    let composition_limits = CompositionLimits::new(4, 2, 8, 8);
++
++    let left = broad_source
++        .prepare_replace(
++            composition_limits,
++            "broad-left",
++            Position::new(0),
++            "alpha policy",
++        )
++        .expect("broad prepared edit should validate");
++    let right = strict_source
++        .prepare_replace(
++            composition_limits,
++            "strict-right",
++            Position::new(2),
++            "charlie policy",
++        )
++        .expect("strict prepared edit should validate");
++
++    let mut composition = broad_source.compose(composition_limits);
++    composition
++        .join(left)
++        .expect("broad prepared edit should join");
++    composition
++        .join(right)
++        .expect("equal-byte lineage should ignore distinct transaction policies");
++    let commit = composition
++        .commit()
++        .expect("policy-meeting composition should commit");
++    assert_transaction_policy(
++        commit.snapshot().transaction_limits(),
++        strict,
++        "prepared-edit composition",
++    );
++    assert_public_reopens(commit.snapshot().bytes());
++    assert_eq!(
++        paragraph_text(commit.snapshot().bytes(), Position::new(0)),
++        "alpha policy"
++    );
++    assert_eq!(
++        paragraph_text(commit.snapshot().bytes(), Position::new(2)),
++        "charlie policy"
++    );
++
++    let donor = Snapshot::parse(&writer_document(&["donor policy", "untouched donor"]))
++        .expect("donor should parse");
++    let receiver_bytes = writer_document(&["receiver policy", "untouched receiver"]);
++    let broad_receiver = snapshot(&receiver_bytes, broad);
++    let strict_receiver = snapshot(&receiver_bytes, strict);
++    let plan = strict_receiver
++        .plan_text_transfer_from(
++            &donor,
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++        )
++        .expect("strict transfer plan should validate");
++    let mut transfer_edit = broad_receiver
++        .edit()
++        .expect("broad receiver edit should open");
++    transfer_edit
++        .apply_transfer(&plan)
++        .expect("equal-byte receiver lineage should accept transfer");
++    let transfer_commit = transfer_edit
++        .commit()
++        .expect("policy-meeting transfer should commit");
++    assert_transaction_policy(
++        transfer_commit.snapshot().transaction_limits(),
++        strict,
++        "transfer policy meet",
++    );
++    assert_public_reopens(transfer_commit.snapshot().bytes());
++    assert_eq!(
++        paragraph_text(transfer_commit.snapshot().bytes(), Position::new(0)),
++        "donor policy"
++    );
++}
++
++#[test]
++fn rejected_join_and_transfer_preserve_policy_and_retained_state() {
++    let bytes = writer_document(&["alpha", "bravo", "charlie"]);
++    let broad = transaction_policy(8, 256, 512, 8 * 1024 * 1024);
++    let strict = transaction_policy(4, 64, 128, 0);
++    let broad_source = snapshot(&bytes, broad);
++    let strict_source = snapshot(&bytes, strict);
++    let composition_limits = CompositionLimits::new(4, 2, 8, 8);
++
++    let accepted = broad_source
++        .prepare_replace(
++            composition_limits,
++            "accepted",
++            Position::new(0),
++            "accepted policy",
++        )
++        .expect("accepted prepared edit should validate");
++    let conflicting = strict_source
++        .prepare_replace(
++            composition_limits,
++            "conflicting",
++            Position::new(0),
++            "conflicting policy",
++        )
++        .expect("conflicting prepared edit should validate");
++    let mut composition = broad_source.compose(composition_limits);
++    composition
++        .join(accepted)
++        .expect("accepted prepared edit should join");
++    let join_error = composition
++        .join(conflicting)
++        .expect_err("overlapping prepared edit should be rejected");
++    assert!(matches!(
++        join_error.failure(),
++        SubEditJoinFailure::Overlap(_)
++    ));
++    let rejected = join_error.into_rejected();
++    assert_eq!(rejected.identifier(), "conflicting");
++    let broad_commit = composition
++        .commit()
++        .expect("rejected join must not poison accepted composition");
++    assert_transaction_policy(
++        broad_commit.snapshot().transaction_limits(),
++        broad,
++        "rejected composition",
++    );
++    assert_eq!(
++        paragraph_text(broad_commit.snapshot().bytes(), Position::new(0)),
++        "accepted policy"
++    );
++
++    let mut recovered = strict_source.compose(composition_limits);
++    recovered
++        .join(rejected)
++        .expect("rejected prepared token should remain recoverable");
++    let recovered_commit = recovered
++        .commit()
++        .expect("recovered rejected edit should commit");
++    assert_transaction_policy(
++        recovered_commit.snapshot().transaction_limits(),
++        strict,
++        "recovered prepared token",
++    );
++
++    let donor = Snapshot::parse(&writer_document(&["donor transfer", "untouched donor"]))
++        .expect("donor should parse");
++    let wrong_receiver_bytes = writer_document(&["wrong receiver", "untouched receiver"]);
++    let wrong_receiver = snapshot(&wrong_receiver_bytes, strict);
++    let wrong_plan = wrong_receiver
++        .plan_text_transfer_from(
++            &donor,
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++        )
++        .expect("wrong receiver transfer plan should validate");
++
++    let mut edit = broad_source.edit().expect("broad edit should open");
++    edit.replace_paragraph(Position::new(0), "before rejected transfer")
++        .expect("pre-transfer mutation should stage");
++    let held_before_rejection = edit.retained_render_bytes();
++    assert!(held_before_rejection.is_some());
++    let source_policy_before = edit.source().transaction_limits();
++    assert!(matches!(
++        edit.apply_transfer(&wrong_plan),
++        Err(Error::Conflict)
++    ));
++    assert_eq!(edit.retained_render_bytes(), held_before_rejection);
++    assert_transaction_policy(
++        edit.source().transaction_limits(),
++        source_policy_before,
++        "rejected transfer source policy",
++    );
++    let edit_commit = edit
++        .commit()
++        .expect("rejected transfer must leave the staged edit committable");
++    assert_transaction_policy(
++        edit_commit.snapshot().transaction_limits(),
++        broad,
++        "rejected transfer commit",
++    );
++    assert_eq!(
++        paragraph_text(edit_commit.snapshot().bytes(), Position::new(0)),
++        "before rejected transfer"
++    );
++}
++
++#[test]
++fn forward_patch_and_three_way_merge_meet_before_after_policies() {
++    let bytes = writer_document(&["alpha", "bravo", "charlie"]);
++    let broad = transaction_policy(10, 256, 512, 8 * 1024 * 1024);
++    let strict = transaction_policy(4, 64, 128, 0);
++    let source = snapshot(&bytes, broad);
++    let mut edit = source.edit().expect("broad edit should open");
++    edit.replace_paragraph(Position::new(0), "alpha patched")
++        .expect("broad patch should stage");
++    let patch = edit
++        .commit()
++        .expect("broad patch should commit")
++        .patch()
++        .clone();
++    assert_transaction_policy(
++        patch.before().transaction_limits(),
++        broad,
++        "patch before policy",
++    );
++    assert_transaction_policy(
++        patch.after().transaction_limits(),
++        broad,
++        "patch after policy",
++    );
++
++    let strict_source = snapshot(&bytes, strict);
++    let applied = patch
++        .apply(&strict_source)
++        .expect("forward patch should accept equal-byte strict source");
++    assert_transaction_policy(
++        applied.transaction_limits(),
++        strict,
++        "forward patch target policy",
++    );
++    assert_eq!(
++        paragraph_text(applied.bytes(), Position::new(0)),
++        "alpha patched"
++    );
++    let restored = patch
++        .inverse()
++        .apply(&applied)
++        .expect("inverse patch should accept the strict result");
++    assert_transaction_policy(
++        restored.transaction_limits(),
++        strict,
++        "inverse patch target policy",
++    );
++    assert_eq!(restored.bytes(), bytes.as_slice());
++
++    let left_policy = transaction_policy(8, 80, 160, 512);
++    let right_policy = transaction_policy(6, 60, 120, 0);
++    let left_source = snapshot(&bytes, left_policy);
++    let right_source = snapshot(&bytes, right_policy);
++    let mut left_edit = left_source.edit().expect("left edit should open");
++    left_edit
++        .replace_paragraph(Position::new(0), "alpha left")
++        .expect("left edit should stage");
++    let left = left_edit.commit().expect("left edit should commit");
++    let mut right_edit = right_source.edit().expect("right edit should open");
++    right_edit
++        .replace_paragraph(Position::new(2), "charlie right")
++        .expect("right edit should stage");
++    let right = right_edit.commit().expect("right edit should commit");
++    assert_transaction_policy(
++        left.patch().before().transaction_limits(),
++        left_policy,
++        "left before policy",
++    );
++    assert_transaction_policy(
++        left.patch().after().transaction_limits(),
++        left_policy,
++        "left after policy",
++    );
++    assert_transaction_policy(
++        right.patch().before().transaction_limits(),
++        right_policy,
++        "right before policy",
++    );
++    assert_transaction_policy(
++        right.patch().after().transaction_limits(),
++        right_policy,
++        "right after policy",
++    );
++
++    let merge_source = snapshot(&bytes, broad);
++    let expected = transaction_policy(6, 60, 120, 0);
++    let merged = merge_source
++        .plan_three_way(left.patch(), right.patch())
++        .expect("equal-byte differently bounded patches should merge");
++    let merged = merged.commit().expect("three-way merge should commit");
++    assert_transaction_policy(
++        merged.snapshot().transaction_limits(),
++        expected,
++        "three-way before/after policy meet",
++    );
++    assert_public_reopens(merged.snapshot().bytes());
++    assert_eq!(
++        paragraph_text(merged.snapshot().bytes(), Position::new(0)),
++        "alpha left"
++    );
++    assert_eq!(
++        paragraph_text(merged.snapshot().bytes(), Position::new(2)),
++        "charlie right"
++    );
++}
++
++fn paragraph_text(bytes: &[u8], position: Position) -> String {
++    Snapshot::parse(bytes)
++        .expect("DOC output should parse")
++        .paragraphs(Projection::All)
++        .expect("DOC output paragraphs should be available")
++        .into_iter()
++        .find(|paragraph| paragraph.position() == position)
++        .expect("edited paragraph should remain addressable")
++        .text()
++        .to_owned()
++}
++
++#[test]
++fn retention_boundaries_preserve_exact_output_and_capacity() {
++    for relative in [
++        "test-data/ole/doc/NoHeadFoot.doc",
++        "test-data/ole/doc/FloatingPictures.doc",
++    ] {
++        let bytes = fixture_bytes(relative);
++        let source = snapshot(&bytes, TransactionLimits::default());
++        let position = Position::new(0);
++        let reference = reference_output(&bytes, position, HANDOFF_REPLACEMENT);
++
++        let mut calibration = source.edit().expect("calibration body edit should open");
++        calibration
++            .replace_paragraph(position, HANDOFF_REPLACEMENT)
++            .expect("calibration replacement should stage");
++        let capacity = calibration
++            .retained_render_bytes()
++            .expect("default DOC retention should hold this candidate");
++        assert!(capacity > 1, "fixture render should have a useful capacity");
++
++        let cases = [
++            ("zero", 0usize),
++            ("under", capacity - 1),
++            ("exact", capacity),
++            ("over", capacity + 1),
++        ];
++        for (name, ceiling) in cases {
++            let limits = TransactionLimits::default().with_max_retained_render_bytes(ceiling);
++            assert_eq!(limits.max_retained_render_bytes(), ceiling);
++            let edit = staged_edit(&bytes, limits, position, HANDOFF_REPLACEMENT);
++            let held = edit.retained_render_bytes();
++            match name {
++                "zero" | "under" => assert_eq!(held, None, "{relative}: {name}"),
++                "exact" => assert_eq!(held, Some(capacity), "{relative}: {name}"),
++                "over" => {
++                    let held = held.expect("over-ceiling candidate should be retained");
++                    assert_eq!(held, capacity, "{relative}: {name}");
++                    assert!(held <= ceiling, "{relative}: {name}");
++                },
++                _ => unreachable!("all retention cases are listed above"),
++            }
++
++            let commit = edit
++                .commit()
++                .expect("retention ceiling must not refuse a supported edit");
++            let output = commit.snapshot().bytes();
++            assert_eq!(output, reference.as_slice(), "{relative}: {name}");
++            assert!(commit.changed());
++            assert_public_reopens(output);
++            assert_eq!(
++                paragraph_text(output, position),
++                HANDOFF_REPLACEMENT,
++                "{relative}: {name} semantic readback"
++            );
++        }
++    }
++}
++
++#[test]
++fn release_successive_noop_and_refused_edits_are_atomic() {
++    let bytes = fixture_bytes("test-data/ole/doc/NoHeadFoot.doc");
++    let position = Position::new(0);
++    let first = "first bounded handoff replacement";
++    let second = "second bounded handoff replacement with more text";
++    let first_reference = reference_output(&bytes, position, first);
++    let second_reference = sequential_reference_output(&bytes, position, &[first, second]);
++
++    let mut edit = staged_edit(&bytes, TransactionLimits::default(), position, first);
++    let first_held = edit.retained_render_bytes();
++    edit.replace_paragraph(position, second)
++        .expect("successive replacement should stage");
++    let second_held = edit.retained_render_bytes();
++    edit.replace_paragraph(position, second)
++        .expect("same-value replacement should be a no-op");
++    assert_eq!(edit.retained_render_bytes(), second_held);
++    edit.release_retained_render();
++    assert_eq!(edit.retained_render_bytes(), None);
++    let second_commit = edit
++        .commit()
++        .expect("released successive edit should commit");
++    assert_eq!(
++        second_commit.snapshot().bytes(),
++        second_reference.as_slice()
++    );
++    assert_public_reopens(second_commit.snapshot().bytes());
++    assert_ne!(first_held, None, "the first edit should exercise retention");
++
++    let limited =
++        TransactionLimits::new(1, 4096, 4096).with_max_retained_render_bytes(8 * 1024 * 1024);
++    let mut refused = staged_edit(&bytes, limited, position, first);
++    let held_before_refusal = refused.retained_render_bytes();
++    let error = refused
++        .replace_paragraph(position, second)
++        .expect_err("the second operation must exceed the operation limit");
++    assert!(matches!(
++        error,
++        Error::Refused(Refusal::OperationLimit { .. })
++    ));
++    assert_eq!(refused.retained_render_bytes(), held_before_refusal);
++    let refused_commit = refused
++        .commit()
++        .expect("a refused later operation must leave the edit committable");
++    assert_eq!(
++        refused_commit.snapshot().bytes(),
++        first_reference.as_slice()
++    );
++
++    let source = snapshot(&bytes, TransactionLimits::default());
++    let original = source
++        .paragraphs(Projection::All)
++        .expect("source paragraphs")
++        .into_iter()
++        .find(|paragraph| paragraph.position() == position)
++        .expect("position zero paragraph")
++        .text()
++        .to_owned();
++    let mut noop = source.edit().expect("no-op edit should open");
++    noop.replace_paragraph(position, &original)
++        .expect("same source text should be a no-op");
++    assert_eq!(noop.retained_render_bytes(), None);
++    let noop_source = noop
++        .commit()
++        .expect("no-op edit should commit")
++        .into_parts()
++        .0;
++    assert_eq!(noop_source.bytes(), bytes.as_slice());
++    assert!(Arc::ptr_eq(
++        &source.bytes_shared(),
++        &noop_source.bytes_shared()
++    ));
++}
++
++#[test]
++fn multi_generation_and_writer_producer_candidates_reopen() {
++    let generated = writer_document(&["alpha", "bravo 😀", "charlie"]);
++    let cases = [
++        ("word97", fixture_bytes("test-data/ole/doc/NoHeadFoot.doc")),
++        (
++            "word0101",
++            fixture_bytes("test-data/ole/doc/documentProperties.doc"),
++        ),
++        ("litchi-writer", generated),
++    ];
++
++    for (name, bytes) in cases {
++        let source = snapshot(&bytes, TransactionLimits::default());
++        let position = replacement_position(&source);
++        let mut edit = source.edit().expect("producer source should edit");
++        edit.replace_paragraph(position, HANDOFF_REPLACEMENT)
++            .expect("producer source replacement should stage");
++        let commit = edit.commit().expect("producer source should commit");
++        let output = commit.snapshot().bytes();
++        assert_public_reopens(output);
++        assert_eq!(
++            paragraph_text(output, position),
++            HANDOFF_REPLACEMENT,
++            "{name} semantic body readback"
++        );
++    }
++}
++
++#[test]
++fn patches_inverse_conflict_and_composition_preserve_handoff_results() {
++    let bytes = writer_document(&["alpha", "bravo", "charlie"]);
++    let source = snapshot(&bytes, TransactionLimits::default());
++    let limits = CompositionLimits::new(4, 2, 8, 8);
++    let left = source
++        .prepare_replace(limits, "left", Position::new(0), "alpha changed")
++        .expect("left replacement should prepare");
++    let right = source
++        .prepare_replace(limits, "right", Position::new(2), "charlie changed")
++        .expect("right replacement should prepare");
++    let mut composition = source.compose(limits);
++    composition
++        .join(left)
++        .expect("left replacement should join");
++    composition
++        .join(right)
++        .expect("right replacement should join");
++    let composed = composition.commit().expect("composition should commit");
++
++    let mut sequential = source.edit().expect("sequential edit should open");
++    sequential
++        .replace_paragraph(Position::new(0), "alpha changed")
++        .expect("sequential left replacement");
++    sequential
++        .replace_paragraph(Position::new(2), "charlie changed")
++        .expect("sequential right replacement");
++    let sequential = sequential.commit().expect("sequential edit should commit");
++    assert_eq!(
++        composed.snapshot().bytes(),
++        sequential.snapshot().bytes(),
++        "composition and sequential publication should agree"
++    );
++
++    let forward = composed
++        .patch()
++        .apply(&source)
++        .expect("forward patch should apply to its exact source");
++    assert_eq!(forward, *composed.snapshot());
++    let inverse = composed
++        .patch()
++        .inverse()
++        .apply(composed.snapshot())
++        .expect("inverse patch should restore its exact source");
++    assert_eq!(inverse.bytes(), source.bytes());
++
++    let wrong = Snapshot::parse(&writer_document(&["different", "bravo", "charlie"]))
++        .expect("mismatched source should parse");
++    let wrong_bytes = wrong.bytes().to_vec();
++    assert!(matches!(
++        composed.patch().apply(&wrong),
++        Err(Error::Conflict)
++    ));
++    assert_eq!(wrong.bytes(), wrong_bytes.as_slice());
++}
++
++#[test]
++fn transfer_after_a_handoff_reopens_and_checks_source_lineage() {
++    let donor = Snapshot::parse(&writer_document(&["donor text", "untouched donor"]))
++        .expect("donor should parse");
++    let receiver_bytes = writer_document(&["receiver text", "untouched receiver"]);
++    let receiver = Snapshot::parse(&receiver_bytes).expect("receiver should parse");
++    let plan = receiver
++        .plan_text_transfer_from(
++            &donor,
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++            litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0)),
++        )
++        .expect("inert text transfer should prepare");
++
++    let mut edit = receiver.edit().expect("receiver edit should open");
++    edit.replace_paragraph(Position::new(0), "intermediate handoff")
++        .expect("intermediate replacement should stage");
++    let held_before_transfer = edit.retained_render_bytes();
++    edit.apply_transfer(&plan)
++        .expect("transfer should invalidate the earlier staged state");
++    let transferred = edit.commit().expect("transferred receiver should commit");
++    let transferred_bytes = transferred.snapshot().bytes();
++    assert_public_reopens(transferred_bytes);
++    assert_eq!(
++        paragraph_text(transferred_bytes, Position::new(0)),
++        "donor text"
++    );
++    assert!(held_before_transfer.is_some());
++
++    let expected_source = snapshot(
++        &receiver_bytes,
++        TransactionLimits::default().with_max_retained_render_bytes(0),
++    );
++    let mut expected_edit = expected_source.edit().expect("expected receiver edit");
++    expected_edit
++        .replace_paragraph(Position::new(0), "intermediate handoff")
++        .expect("same intermediate edit in the recomputation control");
++    expected_edit
++        .apply_transfer(&plan)
++        .expect("expected transfer should stage");
++    let expected = expected_edit
++        .commit()
++        .expect("expected transfer should commit");
++    assert_eq!(transferred_bytes, expected.snapshot().bytes());
++
++    let wrong_receiver = Snapshot::parse(&writer_document(&["wrong receiver"]))
++        .expect("wrong receiver should parse");
++    let wrong_bytes = wrong_receiver.bytes().to_vec();
++    let mut wrong_edit = wrong_receiver.edit().expect("wrong edit should open");
++    assert!(matches!(
++        wrong_edit.apply_transfer(&plan),
++        Err(Error::Conflict)
++    ));
++    assert_eq!(wrong_edit.source().bytes(), wrong_bytes.as_slice());
++}

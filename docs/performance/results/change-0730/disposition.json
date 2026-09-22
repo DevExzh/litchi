@@ -1,0 +1,7 @@
+{
+  "production": "candidate",
+  "status": "retained; correctness, ordinary comparison, allocation and independent review gates passed",
+  "primary_gate": "NoHeadFoot all six paired p50 improvements 11.89\u201313.88% across three cycles",
+  "memory_tradeoff": "Two-edit peak live +16.72% FloatingPictures and +15.60% NoHeadFoot accepted under finite observable retained-state scope; no total-memory/RSS bound",
+  "limits": "Two fixtures only; FloatingPictures paired p50 includes +1.27% regression; no broad producer or CRUD claim"
+}

@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "files": {
+    "quality-3/0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-3/manifest.json": "04364f5d68a3639cbbf7cd1cece9f3e47d2c9b33c729ff31f7c8793593980d6b",
+    "quality-3/5.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-3/4.log": "97ee3f48faa23200e1827c54aab9449dfc465f483b0a66cf5f49f9a6b267c385",
+    "quality-3/1.log": "77c6245164284c5bd90d06233fdcab98f60444b1cfa7cccdc40f4f6deba57d54",
+    "quality-3/3.log": "57a99b9d0f030411d674ca9f5a3cee64984acf9526d46520f8abbb4d03036bd3",
+    "quality-3/10.log": "f277463e52d067d1064ae80d313d550fa3bc7a1e6aaac4346f1aa2b636a3aa1b",
+    "quality-3/7.log": "30dde35c104f80d3bacd0970b2936a5eb024738d297fc5c3fab3660e67fbf115",
+    "quality-3/2.log": "8a1ae1ab0a22a0af8e92333f5768ccc346cef2d8607e4a090af2448403a16aa5",
+    "quality-3/12.log": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+    "quality-3/8.log": "7cf343587654423631bd89617659484a755e195cd85ae1d4eb298f7c861d4246",
+    "quality-3/9.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-3/11.log": "4eecc618e60e6e84a1aacd980688dd12e54c691b0c04dd0b48cd679a205f7995",
+    "quality-3/6.log": "146837365db0d31c9fe9dc733b49a151201d0360b45ed5292eae47a114b92b26",
+    "qualification-0/docfloat.json": "2c8ef309be6558c17bdc14a2f81f298b0ea0e14d945df5fd2712ba74732feab3",
+    "qualification-0/manifest.json": "33c204f708796c917cb3833b57735e1a50f5b3627039fe6ecfe1707a676b926b",
+    "qualification-0/docfloat.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/candidate-smoke.json": "f1f67ef46dcaa069e497ac6d17b31e2436fd2e67d987bf0831762216859a9747",
+    "qualification-0/docnohf.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docnohf.json": "6625f095639636d541541987b0e8a6ba1d8c67a8a5eb2a17a1bbd64f7d5ae135"
+  },
+  "candidate_builds_sha256": "7bceed2161bd8b567919d80cd73cf4ae6b8e296f50c6017a1002be05baaff9c8",
+  "retention_builds_sha256": "d32b6a22c120ebdc69da3bd00d42a1c48ab23109c28a67b3bd2576cca8df1b10"
+}

@@ -1,0 +1,13 @@
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+   Compiling ole-format-save-probe-0730 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0730/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 24.48s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0730/release/deps/ole_format_save_probe_0730-1eba48d82e4d1f41)
+
+running 4 tests
+test tests::oracle_control_rejects_metadata_change ... ok
+test tests::oracle_control_rejects_wrong_doc_target ... ok
+test tests::oracle_control_rejects_missing_stream ... ok
+test tests::oracle_control_rejects_wrong_ppt_slide_identity ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

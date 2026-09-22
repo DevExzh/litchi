@@ -41,15 +41,23 @@ use std::sync::{Arc, OnceLock};
 pub type History = litchi_core::patch::History<Snapshot>;
 
 /// Finite limits for one body transaction.
+///
+/// The default policy retains at most 8 MiB of already-rendered output
+/// allocation capacity between an edit and its commit. [`Self::new`] disables
+/// that retention unless [`Self::with_max_retained_render_bytes`] enables it.
+/// This ceiling excludes source bytes and temporary rendering/validation
+/// allocations; it is not a bound on total process memory. An output above
+/// the ceiling is recomputed at commit without changing the result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TransactionLimits {
     operations: usize,
     replacement_units: usize,
     total_units: usize,
+    retained_render_bytes: usize,
 }
 
 impl TransactionLimits {
-    /// Creates explicit per-transaction bounds.
+    /// Creates explicit per-transaction bounds with rendered-output retention disabled.
     #[must_use]
     pub const fn new(
         max_operations: usize,
@@ -60,7 +68,19 @@ impl TransactionLimits {
             operations: max_operations,
             replacement_units: max_replacement_units,
             total_units: max_total_replacement_units,
+            retained_render_bytes: 0,
         }
+    }
+
+    /// Adds a finite ceiling for retaining one already-rendered DOC output.
+    ///
+    /// A zero ceiling is a supported setting that keeps no rendered handoff;
+    /// the transaction recomputes its output through the existing finish path
+    /// when it is committed.
+    #[must_use]
+    pub const fn with_max_retained_render_bytes(mut self, max_bytes: usize) -> Self {
+        self.retained_render_bytes = max_bytes;
+        self
     }
 
     /// Maximum staged semantic operations.
@@ -80,11 +100,31 @@ impl TransactionLimits {
     pub const fn max_total_replacement_units(self) -> usize {
         self.total_units
     }
+
+    /// Maximum allocation capacity retained for one validated rendered DOC.
+    #[must_use]
+    pub const fn max_retained_render_bytes(self) -> usize {
+        self.retained_render_bytes
+    }
+
+    /// Intersects two finite transaction policies component by component.
+    ///
+    /// The operation that combines values must preserve the stricter member of
+    /// every policy, including the retained-render ceiling.
+    #[must_use]
+    pub fn intersect(self, other: Self) -> Self {
+        Self {
+            operations: self.operations.min(other.operations),
+            replacement_units: self.replacement_units.min(other.replacement_units),
+            total_units: self.total_units.min(other.total_units),
+            retained_render_bytes: self.retained_render_bytes.min(other.retained_render_bytes),
+        }
+    }
 }
 
 impl Default for TransactionLimits {
     fn default() -> Self {
-        Self::new(256, 1024 * 1024, 4 * 1024 * 1024)
+        Self::new(256, 1024 * 1024, 4 * 1024 * 1024).with_max_retained_render_bytes(8 * 1024 * 1024)
     }
 }
 
@@ -817,6 +857,7 @@ impl Snapshot {
         Composition {
             source: self.clone(),
             joined: JoinedSubEdits::new(self.lineage(), limits),
+            transaction_limits: self.transaction_limits,
         }
     }
 
@@ -852,6 +893,7 @@ impl Snapshot {
                 target,
                 replacement,
             },
+            self.transaction_limits,
         )
     }
 
@@ -880,6 +922,7 @@ impl Snapshot {
                 property: CharacterProperty::Bold,
                 enabled,
             },
+            self.transaction_limits,
         )
     }
 
@@ -902,6 +945,7 @@ impl Snapshot {
                 target,
                 replacement,
             },
+            self.transaction_limits,
         )
     }
 
@@ -925,6 +969,7 @@ impl Snapshot {
                 property,
                 enabled,
             },
+            self.transaction_limits,
         )
     }
 
@@ -1049,12 +1094,14 @@ impl Snapshot {
                 dependency: "structural text",
             }));
         }
+        let transaction_limits = self.transaction_limits;
         let mut validation = self.edit()?;
         validation.replace_text(destination, &value)?;
         Ok(TransferPlan {
             target: self.lineage(),
             destination,
             value,
+            transaction_limits,
         })
     }
 
@@ -1093,11 +1140,13 @@ impl Snapshot {
         let options = donor
             .export_for_transfer(source_storage_id, destination_storage_id)
             .map_err(Error::Invalid)?;
+        let transaction_limits = self.transaction_limits;
         let mut validation = self.edit()?;
         validation.add_embedded_object(options.clone())?;
         Ok(EmbeddedTransferPlan {
             target: self.lineage(),
             options,
+            transaction_limits,
         })
     }
 
@@ -1153,12 +1202,14 @@ impl Snapshot {
                     dependency: DrawingDependency::UnsupportedPictureGraph,
                 })
             })?;
+        let transaction_limits = self.transaction_limits;
         let mut validation = self.edit()?;
         validation.install_picture(destination, graph.clone())?;
         Ok(PictureTransferPlan {
             target: self.lineage(),
             destination,
             graph,
+            transaction_limits,
         })
     }
 
@@ -1177,7 +1228,16 @@ impl Snapshot {
     }
 
     fn editor(&self) -> Result<RevisionEditor> {
-        RevisionEditor::open(self.source.as_ref().to_vec(), self.limits).map_err(Error::Invalid)
+        let mut editor = RevisionEditor::open(self.source.as_ref().to_vec(), self.limits)
+            .map_err(Error::Invalid)?;
+        editor.set_retained_render_limit(self.transaction_limits.max_retained_render_bytes());
+        Ok(editor)
+    }
+
+    fn with_transaction_limits(&self, transaction_limits: TransactionLimits) -> Self {
+        let mut snapshot = self.clone();
+        snapshot.transaction_limits = transaction_limits;
+        snapshot
     }
 
     fn lineage(&self) -> Lineage {
@@ -1224,10 +1284,62 @@ impl Edit {
         })
     }
 
+    fn reopen_editor(&self, bytes: Vec<u8>) -> Result<RevisionEditor> {
+        let mut editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        editor
+            .set_retained_render_limit(self.source.transaction_limits.max_retained_render_bytes());
+        Ok(editor)
+    }
+
+    fn with_transaction_limits<T>(
+        &mut self,
+        incoming: TransactionLimits,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let previous = self.source.transaction_limits;
+        let effective = previous.intersect(incoming);
+        if self.changes.len() > effective.operations {
+            return Err(Error::Refused(Refusal::OperationLimit {
+                observed: self.changes.len(),
+                limit: effective.operations,
+            }));
+        }
+        if self.replacement_units > effective.total_units {
+            return Err(Error::Refused(Refusal::ReplacementLimit {
+                observed: self.replacement_units,
+                limit: effective.total_units,
+            }));
+        }
+        self.source.transaction_limits = effective;
+        let result = operation(self);
+        if result.is_ok() {
+            self.editor.set_retained_render_limit(
+                self.source.transaction_limits.max_retained_render_bytes(),
+            );
+        } else {
+            self.source.transaction_limits = previous;
+        }
+        result
+    }
+
     /// Immutable source snapshot that authorizes this transaction.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
+    }
+
+    /// Allocation capacity held by the already-validated rendered handoff,
+    /// when the transaction's finite retention ceiling admitted it.
+    #[must_use]
+    pub fn retained_render_bytes(&self) -> Option<usize> {
+        self.editor.retained_render_capacity()
+    }
+
+    /// Releases the retained rendered handoff without changing the staged
+    /// document or any semantic transaction result. Later mutations may retain
+    /// a new output under the transaction's ceiling.
+    pub fn release_retained_render(&mut self) {
+        self.editor.release_retained_render();
     }
 
     /// Replaces text in one ordinary source-body paragraph.
@@ -1358,7 +1470,9 @@ impl Edit {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
-        self.replace_text(plan.destination, &plan.value)
+        self.with_transaction_limits(plan.transaction_limits, |edit| {
+            edit.replace_text(plan.destination, &plan.value)
+        })
     }
 
     /// Applies a dependency-closed embedded-object transfer prepared for this
@@ -1367,7 +1481,9 @@ impl Edit {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
-        self.add_embedded_object(plan.options.clone())
+        self.with_transaction_limits(plan.transaction_limits, |edit| {
+            edit.add_embedded_object(plan.options.clone())
+        })
     }
 
     /// Applies a canonical picture graph prepared for this exact receiver.
@@ -1375,7 +1491,9 @@ impl Edit {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
-        self.install_picture(plan.destination, plan.graph.clone())
+        self.with_transaction_limits(plan.transaction_limits, |edit| {
+            edit.install_picture(plan.destination, plan.graph.clone())
+        })
     }
 
     fn install_picture(
@@ -1429,10 +1547,8 @@ impl Edit {
         let installed = self
             .editor
             .replace_with_picture_graph(span.start_cp, span.end_cp, &graph)
-            .map_err(Error::Invalid)?;
-        if graph.data_offset.is_some() && installed != graph {
-            return Err(Error::Conflict);
-        }
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Conflict)?;
         self.replacement_units = self.replacement_units.saturating_add(actual);
         self.changes.push(Change::Picture {
             target,
@@ -1516,7 +1632,7 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = self.reopen_editor(bytes)?;
         self.changes.push(Change::EmbeddedObject {
             storage_id,
             before: None,
@@ -1553,7 +1669,7 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = self.reopen_editor(bytes)?;
         self.changes.push(Change::EmbeddedObject {
             storage_id,
             before: Some(before),
@@ -1627,7 +1743,7 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = self.reopen_editor(bytes)?;
         self.changes.push(Change::EmbeddedDisplay {
             storage_id,
             before,
@@ -1915,11 +2031,15 @@ impl Patch {
     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        let transaction_limits = source
+            .transaction_limits
+            .intersect(self.before.transaction_limits)
+            .intersect(self.after.transaction_limits);
         if same_source_allocation(&source.source, &self.before.source) {
             return Ok(if self.is_noop() {
-                source.clone()
+                source.with_transaction_limits(transaction_limits)
             } else {
-                self.after.clone()
+                self.after.with_transaction_limits(transaction_limits)
             });
         }
         if source.fingerprint() != self.before.fingerprint()
@@ -1928,9 +2048,9 @@ impl Patch {
             return Err(Error::Conflict);
         }
         Ok(if self.is_noop() {
-            source.clone()
+            source.with_transaction_limits(transaction_limits)
         } else {
-            self.after.clone()
+            self.after.with_transaction_limits(transaction_limits)
         })
     }
 
@@ -2372,6 +2492,7 @@ impl PreparedOperation {
 /// One independently prepared body-text or formatting edit.
 pub struct PreparedEdit {
     inner: SubEdit<Lineage, PreparedOperation>,
+    transaction_limits: TransactionLimits,
 }
 
 impl PreparedEdit {
@@ -2380,6 +2501,7 @@ impl PreparedEdit {
         limits: CompositionLimits,
         identifier: impl Into<String>,
         operation: PreparedOperation,
+        transaction_limits: TransactionLimits,
     ) -> Result<Self> {
         let writes = [operation.effect()];
         let inner = SubEdit::new(
@@ -2390,7 +2512,10 @@ impl PreparedEdit {
             writes,
             operation,
         )?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            transaction_limits,
+        })
     }
 
     /// Stable caller-selected composition identifier.
@@ -2450,6 +2575,7 @@ impl std::fmt::Debug for JoinError {
 pub struct Composition {
     source: Snapshot,
     joined: JoinedSubEdits<Lineage, PreparedOperation>,
+    transaction_limits: TransactionLimits,
 }
 
 impl Composition {
@@ -2465,13 +2591,18 @@ impl Composition {
         reason = "composition refusals intentionally return the rejected prepared edit to the caller"
     )]
     pub fn join(&mut self, incoming: PreparedEdit) -> std::result::Result<&mut Self, JoinError> {
+        let transaction_limits = incoming.transaction_limits;
         if let Err(error) = self.joined.join(incoming.inner) {
             let (failure, rejected) = error.into_parts();
             return Err(JoinError {
                 failure,
-                rejected: PreparedEdit { inner: rejected },
+                rejected: PreparedEdit {
+                    inner: rejected,
+                    transaction_limits,
+                },
             });
         }
+        self.transaction_limits = self.transaction_limits.intersect(transaction_limits);
         Ok(self)
     }
 
@@ -2494,7 +2625,8 @@ impl Composition {
     /// Returns the same staging, publication, and full-reopen errors as an
     /// ordinary multi-operation [`Edit`].
     pub fn commit(self) -> Result<Commit> {
-        let mut edit = self.source.edit()?;
+        let source = self.source.with_transaction_limits(self.transaction_limits);
+        let mut edit = source.edit()?;
         for prepared in self.joined.into_sub_edits() {
             match prepared.into_payload() {
                 PreparedOperation::Text {
@@ -2529,6 +2661,7 @@ pub struct TransferPlan {
     target: Lineage,
     destination: TextTarget,
     value: String,
+    transaction_limits: TransactionLimits,
 }
 
 impl TransferPlan {
@@ -2548,6 +2681,7 @@ impl TransferPlan {
 pub struct EmbeddedTransferPlan {
     target: Lineage,
     options: crate::embedded_object::WriteOptions,
+    transaction_limits: TransactionLimits,
 }
 
 /// Canonical re-homed inline/floating picture closure prepared for one exact
@@ -2557,6 +2691,7 @@ pub struct PictureTransferPlan {
     target: Lineage,
     destination: TextTarget,
     graph: crate::tracked_revision::PictureGraph,
+    transaction_limits: TransactionLimits,
 }
 
 impl PictureTransferPlan {
@@ -2619,6 +2754,13 @@ pub struct ThreeWayPlan {
 
 impl ThreeWayPlan {
     fn new(source: Snapshot, left: &Patch, right: &Patch) -> Self {
+        let transaction_limits = source
+            .transaction_limits
+            .intersect(left.before.transaction_limits)
+            .intersect(left.after.transaction_limits)
+            .intersect(right.before.transaction_limits)
+            .intersect(right.after.transaction_limits);
+        let source = source.with_transaction_limits(transaction_limits);
         let mut changes = left.changes.clone();
         let mut conflicts = Vec::new();
         for incoming in &right.changes {
@@ -4258,6 +4400,26 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     #[test]
+    fn retained_render_still_requires_independent_public_reader_validation() {
+        let source = Snapshot::parse(&doc(&["alpha"])).expect("valid source");
+        let mut edit = source.edit().expect("edit");
+        // Test-only substitution: the strict owner accepts this package, but
+        // its malformed RSID payload must fail the independent public reader.
+        edit.editor = RevisionEditor::open(public_reader_failure_doc(), Limits::default())
+            .expect("strict owner accepts the public-reader failure fixture");
+        edit.editor.set_retained_render_limit(8 * 1024 * 1024);
+        edit.replace_paragraph(Position::new(0), "replacement")
+            .expect("common candidate validates");
+        assert!(edit.retained_render_bytes().is_some());
+        assert!(matches!(edit.commit(), Err(Error::Invalid(_))));
+        assert_eq!(
+            source.paragraphs(Projection::All).expect("source intact")[0].text(),
+            "alpha"
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
     fn profiled_open_public_reader_error_closes_only_public_phase() {
         let bytes = public_reader_failure_doc();
         assert!(RevisionEditor::open(bytes.clone(), Limits::default()).is_ok());
@@ -5383,6 +5545,104 @@ mod tests {
             .apply_durable(&durable.inverse())
             .expect("revision durable inverse");
         assert_eq!(restored.revisions().expect("restored revisions").len(), 1);
+    }
+
+    #[test]
+    fn retained_picture_mismatch_is_atomic_and_missing_data_handoff_is_current() {
+        for floating in [false, true] {
+            let donor = Snapshot::parse(&picture_doc(floating)).expect("donor");
+            let mut package = PackageEditor::open(
+                formatted_picture_receiver_doc(),
+                Targets::default(),
+                Limits::default(),
+            )
+            .expect("receiver package");
+            package
+                .remove_stream(&["Data".to_string()])
+                .expect("remove unused Data");
+            let receiver =
+                Snapshot::parse(&package.finish().expect("receiver bytes")).expect("receiver");
+            let plan = receiver
+                .plan_picture_transfer_from(
+                    &donor,
+                    TextTarget::body_paragraph(Position::new(0)),
+                    TextTarget::body_paragraph(Position::new(0)),
+                )
+                .expect("picture plan");
+            let mut edit = receiver.edit().expect("edit");
+            edit.replace_paragraph(Position::new(1), "changed other")
+                .expect("first edit");
+            let held = edit.retained_render_bytes();
+            assert!(held.is_some());
+            let before = edit.editor.clone().finish().expect("before bytes");
+            let changes = edit.changes.len();
+            let mut mismatched = plan.clone();
+            mismatched.graph.data_offset = Some(u32::MAX);
+            assert!(matches!(
+                edit.apply_picture_transfer(&mismatched),
+                Err(Error::Conflict)
+            ));
+            assert_eq!(edit.retained_render_bytes(), held);
+            assert_eq!(edit.changes.len(), changes);
+            assert_eq!(edit.editor.clone().finish().expect("after refusal"), before);
+            edit.apply_picture_transfer(&plan)
+                .expect("valid missing-Data insertion");
+            assert!(edit.retained_render_bytes().is_some());
+            let commit = edit.commit().expect("retained commit");
+            let zero = receiver.with_transaction_limits(
+                receiver
+                    .transaction_limits
+                    .with_max_retained_render_bytes(0),
+            );
+            let mut control = zero.edit().expect("control");
+            control
+                .replace_paragraph(Position::new(1), "changed other")
+                .expect("control first");
+            control
+                .apply_picture_transfer(&plan)
+                .expect("control picture");
+            assert_eq!(control.retained_render_bytes(), None);
+            assert_eq!(
+                control.commit().expect("control commit").snapshot().bytes(),
+                commit.snapshot().bytes()
+            );
+            assert_eq!(
+                commit
+                    .patch()
+                    .inverse()
+                    .apply(commit.snapshot())
+                    .expect("inverse"),
+                receiver
+            );
+        }
+    }
+
+    #[test]
+    fn retained_render_is_cleared_by_resource_reopen_and_reenabled_for_formatting() {
+        let donor = Snapshot::parse(&embedded_doc()).expect("embedded donor");
+        let receiver = Snapshot::parse(&doc(&["placeholder", "other"])).expect("receiver");
+        let plan = receiver
+            .plan_embedded_transfer_from(&donor, 77, 88)
+            .expect("embedded plan");
+        let mut outputs = Vec::new();
+        for ceiling in [0, 8 * 1024 * 1024] {
+            let source = receiver.with_transaction_limits(
+                receiver
+                    .transaction_limits
+                    .with_max_retained_render_bytes(ceiling),
+            );
+            let mut edit = source.edit().expect("edit");
+            edit.replace_paragraph(Position::new(1), "changed other")
+                .expect("text edit");
+            assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
+            edit.apply_embedded_transfer(&plan).expect("resource edit");
+            assert_eq!(edit.retained_render_bytes(), None);
+            edit.set_paragraph_bold(Position::new(1), true)
+                .expect("format after resource reopen");
+            assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
+            outputs.push(edit.commit().expect("commit").snapshot().bytes().to_vec());
+        }
+        assert_eq!(outputs[0], outputs[1]);
     }
 
     #[test]

@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "inherited": "0728 final oracle",
+  "runs": [
+    {
+      "output": "native-c0-docfloat-0-baseline.json",
+      "oracles": 50,
+      "negative_controls": 8
+    },
+    {
+      "output": "native-c0-docnohf-0-baseline.json",
+      "oracles": 50,
+      "negative_controls": 7
+    },
+    {
+      "output": "allocation-c0-docfloat-0-baseline.json",
+      "oracles": 1,
+      "negative_controls": 8
+    },
+    {
+      "output": "allocation-c0-docnohf-0-baseline.json",
+      "oracles": 1,
+      "negative_controls": 7
+    }
+  ]
+}

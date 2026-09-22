@@ -1,0 +1,36 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0730/retention-probe/Cargo.toml",
+    "--release",
+    "--offline",
+    "--bins",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "seconds": 1.1869032630929723,
+  "probe_sha256": {
+    "retention-probe/Cargo.lock": "2d6c5dae77a2a4b73edbf064e61886e1c8ba2de56126b18c3e9d622a6093c8ad",
+    "retention-probe/README.md": "de88509fc7833b3174d0317e29b9a2136e19e54510e91aab96746dfda2e1e994",
+    "retention-probe/Cargo.toml": "1f0d5a1846489596a677ffcfe1b204112d0c43b66e783b417b95d1887485a95c",
+    "retention-probe/src/main.rs": "29af34a2d508b11e35aa4447b7234a599db2e98c9e281f77aee98be8076d05e9",
+    "retention-probe/src/lib.rs": "7819d4a0f9777c5788a25ac744a26f211efa256d34efb7d30454134926b5df3d",
+    "retention-probe/src/alloc_metrics.rs": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d",
+    "retention-probe/src/bin/alloc.rs": "1e1415828a7b87d1bea3af40f93c4a0797ad7f3fc3ac6f3592ec46e2351074ba"
+  },
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0730-bin/doc_retention_probe",
+      "bytes": 47483376,
+      "sha256": "5b4398924b3ffe03cf49a5241f94456db88441753aeb2e6f48a59b95b8f90e19"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0730-bin/doc_retention_probe_alloc",
+      "bytes": 47486944,
+      "sha256": "be87286c6b0f568c81cb6baa5e08e648a8283efc65b03134188239d672af60f0"
+    }
+  ],
+  "candidate_builds_sha256": "9b74ae0623d68465c9088e53e61f2cc1d3cc2d08597f1657910383f8020b90d7"
+}

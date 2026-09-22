@@ -1,0 +1,25 @@
+[package]
+name = "doc-retention-probe-0730"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "doc_retention_probe"
+path = "src/main.rs"
+
+[[bin]]
+name = "doc_retention_probe_alloc"
+path = "src/bin/alloc.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-doc = { path = "../../../../../crates/litchi-doc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+[profile.release]
+debug = 1

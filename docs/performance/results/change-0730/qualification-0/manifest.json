@@ -1,0 +1,49 @@
+{
+  "runs": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0730-bin/candidate-ole_format_save_probe",
+        "--case",
+        "docfloat",
+        "--input",
+        "test-data/ole/doc/FloatingPictures.doc",
+        "--operation",
+        "format",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "output": "docfloat.json",
+      "sha256": "2c8ef309be6558c17bdc14a2f81f298b0ea0e14d945df5fd2712ba74732feab3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0730-bin/candidate-ole_format_save_probe",
+        "--case",
+        "docnohf",
+        "--input",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "--operation",
+        "format",
+        "--samples",
+        "1",
+        "--warmups",
+        "1"
+      ],
+      "exit_code": 0,
+      "output": "docnohf.json",
+      "sha256": "6625f095639636d541541987b0e8a6ba1d8c67a8a5eb2a17a1bbd64f7d5ae135",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "candidate_builds_sha256": "7bceed2161bd8b567919d80cd73cf4ae6b8e296f50c6017a1002be05baaff9c8"
+}

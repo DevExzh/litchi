@@ -373,6 +373,35 @@ impl Editor {
         &mut self,
         replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
     ) -> Result<(), OleError> {
+        self.put_streams_shared_with_rendered(replacements)
+            .map(|_| ())
+    }
+
+    /// Replaces existing streams in one failure-atomic CFB publication and
+    /// returns the validated candidate rendering when the batch changes it.
+    ///
+    /// Replacements are applied in iterator order to one isolated candidate.
+    /// Repeated paths therefore retain the last supplied value. The candidate
+    /// is rendered, reopened, and published only once after every replacement
+    /// has passed the configured stream and package bounds. An empty or
+    /// all-no-op batch returns `Ok(None)` without cloning or rendering. A
+    /// repeated path that changes to one value and then changes back to its
+    /// original value is still an effective two-step batch and is rendered.
+    ///
+    /// The returned bytes are the exact rendering validated while publishing
+    /// the candidate. They are handed to the caller and are not retained by
+    /// this editor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the batch exceeds the package stream-count bound,
+    /// a stream is missing or oversized, or the final rendered package fails
+    /// validation. Failure leaves this editor unchanged and returns no
+    /// rendered bytes.
+    pub fn put_streams_shared_with_rendered<'a>(
+        &mut self,
+        replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
+    ) -> Result<Option<Vec<u8>>, OleError> {
         let mut candidate = None;
         for (index, (path, data)) in replacements.into_iter().enumerate() {
             if index >= self.limits.max_streams {
@@ -391,9 +420,12 @@ impl Editor {
             candidate.package.put_stream(path, data, self.limits)?;
         }
         if let Some(candidate) = candidate {
-            *self = candidate.commit_candidate()?;
+            let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
+            *self = candidate;
+            Ok(Some(rendered))
+        } else {
+            Ok(None)
         }
-        Ok(())
     }
 
     /// Adds an opaque package stream below an existing CFB storage.

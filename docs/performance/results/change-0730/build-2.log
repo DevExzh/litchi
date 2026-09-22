@@ -1,0 +1,6 @@
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+   Compiling ole-format-save-probe-0730 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0730/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 51.66s

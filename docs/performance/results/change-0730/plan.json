@@ -1,0 +1,28 @@
+{
+  "cpu": 12,
+  "samples": 50,
+  "warmups": 3,
+  "cycles": 3,
+  "cases": [
+    "docfloat",
+    "docnohf"
+  ],
+  "native_order": [
+    "baseline",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline"
+  ],
+  "native_processes": 36,
+  "allocation_order": [
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline"
+  ],
+  "allocation_processes": 8,
+  "before_native_processes": 2,
+  "before_allocation_processes": 2
+}
