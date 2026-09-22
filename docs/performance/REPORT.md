@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0738 — startup arguments change unchanged-owner timings
+
+[0738](0738-ppt-sample-layout-and-startup-controls.md) records two separately
+frozen matrices: 192 processes, 7,200 native samples and 48 allocation samples.
+Restoring original Sample fields does not remove the secondary observer gap.
+The same original binary with a redundant option increases secondary p50 6.14%;
+explicit/default lifecycle selection also changes timings. Allocation fields
+remain identical. Qualify complete invocation/startup profiles before timing
+transfer; neither a unique mechanism nor the 0735 candidate's regression cause
+is established. Production and the rejection remain unchanged; the non-iWork
+goal stays active. [Evidence](results/change-0738/README.md).
+
 ## 0737 — legacy observer control blocks timing transfer
 
 [0737](0737-ppt-oracle-lifecycle-controls.md) completes 138 unchanged-owner

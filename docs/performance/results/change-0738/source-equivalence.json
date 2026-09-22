@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "blocks": {
+    "#[derive(Clone, Debug, Serialize)]\nstruct Sample {": {
+      "bytes": 342,
+      "sha256": "9a4ef79d52aba6d72381a305a3ea895cbb49b8cafd665018f52b4cd18252f88b",
+      "identical": true
+    },
+    "fn oracle_for_output(": {
+      "bytes": 6249,
+      "sha256": "3bfa93b012998a0cf9740beca7b68c08ba3d281744b6dadf811e1e64fcf928e6",
+      "identical": true
+    },
+    "fn public_format_edit(": {
+      "bytes": 1117,
+      "sha256": "053f47cd16f00673fd440f0530f092c7dcae724a980dba68a5085159e36e0a14",
+      "identical": true
+    },
+    "fn measured_public_format(": {
+      "bytes": 123,
+      "sha256": "3f4c11e9bd8ffc515c960c14146819ad749fa7211b25b985c56cd39f58774359",
+      "identical": true
+    },
+    "fn timed_format(": {
+      "bytes": 297,
+      "sha256": "e8bf2747002bffce312dff6099f02131a1493e23e9f0ebb133d8433563d52b3d",
+      "identical": true
+    },
+    "fn output_sample(": {
+      "bytes": 1059,
+      "sha256": "aa9122b786a23f398b7b53020c8c0a5aae15b731f7811b7e1983280090b5808e",
+      "identical": true
+    }
+  },
+  "scope": "Exact source fields and owner/oracle blocks; no ABI size, address or unique runtime cause claim."
+}

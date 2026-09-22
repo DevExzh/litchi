@@ -1,0 +1,17 @@
+{
+  "allocation_comparisons": 6,
+  "allocation_processes": 24,
+  "analysis_match": true,
+  "analysis_sha256": "8b30947da741c9aedb4c5090b5d42a4cc68d3c8e3d14f71e2b3bb28a4a1e892d",
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 7338,
+  "capture_sha256": "b1ac0161e764ec9f51d6648beb36ea97de14bbfed8bc91674628744c6b10ed6c",
+  "freeze_sha256": "1adfdee208836133e53167403abc68880fd96764effe6e06218b445642716559",
+  "fresh_scope": "No fresh arm; all four arms use the legacy lifecycle and full 50-sample windows.",
+  "native_comparisons": 6,
+  "native_processes": 72,
+  "native_samples": 3600,
+  "preflight_sha256": "41c130f6a1a46cb20d75a90721415f418db9cac46c9d755753160e5facfa0d6d",
+  "schema_version": 1,
+  "status": "passed"
+}
