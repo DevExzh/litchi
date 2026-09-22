@@ -1,0 +1,76 @@
+{
+  "probe_sha256": {
+    "probe/Cargo.lock": "aaac41f759a794e8c9f951d50f1e3f2ab26720800e8208d67b892ec5961a2624",
+    "probe/Cargo.toml": "0e2d893950788a4de3b8d19611996709d1e90db7b4dc7451a5c074711e637caf",
+    "probe/src/main.rs": "586889ba8e51af2f98550fdda58d8666eb3159c159d315b51f06bf55e2ef70f3",
+    "probe/src/lib.rs": "e70f07d1b51c5b54f82154a07671d69d9090ee38d2e929f3423b78890742d987",
+    "probe/src/alloc_metrics.rs": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+  },
+  "runs": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0729/probe/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.06505785998888314,
+      "log": "0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0729/probe/Cargo.toml",
+        "--release",
+        "--offline",
+        "--locked",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 0.9569624389987439,
+      "log": "1.log",
+      "sha256": "5577ddfd7508fff8fd50a1d327e6d48edea4bc9a5fc44e8ee7fddd85f6249df1"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0729/probe/Cargo.toml",
+        "--release",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 16.76502974599134,
+      "log": "2.log",
+      "sha256": "5f488a483c67f3889ef79f07e7991bda5ea6a0557ac1a6e29b5f6c44dbeff816"
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0729/probe/Cargo.toml",
+        "--release",
+        "--offline",
+        "--locked",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "seconds": 1.3584302079398185,
+      "log": "3.log",
+      "sha256": "b4554b83448ed43fc3f65601f03c8a0f02dded698b761ee0cc22f65af43e51c1"
+    }
+  ]
+}

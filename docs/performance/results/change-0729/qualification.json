@@ -1,0 +1,27 @@
+{
+  "builds_sha256": "1cd1e8c56981cc4da3c25df30ce9501eb509efffcb7715a1a5a5315c636691cf",
+  "files": {
+    "quality-0/0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-0/manifest.json": "12a8eeb77ad6093287eb9899194b63b95e6ae149872b72837a389aed5ea3deab",
+    "quality-0/1.log": "5577ddfd7508fff8fd50a1d327e6d48edea4bc9a5fc44e8ee7fddd85f6249df1",
+    "quality-0/3.log": "b4554b83448ed43fc3f65601f03c8a0f02dded698b761ee0cc22f65af43e51c1",
+    "quality-0/2.log": "5f488a483c67f3889ef79f07e7991bda5ea6a0557ac1a6e29b5f6c44dbeff816",
+    "qualification-0/docfloat-profiled-empty.json": "77be273c8ce1d0c3a127ee9640187912c590a7b586ff676442a2abd2f5499ae8",
+    "qualification-0/docfloat-ordinary-opaque.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docfloat-profiled-clock.json": "d815c4764bfe1027a8feeeb8b7b779b67463d1f9bbb9f2f09f0a47deeff5f23a",
+    "qualification-0/manifest.json": "0b4e0e6ea02fd1bea5cf5a38016b433e03adaaeeddfb6f07f9b0505c6fc5e891",
+    "qualification-0/docfloat-profiled-clock.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docfloat-ordinary-split.json": "df8e3e599c5f6ea04cded13d4399026ab782b90b89041dfdcd465ed5eb14569e",
+    "qualification-0/docnohf-ordinary-opaque.json": "dbd4930ae73c41d0aed06af8cfd19fd714acb08770ca41772790057bc0bd4749",
+    "qualification-0/docnohf-ordinary-split.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docfloat-ordinary-split.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docfloat-profiled-empty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docfloat-ordinary-opaque.json": "4e0d6203412c6bfb6ffa9b19f39589d33bfc07b12467c1bc9ae3b21ec8b06809",
+    "qualification-0/docnohf-profiled-clock.json": "25c33c87d33c314d1fbd2ca979c2ab95c98caeb70487fa64cf6a49ccd9436ca6",
+    "qualification-0/docnohf-profiled-clock.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docnohf-profiled-empty.json": "f266426a75989b104e145511869eaa315b5c97007a4fa9fbdd6cc75257d5b369",
+    "qualification-0/docnohf-profiled-empty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docnohf-ordinary-opaque.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-0/docnohf-ordinary-split.json": "b55c1fd182e762d0336caec09abbae9c49657a84051dbad9c04e2f2df09f2d00"
+  }
+}

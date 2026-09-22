@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "kind": "synthetic schema integration only; not measurement",
+  "analyzer_sha256": "e4a1db02606ad3640b24bf051a6cd4d7ce9edcdd43ae129054ab024234f7d82f",
+  "auditor_sha256": "bd351d343cea898d58eedb7be72d7a3c752560155eefa108009e0d7361d2e737",
+  "contract_sha256": "501e079be92fb417689382257e0a758dd22d160032671f10df7c594629597c54",
+  "script_sha256": "e4e3012ff1ace73c7557d9651f89d8d31e51d34cfc5f1e2e477f3b6893b36a4c"
+}

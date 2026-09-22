@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0729 — public DOC phase evidence bounds the render opportunity
+
+[0729](0729-doc-public-phase-attribution.md) measures actual public owners
+rather than inferring their phases from container controls. Profiled finish
+occupies roughly 13% on NoHeadFoot and 8% on FloatingPictures; only the smaller
+fixture clears every 5% observer/control check. All 72 processes, exact prior
+outputs, semantic event traces and independent statistics pass. The larger
+fixture's 17 flags and profiled lifetime differences remain explicit. Next is a
+bounded DOC validated-render handoff pilot with ordinary-path and memory gates.
+Production remains unchanged. [Packet](results/change-0729/README.md).
+
 ## 0728 — qualified current DOC/PPT save baseline
 
 [0728](0728-doc-ppt-current-save-baseline.md) records 81 fixed processes under

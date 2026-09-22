@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0729 — bounded DOC rendered-output handoff pilot is next
+
+[0729](0729-doc-public-phase-attribution.md) measures Finish at 13.00–13.30%
+of the profiled NoHeadFoot workflow, with all small-case observer/control checks
+within 5%. FloatingPictures reports 7.68–8.18%, but its 17 control flags prevent
+precise transfer to ordinary-path fractions. Current evidence supports a narrow
+source-qualified batched validated-render handoff pilot, with ordinary-path
+retention controls on both cases, required validation, atomicity, no-op and
+successive-edit proofs, and explicit retained-memory accounting. It does not
+justify a generic unbounded cache or a Reuse-policy change. Public validation
+remains mandatory. [Evidence](results/change-0729/README.md). The non-iWork goal
+remains active; production is unchanged.
+
 ## 0728 — DOC repeated rendering remains a bounded investigation
 
 [0728](0728-doc-ppt-current-save-baseline.md) measures common Reuse DOC finish

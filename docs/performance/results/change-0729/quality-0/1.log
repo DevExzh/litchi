@@ -1,0 +1,15 @@
+   Compiling ole-format-save-probe-0729 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0729/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.92s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0729/release/deps/ole_format_save_probe_0729-db0fa68abea09d27)
+
+running 7 tests
+test tests::oracle_control_rejects_metadata_change ... ok
+test tests::oracle_control_rejects_wrong_doc_target ... ok
+test tests::oracle_control_rejects_missing_stream ... ok
+test tests::oracle_control_rejects_wrong_ppt_slide_identity ... ok
+test tests::profiled_clock_trace_rejects_an_incomplete_commit_sequence ... ok
+test tests::public_phase_split_reports_unattributed_residual ... ok
+test tests::profiled_clock_trace_requires_balanced_expected_phase_pairs ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

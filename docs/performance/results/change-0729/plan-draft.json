@@ -1,0 +1,470 @@
+{
+  "status": "prospective draft pending stable probe qualification",
+  "cpu": 12,
+  "cycles": 3,
+  "rounds": 3,
+  "cases": [
+    "docfloat",
+    "docnohf"
+  ],
+  "routes": [
+    "ordinary-opaque",
+    "ordinary-split",
+    "profiled-empty",
+    "profiled-clock"
+  ],
+  "samples": 50,
+  "warmups": 3,
+  "processes": 72,
+  "measured_lifecycles": 3600,
+  "observer_flag_percent": 5,
+  "schedule": [
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docfloat",
+      "route": "profiled-clock"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-opaque"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "ordinary-split"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-empty"
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "case": "docnohf",
+      "route": "profiled-clock"
+    }
+  ],
+  "comparisons": [
+    [
+      "ordinary-opaque",
+      "ordinary-split"
+    ],
+    [
+      "ordinary-split",
+      "profiled-empty"
+    ],
+    [
+      "profiled-empty",
+      "profiled-clock"
+    ]
+  ],
+  "disposition": "unchanged source attribution; no production performance claim"
+}

@@ -1,0 +1,14 @@
+{
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0729",
+    "/home/zhuhe/code/litchi-0729-bin"
+  ],
+  "identities": [
+    {
+      "path": "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+      "bytes": 76667464,
+      "sha256": "9111bb2a6a458ff2409ca28e70bbde1f2c36d94fa6a3c8fcb7a9612f6566a5a2"
+    }
+  ],
+  "removed": true
+}
