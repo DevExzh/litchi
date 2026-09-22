@@ -1,0 +1,26 @@
+{
+  "schema": "financial-annuity-edge-development-v1",
+  "scope": "Exploratory 8-vector public regression PASS while the scaled-arithmetic kernel was being edited. Hashes were observed after execution only; this is not frozen acceptance. Re-run after handoff.",
+  "commit": "4bce6e1a6e083ccca960cdec6b05b508c0538324",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "--test",
+    "ods_formula_financial_evaluation",
+    "ppmt_large_present_value_and_late_ipmt_match_decimal_profile",
+    "--",
+    "--exact",
+    "--quiet"
+  ],
+  "exit_code": 0,
+  "sha256": {
+    "crates/litchi-ods/src/codec/formula/evaluation/financial/kernel.rs": "34b1759cc5ffce7afc45fa1114dc979f5f78c626f10ac8eca5605aeaa7d3bc67",
+    "crates/litchi-ods/tests/ods_formula_financial_evaluation.rs": "31612e8cdbff3abe9944f91458ae5158c92f8bf6baf4ea3171ac6cf343d4f10a",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  },
+  "output": "   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-financial-development/crates/litchi-ods)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.42s\n     Running tests/ods_formula_financial_evaluation.rs (target/debug/deps/ods_formula_financial_evaluation-8dff535efe13a9ed)\n\nrunning 1 test\n.\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s\n\n"
+}
