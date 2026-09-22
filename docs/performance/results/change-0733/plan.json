@@ -1,0 +1,13 @@
+{
+  "base_head": "65b02b5c705a1de0bf3f714296a6e85e577d1cac",
+  "kind": "retrospective analysis of sealed 0731 instruction profiles, informed by 0732 native phases",
+  "new_library_measurements": false,
+  "profile_repeats": [
+    0,
+    1,
+    2
+  ],
+  "scope": "Ir partition within the collected embedded finish; no native latency fraction or speedup inference",
+  "candidate": "qualify moving PPT stream payloads into existing owned CFB writer ingress; preserve every validation and digest",
+  "counter_witness": "three fixed standalone Callgrind runs; calls metadata is not a collected-invocation denominator"
+}

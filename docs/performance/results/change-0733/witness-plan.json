@@ -1,0 +1,69 @@
+{
+  "scope": "collection counter semantics only; no PPT timing evidence",
+  "source_sha256": "e363975929135a2e3de54259c824ed2df36478ebc3e65cf9f187abb3aec260b9",
+  "runner_sha256": "7b5d0d36ffb7ee56460b02e11c36df05cbf47b43812264db01ec7cd5714637fc",
+  "commands": [
+    [
+      "rustfmt",
+      "--check",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0733/collection-witness.rs"
+    ],
+    [
+      "rustc",
+      "--edition=2024",
+      "--crate-name",
+      "collection_witness",
+      "-C",
+      "opt-level=2",
+      "-C",
+      "debuginfo=1",
+      "-D",
+      "warnings",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0733/collection-witness.rs",
+      "-o",
+      "/home/zhuhe/code/litchi-0733-bin/collection-witness"
+    ],
+    [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-0733-bin/collection-witness"
+    ],
+    [
+      "taskset",
+      "-c",
+      "12",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=collection_witness::owner",
+      "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/0.callgrind",
+      "--log-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/0.valgrind",
+      "/home/zhuhe/code/litchi-0733-bin/collection-witness"
+    ],
+    [
+      "taskset",
+      "-c",
+      "12",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=collection_witness::owner",
+      "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/1.callgrind",
+      "--log-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/1.valgrind",
+      "/home/zhuhe/code/litchi-0733-bin/collection-witness"
+    ],
+    [
+      "taskset",
+      "-c",
+      "12",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=collection_witness::owner",
+      "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/2.callgrind",
+      "--log-file=/home/zhuhe/code/litchi/docs/performance/results/change-0733/witness/2.valgrind",
+      "/home/zhuhe/code/litchi-0733-bin/collection-witness"
+    ]
+  ]
+}

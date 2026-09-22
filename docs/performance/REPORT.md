@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0733 — concrete PPT payload ownership pilot nominated
+
+[0733](0733-ppt-finish-instruction-partition.md) conserves all retained profile
+costs and partitions embedded finish through seven uniquely attributable nodes.
+Five stream payloads totaling 384,906 bytes pass through copying writer ingress;
+existing owned ingress is the next bounded candidate. A safe standalone witness
+resolves Callgrind call-count contamination from uncollected invocations.
+Ten parser/context/custody controls pass. No production change or speedup is
+claimed; fresh before/after ordinary-path and memory evidence is required.
+[Evidence](results/change-0733/README.md).
+
 ## 0732 — native PPT attribution retained with three observer flags
 
 [0732](0732-ppt-native-phase-attribution.md) adds content-free, feature-gated

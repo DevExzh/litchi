@@ -1,0 +1,10 @@
+{
+  "change-0731": {
+    "path": "docs/performance/results/change-0731/artifact-manifest.json",
+    "sha256": "98c2a985c555ea622f1d2cb890515748029ae750b74cd298ee97a8e5432d250e"
+  },
+  "change-0732": {
+    "path": "docs/performance/results/change-0732/artifact-manifest.json",
+    "sha256": "e4be0f94f5d863d637df5107bac485c791d09a406bdbaebbd84045d460f1895a"
+  }
+}

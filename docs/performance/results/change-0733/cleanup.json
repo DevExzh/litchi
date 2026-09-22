@@ -1,0 +1,14 @@
+{
+  "removed": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0733-bin/collection-witness",
+      "bytes": 4344088,
+      "sha256": "3e73897859157aad718d7b0f52ee880a528b1491d8b5d8121011e27ec5e0afa9"
+    }
+  ],
+  "roots": [
+    "/home/zhuhe/code/litchi-0733-bin"
+  ],
+  "library_builds_created": false
+}
