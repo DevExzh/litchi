@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "files": {
+    "qualification-raw/baseline-primary-allocation.json": "757b8323d91227dd3f443f3b3e34e799dea6b0a5b64aa8597e68d0a6fcdd05ba",
+    "qualification-raw/baseline-primary-allocation.receipt.json": "b152b4760e6b50065b37e3ed3ce4575d371eb27e315b5033226217afa1c9517e",
+    "qualification-raw/baseline-primary-allocation.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/baseline-primary-native.json": "4b12263dbcb29ff8a03e885aea3cc405aa012c3b559203f242f367d3db39de06",
+    "qualification-raw/baseline-primary-native.receipt.json": "3a7c272a2289aa960cf066784ee434cc9eca2c1a296f64eeb29227869f46e369",
+    "qualification-raw/baseline-primary-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/baseline-secondary-0-native.json": "6f7503259ce8f56f6fc9d370c1b796d0c2d2f47f145e37c0f9a79faeb2bfa746",
+    "qualification-raw/baseline-secondary-0-native.receipt.json": "0f4113662d931bd04fd83df6e8efdde8952bdedf25f4b87e9341ebef8e136491",
+    "qualification-raw/baseline-secondary-0-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/baseline-secondary-allocation.json": "6c9e19e353d7592e20d11a1a69d3db870b252fcbebc7a5f8a3f2aa336628ea1f",
+    "qualification-raw/baseline-secondary-allocation.receipt.json": "d9f389b212fe1921ced9611d0ccdc6476ce72e12295f18d4f1993258da6363f7",
+    "qualification-raw/baseline-secondary-allocation.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/candidate-primary-allocation.json": "1e5bc2a77344265b822edea9fb3317b4097f21717709d44293707e502dcd068f",
+    "qualification-raw/candidate-primary-allocation.receipt.json": "f55ddaf7c7f06f84ec17f08d027c4a5bfdbdbae650af7d09a6b8d5709b68551c",
+    "qualification-raw/candidate-primary-allocation.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/candidate-primary-native.json": "aa89fc8b9d941fb881cd0de378a8c036c1a11facbff38013de355c44a6520b1c",
+    "qualification-raw/candidate-primary-native.receipt.json": "e7f5aca553765f9633577389e7cd70326798b4b3684044548df544d59b8b7c14",
+    "qualification-raw/candidate-primary-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/candidate-secondary-allocation.json": "598dec0b1093392839700f1fe58560e9ccf576d08d53fc2c8b7a109c3ff0e112",
+    "qualification-raw/candidate-secondary-allocation.receipt.json": "380c4d28c2e50e5f367ed9d53b0ca667af31f7f542cd391ab2ee65448ddf7ae8",
+    "qualification-raw/candidate-secondary-allocation.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification-raw/candidate-secondary-native.json": "a818b2cab8074cf92ce1c4be11a9ac0ec8a51e4e6fe89870808451854eabf1d5",
+    "qualification-raw/candidate-secondary-native.receipt.json": "ddc32d98f06203b817d630978e5fc18ccfe6dfe31e6927286642265dc28633a0",
+    "qualification-raw/candidate-secondary-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "builds": {
+    "baseline": "8f64beab991c8af49c38971f240e62abf04a00341649bea9991920e9247406ed",
+    "candidate": "29b18f27cf7df5d34659465c5d97a77a86e2f1bafd522cad61c80d50130c6484"
+  }
+}

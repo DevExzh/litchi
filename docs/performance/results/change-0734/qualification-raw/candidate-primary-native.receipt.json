@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0734-bin/candidate-ole_format_save_probe",
+    "--case",
+    "ppt45543",
+    "--input",
+    "test-data/poi/test-data/slideshow/45543.ppt",
+    "--operation",
+    "format",
+    "--samples",
+    "1",
+    "--warmups",
+    "0"
+  ],
+  "exit_code": 0,
+  "output": "qualification-raw/candidate-primary-native.json",
+  "sha256": "aa89fc8b9d941fb881cd0de378a8c036c1a11facbff38013de355c44a6520b1c",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

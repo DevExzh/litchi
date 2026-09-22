@@ -1,0 +1,347 @@
+{
+  "schedule": [
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 1,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "native",
+      "cycle": 2,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 0,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 1,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "baseline"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "primary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "candidate"
+    },
+    {
+      "lane": "allocation",
+      "cycle": 0,
+      "repeat": 2,
+      "case": "secondary",
+      "variant": "baseline"
+    }
+  ],
+  "native_samples": 50,
+  "native_warmups": 3,
+  "allocation_samples": 1,
+  "allocation_warmups": 0,
+  "cpu": 12,
+  "bootstrap_seed": 7334,
+  "bootstrap_resamples": 10000
+}

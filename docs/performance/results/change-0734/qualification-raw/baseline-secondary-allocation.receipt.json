@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0734-bin/baseline-ole_format_save_probe_alloc",
+    "--case",
+    "ppt-secondary",
+    "--input",
+    "test-data/poi/test-data/slideshow/41246-1.ppt",
+    "--operation",
+    "format",
+    "--samples",
+    "1",
+    "--warmups",
+    "0"
+  ],
+  "exit_code": 0,
+  "output": "qualification-raw/baseline-secondary-allocation.json",
+  "sha256": "6c9e19e353d7592e20d11a1a69d3db870b252fcbebc7a5f8a3f2aa336628ea1f",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

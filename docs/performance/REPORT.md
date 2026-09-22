@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0734 — scoped PPT ownership optimization retained
+
+[0734](0734-ppt-owned-stream-handoff.md) removes five redundant writer payload
+allocations using the existing CFB owned ingress. The audited 48-process matrix
+shows primary median paired p50 −5.55% and peak live bytes −25.82%; secondary
+latency has no clear change, while allocated bytes fall on both decks. All
+1,812 measured outputs satisfy the exact preservation oracle. One primary
+p99/maximum +9.56% flag remains an explicit limit. Fresh owner tests pass 1,211
+plus 14 doctests; probe, Clippy, docs, boundaries and 19 corruption controls
+pass. This completes the bounded pilot, not the wider non-iWork performance
+program. [Evidence](results/change-0734/README.md).
+
 ## 0733 — concrete PPT payload ownership pilot nominated
 
 [0733](0733-ppt-finish-instruction-partition.md) conserves all retained profile

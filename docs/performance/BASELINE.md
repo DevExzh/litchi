@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0734 — retained PPT owned payload handoff
+
+[0734](0734-ppt-owned-stream-handoff.md) compares 36 native and 12 allocation
+processes on two decks. Primary paired p50 improves 5.55% (bootstrap 95%:
+4.96–6.21% improvement), while secondary paired p50 is +0.35% with an interval
+crossing zero. Exactly five allocations and 384,906/279,817 allocated bytes
+are removed per commit. Primary peak live bytes fall 25.82%; secondary peak is
+unchanged. One primary p99/maximum pair regresses 9.56% and remains disclosed.
+All output oracles, twelve final gates and 19 corruption controls pass.
+[Sealed evidence](results/change-0734/README.md). No RSS or broad speedup claim.
+
 ## 0733 — finish instruction partition, with call-count control
 
 [0733](0733-ppt-finish-instruction-partition.md) replays the sealed 0731 profiles:

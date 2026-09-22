@@ -1,0 +1,22 @@
+{
+  "all_targets": {
+    "passed": 1211,
+    "failed": 0,
+    "ignored": 3
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 8
+  },
+  "baseline_probe": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "candidate_probe": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  }
+}
