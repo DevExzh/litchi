@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0728 — qualified current DOC/PPT save baseline
+
+[0728](0728-doc-ppt-current-save-baseline.md) records 81 fixed processes under
+current Reuse/Rewrite policies with direct semantic and metadata oracles,
+separate allocation regions, independent statistics and exact offline replay.
+DOC common-container finish accounts for roughly 29–31% of that control's time;
+this is not a public-format fraction or speedup estimate. Public DOC attribution
+is the next bounded step, while PPT remains a separate save route. Production
+is unchanged and the broader non-iWork goal remains active.
+[Evidence packet](results/change-0728/README.md).
+
 ## 0719 — producer XLSX edit/save output oracle
 
 [0719](0719-producer-edit-output-oracle.md) strengthens the existing producer

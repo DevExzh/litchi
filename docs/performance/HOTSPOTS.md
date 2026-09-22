@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0728 — DOC repeated rendering remains a bounded investigation
+
+[0728](0728-doc-ppt-current-save-baseline.md) measures common Reuse DOC finish
+at 28.95–30.67% of its container lifecycle and staging at 53.83–57.42%.
+Source inspection confirms staging discards a validated rendering before a
+later finish render. These fractions do not describe the separate public DOC
+owner. Next attribute that public owner with its existing observer hooks,
+including observer overhead, before qualifying a batched rendered-output handoff.
+PPT uses a separate writer and requires its own attribution. Rewrite is faster
+in the common controls but changes raw directory metadata; keep Reuse policy.
+[Evidence](results/change-0728/README.md). Production and the active non-iWork
+goal remain unchanged; no registered claim is promoted.
+
 ## 0727 — XLS warm-tail recurrence; next qualify DOC/PPT saves
 
 [0727](0727-xls-warm-tail-replication.md) retains 324 processes over three fixed

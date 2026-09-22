@@ -1,0 +1,18 @@
+{
+  "status": "prospective draft; freeze only after probe and oracle qualification",
+  "cpu": 12,
+  "cycles": 2,
+  "processes_per_route_cycle": 3,
+  "samples": 30,
+  "warmups": 2,
+  "cases": ["docfloat", "docnohf", "ppt45543"],
+  "routes": ["format-default", "container-reuse", "container-rewrite"],
+  "order": "cycle0 forward case/route order; cycle1 reverse case/route order",
+  "native_processes": 54,
+  "allocation_processes_per_route": 3,
+  "allocation_samples": 1,
+  "allocation_warmups": 0,
+  "allocation_processes": 27,
+  "disposition": "unchanged-production baseline; no before-after speedup claim",
+  "limits": "Region counters are not RSS; independent routes are not nested phase fractions; policy deltas do not justify changing the Reuse default."
+}
