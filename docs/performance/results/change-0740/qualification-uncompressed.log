@@ -1,0 +1,4 @@
+PASS qualification 1/4 native pptx_cross_copy_plain_lifecycle
+PASS qualification 2/4 native pptx_cross_copy_media_rich_lifecycle
+PASS qualification 3/4 profile pptx_cross_copy_plain_lifecycle
+PASS qualification 4/4 profile pptx_cross_copy_media_rich_lifecycle

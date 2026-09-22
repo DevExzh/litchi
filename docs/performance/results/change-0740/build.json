@@ -1,0 +1,23 @@
+[
+  {
+    "lane": "native",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "started": 1790091016.4481637,
+    "ended": 1790091463.5442357,
+    "exit": 0,
+    "log_sha256": "586124e61bc9d01a172300a6ff8694db70f3585f00058f61406b32c7f36e42f6",
+    "binary": "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+    "binary_sha256": "8436f9bc5869f2202ccb58a737840c7967de96d45ccf0eb943d4106e327e1276",
+    "binary_bytes": 62939968
+  }
+]

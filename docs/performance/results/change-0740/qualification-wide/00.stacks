@@ -1,0 +1,4006 @@
+taskset 2250997/2250997 983395.788010:          1 cycles:u: 
+	ffffffff9e800b90 [unknown] ([unknown])
+	    75f50808bcc0 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788032:          1 cycles:u: 
+	    75f50808c864 _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788045:          1 cycles:u: 
+	ffffffff9e800b90 [unknown] ([unknown])
+	    75f50808c864 _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788057:          7 cycles:u: 
+	    75f50808c88a _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788071:         79 cycles:u: 
+	ffffffff9e801010 [unknown] ([unknown])
+	    75f50808c88a _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788086:        849 cycles:u: 
+	    75f50808c8a2 _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788103:       8616 cycles:u: 
+	    75f50808027b __tunables_init (inlined)
+	    75f50808b6db _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808ce4f _dl_start_final (inlined)
+	    75f50808ce4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788182:      76653 cycles:u: 
+	ffffffff9efed639 [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    75f50808179a _dl_load_cache_lookup (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f5080734a7 _dl_map_new_object (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50806ba7c openaux (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50806a510 _dl_catch_exception (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50806beb0 _dl_map_object_deps (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808ed0f dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808b735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808ce4f _dl_start_final (inlined)
+	    75f50808ce4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    75f50808bcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+taskset 2250997/2250997 983395.788510:          1 cycles:u: 
+	    580aae00546d [unknown] (/usr/bin/taskset)
+	    580aae00404d [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+taskset 2250997/2250997 983395.788532:          1 cycles:u: 
+	    580aae005443 [unknown] (/usr/bin/taskset)
+	    580aae00404d [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+taskset 2250997/2250997 983395.788545:          1 cycles:u: 
+	    580aae004055 [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+taskset 2250997/2250997 983395.788558:          7 cycles:u: 
+	    75f507ebd930 __libc_free (inlined)
+	    580aae004059 [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+taskset 2250997/2250997 983395.788570:         73 cycles:u: 
+	    75f507ebd94b __libc_free (inlined)
+	    580aae004059 [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+taskset 2250997/2250997 983395.788585:        795 cycles:u: 
+	ffffffff9ff19a28 [unknown] ([unknown])
+	    75f507ebd94b __libc_free (inlined)
+	    580aae004059 [unknown] (/usr/bin/taskset)
+	    75f507e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    75f507e2a9d7 __libc_start_main_impl (inlined)
+	    580aae004314 [unknown] (/usr/bin/taskset)
+
+litchi-perf-bas 2250997/2250997 983395.788928:       8734 cycles:u: 
+	    778a8dbbe864 _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbdcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+litchi-perf-bas 2250997/2250997 983395.788998:      73254 cycles:u: 
+	    778a8dbc0150 elf_get_dynamic_info (inlined)
+	    778a8dbc0150 dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbd735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbee4f _dl_start_final (inlined)
+	    778a8dbbee4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbdcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+litchi-perf-bas 2250997/2250997 983395.789138:      90863 cycles:u: 
+	ffffffff9e800b90 [unknown] ([unknown])
+	    778a8dba3ddf elf_get_dynamic_info (inlined)
+	    778a8dba3ddf _dl_map_object_from_fd (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dba5009 _dl_map_new_object (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8db9da7c openaux (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8db9c510 _dl_catch_exception (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8db9deb0 _dl_map_object_deps (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbc0d0f dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbd735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbee4f _dl_start_final (inlined)
+	    778a8dbbee4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbdcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+litchi-perf-bas 2250997/2250997 983395.789224:     242459 cycles:u: 
+	ffffffff9e800080 [unknown] ([unknown])
+	    778a8dbc4a5b __mprotect (inlined)
+	    778a8dbaf32f _dl_protect_relro (inlined)
+	    778a8dbaf32f _dl_relocate_object (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbc13da dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbd735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbee4f _dl_start_final (inlined)
+	    778a8dbbee4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbdcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+litchi-perf-bas 2250997/2250997 983395.789458:     429549 cycles:u: 
+	    778a8dba6491 do_lookup_x (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dba6e03 _dl_lookup_symbol_x (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbabe00 resolve_map (inlined)
+	    778a8dbabe00 elf_machine_rela (inlined)
+	    778a8dbabe00 elf_dynamic_do_Rela (inlined)
+	    778a8dbabe00 _dl_relocate_object_no_relro (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbaf2e0 _dl_relocate_object (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbc13da dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbd735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbee4f _dl_start_final (inlined)
+	    778a8dbbee4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    778a8dbbdcc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+litchi-perf-bas 2250997/2250997 983395.790171:    1005667 cycles:u: 
+	    60128c027b31 quick_xml::events::attributes::IterState::check_for_duplicates (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	    60128c02827f quick_xml::events::attributes::IterState::next (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	    60128c0616bb memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	3e3e3e3e3e3e3e3d [unknown] ([unknown])
+
+litchi-perf-bas 2250997/2250997 983395.790565:    1388217 cycles:u: 
+	    60128c0201c0 zlib_rs::deflate::algorithm::medium::deflate_medium (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+
+litchi-perf-bas 2250997/2250997 983395.790933:    1458573 cycles:u: 
+	    60128c0119bc zlib_rs::deflate::flush_block_only (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	       700040007 [unknown] ([unknown])
+
+litchi-perf-bas 2250997/2250997 983395.791377:    1901667 cycles:u: 
+	    60128c020503 zlib_rs::deflate::algorithm::medium::deflate_medium (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	    60128c0146d5 zlib_rs::deflate::deflate (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+
+litchi-perf-bas 2250997/2250997 983395.792013:    2312943 cycles:u: 
+	    778a8d8bab8e _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc759 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bde4e __libc_realloc (inlined)
+	    60128bef8d0e alloc::raw_vec::RawVecInner<A>::finish_grow (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+
+litchi-perf-bas 2250997/2250997 983395.792706:    2853331 cycles:u: 
+	    60128c013578 zlib_rs::deflate::Heap::pqdownheap (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+
+litchi-perf-bas 2250997/2250997 983395.793446:    3058989 cycles:u: 
+	    60128c01510a zlib_rs::deflate::BitWriter::send_tree (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+	    601289373971 anon.67c8fe965584e957c53a0dc5d941f85b.75.llvm.6877377404663027520 (/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline)
+
+litchi-perf-bas 2250997/2250997 983395.794215:    3307211 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.795045:    3552786 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.795943:    3767315 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.796857:    3923033 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.797763:    4014074 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.798708:    4062835 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.799749:    4138876 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.800733:    4187231 cycles:u: 
+	    778a8d8bdd2d checked_request2size (inlined)
+	    778a8d8bdd2d __libc_realloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.801695:    4145237 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.802655:    4169985 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.803626:    4208829 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.804658:    4246471 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.805658:    4278648 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.806769:    4243469 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.807762:    4245845 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.808724:    4141046 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.809681:    4168484 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.810657:    4207181 cycles:u: 
+	ffffffff9efed5fe [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    778a8d8bb791 sysmalloc (inlined)
+	    778a8d8bb791 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc960 _int_memalign (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bd819 _mid_memalign (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bee89 __posix_memalign (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bee89 __posix_memalign (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.811705:    4250597 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.812702:    4237682 cycles:u: 
+	    778a8d8bb374 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc759 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bde4e __libc_realloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.813676:    4228832 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.814648:    4236744 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.815659:    4265795 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.816644:    4280131 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.817628:    4283788 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.818621:    4302735 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.819657:    4319392 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.820656:    4309750 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.821649:    4295901 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.822635:    4301795 cycles:u: 
+	    778a8d9b2b86 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.823626:    4311161 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.824686:    4325314 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.825714:    4318207 cycles:u: 
+	    778a8d8bc393 __libc_calloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.826705:    4276679 cycles:u: 
+	    778a8d9b2b86 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.827689:    4259108 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.828673:    4272102 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.829779:    4293521 cycles:u: 
+	    778a8d9b2b6b __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.830776:    4310852 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.831804:    4205307 cycles:u: 
+	ffffffff9e800ef0 [unknown] ([unknown])
+	    778a8d9bca8e __memset_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.832795:    4221669 cycles:u: 
+	    778a8d8ba5e6 _int_free_merge_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.833832:    4209569 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.834788:    4214154 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.835761:    4196602 cycles:u: 
+	    778a8d9b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.836734:    4228054 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.837758:    4252599 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.838744:    4280280 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.839726:    4255181 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.840712:    4273177 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.841700:    4295584 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.842723:    4311102 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.843728:    4323275 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.844749:    4298589 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.845743:    4302012 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.846726:    4284153 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.847716:    4294791 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.848718:    4311403 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.849718:    4326632 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.850708:    4324486 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.851705:    4329306 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.852708:    4338518 cycles:u: 
+	    778a8d8ba7a0 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.853733:    4347054 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.854735:    4346019 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.855760:    4323239 cycles:u: 
+	    778a8d8ba9b7 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc759 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bde4e __libc_realloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.856767:    4322988 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.857756:    4303532 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.858739:    4302400 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.859740:    4317464 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.860747:    4332966 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.861741:    4335110 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.862728:    4331506 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.863735:    4342050 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.864772:    4353285 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.865779:    4350090 cycles:u: 
+	    778a8d9bca8e __memset_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.866797:    4315529 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.867803:    4316573 cycles:u: 
+	ffffffff9e800ef0 [unknown] ([unknown])
+	    778a8d93ca2d syscall (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	2121212121212120 [unknown] ([unknown])
+
+litchi-perf-bas 2250997/2250997 983395.868800:    4308705 cycles:u: 
+	ffffffff9e800ef0 [unknown] ([unknown])
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.869785:    4309751 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.870831:    4314144 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.871830:    4322325 cycles:u: 
+	    778a8d9b2b91 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.872820:    4300581 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.873790:    4307875 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.874788:    4314786 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.875842:    4333624 cycles:u: 
+	    778a8d8bbc78 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc2ae __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.876844:    4326447 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.877858:    4300803 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.878844:    4297859 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.879836:    4299318 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.880830:    4313255 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.881835:    4323716 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.882831:    4331730 cycles:u: 
+	    778a8d9b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.883829:    4330209 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.884825:    4335297 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.885827:    4340169 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.886858:    4347801 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.887867:    4333816 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.888886:    4317699 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.889885:    4305338 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.890873:    4303895 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.891873:    4305465 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.892878:    4318320 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.893871:    4322627 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.894857:    4321443 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.895857:    4332914 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.896888:    4345726 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.897893:    4341934 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.898886:    4319581 cycles:u: 
+	    778a8d8bd414 __libc_malloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.899913:    4321607 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.900903:    4318504 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.901892:    4308423 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.902879:    4322508 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.903896:    4336683 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.904893:    4345617 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.905884:    4334367 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.906879:    4342297 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.907920:    4353815 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.908926:    4346059 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.909919:    4320112 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.910938:    4322162 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.911938:    4320255 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.912924:    4314593 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.913914:    4320157 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.914918:    4336575 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.915925:    4347088 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.916915:    4342833 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.917910:    4343698 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.918940:    4356744 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.919955:    4348622 cycles:u: 
+	    778a8d8bb36e _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc759 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bde4e __libc_realloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.920951:    4330851 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.921969:    4325388 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.922959:    4321231 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.923954:    4318226 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.924946:    4329706 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.925950:    4339184 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.926946:    4348450 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.927948:    4347229 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.928949:    4352462 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.929978:    4354849 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.930982:    4343208 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.931989:    4329155 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.933007:    4328909 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.934025:    4316447 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.935011:    4314510 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.936010:    4298908 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.937010:    4314597 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.937999:    4318828 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.938986:    4322961 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.939993:    4337200 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.941019:    4348838 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.942021:    4333952 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.943016:    4323624 cycles:u: 
+	    778a8d8b9332 unlink_chunk (inlined)
+	    778a8d8ba604 _int_free_merge_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.944044:    4326354 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.945033:    4320330 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.946016:    4310925 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.947006:    4326393 cycles:u: 
+	    778a8d9bca8e __memset_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.948021:    4344821 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.949017:    4351242 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.950011:    4342058 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.951009:    4350353 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.952048:    4359531 cycles:u: 
+	    778a8d8bac0c _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc2ae __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.953055:    4357739 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.954048:    4324785 cycles:u: 
+	    778a8d8ba609 _int_free_create_chunk (inlined)
+	    778a8d8ba609 _int_free_merge_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.955065:    4326561 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.956065:    4324473 cycles:u: 
+	    778a8d9b2b91 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.957051:    4320100 cycles:u: 
+	    778a8d8ba2e4 _int_free_maybe_trim (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bc868 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8bde4e __libc_realloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.958044:    4325964 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.959051:    4342771 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.960056:    4349022 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.961046:    4343772 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.962044:    4345379 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.963073:    4357548 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.964089:    4349013 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.965103:    4331338 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.966099:    4325377 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.967086:    4313300 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.968082:    4322674 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.969082:    4336004 cycles:u: 
+	    778a8d9bc3ea __memmove_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.970086:    4343411 cycles:u: 
+	    778a8d9bc193 __memmove_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.971080:    4344427 cycles:u: 
+	    778a8d9b2b7d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.972080:    4344759 cycles:u: 
+	    778a8d9b2b40 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.973082:    4351834 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.974109:    4355050 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.975112:    4343838 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.976139:    4331305 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.977137:    4332172 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.978122:    4309083 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.979107:    4318214 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.980117:    4335978 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.981119:    4349655 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.982114:    4342484 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.983107:    4345015 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.984121:    4353729 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.985154:    4357979 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.986156:    4336277 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.987172:    4319791 cycles:u: 
+	    778a8d8bd406 __libc_malloc (inlined)
+
+litchi-perf-bas 2250997/2250997 983395.988183:    4325061 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.989171:    4306536 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.990155:    4303647 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.991156:    4320935 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.992167:    4339272 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.993159:    4335356 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.994148:    4330418 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.995153:    4343783 cycles:u: 
+	    778a8d8ba5ed _int_free_merge_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983395.996194:    4353214 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.997195:    4335157 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.998215:    4312849 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983395.999214:    4313862 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.000211:    4302349 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.001197:    4304535 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.002196:    4314416 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.003191:    4330984 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.004192:    4332942 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.005183:    4337225 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.006182:    4341607 cycles:u: 
+	    778a8d9b2b73 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.007212:    4352090 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.008224:    4342299 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.009241:    4325004 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.010235:    4322953 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.011219:    4308945 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.012216:    4319814 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.013219:    4335740 cycles:u: 
+	    778a8d9b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.014215:    4342057 cycles:u: 
+	    778a8d9b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.015207:    4341799 cycles:u: 
+	    778a8d9b2b91 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.016214:    4349105 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.017219:    4356816 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.018250:    4352493 cycles:u: 
+	    778a8d8bd986 __libc_free (inlined)
+
+litchi-perf-bas 2250997/2250997 983396.019249:    4338050 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.020280:    4324410 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.021273:    4317649 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.022257:    4303152 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.023244:    4316584 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.024257:    4333874 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.025255:    4344669 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.026247:    4336789 cycles:u: 
+	    778a8d9b2b40 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.027238:    4342805 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.028252:    4353868 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.029286:    4359257 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.030287:    4337630 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.031306:    4321768 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.032308:    4316157 cycles:u: 
+	    778a8d9b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.033294:    4307822 cycles:u: 
+	    778a8d9b2b7b __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.034279:    4312907 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.035282:    4330644 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.036290:    4345720 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.037282:    4341997 cycles:u: 
+	    778a8d9b2b93 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.038278:    4340448 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.039305:    4351401 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.040324:    4355719 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.041321:    4326938 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.042338:    4317886 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.043333:    4314762 cycles:u: 
+	    778a8d9b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.044330:    4312073 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.045317:    4317390 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.046318:    4327022 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.047314:    4340457 cycles:u: 
+	    778a8d9b2b8d __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+litchi-perf-bas 2250997/2250997 983396.048318:    4342666 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.049314:    4346165 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.050341:    4347911 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.051349:    4354008 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.052357:    4327520 cycles:u: 
+	    778a8d8ba65c _int_free_create_chunk (inlined)
+	    778a8d8ba65c _int_free_merge_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    778a8d8ba7b8 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+
+rustc 2251000/2251000 983396.057095:    3836744 cycles:u: 
+	ffffffff9efed639 [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    5f4377967210 <regex_automata::nfa::thompson::map::Utf8BoundedEntry as alloc::vec::spec_from_elem::SpecFromElem>::from_elem::<alloc::alloc::Global> (/home/zhuhe/.cargo/bin/rustup)
+	    5f43779665c6 <regex_automata::nfa::thompson::compiler::Utf8Compiler>::new (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377962f5d <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377960a7a <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f43779660eb <regex_automata::nfa::thompson::compiler::Compiler>::c_alt_iter::<core::iter::adapters::map::Map<core::slice::iter::Iter<regex_syntax::hir::Hir>, <regex_automata::nfa::thompson::compiler::Compiler>::c_alt_slice::{closure#1}>> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377960d80 <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f437795fbc8 <regex_automata::nfa::thompson::compiler::Compiler>::c_cap (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377960a7a <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377960f01 <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377960a7a <regex_automata::nfa::thompson::compiler::Compiler>::c (/home/zhuhe/.cargo/bin/rustup)
+	    5f437795fbc8 <regex_automata::nfa::thompson::compiler::Compiler>::c_cap (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377998793 <core::iter::adapters::map::Map<core::slice::iter::Iter<&regex_syntax::hir::Hir>, <regex_automata::nfa::thompson::compiler::Compiler>::compile<&regex_syntax::hir::Hir>::{closure#1}> as core::iter::traits::iterator::Iterator>::next (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377974804 <regex_automata::nfa::thompson::compiler::Compiler>::build_many_from_hir::<&regex_syntax::hir::Hir> (/home/zhuhe/.cargo/bin/rustup)
+	    5f437796872c regex_automata::meta::strategy::new (/home/zhuhe/.cargo/bin/rustup)
+	    5f43776c90e4 <regex::regex::string::Regex>::new (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b34e33 <<rustup::dist::target_tuple::PartialTargetTuple>::new::RE::{closure#0} as core::ops::function::FnOnce<()>>::call_once (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b34cc1 <std::sync::once::Once>::call_once_force::<<std::sync::lazy_lock::LazyLock<regex::regex::string::Regex>>::force::{closure#0}>::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f43776fcb28 <std::sys::sync::once::futex::Once>::call (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b33886 <rustup::dist::target_tuple::PartialTargetTuple>::new (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b32bab <rustup::dist::PartialToolchainDesc>::resolve (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b852b9 <rustup::toolchain::names::ResolvableToolchainName>::resolve (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377bb4fbc <rustup::config::Cfg>::from_env (/home/zhuhe/.cargo/bin/rustup)
+	    5f43777467c3 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.058544:    3294206 cycles:u: 
+	    5f4377cb7c1f toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.059799:    3180163 cycles:u: 
+	ffffffff9e800ef0 [unknown] ([unknown])
+	    5f4377cce83d <alloc::vec::Vec<toml_parser::parser::event::Event> as toml_parser::parser::event::EventReceiver>::key_val_sep (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cce46c <toml_parser::parser::event::ValidateWhitespace as toml_parser::parser::event::EventReceiver>::newline (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb87fc toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.061220:    2970589 cycles:u: 
+	    5f4377ccd6d9 toml_parser::parser::document::opt_dot_keys (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377ccdb58 toml_parser::parser::document::on_expression_key (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb852e toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.062043:    2737288 cycles:u: 
+	    5f4377cc4218 <toml::de::parser::key::State>::close_key (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cbb425 toml::de::parser::key::on_key (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb923a toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.062972:    2703078 cycles:u: 
+	ffffffff9efed639 [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    7425012bb464 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    7425012bc1dc __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5f4377cbc724 <alloc::collections::btree::map::entry::VacantEntry<serde_spanned::spanned::Spanned<alloc::borrow::Cow<str>>, serde_spanned::spanned::Spanned<toml::de::parser::devalue::DeValue>>>::insert_entry (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb9c62 toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.063924:    2800887 cycles:u: 
+	    7425013b2b77 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5f4377cbad34 <toml::de::parser::document::State>::finish_table (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb91a5 toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.064857:    2837884 cycles:u: 
+	    5f4377cc4218 <toml::de::parser::key::State>::close_key (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cbb425 toml::de::parser::key::on_key (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb93e4 toml::de::parser::parse_document (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377cb79d3 <toml::de::deserializer::Deserializer>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b6bf <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.065861:    2877210 cycles:u: 
+	    7425012bc1cc __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5f4377b3e5ae <alloc::string::String as serde_core::de::Deserialize>::deserialize::<toml::de::deserializer::value::ValueDeserializer> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b3dd63 <toml::de::deserializer::table::TableMapAccess as serde_core::de::MapAccess>::next_value_seed::<core::marker::PhantomData<alloc::string::String>> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b575b6 <alloc::vec::Vec<rustup::dist::manifest::Component> as serde_core::de::Deserialize>::deserialize::<toml::de::deserializer::value::ValueDeserializer> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b71848 <toml::de::deserializer::table::TableMapAccess as serde_core::de::MapAccess>::next_value::<core::option::Option<alloc::vec::Vec<rustup::dist::manifest::Component>>> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b6a46f <toml::de::deserializer::value::ValueDeserializer as serde_core::de::Deserializer>::deserialize_any::<<alloc::collections::btree::map::BTreeMap<_, _> as serde_core::de::Deserialize>::deserialize::MapVisitor<rustup::dist::TargetTuple, rustup::dist::manifest::TargetedPackage>> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5e919 <rustup::dist::manifest::Manifest as serde_core::de::Deserialize>::deserialize::<toml::de::deserializer::Deserializer> (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5b717 <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.066521:    2898094 cycles:u: 
+	    7425013b2b44 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5f4377b66793 <rustup::dist::manifest::Package>::get_target (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b66226 <rustup::dist::manifest::Manifest>::validate_targeted_package (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5bed2 <rustup::dist::manifest::Manifest>::parse (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377b5a9aa <rustup::dist::manifestation::Manifestation>::load_manifest (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773ff1c <rustup::config::Cfg>::ensure_installed::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776183 <rustup::config::Cfg>::ensure_installed::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377741d16 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377776c35 <rustup::config::Cfg>::ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437777709d <rustup::config::Cfg>::maybe_ensure_active_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377775124 <rustup::config::Cfg>::local_toolchain::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f4377746ad0 rustup::cli::proxy_mode::main::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+	    5f437773b4a0 rustup_init::run_rustup_inner::{closure#0}::{closure#0} (/home/zhuhe/.cargo/bin/rustup)
+
+rustc 2251000/2251000 983396.070025:    3836744 cycles:u: 
+	    7ca8bd0a0491 do_lookup_x (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0a0e03 _dl_lookup_symbol_x (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0a5e00 resolve_map (inlined)
+	    7ca8bd0a5e00 elf_machine_rela (inlined)
+	    7ca8bd0a5e00 elf_dynamic_do_Rela (inlined)
+	    7ca8bd0a5e00 _dl_relocate_object_no_relro (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0a92e0 _dl_relocate_object (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0bb3da dl_main (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0b7735 _dl_sysdep_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0b8e4f _dl_start_final (inlined)
+	    7ca8bd0b8e4f _dl_start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0b7cc7 _start (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+rustc 2251000/2251000 983396.071208:    2936925 cycles:u: 
+	    7ca8b38397c2 llvm::cl::Option::addArgument() (/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.22.1-rust-1.95.0-stable)
+	    7ca8b3951f8f _GLOBAL__sub_I_JumpTableToSwitch.cpp (/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.22.1-rust-1.95.0-stable)
+	    7ca8bd09aa2e call_init.part.0 (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd09ab43 call_init (inlined)
+	    7ca8bd09ab43 _dl_init (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+	    7ca8bd0b7d1f _dl_start_user (/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)
+
+git 2251004/2251004 983396.076246:    3836744 cycles:u: 
+	    741f02fbc193 __memmove_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266dd9d30 [unknown] (/usr/bin/git)
+	    5fd266de263a [unknown] (/usr/bin/git)
+	    5fd266de996c [unknown] (/usr/bin/git)
+	    5fd266e28651 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.077895:    3282479 cycles:u: 
+	ffffffff9efed639 [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    741f02fbc223 __memmove_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266dd9d30 [unknown] (/usr/bin/git)
+	    5fd266de263a [unknown] (/usr/bin/git)
+	    5fd266de996c [unknown] (/usr/bin/git)
+	    5fd266e28651 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.079359:    2998648 cycles:u: 
+	    741f02fbc193 __memmove_avx512_unaligned_erms (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266dd9d30 [unknown] (/usr/bin/git)
+	    5fd266de263a [unknown] (/usr/bin/git)
+	    5fd266de996c [unknown] (/usr/bin/git)
+	    5fd266e28651 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.081012:    2748579 cycles:u: 
+	ffffffff9efed639 [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    5fd266dd9b27 [unknown] (/usr/bin/git)
+	    5fd266de263a [unknown] (/usr/bin/git)
+	    5fd266de996c [unknown] (/usr/bin/git)
+	    5fd266e28651 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.082270:    2430463 cycles:u: 
+	    5fd266cdeb82 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266cded20 [unknown] (/usr/bin/git)
+	    5fd266de1412 [unknown] (/usr/bin/git)
+	    5fd266de26bc [unknown] (/usr/bin/git)
+	    5fd266de996c [unknown] (/usr/bin/git)
+	    5fd266e28651 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.083314:    2265033 cycles:u: 
+	    5fd266e28558 [unknown] (/usr/bin/git)
+	    5fd266bb0c83 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251006 983396.086465:    2264974 cycles:u: 
+	ffffffff9e8000b6 [unknown] ([unknown])
+
+git 2251004/2251009 983396.093243:    1769591 cycles:u: 
+
+git 2251004/2251011 983396.096268:     852675 cycles:u: 
+
+git 2251004/2251012 983396.098294:     662029 cycles:u: 
+	ffffffff9e8000c0 [unknown] ([unknown])
+
+git 2251004/2251013 983396.100143:     583877 cycles:u: 
+
+git 2251004/2251013 983396.101575:     520421 cycles:u: 
+	ffffffff9e80008b [unknown] ([unknown])
+
+git 2251004/2251014 983396.103226:     473518 cycles:u: 
+	ffffffff9ff15b5d [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251015 983396.104763:     423084 cycles:u: 
+	ffffffff9ff201ed [unknown] ([unknown])
+	ffffffff9f0f9dad [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251016 983396.106162:     387506 cycles:u: 
+
+git 2251004/2251016 983396.107394:     347253 cycles:u: 
+	ffffffff9f0d87c1 [unknown] ([unknown])
+	ffffffff9f5abe9f [unknown] ([unknown])
+	ffffffff9f0f9dcd [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251017 983396.108675:     330139 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251018 983396.109833:     315269 cycles:u: 
+	ffffffff9f4bed64 [unknown] ([unknown])
+	ffffffff9ec5e39c [unknown] ([unknown])
+	ffffffff9eb4a1fb [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251018 983396.110926:     298250 cycles:u: 
+
+git 2251004/2251019 983396.111988:     290157 cycles:u: 
+	ffffffff9e800083 [unknown] ([unknown])
+
+git 2251004/2251019 983396.112992:     285673 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251020 983396.113938:     283640 cycles:u: 
+
+git 2251004/2251020 983396.115007:     286129 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251021 983396.116037:     285293 cycles:u: 
+
+git 2251004/2251021 983396.117078:     282470 cycles:u: 
+
+git 2251004/2251022 983396.118136:     280431 cycles:u: 
+
+git 2251004/2251022 983396.119155:     278014 cycles:u: 
+
+git 2251004/2251023 983396.120152:     275490 cycles:u: 
+	ffffffff9e8000b5 [unknown] ([unknown])
+
+git 2251004/2251023 983396.121119:     275121 cycles:u: 
+	ffffffff9e8000a7 [unknown] ([unknown])
+
+git 2251004/2251024 983396.122162:     276029 cycles:u: 
+
+git 2251004/2251024 983396.123174:     276372 cycles:u: 
+	ffffffff9e800080 [unknown] ([unknown])
+
+git 2251004/2251005 983396.124181:     274808 cycles:u: 
+
+git 2251004/2251005 983396.125147:     275015 cycles:u: 
+	ffffffff9ff15ab0 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251005 983396.126236:     275770 cycles:u: 
+
+git 2251004/2251006 983396.127337:     274498 cycles:u: 
+
+git 2251004/2251006 983396.128349:     269488 cycles:u: 
+	ffffffff9ff15a9c [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251006 983396.129320:     264580 cycles:u: 
+
+git 2251004/2251007 983396.130296:     265733 cycles:u: 
+
+git 2251004/2251007 983396.131295:     268060 cycles:u: 
+	ffffffff9e8000a7 [unknown] ([unknown])
+
+git 2251004/2251007 983396.132307:     269151 cycles:u: 
+	ffffffff9ff15a76 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251008 983396.133302:     268357 cycles:u: 
+
+git 2251004/2251008 983396.134384:     269399 cycles:u: 
+
+git 2251004/2251008 983396.135416:     267611 cycles:u: 
+
+git 2251004/2251009 983396.136378:     264299 cycles:u: 
+	ffffffff9e800083 [unknown] ([unknown])
+
+git 2251004/2251009 983396.137264:     263169 cycles:u: 
+
+git 2251004/2251009 983396.138228:     265813 cycles:u: 
+
+git 2251004/2251017 983396.139261:     274507 cycles:u: 
+	ffffffff9e80008b [unknown] ([unknown])
+
+git 2251004/2251017 983396.140346:     274707 cycles:u: 
+
+git 2251004/2251017 983396.141296:     271815 cycles:u: 
+	ffffffff9f04fc88 [unknown] ([unknown])
+	ffffffff9f0f9dad [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251010 983396.142176:     269318 cycles:u: 
+
+git 2251004/2251010 983396.142951:     272246 cycles:u: 
+
+git 2251004/2251010 983396.143883:     286670 cycles:u: 
+
+git 2251004/2251011 983396.144869:     299500 cycles:u: 
+	ffffffff9eb48c8a [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251011 983396.145796:     302878 cycles:u: 
+
+git 2251004/2251011 983396.146705:     303573 cycles:u: 
+
+git 2251004/2251011 983396.147732:     308397 cycles:u: 
+	ffffffff9e800080 [unknown] ([unknown])
+
+git 2251004/2251013 983396.148671:     313910 cycles:u: 
+
+git 2251004/2251013 983396.149817:     312007 cycles:u: 
+	ffffffff9e8000a9 [unknown] ([unknown])
+
+git 2251004/2251012 983396.150895:     311702 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251012 983396.151965:     304293 cycles:u: 
+	ffffffff9ff15a9c [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251012 983396.152930:     300438 cycles:u: 
+	ffffffff9e800083 [unknown] ([unknown])
+
+git 2251004/2251018 983396.153923:     299336 cycles:u: 
+
+git 2251004/2251018 983396.155000:     300969 cycles:u: 
+
+git 2251004/2251018 983396.156060:     299301 cycles:u: 
+
+git 2251004/2251015 983396.157121:     293971 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251015 983396.158195:     291285 cycles:u: 
+
+git 2251004/2251015 983396.159220:     286403 cycles:u: 
+
+git 2251004/2251014 983396.160241:     284206 cycles:u: 
+	ffffffff9e8000a7 [unknown] ([unknown])
+
+git 2251004/2251014 983396.161313:     282870 cycles:u: 
+	ffffffff9f0d85b6 [unknown] ([unknown])
+	ffffffff9f0d87f6 [unknown] ([unknown])
+	ffffffff9f5abe9f [unknown] ([unknown])
+	ffffffff9f0f9dcd [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251014 983396.162370:     279925 cycles:u: 
+
+git 2251004/2251016 983396.163393:     276410 cycles:u: 
+
+git 2251004/2251016 983396.164320:     274065 cycles:u: 
+	ffffffff9f04fc4c [unknown] ([unknown])
+	ffffffff9f0f9dad [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251016 983396.165331:     275388 cycles:u: 
+	ffffffff9e8000dd [unknown] ([unknown])
+
+git 2251004/2251019 983396.166328:     277905 cycles:u: 
+
+git 2251004/2251019 983396.167232:     276159 cycles:u: 
+
+git 2251004/2251019 983396.168213:     279721 cycles:u: 
+
+git 2251004/2251021 983396.169091:     284787 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251021 983396.170210:     290383 cycles:u: 
+	ffffffff9e80008b [unknown] ([unknown])
+
+git 2251004/2251021 983396.171283:     291293 cycles:u: 
+	ffffffff9e800080 [unknown] ([unknown])
+
+git 2251004/2251020 983396.172352:     286067 cycles:u: 
+	ffffffff9eb48c8a [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251020 983396.173386:     282275 cycles:u: 
+	ffffffff9f04fc75 [unknown] ([unknown])
+	ffffffff9f0f9dad [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251020 983396.174375:     277587 cycles:u: 
+
+git 2251004/2251023 983396.175428:     277042 cycles:u: 
+
+git 2251004/2251023 983396.176437:     277270 cycles:u: 
+
+git 2251004/2251023 983396.177374:     275808 cycles:u: 
+
+git 2251004/2251022 983396.178357:     275459 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251022 983396.179361:     278629 cycles:u: 
+
+git 2251004/2251022 983396.180339:     280404 cycles:u: 
+	ffffffff9e80008b [unknown] ([unknown])
+
+git 2251004/2251024 983396.181331:     280992 cycles:u: 
+	ffffffff9f01b462 [unknown] ([unknown])
+	ffffffff9f0d87f6 [unknown] ([unknown])
+	ffffffff9f5abe9f [unknown] ([unknown])
+	ffffffff9f0f9dcd [unknown] ([unknown])
+	ffffffff9f100fe0 [unknown] ([unknown])
+	ffffffff9f0f11b6 [unknown] ([unknown])
+	ffffffff9f0f1214 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251024 983396.182405:     281152 cycles:u: 
+	ffffffff9e800083 [unknown] ([unknown])
+
+git 2251004/2251024 983396.183508:     281345 cycles:u: 
+	ffffffff9e800080 [unknown] ([unknown])
+
+git 2251004/2251005 983396.184624:     276317 cycles:u: 
+	ffffffff9e80008b [unknown] ([unknown])
+
+git 2251004/2251005 983396.185660:     270633 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251005 983396.186721:     264961 cycles:u: 
+
+git 2251004/2251006 983396.187697:     263194 cycles:u: 
+
+git 2251004/2251006 983396.188626:     260268 cycles:u: 
+	ffffffff9f0f1203 [unknown] ([unknown])
+	ffffffff9f0f128c [unknown] ([unknown])
+	ffffffff9eb4a255 [unknown] ([unknown])
+	ffffffff9ff15b65 [unknown] ([unknown])
+	ffffffff9e80012b [unknown] ([unknown])
+
+git 2251004/2251006 983396.189550:     262438 cycles:u: 
+
+git 2251004/2251012 983396.211117:    3836744 cycles:u: 
+
+git 2251004/2251020 983396.213853:     914289 cycles:u: 
+
+git 2251004/2251004 983396.245080:    3836744 cycles:u: 
+	    5fd266d39f2f [unknown] (/usr/bin/git)
+	    5fd266ddb8a4 [unknown] (/usr/bin/git)
+	    5fd266bb0ca3 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.246032:    3690448 cycles:u: 
+	    5fd266d39f28 [unknown] (/usr/bin/git)
+	    5fd266d18a02 [unknown] (/usr/bin/git)
+	    5fd266e9e20e [unknown] (/usr/bin/git)
+	    5fd266ea503f [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.247603:    3717983 cycles:u: 
+	    5fd266e9c22f [unknown] (/usr/bin/git)
+	    5fd266d1e61d [unknown] (/usr/bin/git)
+	    5fd266d1e784 [unknown] (/usr/bin/git)
+	    5fd266e9e3ad [unknown] (/usr/bin/git)
+	    5fd266ea5338 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.248858:    3557091 cycles:u: 
+	    5fd266d8dc9b [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.249598:    3277061 cycles:u: 
+	    5fd266d8dc95 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.250337:    3194769 cycles:u: 
+	    5fd266d5dac3 [unknown] (/usr/bin/git)
+	    5fd266d8dcbc [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.251209:    3460603 cycles:u: 
+	    5fd266d5daca [unknown] (/usr/bin/git)
+	    5fd266d8dcbc [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.252070:    3709308 cycles:u: 
+	    5fd266d8dc9b [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.252940:    3814507 cycles:u: 
+	    5fd266d8dc9b [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.253875:    3951334 cycles:u: 
+	    5fd266d8dc87 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.254796:    4074521 cycles:u: 
+	ffffffff9e800ef0 [unknown] ([unknown])
+	    5fd266d8dc87 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.255816:    4111533 cycles:u: 
+	    5fd266d8dc9b [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.256755:    4158830 cycles:u: 
+	    5fd266d8dca0 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.257703:    4150552 cycles:u: 
+	    5fd266d8dca0 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.258669:    4202595 cycles:u: 
+	    5fd266d5daca [unknown] (/usr/bin/git)
+	    5fd266d8dcbc [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.259640:    4251278 cycles:u: 
+	    5fd266d8dc95 [unknown] (/usr/bin/git)
+	    5fd266d8dea2 [unknown] (/usr/bin/git)
+	    5fd266d8e32f [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.260904:    4286148 cycles:u: 
+	ffffffff9fee6c00 [unknown] ([unknown])
+	ffffffff9efed5ef [unknown] ([unknown])
+	ffffffff9ec1a367 [unknown] ([unknown])
+	ffffffff9ff1e2e3 [unknown] ([unknown])
+	ffffffff9e800bb7 [unknown] ([unknown])
+	    741f02ebb464 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02ebc1dc __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02ef886b __alloc_dir (inlined)
+	    741f02ef886b opendir_tail (inlined)
+	    741f02ef886b __opendir (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d3c675 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.263297:    4220503 cycles:u: 
+	    5fd266d3c74f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.265245:    3541574 cycles:u: 
+	    5fd266d3b58c [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.266783:    3143268 cycles:u: 
+	    5fd266ea012d [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b337 [unknown] (/usr/bin/git)
+	    5fd266d3b5ff [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.268320:    2846800 cycles:u: 
+	    5fd266d8e31a [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.269638:    2532075 cycles:u: 
+	    5fd266e9fbc0 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.270841:    2366391 cycles:u: 
+	    741f02ef8a29 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.272020:    2207107 cycles:u: 
+	    5fd266d8e31d [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.272955:    2130760 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.273961:    2099636 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.275256:    2119135 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.276402:    2049780 cycles:u: 
+	    5fd266e9fbc2 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.277395:    1983276 cycles:u: 
+	    741f02fb2ba6 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d8e3a4 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.278440:    1920341 cycles:u: 
+	    5fd266d3b58c [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.279407:    1942100 cycles:u: 
+	    5fd266d3b428 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.280416:    1920299 cycles:u: 
+	    5fd266d3b58c [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.281441:    1929383 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.282470:    1927678 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.283479:    1925993 cycles:u: 
+	    5fd266ea007b [unknown] (/usr/bin/git)
+	    5fd266ea0204 [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.284449:    1904704 cycles:u: 
+	    5fd266d8e393 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.285237:    1922125 cycles:u: 
+	    741f02fb2e17 __memcmp_evex_movbe (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266dd95a8 [unknown] (/usr/bin/git)
+	    5fd266d35fd7 [unknown] (/usr/bin/git)
+	    5fd266d3cefc [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.286225:    1969145 cycles:u: 
+	    741f02ebdd88 __libc_realloc (inlined)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63ee3 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3cd72 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.287168:    2029580 cycles:u: 
+	    5fd266ea012d [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.288028:    2037702 cycles:u: 
+	    5fd266d8e393 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.288988:    2106175 cycles:u: 
+	    5fd266e9fb97 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.290039:    2156794 cycles:u: 
+	    5fd266e9fcb6 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.291324:    2155129 cycles:u: 
+	    5fd266d5d9d1 [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.292293:    2063712 cycles:u: 
+	    741f02fb7371 __strncmp_evex (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d36040 [unknown] (/usr/bin/git)
+	    5fd266d3cefc [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.293306:    2002465 cycles:u: 
+	    5fd266d358fd [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.294328:    2022001 cycles:u: 
+	    5fd266d3b5d8 [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.295380:    2024920 cycles:u: 
+	    5fd266d3b595 [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.296375:    2019228 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.297337:    1995334 cycles:u: 
+	    741f02ebdd63 __libc_realloc (inlined)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63ee3 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3cd72 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.298464:    2012082 cycles:u: 
+	    5fd266e9fc73 [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b337 [unknown] (/usr/bin/git)
+	    5fd266d3b5ff [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.299464:    2021006 cycles:u: 
+	    5fd266ea018d [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.300459:    1960468 cycles:u: 
+	    5fd266d5d9d1 [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.301412:    1971803 cycles:u: 
+	    5fd266dd9595 [unknown] (/usr/bin/git)
+	    5fd266d35fd7 [unknown] (/usr/bin/git)
+	    5fd266d3cefc [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.302363:    1978004 cycles:u: 
+	    5fd266d3b58c [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.303396:    2002811 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.304393:    2016159 cycles:u: 
+	    5fd266ea018d [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.305396:    2003899 cycles:u: 
+	    741f02fb72ee __strncmp_evex (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d3b317 [unknown] (/usr/bin/git)
+	    5fd266d3b5ff [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.306380:    2014203 cycles:u: 
+	    5fd266ea0138 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.307459:    2006266 cycles:u: 
+	    741f02ebc1e8 __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02ef886b __alloc_dir (inlined)
+	    741f02ef886b opendir_tail (inlined)
+	    741f02ef886b __opendir (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d3c675 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.308366:    2008294 cycles:u: 
+	    5fd266d3b58c [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.309335:    1976019 cycles:u: 
+	    741f02ef8a29 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.310402:    2034870 cycles:u: 
+	    5fd266d8e31a [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.311360:    2019672 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.312382:    2021015 cycles:u: 
+	    5fd266ea0064 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.313377:    2040858 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.314370:    2008452 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.315362:    2031369 cycles:u: 
+	    5fd266d8e313 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.316477:    2042306 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.317386:    2036265 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.318374:    2002286 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.319274:    2043297 cycles:u: 
+	    741f02ebc191 __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63f09 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3c55f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.320259:    2057024 cycles:u: 
+	    5fd266dd95a4 [unknown] (/usr/bin/git)
+	    5fd266d3adfd [unknown] (/usr/bin/git)
+	    5fd266d3bb20 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.321154:    2097213 cycles:u: 
+	    5fd266d3587b [unknown] (/usr/bin/git)
+	    5fd266d3b337 [unknown] (/usr/bin/git)
+	    5fd266d3b5ff [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.322218:    2120132 cycles:u: 
+	    5fd266d5d9d1 [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.323264:    2161956 cycles:u: 
+	    5fd266d8e393 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.324516:    2128322 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.325404:    2105007 cycles:u: 
+	    5fd266ea012d [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.326463:    2018780 cycles:u: 
+	    5fd266d5d9d1 [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.327368:    2058756 cycles:u: 
+	    741f02ebdd88 __libc_realloc (inlined)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63ee3 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3cd72 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.328354:    2035431 cycles:u: 
+	    5fd266d3d0cb [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.329403:    2090398 cycles:u: 
+	    5fd266d5d9d1 [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.330329:    2077334 cycles:u: 
+	    741f02ef8a29 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.331407:    2088674 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.332511:    2096156 cycles:u: 
+	    741f02eba839 _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d3ca7b [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.333491:    2062122 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.334347:    2017342 cycles:u: 
+	    5fd266d8e30d [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.335282:    2057956 cycles:u: 
+	    5fd266e657e0 [unknown] (/usr/bin/git)
+	    5fd266d8e34c [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.336285:    2123758 cycles:u: 
+	    5fd266d8e31a [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.337422:    2156571 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.338440:    2137396 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.339408:    2080915 cycles:u: 
+	    5fd266ea013c [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.340508:    2099987 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.341470:    2088723 cycles:u: 
+	    741f02ebb374 _int_malloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02ebc759 _int_realloc (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02ebdd7e __libc_realloc (inlined)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63ee3 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3cd72 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.342390:    2066641 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.343403:    2079119 cycles:u: 
+	    5fd266ea0129 [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.344476:    2117088 cycles:u: 
+	    741f02ef8a29 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.345452:    2095901 cycles:u: 
+	    5fd266d8e31a [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.346330:    2054625 cycles:u: 
+	    741f02ef8a00 __readdir64 (inlined)
+	    5fd266d3c753 [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.347363:    2096911 cycles:u: 
+	    5fd266e9fc73 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.348535:    2148843 cycles:u: 
+	    741f02fb7371 __strncmp_evex (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d36040 [unknown] (/usr/bin/git)
+	    5fd266d3cefc [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.349732:    2113327 cycles:u: 
+	    5fd266e9fca9 [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b337 [unknown] (/usr/bin/git)
+	    5fd266d3b5ff [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.350883:    2042335 cycles:u: 
+	    5fd266d3b69f [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.351860:    1954348 cycles:u: 
+	    741f02ebc1cc __libc_malloc2 (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266ea7c0a [unknown] (/usr/bin/git)
+	    5fd266e63f09 [unknown] (/usr/bin/git)
+	    5fd266e649c1 [unknown] (/usr/bin/git)
+	    5fd266d3c55f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.352868:    1932762 cycles:u: 
+	    5fd266d35e1b [unknown] (/usr/bin/git)
+	    5fd266d3b5c8 [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.353833:    1939735 cycles:u: 
+	    5fd266d35dfc [unknown] (/usr/bin/git)
+	    5fd266d3b5c8 [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.354772:    1945867 cycles:u: 
+	    5fd266d5d9fb [unknown] (/usr/bin/git)
+	    5fd266d8e366 [unknown] (/usr/bin/git)
+	    5fd266d3ce25 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.355904:    1955513 cycles:u: 
+	    5fd266ea0061 [unknown] (/usr/bin/git)
+	    5fd266ea00be [unknown] (/usr/bin/git)
+	    5fd266d358f6 [unknown] (/usr/bin/git)
+	    5fd266d3b4a9 [unknown] (/usr/bin/git)
+	    5fd266d3b58a [unknown] (/usr/bin/git)
+	    5fd266d3b9b6 [unknown] (/usr/bin/git)
+	    5fd266d3c187 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.357018:    1953518 cycles:u: 
+	    741f02eba84c _int_free_chunk (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    5fd266d3ca7b [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.358092:    1904322 cycles:u: 
+	    5fd266dd9653 [unknown] (/usr/bin/git)
+	    5fd266d35fd7 [unknown] (/usr/bin/git)
+	    5fd266d3cefc [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.359156:    1865737 cycles:u: 
+	    5fd266d3b595 [unknown] (/usr/bin/git)
+	    5fd266d3c215 [unknown] (/usr/bin/git)
+	    5fd266d3ce65 [unknown] (/usr/bin/git)
+	    5fd266d3c7cd [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3cb5f [unknown] (/usr/bin/git)
+	    5fd266d3efd6 [unknown] (/usr/bin/git)
+	    5fd266d3f8b1 [unknown] (/usr/bin/git)
+	    5fd266ea125d [unknown] (/usr/bin/git)
+	    5fd266ea5241 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.359641:    1841055 cycles:u: 
+	    5fd266eadf66 [unknown] (/usr/bin/git)
+	    5fd266ea5296 [unknown] (/usr/bin/git)
+	    5fd266bb0da8 [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+git 2251004/2251004 983396.360081:    1827828 cycles:u: 
+	    5fd266de38f8 [unknown] (/usr/bin/git)
+	    5fd266bb0dbf [unknown] (/usr/bin/git)
+	    5fd266b769d3 [unknown] (/usr/bin/git)
+	    5fd266b77c79 [unknown] (/usr/bin/git)
+	    5fd266b74533 [unknown] (/usr/bin/git)
+	    741f02e2a8c0 __libc_start_call_main (/usr/lib/x86_64-linux-gnu/libc.so.6)
+	    741f02e2a9d7 __libc_start_main_impl (inlined)
+	    5fd266b74584 [unknown] (/usr/bin/git)
+
+litchi-perf-bas 2250997/2250997 983396.363559:    3836744 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.364488:    3480844 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.365441:    3510602 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.366411:    3568799 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.367375:    3609086 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.368356:    3637576 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.369334:    3667786 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.370353:    3682380 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.371344:    3704303 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.372335:    3685687 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.373328:    3699645 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.374326:    3706737 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.375319:    3715001 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.376313:    3720060 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.377308:    3731084 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.378306:    3736729 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.379301:    3740813 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.380314:    3745284 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.381316:    3749420 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.382321:    3739914 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.383324:    3742380 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.384322:    3741968 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.385325:    3741947 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.386328:    3744285 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.387333:    3744292 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.388341:    3743993 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.389348:    3743149 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.390358:    3737517 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.391360:    3735981 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.392366:    3730055 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.393366:    3728693 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.394362:    3729460 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.395360:    3732631 cycles:u: 
+
+litchi-perf-bas 2250997/2250997 983396.396357:    3736030 cycles:u: 
+

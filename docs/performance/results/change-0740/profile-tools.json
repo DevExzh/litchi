@@ -1,0 +1,26 @@
+{
+  "tools": {
+    "perf": {
+      "path": "/usr/bin/perf",
+      "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009",
+      "version": "perf version 7.0.14"
+    },
+    "nm": {
+      "path": "/usr/bin/nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009",
+      "version": "GNU nm (GNU Binutils for Ubuntu) 2.46"
+    },
+    "objdump": {
+      "path": "/usr/bin/objdump",
+      "sha256": "6e8454a1edb913e86e4274a48bb8a836622ef80d147a1413c21369a2e5dc1cbc",
+      "version": "GNU objdump (GNU Binutils for Ubuntu) 2.46"
+    },
+    "zstd": {
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+    }
+  },
+  "perf_event_paranoid": "1",
+  "hardware_probe": "Exploratory perf stat -e cycles,instructions -- true succeeded before build; formal qualification retains raw records."
+}

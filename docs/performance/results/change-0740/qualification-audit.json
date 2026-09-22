@@ -1,0 +1,84 @@
+{
+  "status": "passed",
+  "rows": [
+    {
+      "folder": "qualification",
+      "index": 0,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification",
+      "index": 1,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification",
+      "index": 2,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-uncompressed",
+      "index": 0,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-uncompressed",
+      "index": 1,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-uncompressed",
+      "index": 2,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-uncompressed",
+      "index": 3,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-wide",
+      "index": 0,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-wide",
+      "index": 1,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-fp",
+      "index": 0,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-fp",
+      "index": 1,
+      "mode": "native",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-fp",
+      "index": 2,
+      "mode": "profile",
+      "projection": "passed"
+    },
+    {
+      "folder": "qualification-fp",
+      "index": 3,
+      "mode": "profile",
+      "projection": "passed"
+    }
+  ],
+  "scope": "logical report projection only; does not validate corrupt or unqualified profile attribution"
+}

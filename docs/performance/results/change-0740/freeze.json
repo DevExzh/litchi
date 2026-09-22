@@ -1,0 +1,12 @@
+{
+  "created": 1790092370.2419205,
+  "scripts": {
+    "formal.py": "a2f81ef84b42b42874609583f778573a76f07348cf91692d75bd65366dd82b28",
+    "parse-stacks.py": "56b7ce02f64daf176546d1895b20a547e663aea7e8e5f333def907c90a453827",
+    "contract.py": "901f4c7b02e3a0aec30805562f973fdfd46b5bb4b982a1e74361b218e641e2f5"
+  },
+  "build_sha256": "3333997c14ca59971a12caee0a2cce3a28e86c6562c2e42b4ae6b96fc0317586",
+  "matrix": "3 fresh processes/case; alternating order; plain 100 samples, media 10; no warmups; CPU12; cycles:u 997Hz FP127",
+  "scope": "diagnostic build sampled period only; no latency or ordinary build transfer",
+  "classification": "unknown, empty, >=127-frame or conflicting paths ambiguous; strict root+plan helper+prepare, no apply; exclusive candidate writer generated deflate and residual partitions"
+}

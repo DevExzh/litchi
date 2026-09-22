@@ -1,0 +1,7 @@
+failed to write perf data, error: Bad address
+failed to write perf data, error: Bad address
+[ perf record: Woken up 34 times to write data ]
+failed to decompress (B): 81008 -> 528384, dst_size 528384 : Data corruption detected
+Couldn't decompress data
+0x80e20 [0x3c80]: failed to process type: 83 [Operation not permitted]
+[ perf record: Captured and wrote 0.750 MB /home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification/02.perf.data (465 samples), compressed (original 8.274 MB, ratio is 11.059) ]

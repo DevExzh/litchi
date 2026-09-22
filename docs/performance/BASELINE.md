@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0740 — diagnostic native cross-copy planning attribution
+
+[0740](0740-pptx-cross-copy-native-profile.md) preserves unchanged production and
+harness source. Three frame-pointer profiles per corpus place generated-entry
+Deflate at 78.79–79.54% of strict planning sample period for media-rich decks,
+and 1.77–2.44% for plain decks. Unknown and unrooted work remain excluded and
+reported. These are diagnostic-build sampled periods, not ordinary-release
+latency shares or removable-cost estimates. Failed ordinary DWARF and corrupt
+compressed qualifications are retained. Bounded authorized compressed transfer
+for binary image leaves is the next source-backed investigation, subject to
+physical patch identity and preservation proofs. No coverage or timing-contract
+promotion; the program goal remains open.
+
 ## 0739 — current owned PPTX cross-copy planning baseline
 
 [0739](0739-pptx-cross-copy-current-baseline.md) measures 540 native samples

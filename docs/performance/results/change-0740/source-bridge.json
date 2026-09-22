@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "reference": "../change-0739/source.json",
+  "reference_sha256": "099bce30261e964fcbcfdc5ee257955d5b6ca13526c4215a7b47e2a51b394b50",
+  "source_files": 7281,
+  "equal_files": true,
+  "oracle_sha256": "f83e4021d217df2dea45432559144fef2bdec921dffc180db37a7d557c511959",
+  "scope": "Same production/harness source and oracle; no compiler-byte equality or timing comparability inferred."
+}

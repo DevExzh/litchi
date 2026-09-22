@@ -1,0 +1,26 @@
+{
+  "removed": [
+    {
+      "removed": "/home/zhuhe/code/litchi-target-0740",
+      "binary": "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "sha256": "8436f9bc5869f2202ccb58a737840c7967de96d45ccf0eb943d4106e327e1276",
+      "bytes": 62939968,
+      "perf_cache": {
+        "removed": "/home/zhuhe/.debug/home/zhuhe/code/litchi-target-0740",
+        "elf_sha256": "8436f9bc5869f2202ccb58a737840c7967de96d45ccf0eb943d4106e327e1276",
+        "removed_buildid_link": "/home/zhuhe/.debug/.build-id/73/3c07380b9a064e2333c670ac9bbf533959d210"
+      }
+    },
+    {
+      "removed": "/home/zhuhe/code/litchi-target-0740-fp",
+      "binary": "/home/zhuhe/code/litchi-target-0740-fp/release/litchi-perf-baseline",
+      "sha256": "50296656d429cfd08a22d5e8ed8a642e7c31553f31edb78ce9682cb7b69f4d92",
+      "bytes": 61582792,
+      "perf_cache": {
+        "removed": "/home/zhuhe/.debug/home/zhuhe/code/litchi-target-0740-fp",
+        "elf_sha256": "50296656d429cfd08a22d5e8ed8a642e7c31553f31edb78ce9682cb7b69f4d92",
+        "removed_buildid_link": "/home/zhuhe/.debug/.build-id/8f/58ecd1753b89ecff9ad3cfd78717aaf3502a48"
+      }
+    }
+  ]
+}

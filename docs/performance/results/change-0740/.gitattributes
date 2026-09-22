@@ -1,0 +1,5 @@
+# Preserve exact profiler bytes; stacks contain perf-generated whitespace.
+*.stacks -text -diff
+*.perf.data.gz -text -diff
+fp-plan-wrapper-disassembly.txt whitespace=-blank-at-eol,-blank-at-eof
+qualification-prologues.txt whitespace=-blank-at-eol,-blank-at-eof

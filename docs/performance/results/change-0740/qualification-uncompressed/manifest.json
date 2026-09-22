@@ -1,0 +1,162 @@
+[
+  {
+    "mode": "native",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/00.json"
+    ],
+    "started": 1790091553.1431067,
+    "ended": 1790091553.530048,
+    "exit": 0,
+    "files": {
+      "00.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.json": "1fba78ead47817525db32ea8675441228f1ae47885076e8cce81726d6372e162"
+    }
+  },
+  {
+    "mode": "native",
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/01.json"
+    ],
+    "started": 1790091553.531906,
+    "ended": 1790091556.8460724,
+    "exit": 0,
+    "files": {
+      "01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "01.json": "fbd2b5e440b3f7e9051f85a88d1e9320a90b0c380f96927c27b20b6a95ef7e40",
+      "01.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "mode": "profile",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 20,
+    "warmups": 0,
+    "command": [
+      "perf",
+      "record",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/02.perf.data",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "20",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/02.json"
+    ],
+    "started": 1790091556.8481035,
+    "ended": 1790091557.9031594,
+    "exit": 0,
+    "script_command": [
+      "perf",
+      "script",
+      "--show-lost-events",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/02.perf.data",
+      "-F",
+      "comm,pid,tid,time,event,period,ip,sym,dso"
+    ],
+    "script_exit": 0,
+    "files": {
+      "02.json": "cf254535c1007f0bc8fc4c0eb3fdec8c6d9cc1faab3f299a5553fd4c570bb401",
+      "02.perf.data": "1bfa0e673d20159995bf3f97e7dc3daef9945eb0dd1db05761f576d26b1dd58b",
+      "02.script.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "02.stacks": "f543abd4f711e40ee1881ec6e36ae326044468245b44e096366ce5b1e63b3b17",
+      "02.stderr": "a62f26ad085cdba843ff57f7838f8064b39d39e5b2547625386b36b16ecb8ec0",
+      "02.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "mode": "profile",
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 2,
+    "warmups": 0,
+    "command": [
+      "perf",
+      "record",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/03.perf.data",
+      "--",
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0740/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "2",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/03.json"
+    ],
+    "started": 1790091558.481404,
+    "ended": 1790091562.8176305,
+    "exit": 0,
+    "script_command": [
+      "perf",
+      "script",
+      "--show-lost-events",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0740/qualification-uncompressed/03.perf.data",
+      "-F",
+      "comm,pid,tid,time,event,period,ip,sym,dso"
+    ],
+    "script_exit": 0,
+    "files": {
+      "03.script.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "03.stderr": "66234175862e6b2e3435e96ce4922779381955a1c06c58a52e2b71955b63cd0e",
+      "03.json": "d484a6e080299ff71760e49fbae9e2d391485e6a419852123bacd4cafabbacf7",
+      "03.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "03.stacks": "ce1375a8a6368bcf6e7c69913c4c736af463f11ba884249edd5685650638d6de",
+      "03.perf.data": "3bfe352babdc2f1f18db5a89fae83c1b04c5e90820eabba1dc3ec50c58dad143"
+    }
+  }
+]
