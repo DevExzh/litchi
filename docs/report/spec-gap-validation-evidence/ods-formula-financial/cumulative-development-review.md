@@ -26,3 +26,17 @@ subtract-on-next-step compensation convention but added that compensation at
 finalization. The owner must fix the sign convention and retain a focused
 regression. Temporary probe sources and binary were removed automatically.
 No performance acceptance or frozen-source claim is made here.
+
+## Generalized positive-rate checkpoint
+
+Isolated commit `ab93dec951` scales the payment equation by inverse growth,
+computes remaining balance from the terminal value, and subtracts the Kahan
+rounding excess at finalization. The previous two finite-result regressions
+and all twelve long-span oracle rows now pass through public APIs. The
+focused suites pass 16 evaluation, 23 resource, two scalar/reducer oracle, and
+two roots tests. The 35 financial library tests and all-target Clippy with
+warnings denied also pass. Debug profiling preflight passes all 91 cases; its
+receipt is `performance/development-preflight-stability-fixed.json`.
+
+This is a tested development checkpoint, not final numerical acceptance.
+Independent edge review, final frozen gates, and timing capture remain open.
