@@ -1,0 +1,25 @@
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+   Compiling ole-format-save-probe-0732 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0732/probe)
+error[E0382]: borrow of partially moved value: `source`
+   --> src/ppt_phase.rs:840:45
+    |
+838 |         source_inventory: source.summary,
+    |                           -------------- value partially moved here
+839 |         expected_output_inventory: expected.summary,
+840 |         replacements: replacement_summaries(&source, &expected, &replacements),
+    |                                             ^^^^^^^ value borrowed here after partial move
+    |
+    = note: partial move occurs because `source.summary` has type `InventorySummary`, which does not implement the `Copy` trait
+
+error[E0382]: borrow of partially moved value: `expected`
+   --> src/ppt_phase.rs:840:54
+    |
+839 |         expected_output_inventory: expected.summary,
+    |                                    ---------------- value partially moved here
+840 |         replacements: replacement_summaries(&source, &expected, &replacements),
+    |                                                      ^^^^^^^^^ value borrowed here after partial move
+    |
+    = note: partial move occurs because `expected.summary` has type `InventorySummary`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `ole-format-save-probe-0732` (lib test) due to 2 previous errors

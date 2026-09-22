@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0732 — native PPT attribution retained with three observer flags
+
+[0732](0732-ppt-native-phase-attribution.md) adds content-free, feature-gated
+commit events while leaving ordinary commit byte-identical. All 36 native
+processes, 1,800 output oracles and 9,000 clock events pass independent replay.
+Observed hashing is roughly one third of the lifecycle and embedded finish
+roughly one sixth, but three >5% clock median flags prevent precise transfer
+to ordinary commit. All twelve final quality commands and 23 corruption
+controls pass; failed build/preflight attempts remain visible. Next investigate
+finish work with unchanged validation and ordinary-path controls. No speedup
+claim is promoted. [Evidence](results/change-0732/README.md).
+
 ## 0731 — public PPT attribution with an explicit profiler limit
 
 [0731](0731-ppt-public-instruction-attribution.md) records three native, three

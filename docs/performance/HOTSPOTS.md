@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0732 — inspect native PPT finish; retain observer qualification
+
+[0732](0732-ppt-native-phase-attribution.md) replaces the software-SHA profiler
+inference with native observations: combined artifact hashes are 33.25–33.87%
+of the observed whole and embedded finish is 16.73–16.87%. Three of nine
+empty-to-clock median controls exceed 5%; exact ordinary fractions remain
+unqualified. Required before/after artifact digests cannot be removed. Next
+inspect repeated work inside embedded finish, preserving publication validation
+and qualifying any candidate on the ordinary public path. Refine clock controls
+before transferring diagnostic fractions. No cache, policy or optimization
+change is authorized by these fractions alone. The non-iWork goal stays active.
+
 ## 0731 — native PPT phase attribution required before optimization
 
 [0731](0731-ppt-public-instruction-attribution.md) confirms the PPT workflow and

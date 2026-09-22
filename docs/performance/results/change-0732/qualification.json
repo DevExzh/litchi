@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "build_sha256": "fdeee7da2413bd0b9e23c30eedd8975f87ec08ead112a4c0e2d738578ecb98c7",
+  "files": {
+    "qualification/manifest.json": "d7960237449183d622e0103b1efd7d841d7f3f88dc4004a583b1e296e5f68361",
+    "qualification/profiled-clock.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/profiled-empty.json": "b8b7d72c5a1759ab8059d8c46d7be835285a0c89a6af8499851b5e925691392d",
+    "qualification/ordinary-split.json": "e03beb005a18918b4d24b2f068fd3a3aaa3b31957f737dca8497eb4797b7a24a",
+    "qualification/ordinary-opaque.json": "bd2b1e230987012b839ccb16ec65e510a111cef97109b0d7892e939094b8d295",
+    "qualification/ordinary-split.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/profiled-clock.json": "57e4d67eaa1b9e8c49e56e97853459a8c955edba554b3e3e3af326c2b21a016a",
+    "qualification/profiled-empty.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/ordinary-opaque.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

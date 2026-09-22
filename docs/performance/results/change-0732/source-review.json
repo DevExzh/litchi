@@ -1,0 +1,15 @@
+{
+  "base_head": "5655594bf9452e533b8b6f09ee192d396be6c50d",
+  "files": {
+    "crates/litchi-ppt/Cargo.toml": {
+      "before_sha256": "c4ed2bea304a9a6ae84f448d2829af72336c884767682856a3ec87b4ad0e9ef8",
+      "after_sha256": "a8388007e33328b0d30859557694421fc590c7fcf0bcdfea5994eff341293981"
+    },
+    "crates/litchi-ppt/src/slide_order.rs": {
+      "before_sha256": "330e38e6297217de635cbf55d3bd851a0330ec8e2ef05017c31abda28e3101fd",
+      "after_sha256": "8caf133a972d513b72a7cc83e76fba98be3aa253027978e02aa7cb49bcac267a"
+    }
+  },
+  "ordinary_commit_sha256": "3d23ddc5d2766c351e723573a34f7fab46d7e3103807a83d315413539766db71",
+  "ordinary_commit_unchanged": true
+}

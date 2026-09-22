@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0732 — native PPT phases with measured observer limits
+
+[0732](0732-ppt-native-phase-attribution.md) qualifies 36 processes and 1,800
+measured PPT lifecycles against the sealed oracle. Ordinary opaque p50 is
+978.53–997.45 µs. Native observed hashing occupies 33.25–33.87% of its whole
+lifecycle; embedded finish occupies 16.73–16.87%. Three clock-observer median
+comparisons exceed 5%, so these are diagnostic-route fractions, not exact
+ordinary-path costs. Twelve quality gates, independent replay and 23 analyzer
+controls pass. Ordinary commit is byte-identical; only opt-in diagnostics are
+added. No speedup or allocation claim is made. [Evidence](results/change-0732/README.md).
+
 ## 0731 — public PPT baseline and Callgrind dispatch limit
 
 [0731](0731-ppt-public-instruction-attribution.md) qualifies nine processes with

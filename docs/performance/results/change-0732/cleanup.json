@@ -1,0 +1,14 @@
+{
+  "removed": true,
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0732-bin/ppt_phase_probe",
+      "bytes": 76778568,
+      "sha256": "0beff76c495dfec3c39426e3d146a9a686619f62ac7ceba13f61b4baf80497e6"
+    }
+  ],
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0732",
+    "/home/zhuhe/code/litchi-0732-bin"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "scope": "observed route only; combine spans per owner before taking medians",
+  "capture_manifest_sha256": "a00677bdc961fc7616e891549fb35733e3c3544dd35b92d228be251a46419b8d",
+  "script_sha256": "d426ef1f887f5b317b12dc4596edca6e0fedd2e57aeefb2fc1d8e571e215a638",
+  "processes": [
+    {
+      "cycle": 0,
+      "repeat": 0,
+      "combined_hash_p50_ns": 350096.5,
+      "combined_hash_whole_ratio_p50": 0.3361999482371975,
+      "combined_hash_commit_ratio_p50": 0.43398696808992865
+    },
+    {
+      "cycle": 0,
+      "repeat": 1,
+      "combined_hash_p50_ns": 350207.0,
+      "combined_hash_whole_ratio_p50": 0.3345035548499674,
+      "combined_hash_commit_ratio_p50": 0.43102605911465786
+    },
+    {
+      "cycle": 0,
+      "repeat": 2,
+      "combined_hash_p50_ns": 350136.5,
+      "combined_hash_whole_ratio_p50": 0.33246690509563326,
+      "combined_hash_commit_ratio_p50": 0.42774512789138686
+    },
+    {
+      "cycle": 1,
+      "repeat": 0,
+      "combined_hash_p50_ns": 350056.5,
+      "combined_hash_whole_ratio_p50": 0.3333564200213268,
+      "combined_hash_commit_ratio_p50": 0.4282838103715705
+    },
+    {
+      "cycle": 1,
+      "repeat": 1,
+      "combined_hash_p50_ns": 350247.0,
+      "combined_hash_whole_ratio_p50": 0.33530552824779,
+      "combined_hash_commit_ratio_p50": 0.43312212122598703
+    },
+    {
+      "cycle": 1,
+      "repeat": 2,
+      "combined_hash_p50_ns": 350141.5,
+      "combined_hash_whole_ratio_p50": 0.33430032787690694,
+      "combined_hash_commit_ratio_p50": 0.43049182314341217
+    },
+    {
+      "cycle": 2,
+      "repeat": 0,
+      "combined_hash_p50_ns": 350361.0,
+      "combined_hash_whole_ratio_p50": 0.33871070453034396,
+      "combined_hash_commit_ratio_p50": 0.43252350136489964
+    },
+    {
+      "cycle": 2,
+      "repeat": 1,
+      "combined_hash_p50_ns": 350246.5,
+      "combined_hash_whole_ratio_p50": 0.33521271858541185,
+      "combined_hash_commit_ratio_p50": 0.4313839676429543
+    },
+    {
+      "cycle": 2,
+      "repeat": 2,
+      "combined_hash_p50_ns": 350486.5,
+      "combined_hash_whole_ratio_p50": 0.33517099824600166,
+      "combined_hash_commit_ratio_p50": 0.43144829949550506
+    }
+  ]
+}

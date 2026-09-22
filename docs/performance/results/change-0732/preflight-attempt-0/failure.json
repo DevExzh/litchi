@@ -1,0 +1,5 @@
+{
+  "status": "failed",
+  "phase": "synthetic module import",
+  "error": "IndexError: ROOT = P.parents[3] in shallow /tmp packet; no native matrix collected"
+}

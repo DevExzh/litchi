@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "kind": "synthetic-schema-only",
+  "freeze_sha256": "5811b2cc32c6f13f859164919e923c2fd82ac4b040c210776636df83486cda32",
+  "scripts": {
+    "preflight.py": "ff8782ffbe34b66fb431a4468f170d1e31a393627bb84f6ff02c62d1e972e880",
+    "analyze.py": "067f3cf7121ca846e3838e1a9133e309295b44f24a04ecd0c24f5ab54b5df7d5",
+    "audit.py": "76a89fe9aeed284c8075c1597976e60a234e043eca433c3c8f488834f9186a99"
+  },
+  "script_sha256": "ff8782ffbe34b66fb431a4468f170d1e31a393627bb84f6ff02c62d1e972e880",
+  "analyzer_sha256": "067f3cf7121ca846e3838e1a9133e309295b44f24a04ecd0c24f5ab54b5df7d5",
+  "audit_sha256": "76a89fe9aeed284c8075c1597976e60a234e043eca433c3c8f488834f9186a99",
+  "auditor_sha256": "76a89fe9aeed284c8075c1597976e60a234e043eca433c3c8f488834f9186a99",
+  "process_count": 36,
+  "synthetic_capture_count": 36
+}
