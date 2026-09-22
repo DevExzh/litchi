@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0731 — native PPT phase attribution required before optimization
+
+[0731](0731-ppt-public-instruction-attribution.md) confirms the PPT workflow and
+its preservation oracle but exposes a profiler-dispatch limitation: Callgrind's
+67.78% artifact-hash instruction fraction comes from software SHA on a host
+with native SHA acceleration masked under Valgrind. Do not rank native hashing
+or writer costs from those fractions. Next add bounded native phase observation
+with ordinary/observed controls around hashing, persisted-slide capture, writer
+finish, preservation checks and final reopen. No validation or patch digest
+removal is justified. Production and the non-iWork goal remain unchanged.
+
 ## 0730 — bounded DOC handoff retained; next attribute public PPT saves
 
 [0730](0730-doc-bounded-render-handoff.md) removes the repeated DOC finish render

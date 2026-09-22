@@ -1,0 +1,56 @@
+{
+  "analyzer_sha256": "f0f19eeacf675e992b5e2828a13dec984d924cd34055bf655e4575f1ea43a2d9",
+  "script_sha256": "c1fc08b2f088a528ff6a342632a80b236d0178bafb5fe29b818cb67d4c23215a",
+  "checks": [
+    {
+      "name": "complete packet accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "wrong output identity",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "false semantic oracle",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing negative control",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "zero native time",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing process",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "wrong command",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "wrong profile hash",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "profile arithmetic with updated digest",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "restored packet accepted",
+      "accepted": true,
+      "expected": true
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+==1941308== Nulgrind, the minimal Valgrind tool
+==1941308== Copyright (C) 2002-2024, and GNU GPL'd, by Nicholas Nethercote et al.
+==1941308== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1941308== Command: /home/zhuhe/code/litchi-0731-bin/feature-witness
+==1941308== 
+==1941308== 

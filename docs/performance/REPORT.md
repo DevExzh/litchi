@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0731 — public PPT attribution with an explicit profiler limit
+
+[0731](0731-ppt-public-instruction-attribution.md) records three native, three
+allocation and three owner-scoped Callgrind processes, all matching the sealed
+PPT oracle. Native p50 is 1058.43–1070.69 μs with no >5% central repeat flag.
+The 67.78% Callgrind artifact-hash fraction is not a native latency fraction:
+Valgrind masks SHA acceleration and the profile uses software SHA. This result
+requires native phase attribution before nominating an optimization. Five probe
+gates and ten analyzer controls pass; production is unchanged and no broader
+performance claim is promoted. [Evidence](results/change-0731/README.md).
+
 ## 0730 — bounded DOC render handoff retained
 
 [0730](0730-doc-bounded-render-handoff.md) retains a finite, capacity-accounted
