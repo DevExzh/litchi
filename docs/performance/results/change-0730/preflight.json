@@ -1,0 +1,8 @@
+{
+  "analyzer_sha256": "6dc6e76645e536524841194003d04ede635b842eb623f121d1f2206ab8419432",
+  "auditor_sha256": "cd9401d2464e2e1eaa9e56a31d5608be884c84dba92fac59b476e425fb5a71a3",
+  "contract_sha256": "f870329cc076be509c2066e8ab654b8ce24ab63c3737c110710697a13eb0b4ea",
+  "kind": "synthetic schema integration only; no measurement",
+  "script_sha256": "4258755db26b6ccfa9a8fbb9bbd8ddf2ea54210aeb55dc2693165db80b57351b",
+  "status": "passed"
+}

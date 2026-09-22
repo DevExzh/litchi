@@ -1,0 +1,106 @@
+{
+  "analyzer_sha256": "6dc6e76645e536524841194003d04ede635b842eb623f121d1f2206ab8419432",
+  "script_sha256": "abc90923e67de5fca81a2fb35db854dc0d0f3dfa1ef8921d37f70d634362ea42",
+  "checks": [
+    {
+      "name": "complete packet accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "raw report hash mismatch rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "false expected semantic boolean rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing semantic witness rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "physical-only length proof rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing format-specific length proof rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing named negative control rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "accepted negative control rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "wrong source identity rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "wrong output identity rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "stream inventory mutation rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "allocation field removal rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "timing field mutation rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "duplicate process rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "command order mutation rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing process rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "partial binary cleanup witness rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "frozen custody mutation rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "quality manifest failure rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "oracle contract mutation rejected",
+      "accepted": false,
+      "expected": false
+    }
+  ]
+}

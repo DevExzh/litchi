@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0730 — retained bounded DOC validated-render handoff
+
+[0730](0730-doc-bounded-render-handoff.md) retains the bounded handoff after
+36 native/8 allocation comparisons, 24 retention controls, exact output/oracle
+checks and independent replay. NoHeadFoot paired p50 improves 11.89–13.88%;
+FloatingPictures ranges from 14.86% faster to 1.27% slower. Allocated bytes fall
+9.01%/11.80%, and single-edit peaks stay unchanged. Two-edit peaks rise
+16.72%/15.60%, an explicitly accepted retained-state tradeoff, not a process-memory
+bound. All 13 quality gates and 20 corruption controls pass.
+[Evidence](results/change-0730/README.md).
+
 ## 0729 — actual public DOC attribution and observer controls
 
 [0729](0729-doc-public-phase-attribution.md) freezes 72 processes and 3,600

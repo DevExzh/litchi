@@ -1,0 +1,6 @@
+{
+  "packet": "change-0728",
+  "artifact_manifest_sha256": "a39fb1e5aa4ba31f155e1dd9a473b369c9619a621c206dabf26796b9a1f1eb8f",
+  "oracle_contract_sha256": "9d1baa0a4978aa9f634545a09d4a594dfb2cfa3785c1895576680045af8b44f9",
+  "baseline_head": "a15434b7f8555539c6b8ea36c1408716f95da09b"
+}

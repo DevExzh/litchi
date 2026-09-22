@@ -1,0 +1,669 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    clippy::cast_possible_truncation,
+    clippy::drop_non_drop,
+    clippy::default_trait_access,
+    clippy::bool_assert_comparison,
+    reason = "integration tests use concise assertions and checked fixture-sized literals"
+)]
+
+use litchi_cfb::{OleFile, OleWriter, SectorLayoutPolicy};
+use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
+use std::io::Cursor;
+use std::sync::Arc;
+
+fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    build(&mut writer);
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).expect("test CFB should write");
+    output.into_inner()
+}
+
+fn first_free_sector(bytes: &[u8]) -> usize {
+    let sector_size = 1usize << u16::from_le_bytes(bytes[0x1E..0x20].try_into().unwrap());
+    let fat_count = u32::from_le_bytes(bytes[0x2C..0x30].try_into().unwrap()) as usize;
+    let mut fat = Vec::new();
+    for index in 0..fat_count {
+        let sector = u32::from_le_bytes(
+            bytes[0x4C + index * 4..0x50 + index * 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let start = (sector + 1) * sector_size;
+        for word in bytes[start..start + sector_size].chunks_exact(4) {
+            fat.push(u32::from_le_bytes(word.try_into().unwrap()));
+        }
+    }
+    let physical_sectors = bytes.len() / sector_size - 1;
+    fat.iter()
+        .take(physical_sectors)
+        .position(|entry| *entry == 0xFFFF_FFFF)
+        .expect("source should contain a free sector")
+}
+
+fn target(key: &str, path: &[&str]) -> Target {
+    Target::new(key, path.iter().copied()).expect("test target should validate")
+}
+
+fn targets(key: &str, path: &[&str]) -> Targets {
+    Targets::one(target(key, path))
+}
+
+fn ansi(value: &str, output: &mut Vec<u8>) {
+    output.extend_from_slice(&((value.len() + 1) as u32).to_le_bytes());
+    output.extend_from_slice(value.as_bytes());
+    output.push(0);
+}
+
+fn comp_obj(user_type: &str, prog_id: &str) -> Vec<u8> {
+    let mut output = vec![0; 28];
+    output[12..28].copy_from_slice(&[
+        0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+        0x07,
+    ]);
+    ansi(user_type, &mut output);
+    ansi("Embedded Object", &mut output);
+    ansi(prog_id, &mut output);
+    output
+}
+
+fn native(command: &str, payload: &[u8]) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&2u16.to_le_bytes());
+    body.extend_from_slice(b"report.txt\0");
+    body.extend_from_slice(b"report.txt\0");
+    body.extend_from_slice(&[0; 4]);
+    body.extend_from_slice(command.as_bytes());
+    body.push(0);
+    body.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    body.extend_from_slice(payload);
+    let mut output = (body.len() as u32).to_le_bytes().to_vec();
+    output.extend_from_slice(&body);
+    output
+}
+
+fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
+    let metadata = comp_obj("Package", "Package");
+    let native = native("do-not-run", b"opaque native bytes");
+    write_cfb(|writer| {
+        writer
+            .create_stream(&["WordDocument"], b"unknown-records")
+            .expect("test stream should write");
+        writer
+            .create_storage(&["ObjectPool", "_42"])
+            .expect("test storage should write");
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{3}ObjInfo"], obj_info)
+            .expect("test metadata should write");
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{1}CompObj"], &metadata)
+            .expect("test metadata should write");
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{1}Ole10Native"], &native)
+            .expect("test native stream should write");
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{3}PRINT"], b"metafile")
+            .expect("test preview stream should write");
+    })
+}
+
+#[test]
+fn discovers_only_host_selected_storage_and_keeps_metadata_opaque() {
+    let bytes = doc_with_object(&[0x40, 0x00, 0x02, 0x00]);
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("host-object", &["ObjectPool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("discovery should pass");
+    let object = objects
+        .get("host-object")
+        .expect("target should be present");
+    assert_eq!(object.key(), "host-object");
+    assert_eq!(
+        object.path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
+    );
+    assert_eq!(
+        object.stream(&["\u{3}ObjInfo"]),
+        Some(&[0x40, 0x00, 0x02, 0x00][..])
+    );
+    assert_eq!(object.storage().directory().kind(), EntryKind::Storage);
+    assert!(object.storage().directory().sid().raw() > 0);
+    assert_eq!(object.streams().len(), 4);
+    assert!(object.stream(&["\u{1}Ole10Native"]).is_some());
+    let preview = object
+        .streams()
+        .iter()
+        .find(|stream| stream.name() == Some("\u{3}PRINT"))
+        .expect("preview stream metadata should be captured");
+    let preview_directory = preview
+        .directory()
+        .expect("preview should retain directory metadata");
+    assert_eq!(preview_directory.kind(), EntryKind::Stream);
+    assert_eq!(
+        preview_directory.stream_size(),
+        preview.bytes().len() as u64
+    );
+    assert!(preview_directory.links().child().is_none());
+    assert!(object.compound().starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert_eq!(
+        objects.at(0).map(litchi_ole_common::object::Object::key),
+        Some("host-object")
+    );
+}
+
+#[test]
+fn target_catalog_is_explicit_and_rejects_ambiguous_paths() {
+    let first = target("first", &["Pool", "A"]);
+    let second = target("second", &["Pool", "B"]);
+    let selected = Targets::new([first.clone(), second]).expect("targets should validate");
+    assert_eq!(selected.get("first"), Some(&first));
+    assert!(Targets::new([first.clone(), target("other", &["Pool", "A"])]).is_err());
+    assert!(Targets::new([first, target("first", &["Pool", "C"])]).is_err());
+    assert!(Targets::new([target("parent", &["Pool"]), target("child", &["Pool", "A"]),]).is_err());
+}
+
+#[test]
+fn target_paths_follow_cfb_name_limits_and_simple_uppercase_identity() {
+    assert!(Target::new("empty", [""]).is_err());
+    assert!(Target::new("forbidden", ["Pool/Child"]).is_err());
+    assert!(Target::new("nul", ["Pool\0Child"]).is_err());
+    assert!(Target::new("too-long", ["😀".repeat(16)]).is_err());
+    assert!(Target::new("control-is-allowed", ["\u{3}ObjInfo"]).is_ok());
+
+    let upper = target("upper", &["Pool", "Child"]);
+    let lower = target("lower", &["pool", "child"]);
+    assert!(Targets::new([upper, lower]).is_err());
+}
+
+#[test]
+fn discovery_resolves_case_variant_target_paths_to_stored_cfb_names() {
+    let bytes = doc_with_object(&[0, 0, 0, 0]);
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("object", &["objectpool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("target should resolve");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("object should be present")
+            .path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
+    );
+
+    let editor = Editor::open(doc_with_object(&[0, 0, 0, 0]), selected, Limits::default())
+        .expect("editor target should resolve");
+    assert_eq!(
+        editor
+            .targets()
+            .get("object")
+            .expect("resolved target should be present")
+            .path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
+    );
+}
+
+#[test]
+fn malformed_format_metadata_is_retained_without_common_classification() {
+    let malformed = doc_with_object(&[0x00, 0x04, 0x00, 0x00]);
+    let mut ole = OleFile::open(Cursor::new(malformed)).expect("test CFB should open");
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("opaque data is valid");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("object should be present")
+            .stream(&["\u{3}ObjInfo"]),
+        Some(&[0x00, 0x04, 0x00, 0x00][..])
+    );
+
+    let valid = doc_with_object(&[0, 0, 0, 0]);
+    let mut ole = OleFile::open(Cursor::new(valid)).expect("test CFB should open");
+    let limits = Limits {
+        max_stream_size: 4,
+        ..Limits::default()
+    };
+    assert!(discover(&mut ole, &selected, limits).is_err());
+}
+
+#[test]
+fn missing_target_is_a_checked_discovery_error() {
+    let bytes = doc_with_object(&[0, 0, 0, 0]);
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("missing", &["ObjectPool", "_404"]);
+    assert!(discover(&mut ole, &selected, Limits::default()).is_err());
+}
+
+#[test]
+fn targeted_replace_preserves_unrelated_streams_and_opaque_reference() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["\u{1}CompObj"], &comp_obj("Worksheet", "Excel.Sheet.8"))
+            .expect("replacement metadata should write");
+        writer
+            .create_stream(&["CONTENTS"], b"new inert workbook bytes")
+            .expect("replacement payload should write");
+    });
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let mut editor =
+        Editor::open(original, selected.clone(), Limits::default()).expect("editor should open");
+    editor
+        .replace("object", replacement)
+        .expect("replacement should commit");
+    assert!(editor.is_changed());
+    let output = editor.finish().expect("editor should finish");
+    let mut ole = OleFile::open(Cursor::new(output)).expect("output CFB should open");
+    assert_eq!(
+        ole.open_stream(&["WordDocument"])
+            .expect("unrelated stream should remain"),
+        b"unknown-records"
+    );
+    assert_eq!(
+        ole.open_stream(&["ObjectPool", "_42", "CONTENTS"])
+            .expect("replacement stream should be present"),
+        b"new inert workbook bytes"
+    );
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("reopen should pass");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("object should remain selected")
+            .stream(&["\u{1}CompObj"])
+            .expect("opaque metadata should remain"),
+        comp_obj("Worksheet", "Excel.Sheet.8").as_slice()
+    );
+}
+
+#[test]
+fn no_op_editor_round_trip_is_byte_identical() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().expect("editor should finish"), original);
+}
+
+#[test]
+fn commit_exposes_snapshot_and_reversible_patch() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    editor
+        .put_stream(&["WordDocument".into()], b"changed".to_vec())
+        .expect("stream edit should commit");
+
+    let committed = editor.commit().expect("commit should validate");
+    assert_eq!(committed.patch().before(), original.as_slice());
+    assert_eq!(
+        committed
+            .snapshot()
+            .finish()
+            .expect("snapshot should finish"),
+        committed.patch().after()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(committed.patch().after())
+            .expect("inverse should apply"),
+        original
+    );
+}
+
+#[test]
+fn failed_replacement_is_transactional() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    assert!(editor.replace("object", vec![1, 2, 3]).is_err());
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().expect("editor should finish"), original);
+}
+
+#[test]
+fn shared_stream_replacement_reuses_validated_allocation() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original,
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let path = vec![
+        "ObjectPool".to_string(),
+        "_42".to_string(),
+        "\u{3}PRINT".to_string(),
+    ];
+    let replacement: Arc<[u8]> = Arc::from(&b"shared-word-stream"[..]);
+    editor
+        .put_stream_shared(&path, Arc::clone(&replacement))
+        .expect("stream replacement should commit");
+    let installed = editor
+        .stream_shared(&path)
+        .expect("stream should remain available");
+    assert!(Arc::ptr_eq(&replacement, &installed));
+    assert_eq!(editor.stream(&path), Some(&b"shared-word-stream"[..]));
+    let metadata = editor
+        .objects()
+        .get("object")
+        .and_then(|object| {
+            object
+                .streams()
+                .iter()
+                .find(|stream| stream.path() == &path[2..])
+        })
+        .and_then(|stream| stream.directory())
+        .expect("edited stream should be reparsed before publication");
+    assert_eq!(metadata.kind(), EntryKind::Stream);
+    assert_eq!(metadata.stream_size(), replacement.len() as u64);
+    assert!(metadata.uses_mini_stream());
+}
+
+#[test]
+fn same_length_editor_edit_uses_source_backed_copy_through() {
+    let base = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], &vec![0x11u8; 40_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source stream should write");
+    });
+    let source = {
+        let mut writer = OleWriter::new();
+        assert!(writer.adopt_source_layout(&base).unwrap());
+        writer
+            .create_stream(&["A"], &vec![0x33u8; 6_000])
+            .expect("source edit should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source edit should write");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    };
+    let free_sector = first_free_sector(&source);
+    let sector_size = 1usize << u16::from_le_bytes(source[0x1E..0x20].try_into().unwrap());
+    let free_offset = (free_sector + 1) * sector_size;
+    let mut mutated = source.clone();
+    mutated[free_offset] = 0xA7;
+
+    let mut editor = Editor::open(mutated.clone(), Targets::default(), Limits::default())
+        .expect("source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x44u8; 6_000])
+        .expect("same-length edit should commit");
+    let output = editor.finish().expect("same-length edit should finish");
+
+    assert_eq!(output.len(), mutated.len());
+    assert_eq!(
+        output[free_offset], 0xA7,
+        "copy-through retains untouched bytes"
+    );
+    let mut ole = OleFile::open(Cursor::new(output)).expect("copy-through output should reopen");
+    assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 6_000]);
+    assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
+}
+
+#[test]
+fn same_length_overlay_declines_noncanonical_v3_empty_size_word() {
+    let source = write_cfb(|writer| {
+        writer
+            .create_stream(&["Empty"], &[])
+            .expect("empty stream should write");
+        writer
+            .create_stream(&["A"], &[0x11u8; 128])
+            .expect("edited stream should write");
+    });
+    let empty_sid = {
+        let ole = OleFile::open(Cursor::new(source.clone())).expect("source should open");
+        ole.list_directory_entries(&[])
+            .expect("root entries should list")
+            .into_iter()
+            .find(|entry| entry.name == "Empty")
+            .expect("empty stream should be present")
+            .sid
+    };
+    let sector_size = 1usize << u16::from_le_bytes(source[0x1E..0x20].try_into().unwrap());
+    let first_directory_sector =
+        u32::from_le_bytes(source[0x30..0x34].try_into().unwrap()) as usize;
+    let size_high = (first_directory_sector + 1) * sector_size + empty_sid as usize * 128 + 0x7C;
+    let mut mutated = source;
+    mutated[size_high..size_high + 4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes());
+
+    let mut editor = Editor::open(mutated, Targets::default(), Limits::default())
+        .expect("mutated source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x44u8; 128])
+        .expect("same-length edit should commit");
+    let output = editor.finish().expect("fallback layout should finish");
+    let mut ole = OleFile::open(Cursor::new(output.clone())).expect("output should reopen");
+    assert_eq!(ole.open_stream(&["Empty"]).unwrap(), Vec::<u8>::new());
+    assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 128]);
+    let output_size_high =
+        (first_directory_sector + 1) * sector_size + empty_sid as usize * 128 + 0x7C;
+    assert_eq!(
+        &output[output_size_high..output_size_high + 4],
+        &[0, 0, 0, 0]
+    );
+}
+
+#[test]
+fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let word_path = vec!["WordDocument".to_string()];
+    let preview_path = vec![
+        "ObjectPool".to_string(),
+        "_42".to_string(),
+        "\u{3}PRINT".to_string(),
+    ];
+    let word: Arc<[u8]> = Arc::from(&b"batched word stream"[..]);
+    let preview: Arc<[u8]> = Arc::from(&b"batched preview stream"[..]);
+    let mut noop = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("no-op editor should open");
+    let original_word = noop
+        .stream_shared(&word_path)
+        .expect("original WordDocument should be available");
+    noop.put_streams_shared([(word_path.as_slice(), Arc::clone(&original_word))])
+        .expect("identical batch should be a no-op");
+    assert!(!noop.is_changed());
+    assert!(Arc::ptr_eq(
+        &original_word,
+        &noop
+            .stream_shared(&word_path)
+            .expect("no-op WordDocument should remain available")
+    ));
+    assert_eq!(noop.finish().expect("no-op batch stays exact"), original);
+
+    let mut sequential = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("sequential editor should open");
+    sequential
+        .put_stream_shared(&word_path, Arc::clone(&word))
+        .expect("first sequential stream should commit");
+    sequential
+        .put_stream_shared(&preview_path, Arc::clone(&preview))
+        .expect("second sequential stream should commit");
+    let sequential = sequential
+        .finish()
+        .expect("sequential editor should finish");
+
+    let mut editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    editor
+        .put_streams_shared([
+            (word_path.as_slice(), Arc::clone(&word)),
+            (preview_path.as_slice(), Arc::clone(&preview)),
+        ])
+        .expect("stream batch should commit");
+    assert!(Arc::ptr_eq(
+        &word,
+        &editor
+            .stream_shared(&word_path)
+            .expect("WordDocument should remain available")
+    ));
+    assert!(Arc::ptr_eq(
+        &preview,
+        &editor
+            .stream_shared(&preview_path)
+            .expect("preview should remain available")
+    ));
+    assert_eq!(
+        editor.finish().expect("batched editor should finish"),
+        sequential
+    );
+
+    let missing_path = vec!["missing".to_string()];
+    let mut failed = Editor::open(original.clone(), selected, Limits::default())
+        .expect("second editor should open");
+    assert!(
+        failed
+            .put_streams_shared([
+                (word_path.as_slice(), Arc::clone(&word)),
+                (missing_path.as_slice(), Arc::clone(&preview)),
+            ])
+            .is_err()
+    );
+    assert!(!failed.is_changed());
+    assert_eq!(failed.finish().expect("failed batch stays exact"), original);
+}
+
+#[test]
+fn add_and_remove_use_explicit_targets() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original,
+        targets("first", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let nested = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"new object")
+            .expect("nested payload should write");
+    });
+    editor
+        .add_storage(target("second", &["ObjectPool", "_43"]), nested)
+        .expect("explicit storage should be added");
+    assert!(editor.objects().get("second").is_some());
+    let removed = editor
+        .remove_storage("second")
+        .expect("explicit storage should be removed");
+    assert!(removed.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert!(editor.objects().get("second").is_none());
+    assert!(editor.objects().get("first").is_some());
+}
+
+#[test]
+fn snapshots_share_streams_and_edit_independently() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let snapshot = Snapshot::open(original.clone(), selected, Limits::default())
+        .expect("snapshot should open");
+    let clone = snapshot.clone();
+    assert!(!snapshot.is_changed());
+    let path = vec!["WordDocument".to_string()];
+    let first = snapshot
+        .stream_shared(&path)
+        .expect("snapshot stream should exist");
+    let second = clone
+        .stream_shared(&path)
+        .expect("cloned snapshot stream should exist");
+    assert!(Arc::ptr_eq(&first, &second));
+
+    let mut editor = snapshot.edit();
+    editor
+        .put_stream(&path, b"edited from snapshot".to_vec())
+        .expect("snapshot edit should commit");
+    assert!(!snapshot.is_changed());
+    assert_eq!(snapshot.finish().expect("source should finish"), original);
+    assert_eq!(editor.stream(&path), Some(&b"edited from snapshot"[..]));
+}
+
+#[test]
+fn changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors() {
+    let base = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], &vec![0x11u8; 20_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source stream should write");
+    });
+
+    // Move B into A's released sectors and leave A with a shorter allocation.
+    // This makes the adopted source physically different from the deterministic
+    // from-scratch order while preserving the same logical directory shape.
+    let source = {
+        let mut writer = OleWriter::new();
+        assert!(
+            writer
+                .adopt_source_layout(&base)
+                .expect("source should adopt")
+        );
+        writer
+            .create_stream(&["A"], &vec![0x33u8; 5_000])
+            .expect("source edit should write");
+        writer
+            .create_stream(&["B"], &vec![0x44u8; 20_000])
+            .expect("source edit should write");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("source should write");
+        assert!(
+            writer
+                .last_sector_layout()
+                .expect("source report")
+                .reused_source_layout()
+        );
+        output.into_inner()
+    };
+
+    let mut editor = Editor::open(source.clone(), Targets::default(), Limits::default())
+        .expect("source should open");
+    editor
+        .put_stream(&["A".into()], vec![0x55u8; 5_000])
+        .expect("DOC stream edit should commit");
+    let commit = editor.commit().expect("DOC edit should commit");
+    assert_eq!(
+        commit.snapshot().sector_layout_policy(),
+        SectorLayoutPolicy::Reuse
+    );
+    assert_eq!(
+        commit.snapshot().finish().expect("snapshot should finish"),
+        commit.patch().after(),
+        "a changed source-backed snapshot must use the same layout policy as the DOC save"
+    );
+
+    let mut rewrite = OleWriter::new();
+    rewrite
+        .create_stream(&["A"], &vec![0x55u8; 5_000])
+        .expect("rewrite stream should write");
+    rewrite
+        .create_stream(&["B"], &vec![0x44u8; 20_000])
+        .expect("rewrite stream should write");
+    let mut rewritten = Cursor::new(Vec::new());
+    rewrite
+        .write_to(&mut rewritten)
+        .expect("rewrite should write");
+    let rewritten = rewritten.into_inner();
+    assert_ne!(
+        commit.patch().after(),
+        rewritten.as_slice(),
+        "the source-backed route should retain its adopted physical layout"
+    );
+}

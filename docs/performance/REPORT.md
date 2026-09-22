@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0730 — bounded DOC render handoff retained
+
+[0730](0730-doc-bounded-render-handoff.md) retains a finite, capacity-accounted
+validated-render handoff after all correctness and measurement gates pass.
+NoHeadFoot paired lifecycle p50 improves 11.89–13.88%; FloatingPictures ranges
+from 14.86% faster to 1.27% slower. Allocated bytes fall 9.01%/11.80% with unchanged
+single-edit peak live bytes. Two-edit peaks rise 16.72%/15.60%; this explicit
+tradeoff is accepted within the retained-state contract, without an RSS or total
+memory bound. All 13 quality commands, independent 44-process replay and
+20 corruption controls pass. No broader producer/CRUD claim is promoted.
+[Evidence](results/change-0730/README.md). The non-iWork goal remains active.
+
 ## 0729 — public DOC phase evidence bounds the render opportunity
 
 [0729](0729-doc-public-phase-attribution.md) measures actual public owners

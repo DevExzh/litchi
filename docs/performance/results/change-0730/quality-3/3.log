@@ -1,0 +1,40 @@
+    Finished `release` profile [optimized] target(s) in 0.10s
+   Doc-tests litchi_doc
+
+running 26 tests
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::table_count (line 56) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/links.rs - document::model::semantic::links::Document::hyperlinks (line 17) ... ignored
+test crates/litchi-doc/src/document/model/semantic/media.rs - document::model::semantic::media::Document::image_data (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/numbering.rs - document::model::semantic::numbering::Document::list_tables (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/headers.rs - document::model::semantic::subdocuments::headers::Document::headers_footers (line 16) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::endnotes (line 51) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::footnotes (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::text (line 10) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::paragraph_count (line 29) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::elements (line 217) - compile ... ok
+test crates/litchi-doc/src/document/model/state.rs - document::model::state::Document (line 54) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::tables (line 193) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::paragraphs (line 46) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::document (line 151) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 124) - compile ... ok
+test crates/litchi-doc/src/lib.rs - (line 97) - compile ... ok
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph (line 17) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph::formulas_as_latex (line 247) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run (line 279) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::formula_as_latex (line 609) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::image (line 651) ... ignored
+test crates/litchi-doc/src/table.rs - table::Table (line 17) ... ignored
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_reader (line 57) - compile ... ok
+test crates/litchi-doc/src/writer/mod.rs - writer::core (line 57) - compile ... ok
+test crates/litchi-doc/src/package/model.rs - package::model::Package (line 542) - compile ... ok
+
+test result: ok. 14 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 6.32s; merged doctests compilation took 6.32s
+   Doc-tests litchi_ole_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

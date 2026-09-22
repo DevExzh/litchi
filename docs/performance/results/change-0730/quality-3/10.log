@@ -1,0 +1,18 @@
+    Checking smallvec v1.16.1
+    Checking serde v1.0.229
+    Checking thiserror v2.0.20
+    Checking multiversion v0.9.0
+    Checking encoding_rs v0.8.41
+    Checking chrono v0.4.45
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking num-bigint-dig v0.8.6
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rsa v0.9.10
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Checking doc-retention-probe-0730 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0730/retention-probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 8.18s

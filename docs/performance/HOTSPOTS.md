@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0730 — bounded DOC handoff retained; next attribute public PPT saves
+
+[0730](0730-doc-bounded-render-handoff.md) removes the repeated DOC finish render
+under an observable, releasable 8 MiB capacity ceiling. The small fixture clears
+the prospective gate in all cycles (11.89–13.88% paired p50 improvement); larger
+fixture results remain mixed. Allocation work falls, but two-edit peak live bytes
+rise 16.72%/15.60% and are explicitly accepted with the documented retained-state
+scope. Required final validation and Reuse remain unchanged. Next measure public
+PPT save phases separately; broader DOC corpus and many-edit memory evidence
+remain open. The non-iWork performance goal stays active.
+
 ## 0729 — bounded DOC rendered-output handoff pilot is next
 
 [0729](0729-doc-public-phase-attribution.md) measures Finish at 13.00–13.30%

@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "capture_freeze_and_preflight_binding": "passed",
+  "owned_roots_absent": true,
+  "runs": [
+    {
+      "command": [
+        "python3",
+        "docs/performance/results/change-0730/source-guard.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15138449508231133,
+      "log": "terminal/source-guard.py.log",
+      "sha256": "3c7b03ba23f8bbc418ac00d704769795f18687a676e7edff2230447dd509d66c"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/performance/results/change-0730/retention.py",
+        "check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.023888704017736018,
+      "log": "terminal/retention.py.log",
+      "sha256": "8b1f1c8ecf989f3973f84fbe707d5dcb82c916fbfc9dc1046f50b7a40196fad8"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/performance/results/change-0730/analyze.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.116645035916008,
+      "log": "terminal/analyze.py.log",
+      "sha256": "c9bbaa296e8272c5e762ed97250738b2e84727406537f42de7a81858f8b4f8f3"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/performance/results/change-0730/audit.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.0003147890092805,
+      "log": "terminal/audit.py.log",
+      "sha256": "bac7cbee9d44ecc31c825f7eb8d5668b80d5112a5538b7758ab4875100d93ed1"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/performance/results/change-0730/negative-checks.py"
+      ],
+      "exit_code": 0,
+      "seconds": 16.94991641899105,
+      "log": "terminal/negative-checks.py.log",
+      "sha256": "e0f1aee12e0c7143fc433b38e01446917b07e4b92fd2fa7ee0914a03b5d51568"
+    }
+  ]
+}
