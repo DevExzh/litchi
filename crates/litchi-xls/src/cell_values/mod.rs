@@ -25,6 +25,7 @@
 mod structural;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
+use crate::workbook::{KeptCells, ValidationWorkbook};
 use crate::{Error, Result, SheetKind, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::consts::STGTY_STORAGE;
@@ -442,7 +443,10 @@ enum SourceProtectionPolicy {
 }
 
 impl SourcePolicyFacts {
-    fn from_workbook<R: Read + Seek>(workbook: &Workbook<R>, sheets: &[SheetData]) -> Result<Self> {
+    fn from_workbook<R: Read + Seek>(
+        workbook: &ValidationWorkbook<R>,
+        sheets: &[SheetData],
+    ) -> Result<Self> {
         require_public_worksheet_coverage(workbook, sheets)?;
         Ok(Self {
             public_worksheet_coverage: true,
@@ -497,9 +501,15 @@ struct NumericTargetVerification<'a> {
 }
 
 impl NumericTargetVerification<'_> {
+    /// The cells the final readback reads: the only cells the target's
+    /// validation-only open has to decode.
+    fn kept_cells(self) -> Result<KeptCells> {
+        numeric_readback_cells(self.source, self.changes)
+    }
+
     fn run<R: Read + Seek>(
         self,
-        workbook: &Workbook<R>,
+        workbook: &ValidationWorkbook<R>,
         target_bytes: &[u8],
         target_workbook_path: &[String],
         target_workbook_stream: &[u8],
@@ -595,8 +605,15 @@ impl Snapshot {
         // dependencies before the narrower source-offset inventory is kept.
         // The legacy reader intentionally skips some malformed optional sheet
         // projections, so this edit owner additionally requires every sheet
-        // it can mutate to have survived that complete semantic open.
-        let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
+        // it can mutate to have survived that complete semantic open. It is
+        // the complete reader's validation-only mode: every record is
+        // validated exactly as `Workbook::new` validates it, and no cell is
+        // decoded except the ones a verification reads back.
+        let kept = match verification {
+            Some(verification) => verification.kept_cells()?,
+            None => KeptCells::none(),
+        };
+        let workbook = Workbook::validation_only(Cursor::new(source.as_slice()), kept)?;
         let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
         let shared_strings = workbook.shared_strings_shared();
         let shared_string_properties =
@@ -642,8 +659,12 @@ impl Snapshot {
 
         // Keep the complete public reader as an independent validation owner.
         // Only the private offset inventory is carried forward after proving
-        // that every other Workbook-stream byte is unchanged.
-        let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
+        // that every other Workbook-stream byte is unchanged. Its
+        // validation-only mode decodes just the cells the readback reads.
+        let workbook = Workbook::validation_only(
+            Cursor::new(source.as_slice()),
+            numeric_readback_cells(source_snapshot, changes)?,
+        )?;
         let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
         verify_public_numeric_readback(&workbook, source_snapshot, changes)?;
 
@@ -5282,7 +5303,10 @@ fn verify_source_backed_numeric_plan_target(
     source: &Snapshot,
     changes: &[Change],
 ) -> Result<SourceVersion> {
-    let workbook = Workbook::new(ComposedPositionalReader::new(candidate.clone()))?;
+    let workbook = Workbook::validation_only(
+        ComposedPositionalReader::new(candidate.clone()),
+        numeric_readback_cells(source, changes)?,
+    )?;
     require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
     require_unprotected_workbook(&workbook)?;
     require_macro_free_workbook(&workbook)?;
@@ -5574,7 +5598,7 @@ impl From<OverlayError> for Error {
 }
 
 fn workbook_protection_policy<R: Read + Seek>(
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
 ) -> Result<SourceProtectionPolicy> {
     let protection = workbook.protection();
     if protection.structure_protected()
@@ -5591,7 +5615,7 @@ fn workbook_protection_policy<R: Read + Seek>(
         let Some(index) = metadata.parsed_worksheet_index() else {
             continue;
         };
-        let protection = workbook.xls_worksheet(index)?.protection();
+        let protection = workbook.worksheet_protection(index)?;
         if protection.is_protected()
             || protection.objects_protected()
             || protection.scenarios_protected()
@@ -5603,7 +5627,7 @@ fn workbook_protection_policy<R: Read + Seek>(
     Ok(SourceProtectionPolicy::Unprotected)
 }
 
-fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+fn require_unprotected_workbook<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Result<()> {
     match workbook_protection_policy(workbook)? {
         SourceProtectionPolicy::Unprotected => Ok(()),
         SourceProtectionPolicy::WorkbookOrShared => Err(Error::UnsafeEdit(
@@ -5615,7 +5639,7 @@ fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Resul
     }
 }
 
-fn workbook_is_macro_free<R: Read + Seek>(workbook: &Workbook<R>) -> bool {
+fn workbook_is_macro_free<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> bool {
     let metadata = workbook.vba_metadata();
     if metadata.has_project_marker()
         || workbook.vba_project_storage().is_some()
@@ -5629,7 +5653,7 @@ fn workbook_is_macro_free<R: Read + Seek>(workbook: &Workbook<R>) -> bool {
     true
 }
 
-fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+fn require_macro_free_workbook<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Result<()> {
     if workbook_is_macro_free(workbook) {
         Ok(())
     } else {
@@ -6489,7 +6513,7 @@ fn require_numeric_field(workbook: &[u8], entry: &Entry, expected: &[u8]) -> Res
 }
 
 fn require_public_worksheet_coverage<R: Read + Seek>(
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
     sheets: &[SheetData],
 ) -> Result<()> {
     for sheet in sheets {
@@ -6507,8 +6531,31 @@ fn require_public_worksheet_coverage<R: Read + Seek>(
     Ok(())
 }
 
+/// The `(tab position, row, column)` of every staged cell: the cells
+/// [`verify_public_numeric_readback`] reads, and so the only cells a
+/// validation-only open of the target has to decode.
+fn numeric_readback_cells(snapshot: &Snapshot, changes: &[Change]) -> Result<KeptCells> {
+    let mut cells = Vec::new();
+    cells
+        .try_reserve_exact(changes.len())
+        .map_err(|_error| Error::Allocation("listing numeric readback cells"))?;
+    for change in changes {
+        let sheet = snapshot
+            .inner
+            .sheets
+            .get(change.sheet)
+            .ok_or_else(|| Error::UnsafeEdit("edited worksheet is stale".into()))?;
+        cells.push((
+            sheet.workbook_index,
+            change.reference.row(),
+            u16::from(change.reference.column()),
+        ));
+    }
+    KeptCells::from_cells(cells)
+}
+
 fn verify_public_numeric_readback<R: Read + Seek>(
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
     snapshot: &Snapshot,
     changes: &[Change],
 ) -> Result<()> {
@@ -6524,11 +6571,11 @@ fn verify_public_numeric_readback<R: Read + Seek>(
             Error::UnsafeEdit("edited tab is not a public worksheet on readback".into())
         })?;
         let cell = workbook
-            .xls_worksheet(worksheet_index)?
-            .get_cell(
-                u32::from(change.reference.row()),
-                u32::from(change.reference.column()),
-            )
+            .kept_cell(
+                worksheet_index,
+                change.reference.row(),
+                u16::from(change.reference.column()),
+            )?
             .ok_or_else(|| {
                 Error::UnsafeEdit("edited cell is absent from public readback".into())
             })?;
@@ -6920,7 +6967,7 @@ fn update_sst_total(workbook: &mut [u8], offset: Option<usize>, delta: i64) -> R
 /// still takes the copying path, which truncates a longer vector and pads a
 /// shorter one exactly as before.
 fn retained_shared_string_properties<R: Read + Seek>(
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
     len: usize,
 ) -> Result<Arc<Vec<Option<Box<crate::records::SharedStringProperties>>>>> {
     if u32::try_from(len).is_ok()

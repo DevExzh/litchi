@@ -3080,11 +3080,7 @@ fn target_cell_value(
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
 ) -> Result<Option<litchi_core::sheet::CellValue>> {
-    let Some(cell) =
-        Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting))
-    else {
-        return Ok(None);
-    };
+    let cell = Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         resolve_shared_string(owner, string_index, execution, strings)?
     } else {
@@ -3113,11 +3109,8 @@ where
         scan.formatting
             .validate_cell_xf(cell_xf_index(record))
             .map_err(SourceBackedError::Parse)?;
-        let Some(cell) =
-            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting))
-        else {
-            return Ok(());
-        };
+        let cell =
+            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting));
         let value = if let Some(string_index) = cell.shared_string_index() {
             resolve_shared_string(scan.owner, string_index, scan.execution, strings)?
         } else {
@@ -4331,10 +4324,7 @@ fn decode_source_cell(
     formatting
         .validate_cell_xf(cell_xf_index(record))
         .map_err(SourceBackedError::Parse)?;
-    let Some(cell) = Cell::from_record_with_formula_context(record, None, None, Some(formatting))
-    else {
-        return Ok(None);
-    };
+    let cell = Cell::from_record_with_formula_context(record, None, None, Some(formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         if owner.sst.segments.is_empty() {
             litchi_core::sheet::CellValue::Error(format!(

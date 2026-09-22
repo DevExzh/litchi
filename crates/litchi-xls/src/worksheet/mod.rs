@@ -282,6 +282,35 @@ impl Worksheet {
         self.shared_string_properties(cell.shared_string_index()?)
     }
 
+    /// Every fact of this worksheet except its decoded cells and the
+    /// workbook-shared formatting table, for tests that compare the complete
+    /// reader with its validation-only mode.
+    ///
+    /// The cell map, and the extents it contributes to, are cleared; the
+    /// formatting table is replaced because its lookup index is a hash map
+    /// whose `Debug` order differs between two opens of the same bytes.
+    #[cfg(test)]
+    pub(crate) fn without_cells_for_tests(&self) -> Self {
+        let mut facts = self.clone();
+        facts.cells.clear();
+        facts.max_row = 0;
+        facts.max_col = 0;
+        facts.formatting = Arc::new(Formatting::default());
+        facts
+    }
+
+    /// Number of decoded cells, for tests.
+    #[cfg(test)]
+    pub(crate) fn cell_count_for_tests(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Decoded cell positions in row-major order, for tests.
+    #[cfg(test)]
+    pub(crate) fn cell_positions_for_tests(&self) -> Vec<(u32, u32)> {
+        self.cells.keys().copied().collect()
+    }
+
     /// Get cell at position
     #[must_use]
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {

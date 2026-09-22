@@ -2562,10 +2562,17 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     let commit = edit.commit_source_backed().unwrap();
     let published = commit.snapshot().bytes().to_vec();
 
-    let independent = Workbook::new(Cursor::new(published.as_slice())).unwrap();
-    require_public_worksheet_coverage(&independent, &source.inner.sheets).unwrap();
-    require_unprotected_workbook(&independent).unwrap();
-    require_macro_free_workbook(&independent).unwrap();
+    // The complete reader's validation-only mode is the owner that answers
+    // these checks at publication; the complete open further down is the
+    // oracle its kept cell has to agree with.
+    let validated = Workbook::validation_only(
+        Cursor::new(published.as_slice()),
+        KeptCells::from_cells([(0, 3, 2)]).unwrap(),
+    )
+    .unwrap();
+    require_public_worksheet_coverage(&validated, &source.inner.sheets).unwrap();
+    require_unprotected_workbook(&validated).unwrap();
+    require_macro_free_workbook(&validated).unwrap();
     let carried = carry_fixed_numeric_inventory(
         &source,
         &commit.snapshot().inner.workbook_stream,
@@ -2598,12 +2605,18 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     );
     assert!(commit.snapshot().inner.source_policy.macro_free_workbook);
 
-    let readback = independent
+    let independent = Workbook::new(Cursor::new(published.as_slice())).unwrap();
+    let complete = independent
         .xls_worksheet(0)
         .unwrap()
         .get_cell(3, 2)
-        .unwrap()
-        .value()
-        .clone();
+        .unwrap();
+    let readback = complete.value().clone();
     assert!(matches!(readback, CellValue::Float(value) if value.to_bits() == 9.25_f64.to_bits()));
+    let kept = validated.kept_cell(0, 3, 2).unwrap().unwrap();
+    assert_eq!(format!("{kept:?}"), format!("{complete:?}"));
+    assert!(matches!(
+        validated.kept_cell(0, 3, 3),
+        Err(Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+    ));
 }

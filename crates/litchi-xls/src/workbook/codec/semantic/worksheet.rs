@@ -2,6 +2,7 @@
 
 use super::super::validation::cell_record_xf;
 use super::super::wire::{SharedFormulaTemplate, parse_shared_formula_template};
+use super::cells::{CellSlot, CellStore};
 use crate::cell::Cell;
 use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
@@ -18,7 +19,6 @@ use crate::{
     layout, merged_cells, page_setup, pivot_table, protection, utils, view,
 };
 use litchi_biff::Records;
-use litchi_core::sheet::Cell as _;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
@@ -60,20 +60,24 @@ impl FormulaLink {
     }
 }
 
-fn add_cell(
+/// Records one validated cell record at its `(row, column)` position.
+///
+/// A position an earlier record already occupies is a duplicate, counted
+/// against the tracking limit exactly once per position. The store then keeps
+/// the record: the public reader decodes it through `decode`, a
+/// validation-only store may count it without decoding. `decode` is the
+/// complete, infallible conversion of this record into the cell the public
+/// reader keeps, so skipping it cannot hide a refusal.
+fn add_cell<S: CellStore>(
+    store: &mut S,
     worksheet: &mut Worksheet,
-    cell: Cell,
+    record: &CellRecord,
+    decode: impl FnOnce() -> Cell,
     duplicate_cells: &mut HashSet<(u16, u16)>,
     maximum: usize,
 ) -> Result<()> {
-    let position = (
-        utils::truncate_u32_to_u16(cell.row()),
-        utils::truncate_u32_to_u16(cell.column()),
-    );
-    if worksheet
-        .get_cell(u32::from(position.0), u32::from(position.1))
-        .is_some()
-    {
+    let position = (record.row(), record.col());
+    if store.is_occupied(worksheet, position) {
         if !duplicate_cells.contains(&position) && duplicate_cells.len() >= maximum {
             return Err(Error::InvalidRecord {
                 record_type: 0x0006,
@@ -85,8 +89,42 @@ fn add_cell(
             .map_err(|_error| Error::Allocation("tracking duplicate worksheet cells"))?;
         duplicate_cells.insert(position);
     }
-    worksheet.add_cell(cell)?;
-    Ok(())
+    store.store(
+        worksheet,
+        position,
+        matches!(record, CellRecord::Formula { .. }),
+        decode,
+    )
+}
+
+/// Decodes the cell the public reader keeps for one validated cell record: its
+/// value, formula text and flags, with a `PtgExp` formula rendered through the
+/// shared-formula template that owns it when that template has already been
+/// read.
+fn decode_cell(
+    record: &CellRecord,
+    shared_strings: &[String],
+    formula_context: Option<&FormulaContext>,
+    formatting: &Formatting,
+    shared_formulas: &HashMap<(u16, u16), SharedFormulaTemplate>,
+) -> Cell {
+    let mut cell = Cell::from_record_with_formula_context(
+        record,
+        Some(shared_strings),
+        formula_context,
+        Some(formatting),
+    );
+    if let CellRecord::Formula {
+        row, col, formula, ..
+    } = record
+        && let Some(anchor) = ptg_exp_anchor(formula)
+        && let Some(rendered) = shared_formulas
+            .get(&anchor)
+            .and_then(|template| template.render(formula_context, *row, *col))
+    {
+        cell.set_rendered_formula(Some(rendered));
+    }
+    cell
 }
 
 fn claim_companion(
@@ -181,13 +219,17 @@ fn claim_array_range(occupancy: &mut HashMap<u16, [u64; 4]>, owner: &ArrayFormul
 }
 
 impl<R: Read + Seek> Workbook<R> {
-    /// Parse a worksheet from its position in the workbook stream
-    pub(crate) fn parse_worksheet_from_position(
+    /// Parse a worksheet from its position in the workbook stream.
+    ///
+    /// `store` decides which validated cell records become decoded cells; it
+    /// never changes which records are validated or in what order.
+    pub(crate) fn parse_worksheet_from_position<S: CellStore>(
         &self,
         workbook_data: &[u8],
         bound_sheet: &BoundSheetRecord,
         encoding: &Encoding,
         compatibility_profile: CompatibilityProfile,
+        store: &mut S,
     ) -> Result<Worksheet> {
         let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_error| {
             Error::InvalidData("worksheet position does not fit in usize".to_string())
@@ -237,6 +279,7 @@ impl<R: Read + Seek> Workbook<R> {
             Some(&self.formula_context),
             self.formatting.clone(),
             compatibility_profile,
+            store,
         )
     }
 
@@ -266,10 +309,11 @@ impl<R: Read + Seek> Workbook<R> {
             formula_context,
             formatting,
             CompatibilityProfile::Strict,
+            &mut super::cells::DecodeEveryCell,
         )
     }
 
-    fn parse_worksheet_records_with_compatibility(
+    pub(in crate::workbook) fn parse_worksheet_records_with_compatibility<S: CellStore>(
         records_iter: &mut Records<'_>,
         stream_len: u64,
         base_position: u64,
@@ -281,7 +325,12 @@ impl<R: Read + Seek> Workbook<R> {
         formula_context: Option<&FormulaContext>,
         formatting: Arc<Formatting>,
         compatibility_profile: CompatibilityProfile,
+        store: &mut S,
     ) -> Result<Worksheet> {
+        // The decoded cells read the same shared-string table the worksheet
+        // holds; the handle is kept here so decoding never borrows the
+        // worksheet the store is writing to.
+        let decode_strings = Arc::clone(&shared_strings);
         let mut worksheet = Worksheet::with_shared_string_properties(
             name.to_string(),
             shared_strings,
@@ -405,24 +454,22 @@ impl<R: Read + Seek> Workbook<R> {
                         *value = FormulaValue::String(text);
                     }
                     formatting.validate_cell_xf(cell_record_xf(&formula))?;
-                    if let Some(mut cell) = Cell::from_record_with_formula_context(
+                    add_cell(
+                        store,
+                        &mut worksheet,
                         &formula,
-                        worksheet.shared_strings(),
-                        formula_context,
-                        Some(&formatting),
-                    ) {
-                        if let CellRecord::Formula {
-                            row, col, formula, ..
-                        } = &formula
-                            && let Some(anchor) = ptg_exp_anchor(formula)
-                            && let Some(rendered) = shared_formulas
-                                .get(&anchor)
-                                .and_then(|template| template.render(formula_context, *row, *col))
-                        {
-                            cell.set_rendered_formula(Some(rendered));
-                        }
-                        add_cell(&mut worksheet, cell, &mut duplicate_cells, tracking_limit)?;
-                    }
+                        || {
+                            decode_cell(
+                                &formula,
+                                &decode_strings,
+                                formula_context,
+                                &formatting,
+                                &shared_formulas,
+                            )
+                        },
+                        &mut duplicate_cells,
+                        tracking_limit,
+                    )?;
                     continue;
                 }
                 // Per MS-XLS 2.1 (FORMULA = Formula [Array / Table / ShrFmla /
@@ -667,27 +714,20 @@ impl<R: Read + Seek> Workbook<R> {
                         }
                     ) {
                         pending_string_formula = Some(cell_record);
-                    } else if let Some(mut cell) = Cell::from_record_with_formula_context(
-                        &cell_record,
-                        worksheet.shared_strings(),
-                        formula_context,
-                        Some(&formatting),
-                    ) {
-                        if let CellRecord::Formula {
-                            row, col, formula, ..
-                        } = &cell_record
-                            && let Some(anchor) = ptg_exp_anchor(formula)
-                                && let Some(rendered) = shared_formulas
-                                    .get(&anchor)
-                                    .and_then(|template| {
-                                        template.render(formula_context, *row, *col)
-                                    })
-                                {
-                                    cell.set_rendered_formula(Some(rendered));
-                                }
+                    } else {
                         add_cell(
+                            store,
                             &mut worksheet,
-                            cell,
+                            &cell_record,
+                            || {
+                                decode_cell(
+                                    &cell_record,
+                                    &decode_strings,
+                                    formula_context,
+                                    &formatting,
+                                    &shared_formulas,
+                                )
+                            },
                             &mut duplicate_cells,
                             tracking_limit,
                         )?;
@@ -735,14 +775,17 @@ impl<R: Read + Seek> Workbook<R> {
                     shared_formulas
                         .try_reserve(1)
                         .map_err(|_error| Error::Allocation("tracking ShrFmla owners"))?;
-                    let rendered = template.render(formula_context, anchor.0, anchor.1);
-                    shared_formulas.insert(anchor, template);
-                    if let Some(cell) = worksheet.get_cell_mut(
-                        u32::from(anchor.0),
-                        u32::from(anchor.1),
-                    ) {
-                        cell.set_rendered_formula(rendered);
+                    // The anchor cell, when one is kept, takes the template's
+                    // rendering at its own position. Rendering is pure, so a
+                    // store that keeps no cell there skips it unobservably.
+                    if let CellSlot::Occupied { cell: Some(cell), .. } =
+                        store.slot(&mut worksheet, anchor)
+                    {
+                        cell.set_rendered_formula(
+                            template.render(formula_context, anchor.0, anchor.1),
+                        );
                     }
+                    shared_formulas.insert(anchor, template);
                 }
 
                 0x0221 => { // Array
@@ -802,38 +845,44 @@ impl<R: Read + Seek> Workbook<R> {
                 0x00BD => { // MulRk
                     for cell_record in CellRecord::parse_mul_rk(record.payload())? {
                         formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
-                        if let Some(cell) = Cell::from_record_with_formula_context(
+                        add_cell(
+                            store,
+                            &mut worksheet,
                             &cell_record,
-                            worksheet.shared_strings(),
-                            formula_context,
-                            Some(&formatting),
-                        ) {
-                            add_cell(
-                                &mut worksheet,
-                                cell,
-                                &mut duplicate_cells,
-                                tracking_limit,
-                            )?;
-                        }
+                            || {
+                                decode_cell(
+                                    &cell_record,
+                                    &decode_strings,
+                                    formula_context,
+                                    &formatting,
+                                    &shared_formulas,
+                                )
+                            },
+                            &mut duplicate_cells,
+                            tracking_limit,
+                        )?;
                     }
                 }
 
                 0x00BE => { // MulBlank
                     for cell_record in CellRecord::parse_mul_blank(record.payload())? {
                         formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
-                        if let Some(cell) = Cell::from_record_with_formula_context(
+                        add_cell(
+                            store,
+                            &mut worksheet,
                             &cell_record,
-                            worksheet.shared_strings(),
-                            formula_context,
-                            Some(&formatting),
-                        ) {
-                            add_cell(
-                                &mut worksheet,
-                                cell,
-                                &mut duplicate_cells,
-                                tracking_limit,
-                            )?;
-                        }
+                            || {
+                                decode_cell(
+                                    &cell_record,
+                                    &decode_strings,
+                                    formula_context,
+                                    &formatting,
+                                    &shared_formulas,
+                                )
+                            },
+                            &mut duplicate_cells,
+                            tracking_limit,
+                        )?;
                     }
                 }
 
@@ -942,8 +991,10 @@ impl<R: Read + Seek> Workbook<R> {
             }
             let anchor = owner.anchor();
             let anchor_position = (anchor.row(), u16::from(anchor.col()));
-            let rendered: Option<Arc<str>> =
-                render_formula(owner.tokens(), formula_context).map(Arc::from);
+            // Rendered once per owner, on the first kept cell that takes it.
+            // Rendering is pure, so a store that keeps none of this range's
+            // cells skips it unobservably.
+            let mut rendered: Option<Option<Arc<str>>> = None;
             for coordinate in owner.cells() {
                 let position = (coordinate.row(), u16::from(coordinate.col()));
                 let link = ptg_exp_cells
@@ -967,18 +1018,26 @@ impl<R: Read + Seek> Workbook<R> {
                         ),
                     });
                 }
-                let cell = worksheet
-                    .get_cell_mut(u32::from(position.0), u32::from(position.1))
-                    .ok_or_else(|| Error::InvalidRecord {
+                let CellSlot::Occupied { formula, cell } = store.slot(&mut worksheet, position)
+                else {
+                    return Err(Error::InvalidRecord {
                         record_type: 0x0221,
                         message: "Array Formula cell was not materialized".to_string(),
-                    })?;
-                cell.set_rendered_formula_arc(rendered.clone());
-                if !cell.set_array_formula(Arc::clone(owner)) {
+                    });
+                };
+                if !formula {
                     return Err(Error::InvalidRecord {
                         record_type: 0x0221,
                         message: "Array owner cannot attach to a non-Formula cell".to_string(),
                     });
+                }
+                if let Some(cell) = cell {
+                    let rendered = rendered.get_or_insert_with(|| {
+                        render_formula(owner.tokens(), formula_context).map(Arc::from)
+                    });
+                    cell.set_rendered_formula_arc(rendered.clone());
+                    let attached = cell.set_array_formula(Arc::clone(owner));
+                    debug_assert!(attached, "a Formula slot holds a Formula cell");
                 }
             }
         }
