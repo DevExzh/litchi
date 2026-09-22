@@ -40,3 +40,15 @@ receipt is `performance/development-preflight-stability-fixed.json`.
 
 This is a tested development checkpoint, not final numerical acceptance.
 Independent edge review, final frozen gates, and timing capture remain open.
+
+## Tiny-rate large-principal follow-up
+
+A root standalone probe of the generalized checkpoint still returns `#NUM!`
+for `IPMT(1e-10;1;2;1e308;0;0)` and corresponding `PPMT`. Independent
+256-digit Decimal arithmetic gives approximately `-1.0000000000000001e298`
+and `-4.99999999975e307`, respectively. The internal payment calculation
+divides the large numerator by a tiny denominator before multiplying by the
+rate, so its intermediate overflows. Public regression cases now cover both;
+a scaled-arithmetic correction and independent review are in progress. Probe
+files were removed. Passing the earlier 91-case preflight does not clear this
+new edge failure.
