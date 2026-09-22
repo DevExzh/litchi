@@ -1,0 +1,83 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0731/probe/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.06365440401714295,
+    "output": "quality/0.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0731/probe/Cargo.toml",
+      "--release",
+      "--offline",
+      "--locked",
+      "--lib"
+    ],
+    "exit_code": 0,
+    "seconds": 101.78944345703349,
+    "output": "quality/1.log",
+    "sha256": "2e7cb1990ea4895509c2c427bc958cbdbaa34959aceb97468cf569a3c1634a09"
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0731/probe/Cargo.toml",
+      "--release",
+      "--offline",
+      "--locked",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 16.78888397407718,
+    "output": "quality/2.log",
+    "sha256": "2be90e2d7489f34de746b9ea1196acecbfb24014d257a25e84c9998c2c2f148f"
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0731/probe/Cargo.toml",
+      "--release",
+      "--offline",
+      "--locked",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 1.388781663030386,
+    "output": "quality/3.log",
+    "sha256": "41b951060c2fb49aec362b582dd6c2d793a420e8719227688473be865c06f82b"
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0731/probe/Cargo.toml",
+      "--release",
+      "--offline",
+      "--locked",
+      "--bins"
+    ],
+    "exit_code": 0,
+    "seconds": 3.852120887953788,
+    "output": "quality/4.log",
+    "sha256": "20eaeb1a158e494a0c7db55afa88defe4b74a8e01ef7d87903f87bf89814ab68"
+  }
+]

@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0731 — public PPT baseline and Callgrind dispatch limit
+
+[0731](0731-ppt-public-instruction-attribution.md) qualifies nine processes with
+the exact 0728 PPT oracle. Native p50 spans 1058.43–1070.69 μs; three allocator
+runs agree at 11,776,674 allocated bytes / 5,663 calls. Callgrind collects about
+59.58 million instructions, but its 67.78% artifact-hash fraction uses software
+SHA: a feature witness confirms Valgrind masks native SHA acceleration. These
+fractions cannot identify native latency bottlenecks. Production is unchanged.
+[Evidence](results/change-0731/README.md).
+
 ## 0730 — retained bounded DOC validated-render handoff
 
 [0730](0730-doc-bounded-render-handoff.md) retains the bounded handoff after

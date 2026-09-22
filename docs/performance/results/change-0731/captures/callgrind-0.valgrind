@@ -1,0 +1,12 @@
+==1939449== Callgrind, a call-graph generating cache profiler
+==1939449== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1939449== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1939449== Command: /home/zhuhe/code/litchi-0731-bin/ole_format_save_probe --case ppt45543 --input test-data/poi/test-data/slideshow/45543.ppt --operation format --samples 1 --warmups 0
+==1939449== Parent PID: 1939412
+==1939449== 
+==1939449== For interactive control, run 'callgrind_control -h'.
+==1939449== 
+==1939449== Events    : Ir
+==1939449== Collected : 59578167
+==1939449== 
+==1939449== I   refs:      59,578,167

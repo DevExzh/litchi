@@ -1,0 +1,48 @@
+{
+  "kind": "post-profile interpretation control; no timing claim",
+  "source_sha256": "e35e24a61e03d186ea4257f218bd0aa1218f012bc0b2660600a73c75fc304a22",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-0731-bin/feature-witness",
+    "bytes": 4346408,
+    "sha256": "a1b35bdeb24dd298e0fa01caeecfca453dc32092282c2394322cdf83f7ea41a0"
+  },
+  "runs": [
+    {
+      "command": [
+        "rustc",
+        "--edition=2024",
+        "-O",
+        "docs/performance/results/change-0731/feature-witness.rs",
+        "-o",
+        "/home/zhuhe/code/litchi-0731-bin/feature-witness"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0731-bin/feature-witness"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "a634e35f4787ead15857279cb083ce665063415f1b7f7fb11772aa7c0ad5ef3f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "valgrind",
+        "--tool=none",
+        "/home/zhuhe/code/litchi-0731-bin/feature-witness"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "b11f224ac30137424e91ae790a53d08e82b1a02a2e300e863981b9299e4b3303",
+      "stderr_sha256": "19af20247861369ff2bea14471fe9dbed021b786bafee49753c1cdc27161146b"
+    }
+  ]
+}

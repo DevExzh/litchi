@@ -1,0 +1,24 @@
+{
+  "binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0731-bin/ole_format_save_probe",
+      "sha256": "dee334de3692ac0ed8b59a8c9aa2e5d53020eff1b4c6ec673bab3a399640071e",
+      "bytes": 76220536
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0731-bin/ole_format_save_probe_alloc",
+      "sha256": "ee99838029fd5e4e7cd674148259ff86c4d4d61020f68fbea1614fadea1bc4c0",
+      "bytes": 76224152
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0731-bin/feature-witness",
+      "bytes": 4346408,
+      "sha256": "a1b35bdeb24dd298e0fa01caeecfca453dc32092282c2394322cdf83f7ea41a0"
+    }
+  ],
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0731",
+    "/home/zhuhe/code/litchi-0731-bin"
+  ],
+  "removed": true
+}

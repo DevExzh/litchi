@@ -1,0 +1,12 @@
+{
+  "source_path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.11.0/src/sha256.rs",
+  "source_sha256": "cb03fddc1325b60935409f097f2fab3ae51cfab15bed1254f4e93d13b28b7eff",
+  "dispatch_excerpt_lines": {
+    "start": 50,
+    "end": 80,
+    "text": "        mod soft;\n\n        cfg_if::cfg_if! {\n            if #[cfg(any(target_arch = \"x86\", target_arch = \"x86_64\"))] {\n                mod x86_sha;\n                cpufeatures::new!(shani_cpuid, \"sha\", \"sse2\", \"ssse3\", \"sse4.1\");\n            } else if #[cfg(target_arch = \"aarch64\")] {\n                mod aarch64_sha2;\n                cpufeatures::new!(sha2_hwcap, \"sha2\");\n            }\n        }\n\n        fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {\n            cfg_if::cfg_if! {\n                if #[cfg(any(target_arch = \"x86\", target_arch = \"x86_64\"))] {\n                    if shani_cpuid::get() {\n                        // SAFETY: we checked that required target features are available\n                        return unsafe { x86_sha::compress(state, blocks) };\n                    }\n                } else if #[cfg(target_arch = \"aarch64\")] {\n                    if sha2_hwcap::get() {\n                        // SAFETY: we checked that `sha2` target feature is available\n                        return unsafe { aarch64_sha2::compress(state, blocks) };\n                    }\n                }\n            }\n\n            soft::compress(state, blocks);\n        }\n    }\n}"
+  },
+  "rustflags": null,
+  "encoded_rustflags": null,
+  "interpretation": "Callgrind raw profile proves software SHA; feature witness proves sha flag masked under Valgrind. Native accelerated dispatch follows source+host features, not native sampled attribution."
+}

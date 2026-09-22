@@ -1,0 +1,24 @@
+{
+  "base_head": "4cb097a4f61d3bf6da77fbbbdf9ab15eff58c52e",
+  "cpu": 12,
+  "native": {
+    "processes": 3,
+    "samples": 50,
+    "warmups": 3
+  },
+  "allocation": {
+    "processes": 3,
+    "samples": 1,
+    "warmups": 0
+  },
+  "callgrind": {
+    "processes": 3,
+    "samples": 1,
+    "warmups": 0,
+    "symbol": "ole_format_save_probe_0731::measured_public_format",
+    "events": "Ir only; simulated instruction counts, no latency or hardware-counter claim"
+  },
+  "order": "native0,allocation0,callgrind0,native1,allocation1,callgrind1,native2,allocation2,callgrind2",
+  "controls": "all established0728PPT direct oracles; repeated native p50/mean absolute5% flags; retain every sample",
+  "source_change": "none; probe wrapper only"
+}
