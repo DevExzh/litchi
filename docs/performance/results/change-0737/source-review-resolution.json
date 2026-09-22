@@ -1,0 +1,14 @@
+{
+  "status": "approved_for_harness_qualification",
+  "review_sha256": "ebda2905f1d8e49fef417751266c46edc6d69d2680b90cb2d0debc68006d3a41",
+  "probe_lib_sha256": "bafa3cf2ba761af1a25046730718be16487442afd6a6a00f164fb9df8158161f",
+  "contract_sha256": "b931dbafa943e5b8145549dbc7457bbedde2a23480c6c50f2560fc1f0bc47671",
+  "readme_sha256": "0fbece1b07ba4bf025bf258835234a6be88a3e2e3720cfa6638b1105bdb63951",
+  "resolutions": [
+    "Hidden serde-skip payloads remain source-audited; no redundant fingerprint added.",
+    "Exact receipt schemas/types and every warmup oracle are validated; 17 corruption controls reject.",
+    "Legacy JSON extension is documented; rebuilt original binary is the exact schema anchor.",
+    "Both strict arms reserve identical witness capacity and retain compact warmup receipts while dropping full warmup witnesses."
+  ],
+  "production_change": false
+}

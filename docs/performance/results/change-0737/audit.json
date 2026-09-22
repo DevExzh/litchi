@@ -1,0 +1,17 @@
+{
+  "allocation_comparisons": 8,
+  "allocation_processes": 30,
+  "analysis_match": true,
+  "analysis_sha256": "0a375d7b6b52fa5495ca882dbb17a7eb7902da27a759902c0f5426d754bbb112",
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 7337,
+  "capture_sha256": "213f5f9c21ad55941d6ffb1a29e75a9647d52769377039914ca6757384e86590",
+  "freeze_sha256": "938d8c1ac5eb9bdaf4d066d7a25203ed8d41dc3e602df058648526cae74bec94",
+  "fresh_scope": "18 one-sample process controls; no tail statistics or tail comparison",
+  "native_comparisons": 8,
+  "native_processes": 108,
+  "native_samples": 4518,
+  "preflight_sha256": "d8f9c3ce8dff0750050deb3afe55cbef04ffc1524c8a7ffb0cf0203c2f281e13",
+  "schema_version": 1,
+  "status": "passed"
+}

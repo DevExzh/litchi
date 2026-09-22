@@ -1,0 +1,16 @@
+{
+  "reason": "Correct legacy-schema claim; no Rust source change. Final probe gates rerun with corrected README custody.",
+  "prior_build": "controls-build-before-readme-fix.json",
+  "removed_binaries": [
+    {
+      "path": "/home/zhuhe/code/litchi-0737-bin/controls-ole_format_save_probe",
+      "bytes": 76550600,
+      "sha256": "c5bc251a78f22b881849abd64ef8f0e4ac4e16b8b66bdfd301d83f261f562830"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0737-bin/controls-ole_format_save_probe_alloc",
+      "bytes": 76554280,
+      "sha256": "64f8d767fd5a4c5f15d17f504bd5e240424c8ff79e75aa6e24ced70e06674f12"
+    }
+  ]
+}

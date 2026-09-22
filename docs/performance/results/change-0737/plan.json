@@ -1,0 +1,1430 @@
+{
+  "kind": "unchanged-owner-harness-qualification",
+  "cpu": 12,
+  "schedule": [
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 3,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 4,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 5,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 6,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 7,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "primary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "retained",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "drained",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "fresh",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "archive",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "legacy-a",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "native",
+      "repeat": 8,
+      "case": "secondary",
+      "arm": "legacy-b",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 50,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "primary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 0,
+      "case": "secondary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "secondary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 1,
+      "case": "primary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "primary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "drained-3",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "retained-3",
+      "build": "controls",
+      "lifecycle": "strict-retained",
+      "samples": 1,
+      "warmups": 3
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "archive-0",
+      "build": "legacy",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "legacy-0",
+      "build": "controls",
+      "lifecycle": "legacy",
+      "samples": 1,
+      "warmups": 0
+    },
+    {
+      "lane": "allocation",
+      "repeat": 2,
+      "case": "secondary",
+      "arm": "drained-0",
+      "build": "controls",
+      "lifecycle": "strict-drained",
+      "samples": 1,
+      "warmups": 0
+    }
+  ],
+  "native_processes": 108,
+  "allocation_processes": 30,
+  "bootstrap_seed": 7337,
+  "bootstrap_resamples": 10000,
+  "review_threshold_percent": 5,
+  "comparisons": [
+    [
+      "archive",
+      "legacy-a"
+    ],
+    [
+      "legacy-a",
+      "legacy-b"
+    ],
+    [
+      "legacy-a",
+      "retained"
+    ],
+    [
+      "retained",
+      "drained"
+    ]
+  ],
+  "fresh_scope": "one-sample process control; no 50-sample tail comparison",
+  "retention_decision": "No production optimization trial; keep0735 rejection unchanged.",
+  "sampling": "Fixed schedule; allsamples retained; pairedprocesses only; overlappingwindows descriptive.",
+  "allocation_comparisons": [
+    [
+      "archive-0",
+      "legacy-0"
+    ],
+    [
+      "legacy-0",
+      "drained-0"
+    ],
+    [
+      "drained-0",
+      "drained-3"
+    ],
+    [
+      "retained-3",
+      "drained-3"
+    ]
+  ]
+}
