@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0729 — actual public DOC attribution and observer controls
+
+[0729](0729-doc-public-phase-attribution.md) freezes 72 processes and 3,600
+lifecycles across four ordinary/profiled routes. Exact 0728 DOC outputs and
+oracles remain unchanged. NoHeadFoot's 54 matched central control checks stay
+within 5%; FloatingPictures produces 17 flags, retained explicitly. Event
+arithmetic, independent statistics, fifteen corruption controls and offline
+replay pass. This diagnostic-feature baseline makes no production speedup or
+new allocation claim. [Evidence](results/change-0729/README.md).
+
 ## 0728 — current DOC/PPT length-changing saves
 
 [0728](0728-doc-ppt-current-save-baseline.md) refreshes the baseline under the

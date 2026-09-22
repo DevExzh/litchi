@@ -1,0 +1,81 @@
+{
+  "analyzer_sha256": "e4a1db02606ad3640b24bf051a6cd4d7ce9edcdd43ae129054ab024234f7d82f",
+  "script_sha256": "36c274d3c3afbbdd26e103881c44e6da5d2295bd7c392b3e96d9aac3f3133711",
+  "checks": [
+    {
+      "name": "complete capture accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "raw hash mismatch rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "false semantic oracle rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing corruption control rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "source identity corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "outer residual corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "false event balance rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "event outcome corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "event order corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "span arithmetic corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "observer clock on empty route rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "duplicate process rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "command count corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing end binding rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing process rejected",
+      "accepted": false,
+      "expected": false
+    }
+  ]
+}

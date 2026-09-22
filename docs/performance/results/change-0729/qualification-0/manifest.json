@@ -1,0 +1,190 @@
+{
+  "builds_sha256": "1cd1e8c56981cc4da3c25df30ce9501eb509efffcb7715a1a5a5315c636691cf",
+  "script_sha256": "1816e232f0a36b33dcd4cb983956253001e3b4afe7839e5359be4b2158fa523a",
+  "runs": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docfloat",
+        "--input",
+        "test-data/ole/doc/FloatingPictures.doc",
+        "--route",
+        "ordinary-opaque",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docfloat-ordinary-opaque.json",
+      "sha256": "4e0d6203412c6bfb6ffa9b19f39589d33bfc07b12467c1bc9ae3b21ec8b06809",
+      "stderr": "docfloat-ordinary-opaque.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docfloat",
+        "--input",
+        "test-data/ole/doc/FloatingPictures.doc",
+        "--route",
+        "ordinary-split",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docfloat-ordinary-split.json",
+      "sha256": "df8e3e599c5f6ea04cded13d4399026ab782b90b89041dfdcd465ed5eb14569e",
+      "stderr": "docfloat-ordinary-split.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docfloat",
+        "--input",
+        "test-data/ole/doc/FloatingPictures.doc",
+        "--route",
+        "profiled-empty",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docfloat-profiled-empty.json",
+      "sha256": "77be273c8ce1d0c3a127ee9640187912c590a7b586ff676442a2abd2f5499ae8",
+      "stderr": "docfloat-profiled-empty.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docfloat",
+        "--input",
+        "test-data/ole/doc/FloatingPictures.doc",
+        "--route",
+        "profiled-clock",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docfloat-profiled-clock.json",
+      "sha256": "d815c4764bfe1027a8feeeb8b7b779b67463d1f9bbb9f2f09f0a47deeff5f23a",
+      "stderr": "docfloat-profiled-clock.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docnohf",
+        "--input",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "--route",
+        "ordinary-opaque",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docnohf-ordinary-opaque.json",
+      "sha256": "dbd4930ae73c41d0aed06af8cfd19fd714acb08770ca41772790057bc0bd4749",
+      "stderr": "docnohf-ordinary-opaque.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docnohf",
+        "--input",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "--route",
+        "ordinary-split",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docnohf-ordinary-split.json",
+      "sha256": "b55c1fd182e762d0336caec09abbae9c49657a84051dbad9c04e2f2df09f2d00",
+      "stderr": "docnohf-ordinary-split.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docnohf",
+        "--input",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "--route",
+        "profiled-empty",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docnohf-profiled-empty.json",
+      "sha256": "f266426a75989b104e145511869eaa315b5c97007a4fa9fbdd6cc75257d5b369",
+      "stderr": "docnohf-profiled-empty.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "/home/zhuhe/code/litchi-0729-bin/doc_phase_probe",
+        "--case",
+        "docnohf",
+        "--input",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "--route",
+        "profiled-clock",
+        "--samples",
+        "1",
+        "--warmups",
+        "0"
+      ],
+      "exit_code": 0,
+      "output": "docnohf-profiled-clock.json",
+      "sha256": "25c33c87d33c314d1fbd2ca979c2ab95c98caeb70487fa64cf6a49ccd9436ca6",
+      "stderr": "docnohf-profiled-clock.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
