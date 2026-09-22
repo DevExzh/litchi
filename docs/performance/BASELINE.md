@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0733 — finish instruction partition, with call-count control
+
+[0733](0733-ppt-finish-instruction-partition.md) replays the sealed 0731 profiles:
+package writing is 63.816% of embedded finish Ir and rewrite validation 24.915%.
+Copying stream ingress is 12.416% of finish Ir and handles 384,906 payload bytes
+on the qualified fixture. A standalone three-run witness proves that raw call
+counts include uncollected invocations; they are not valid per-owner invocation
+denominators. Current source custody and both ancestor seals pass. This is
+retrospective instruction evidence, not fresh PPT latency or a speedup claim.
+[Evidence](results/change-0733/README.md).
+
 ## 0732 — native PPT phases with measured observer limits
 
 [0732](0732-ppt-native-phase-attribution.md) qualifies 36 processes and 1,800

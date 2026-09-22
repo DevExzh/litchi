@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0733 — qualify owned PPT stream handoff next
+
+[0733](0733-ppt-finish-instruction-partition.md) identifies avoidable copying:
+PPT finish owns its stream buffers but calls copying CFB ingress instead of
+existing `create_stream_owned`. That ingress is 12.416% of retained finish Ir;
+this must not be multiplied by 0732 native phase fractions to predict savings.
+Next qualify a consuming payload handoff with fresh ordinary-path latency and
+allocation comparisons, full output/metadata oracles, and unchanged limits,
+Reuse policy, validation and artifact digests. Reuse-plan validation and PPT
+rewrite validation have distinct obligations and remain required. Production
+is unchanged; the broader non-iWork goal stays active.
+
 ## 0732 — inspect native PPT finish; retain observer qualification
 
 [0732](0732-ppt-native-phase-attribution.md) replaces the software-SHA profiler

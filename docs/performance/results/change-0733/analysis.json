@@ -1,0 +1,1177 @@
+{
+  "status": "passed",
+  "scope": "retrospective collected Ir only; no native time or savings inference",
+  "source_bridge": {
+    "source_files": 7206,
+    "identical_files": 7204,
+    "diagnostic_only_changed_files": [
+      "crates/litchi-ppt/Cargo.toml",
+      "crates/litchi-ppt/src/slide_order.rs"
+    ],
+    "ordinary_commit_byte_identical": true,
+    "measured_binary_is_historical": true
+  },
+  "collection_counter_witness": [
+    {
+      "repeat": 0,
+      "collected_Ir": 5010,
+      "owner_work_calls": 1,
+      "work_leaf_calls": 3,
+      "work_leaf_Ir": 5008
+    },
+    {
+      "repeat": 1,
+      "collected_Ir": 5010,
+      "owner_work_calls": 1,
+      "work_leaf_calls": 3,
+      "work_leaf_Ir": 5008
+    },
+    {
+      "repeat": 2,
+      "collected_Ir": 5010,
+      "owner_work_calls": 1,
+      "work_leaf_calls": 3,
+      "work_leaf_Ir": 5008
+    }
+  ],
+  "profiles": [
+    {
+      "repeat": 0,
+      "owner_Ir": 59578167,
+      "finish_Ir": 3087582,
+      "partitions": [
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "parent": "litchi_ppt::slide_order::Transaction::commit",
+          "inclusive_Ir": 3087582,
+          "self_Ir": 1268,
+          "outgoing": [
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+              "Ir": 1970376,
+              "percent": 63.81615127954496,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+              "Ir": 769284,
+              "percent": 24.915419250403716,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::append_checked",
+              "Ir": 312235,
+              "percent": 10.112605916215342,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "hashbrown::map::HashMap<K,V,S,A>::insert",
+              "Ir": 14827,
+              "percent": 0.480213966786955,
+              "calls_metadata": 90
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::generate_incremental_record",
+              "Ir": 9794,
+              "percent": 0.3172061503143884,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_ppt::embedded::object::editor::Editor>",
+              "Ir": 5711,
+              "percent": 0.18496674744184932,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::UserEditAtom::generate_record",
+              "Ir": 1314,
+              "percent": 0.04255757417940641,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::try_reserve_exact",
+              "Ir": 1087,
+              "percent": 0.03520554271918932,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next",
+              "Ir": 1070,
+              "percent": 0.03465495005476778,
+              "calls_metadata": 99
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 476,
+              "percent": 0.015416594603803235,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::double_ended::DoubleEndedIterator>::next_back",
+              "Ir": 52,
+              "percent": 0.001684165797054135,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop",
+              "Ir": 47,
+              "percent": 0.0015222267781066219,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::new",
+              "Ir": 24,
+              "percent": 0.0007773072909480623,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::checked_projected_len",
+              "Ir": 17,
+              "percent": 0.0005505926644215441,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 1970376,
+          "self_Ir": 485,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::write_to",
+              "Ir": 1434432,
+              "percent": 72.79991230100245,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream",
+              "Ir": 383349,
+              "percent": 19.455626743322085,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::adopt_source_layout",
+              "Ir": 147056,
+              "percent": 7.4633470972037825,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>",
+              "Ir": 4346,
+              "percent": 0.22056703898139238,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::new",
+              "Ir": 268,
+              "percent": 0.013601464898070216,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 200,
+              "percent": 0.01015034693885837,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 175,
+              "percent": 0.008881553571501074,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 60,
+              "percent": 0.003045104081657511,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 5,
+              "percent": 0.00025375867347145924,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 769284,
+          "self_Ir": 347,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 671509,
+              "percent": 87.29012952303701,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open",
+              "Ir": 83090,
+              "percent": 10.800952574081874,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::mapping::chain::read",
+              "Ir": 10489,
+              "percent": 1.3634756474851941,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<std::io::cursor::Cursor<&[u8]>>>",
+              "Ir": 1703,
+              "percent": 0.22137468087208365,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+              "Ir": 1669,
+              "percent": 0.21695498671491933,
+              "calls_metadata": 93
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 342,
+              "percent": 0.0444569235808882,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 80,
+              "percent": 0.01039928036979841,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.006889523244991446,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 2,
+              "percent": 0.00025998200924496023,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::write_to",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 1434432,
+          "self_Ir": 152,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::validate",
+              "Ir": 731935,
+              "percent": 51.026120443492616,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::emit",
+              "Ir": 520891,
+              "percent": 36.313397916387814,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::plan_sector_layout",
+              "Ir": 180562,
+              "percent": 12.587700218623121,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<alloc::boxed::Box<litchi_cfb::writer::layout::ReusePlan>>",
+              "Ir": 502,
+              "percent": 0.03499643064293044,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::stream_inputs",
+              "Ir": 270,
+              "percent": 0.018822781421496453,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::validate_stream_size",
+              "Ir": 85,
+              "percent": 0.0059256904475081425,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 35,
+              "percent": 0.0024399901842680587,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::create_stream",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 383349,
+          "self_Ir": 265,
+          "outgoing": [
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 377604,
+              "percent": 98.50136559636259,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream_owned",
+              "Ir": 3920,
+              "percent": 1.0225669037874103,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 1560,
+              "percent": 0.40693989028274496,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 15
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::validate",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 731935,
+          "self_Ir": 368,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 593163,
+              "percent": 81.04039293106628,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_with_limits",
+              "Ir": 84504,
+              "percent": 11.5452874913756,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 51251,
+              "percent": 7.002124505591343,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<litchi_cfb::writer::layout::PlanCursor>>",
+              "Ir": 1271,
+              "percent": 0.17364929945965146,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 920,
+              "percent": 0.1256942214814157,
+              "calls_metadata": 30
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 405,
+              "percent": 0.055332782282579734,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.007241080150559818,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::emit",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 520891,
+          "self_Ir": 27034,
+          "outgoing": [
+            {
+              "callee": "std::io::Write::write_all",
+              "Ir": 493787,
+              "percent": 94.796608119549,
+              "calls_metadata": 36
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::image_run",
+              "Ir": 70,
+              "percent": 0.013438512087941622,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        }
+      ],
+      "create_stream_percent_of_finish": 12.41583219490203
+    },
+    {
+      "repeat": 1,
+      "owner_Ir": 59578131,
+      "finish_Ir": 3087556,
+      "partitions": [
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "parent": "litchi_ppt::slide_order::Transaction::commit",
+          "inclusive_Ir": 3087556,
+          "self_Ir": 1268,
+          "outgoing": [
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+              "Ir": 1970376,
+              "percent": 63.816688668966655,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+              "Ir": 769284,
+              "percent": 24.915629060655093,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::append_checked",
+              "Ir": 312235,
+              "percent": 10.112691073457453,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "hashbrown::map::HashMap<K,V,S,A>::insert",
+              "Ir": 14822,
+              "percent": 0.4800560702380783,
+              "calls_metadata": 90
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::generate_incremental_record",
+              "Ir": 9773,
+              "percent": 0.3165286718686236,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_ppt::embedded::object::editor::Editor>",
+              "Ir": 5711,
+              "percent": 0.18496830502831366,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::UserEditAtom::generate_record",
+              "Ir": 1314,
+              "percent": 0.0425579325524784,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::try_reserve_exact",
+              "Ir": 1087,
+              "percent": 0.03520583918154035,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next",
+              "Ir": 1070,
+              "percent": 0.0346552418806331,
+              "calls_metadata": 99
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 476,
+              "percent": 0.015416724425403134,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::double_ended::DoubleEndedIterator>::next_back",
+              "Ir": 52,
+              "percent": 0.0016841799792457206,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop",
+              "Ir": 47,
+              "percent": 0.0015222395966259397,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::new",
+              "Ir": 24,
+              "percent": 0.000777313836574948,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::checked_projected_len",
+              "Ir": 17,
+              "percent": 0.0005505973009072548,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 1970376,
+          "self_Ir": 485,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::write_to",
+              "Ir": 1434432,
+              "percent": 72.79991230100245,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream",
+              "Ir": 383349,
+              "percent": 19.455626743322085,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::adopt_source_layout",
+              "Ir": 147056,
+              "percent": 7.4633470972037825,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>",
+              "Ir": 4346,
+              "percent": 0.22056703898139238,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::new",
+              "Ir": 268,
+              "percent": 0.013601464898070216,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 200,
+              "percent": 0.01015034693885837,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 175,
+              "percent": 0.008881553571501074,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 60,
+              "percent": 0.003045104081657511,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 5,
+              "percent": 0.00025375867347145924,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 769284,
+          "self_Ir": 347,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 671509,
+              "percent": 87.29012952303701,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open",
+              "Ir": 83090,
+              "percent": 10.800952574081874,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::mapping::chain::read",
+              "Ir": 10489,
+              "percent": 1.3634756474851941,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<std::io::cursor::Cursor<&[u8]>>>",
+              "Ir": 1703,
+              "percent": 0.22137468087208365,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+              "Ir": 1669,
+              "percent": 0.21695498671491933,
+              "calls_metadata": 93
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 342,
+              "percent": 0.0444569235808882,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 80,
+              "percent": 0.01039928036979841,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.006889523244991446,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 2,
+              "percent": 0.00025998200924496023,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::write_to",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 1434432,
+          "self_Ir": 152,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::validate",
+              "Ir": 731935,
+              "percent": 51.026120443492616,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::emit",
+              "Ir": 520891,
+              "percent": 36.313397916387814,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::plan_sector_layout",
+              "Ir": 180562,
+              "percent": 12.587700218623121,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<alloc::boxed::Box<litchi_cfb::writer::layout::ReusePlan>>",
+              "Ir": 502,
+              "percent": 0.03499643064293044,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::stream_inputs",
+              "Ir": 270,
+              "percent": 0.018822781421496453,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::validate_stream_size",
+              "Ir": 85,
+              "percent": 0.0059256904475081425,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 35,
+              "percent": 0.0024399901842680587,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::create_stream",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 383349,
+          "self_Ir": 265,
+          "outgoing": [
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 377604,
+              "percent": 98.50136559636259,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream_owned",
+              "Ir": 3920,
+              "percent": 1.0225669037874103,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 1560,
+              "percent": 0.40693989028274496,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 15
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::validate",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 731935,
+          "self_Ir": 368,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 593163,
+              "percent": 81.04039293106628,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_with_limits",
+              "Ir": 84504,
+              "percent": 11.5452874913756,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 51251,
+              "percent": 7.002124505591343,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<litchi_cfb::writer::layout::PlanCursor>>",
+              "Ir": 1271,
+              "percent": 0.17364929945965146,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 920,
+              "percent": 0.1256942214814157,
+              "calls_metadata": 30
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 405,
+              "percent": 0.055332782282579734,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.007241080150559818,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::emit",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 520891,
+          "self_Ir": 27034,
+          "outgoing": [
+            {
+              "callee": "std::io::Write::write_all",
+              "Ir": 493787,
+              "percent": 94.796608119549,
+              "calls_metadata": 36
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::image_run",
+              "Ir": 70,
+              "percent": 0.013438512087941622,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        }
+      ],
+      "create_stream_percent_of_finish": 12.415936747382071
+    },
+    {
+      "repeat": 2,
+      "owner_Ir": 59578178,
+      "finish_Ir": 3087601,
+      "partitions": [
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "parent": "litchi_ppt::slide_order::Transaction::commit",
+          "inclusive_Ir": 3087601,
+          "self_Ir": 1268,
+          "outgoing": [
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+              "Ir": 1970376,
+              "percent": 63.81575857761414,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+              "Ir": 769284,
+              "percent": 24.9152659297623,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::append_checked",
+              "Ir": 312235,
+              "percent": 10.112543686830001,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "hashbrown::map::HashMap<K,V,S,A>::insert",
+              "Ir": 14809,
+              "percent": 0.4796280348399939,
+              "calls_metadata": 90
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::generate_incremental_record",
+              "Ir": 9831,
+              "percent": 0.31840253970639343,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_ppt::embedded::object::editor::Editor>",
+              "Ir": 5711,
+              "percent": 0.18496560922217606,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::UserEditAtom::generate_record",
+              "Ir": 1314,
+              "percent": 0.04255731229520913,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::try_reserve_exact",
+              "Ir": 1087,
+              "percent": 0.03520532607678259,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next",
+              "Ir": 1070,
+              "percent": 0.03465473680051276,
+              "calls_metadata": 99
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 476,
+              "percent": 0.015416499735555209,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::double_ended::DoubleEndedIterator>::next_back",
+              "Ir": 52,
+              "percent": 0.0016841554332959472,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop",
+              "Ir": 47,
+              "percent": 0.0015222174108636447,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::writer::persist::PersistPtrBuilder::new",
+              "Ir": 24,
+              "percent": 0.0007773025076750526,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::transaction::finish::checked_projected_len",
+              "Ir": 17,
+              "percent": 0.0005505892762698289,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 1970376,
+          "self_Ir": 485,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::write_to",
+              "Ir": 1434432,
+              "percent": 72.79991230100245,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream",
+              "Ir": 383349,
+              "percent": 19.455626743322085,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::adopt_source_layout",
+              "Ir": 147056,
+              "percent": 7.4633470972037825,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>",
+              "Ir": 4346,
+              "percent": 0.22056703898139238,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::new",
+              "Ir": 268,
+              "percent": 0.013601464898070216,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 200,
+              "percent": 0.01015034693885837,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 175,
+              "percent": 0.008881553571501074,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 60,
+              "percent": 0.003045104081657511,
+              "calls_metadata": 9
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 5,
+              "percent": 0.00025375867347145924,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_ppt::embedded::object::editor::transaction::finish::validate_rewrite",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::finish",
+          "inclusive_Ir": 769284,
+          "self_Ir": 347,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 671509,
+              "percent": 87.29012952303701,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open",
+              "Ir": 83090,
+              "percent": 10.800952574081874,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_ppt::embedded::object::editor::mapping::chain::read",
+              "Ir": 10489,
+              "percent": 1.3634756474851941,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<std::io::cursor::Cursor<&[u8]>>>",
+              "Ir": 1703,
+              "percent": 0.22137468087208365,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+              "Ir": 1669,
+              "percent": 0.21695498671491933,
+              "calls_metadata": 93
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 342,
+              "percent": 0.0444569235808882,
+              "calls_metadata": 12
+            },
+            {
+              "callee": "__rustc::__rust_alloc",
+              "Ir": 80,
+              "percent": 0.01039928036979841,
+              "calls_metadata": 6
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.006889523244991446,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_no_alloc_shim_is_unstable_v2",
+              "Ir": 2,
+              "percent": 0.00025998200924496023,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::write_to",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 1434432,
+          "self_Ir": 152,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::validate",
+              "Ir": 731935,
+              "percent": 51.026120443492616,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::emit",
+              "Ir": 520891,
+              "percent": 36.313397916387814,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::plan_sector_layout",
+              "Ir": 180562,
+              "percent": 12.587700218623121,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "core::ptr::drop_in_place<alloc::boxed::Box<litchi_cfb::writer::layout::ReusePlan>>",
+              "Ir": 502,
+              "percent": 0.03499643064293044,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::stream_inputs",
+              "Ir": 270,
+              "percent": 0.018822781421496453,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "litchi_cfb::writer::core::validate_stream_size",
+              "Ir": 85,
+              "percent": 0.0059256904475081425,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 35,
+              "percent": 0.0024399901842680587,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::core::OleWriter::create_stream",
+          "parent": "litchi_ppt::embedded::object::editor::transaction::finish::write_package",
+          "inclusive_Ir": 383349,
+          "self_Ir": 265,
+          "outgoing": [
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 377604,
+              "percent": 98.50136559636259,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::writer::core::OleWriter::create_stream_owned",
+              "Ir": 3920,
+              "percent": 1.0225669037874103,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 1560,
+              "percent": 0.40693989028274496,
+              "calls_metadata": 15
+            }
+          ],
+          "incoming_calls_metadata": 15
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::validate",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 731935,
+          "self_Ir": 368,
+          "outgoing": [
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_stream",
+              "Ir": 593163,
+              "percent": 81.04039293106628,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "litchi_cfb::file::OleFile<R>::open_with_limits",
+              "Ir": 84504,
+              "percent": 11.5452874913756,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__memcmp_avx2_movbe",
+              "Ir": 51251,
+              "percent": 7.002124505591343,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "core::ptr::drop_in_place<litchi_cfb::file::OleFile<litchi_cfb::writer::layout::PlanCursor>>",
+              "Ir": 1271,
+              "percent": 0.17364929945965146,
+              "calls_metadata": 3
+            },
+            {
+              "callee": "__rustc::__rust_dealloc",
+              "Ir": 920,
+              "percent": 0.1256942214814157,
+              "calls_metadata": 30
+            },
+            {
+              "callee": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "Ir": 405,
+              "percent": 0.055332782282579734,
+              "calls_metadata": 15
+            },
+            {
+              "callee": "__memcpy_avx_unaligned_erms",
+              "Ir": 53,
+              "percent": 0.007241080150559818,
+              "calls_metadata": 3
+            }
+          ],
+          "incoming_calls_metadata": 3
+        },
+        {
+          "function": "litchi_cfb::writer::layout::ReusePlan::emit",
+          "parent": "litchi_cfb::writer::core::OleWriter::write_to",
+          "inclusive_Ir": 520891,
+          "self_Ir": 27034,
+          "outgoing": [
+            {
+              "callee": "std::io::Write::write_all",
+              "Ir": 493787,
+              "percent": 94.796608119549,
+              "calls_metadata": 36
+            },
+            {
+              "callee": "litchi_cfb::writer::layout::ReusePlan::image_run",
+              "Ir": 70,
+              "percent": 0.013438512087941622,
+              "calls_metadata": 6
+            }
+          ],
+          "incoming_calls_metadata": 3
+        }
+      ],
+      "create_stream_percent_of_finish": 12.415755792280155
+    }
+  ],
+  "candidate_payload_bytes": 384906,
+  "candidate_stream_count": 5,
+  "native_context": {
+    "packet": "change-0732",
+    "clock_p50_flags": 3,
+    "exact_ordinary_fractions_qualified": false
+  }
+}

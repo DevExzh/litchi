@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "post_cleanup": true,
+  "production_changes": false,
+  "constraints_verified": 34,
+  "checks_sha256": "4139571799f151f94c3464cd94fb340d1e4c78f6c13137bd3bf04a8145b69bfa",
+  "analysis_sha256": "457afa75f3eb91b407a858f1a12e596b482a8e183e9a74da5360a944777ca787",
+  "cleanup_sha256": "16318f94d1bba1c0fd23d2815bee4025cab6116f3bca39f27aeaff8c1f752b86",
+  "reports": {
+    "docs/performance/0733-ppt-finish-instruction-partition.md": "bde2a2994326fe773332cd7bf394cc6f46e3a73925a12023f80f247a5ec06998",
+    "docs/performance/BASELINE.md": "98b5aef6d156f34bf4ec834ee848015445669d4b278518cdecc26ac70638e788",
+    "docs/performance/HOTSPOTS.md": "a51b12913882cac56775dc8e3f06deb848de532a39818b39ed111a5fcd5a65dd",
+    "docs/performance/REPORT.md": "1797fa9f6f399428545ea41326dd1dba4c5db2b2301229e1f71b7f27a2eb2c81"
+  },
+  "scope": "offline replay; no fresh PPT or Cargo measurement; standalone witness only"
+}

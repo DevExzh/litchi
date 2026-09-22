@@ -1,0 +1,59 @@
+{
+  "status": "passed",
+  "baseline_accepted": true,
+  "rejection_count": 10,
+  "checks": [
+    {
+      "name": "wrong event dimension",
+      "rejected": true,
+      "reason": "unexpected events"
+    },
+    {
+      "name": "wrong positions dimension",
+      "rejected": true,
+      "reason": "unexpected positions"
+    },
+    {
+      "name": "wrong summary",
+      "rejected": true,
+      "reason": "profile totals disagree"
+    },
+    {
+      "name": "wrong self total",
+      "rejected": true,
+      "reason": "self sum differs"
+    },
+    {
+      "name": "missing totals",
+      "rejected": true,
+      "reason": "profile totals disagree"
+    },
+    {
+      "name": "dangling call association",
+      "rejected": true,
+      "reason": "incomplete profile"
+    },
+    {
+      "name": "shared context cannot be partitioned",
+      "rejected": true,
+      "reason": "ambiguous positive-cost caller"
+    },
+    {
+      "name": "nonconserving inclusive edge",
+      "rejected": true,
+      "reason": "incoming/outgoing costs disagree"
+    },
+    {
+      "name": "altered ancestor binding",
+      "rejected": true,
+      "reason": "ancestor seal changed"
+    },
+    {
+      "name": "altered witness source receipt",
+      "rejected": true,
+      "reason": "witness source changed"
+    }
+  ],
+  "analyzer_sha256": "a0037e484fc13cbf0488a30acd48d53419714af6b434a884206750dfb4e1654d",
+  "script_sha256": "5f59aa5959a10952001b645d2467f56cbd77b40d67e6156bf242ddd582dfc02f"
+}

@@ -1,0 +1,13 @@
+{
+  "status": "passed with exact raw-output exceptions",
+  "raw_files": [
+    "docs/performance/results/change-0733/witness/0.callgrind",
+    "docs/performance/results/change-0733/witness/0.valgrind",
+    "docs/performance/results/change-0733/witness/1.callgrind",
+    "docs/performance/results/change-0733/witness/1.valgrind",
+    "docs/performance/results/change-0733/witness/2.callgrind",
+    "docs/performance/results/change-0733/witness/2.valgrind"
+  ],
+  "warning_count": 51,
+  "reason": "Preserve hashed Callgrind and Valgrind output exactly; all other staged files pass."
+}
