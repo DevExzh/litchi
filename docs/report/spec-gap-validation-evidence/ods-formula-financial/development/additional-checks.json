@@ -1,0 +1,22 @@
+{
+  "schema": "financial-development-additional-checks-v1",
+  "scope": "Development checks; final numeric/resource review and frozen performance acceptance remain open.",
+  "commit": "ab93dec951bd69924e958310b3b757f83422645e",
+  "lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "checks": [
+    {
+      "command": "cargo clippy --locked --offline -p litchi-ods --all-targets -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked --offline -p litchi-ods --doc -- --quiet",
+      "exit_code": 0,
+      "passed": 6
+    },
+    {
+      "command": "cargo test --locked --offline -p litchi-ods --lib financial -- --quiet",
+      "exit_code": 0,
+      "passed": 35
+    }
+  ]
+}
