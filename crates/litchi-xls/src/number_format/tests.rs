@@ -299,12 +299,9 @@ fn classifies_numeric_and_formula_caches_without_literal_false_positives() {
         value: 12.5,
     };
 
-    let builtin =
-        Cell::from_record_with_formula_context(&builtin, None, None, Some(&formatting)).unwrap();
-    let custom =
-        Cell::from_record_with_formula_context(&custom, None, None, Some(&formatting)).unwrap();
-    let literal =
-        Cell::from_record_with_formula_context(&literal, None, None, Some(&formatting)).unwrap();
+    let builtin = Cell::from_record_with_formula_context(&builtin, None, None, Some(&formatting));
+    let custom = Cell::from_record_with_formula_context(&custom, None, None, Some(&formatting));
+    let literal = Cell::from_record_with_formula_context(&literal, None, None, Some(&formatting));
     assert_eq!(builtin.value(), &CellValue::DateTime(39_304.0));
     assert_eq!(custom.value(), &CellValue::DateTime(45_000.5));
     assert_eq!(literal.value(), &CellValue::Float(12.5));

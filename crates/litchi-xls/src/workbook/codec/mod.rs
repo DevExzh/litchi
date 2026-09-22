@@ -15,6 +15,7 @@ use crate::defined_names::DefinedNameSlot;
 use crate::leniency::ToleranceLog;
 use crate::records::{BoundSheetRecord, SharedStringProperties};
 
+pub(super) use semantic::cells::{DecodeEveryCell, Position, ValidateCells};
 pub(super) use wire::pivot_cache_stream_paths;
 
 /// Inputs owned by the workbook package and consumed by the globals collector.

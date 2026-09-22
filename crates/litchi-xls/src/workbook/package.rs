@@ -10,6 +10,7 @@ pub mod property_set;
 
 use super::codec::{WorkbookGlobalsSink, pivot_cache_stream_paths};
 use super::model::{OpenOptions, Workbook};
+use super::validation_only::CellDecoding;
 use crate::defined_names::DefinedNameSlot;
 use crate::encryption::prepare_workbook_stream;
 use crate::error::{Error, Result};
@@ -28,7 +29,7 @@ use std::io::{Read, Seek};
 use std::sync::Arc;
 
 impl<R: Read + Seek> Workbook<R> {
-    fn empty(ole_file: OleFile<R>) -> Self {
+    pub(super) fn empty(ole_file: OleFile<R>) -> Self {
         Self {
             ole_file,
             worksheets: Vec::new(),
@@ -85,7 +86,7 @@ impl<R: Read + Seek> Workbook<R> {
         let mut workbook = Self::empty(OleFile::open(reader)?);
 
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
-        workbook.parse_workbook(&options)?;
+        workbook.parse_workbook(&options, CellDecoding::Every)?;
         Ok(workbook)
     }
 
@@ -115,12 +116,19 @@ impl<R: Read + Seek> Workbook<R> {
         let mut workbook = Self::empty(ole_file);
 
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
-        workbook.parse_workbook(&options)?;
+        workbook.parse_workbook(&options, CellDecoding::Every)?;
         Ok(workbook)
     }
 
-    /// Parse the workbook stream
-    fn parse_workbook(&mut self, options: &OpenOptions<'_>) -> Result<()> {
+    /// Parse the workbook stream.
+    ///
+    /// `cells` selects which worksheet cells are decoded. It changes nothing
+    /// else: every record is validated by the same code in the same order.
+    pub(super) fn parse_workbook(
+        &mut self,
+        options: &OpenOptions<'_>,
+        cells: CellDecoding<'_>,
+    ) -> Result<()> {
         // Find and read the Workbook stream
         let workbook_data = self
             .ole_file
@@ -197,11 +205,13 @@ impl<R: Read + Seek> Workbook<R> {
             if bound_sheet.sheet_type != crate::records::SheetType::WorkSheet {
                 continue;
             }
-            match self.parse_worksheet_from_position(
+            match self.parse_worksheet_decoding(
                 &workbook_data,
+                sheet_index,
                 bound_sheet,
                 &encoding,
                 options.compatibility_profile(),
+                cells,
             ) {
                 Ok(worksheet) => {
                     let worksheet_index = self.worksheets.len();

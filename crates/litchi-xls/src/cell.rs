@@ -56,15 +56,23 @@ impl Cell {
     /// Create cell from BIFF record
     #[must_use]
     pub fn from_record(record: &CellRecord, sst: Option<&[String]>) -> Option<Self> {
-        Self::from_record_with_formula_context(record, sst, None, None)
+        Some(Self::from_record_with_formula_context(
+            record, sst, None, None,
+        ))
     }
 
+    /// Decodes the cell the workbook reader keeps for one validated record.
+    ///
+    /// Every cell record kind decodes to exactly one cell: the conversion has
+    /// no refusal and no side effect. The worksheet parser's validation-only
+    /// mode relies on this to count a record it does not decode as the same
+    /// one occupied position the decoding mode would have stored.
     pub(crate) fn from_record_with_formula_context(
         record: &CellRecord,
         sst: Option<&[String]>,
         formula_context: Option<&FormulaContext>,
         formatting: Option<&Formatting>,
-    ) -> Option<Self> {
+    ) -> Self {
         let xf_index = record_xf_index(record);
         let shared_string_index = match record {
             CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
@@ -182,7 +190,7 @@ impl Cell {
             value => value,
         };
 
-        Some(Cell {
+        Cell {
             row,
             col,
             value,
@@ -191,7 +199,7 @@ impl Cell {
             formula_metadata,
             shared_string_index,
             xf_index,
-        })
+        }
     }
 
     #[must_use]
@@ -249,6 +257,12 @@ impl Cell {
 
     pub(crate) fn set_rendered_formula_arc(&mut self, formula: Option<Arc<str>>) {
         self.formula = formula;
+    }
+
+    /// Whether this cell was decoded from a BIFF `Formula` record, which is
+    /// the only kind an Array owner can attach to.
+    pub(crate) const fn is_formula_record(&self) -> bool {
+        self.formula_metadata.is_some()
     }
 
     pub(crate) fn set_array_formula(&mut self, owner: Arc<ArrayFormula>) -> bool {
@@ -605,8 +619,7 @@ mod tests {
             formula,
         };
 
-        let cell =
-            Cell::from_record_with_formula_context(&record, None, Some(&context), None).unwrap();
+        let cell = Cell::from_record_with_formula_context(&record, None, Some(&context), None);
         assert_eq!(cell.formula(), Some("='Data 2026'!C5"));
     }
 
