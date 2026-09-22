@@ -1,0 +1,7 @@
+{
+  "status": "passed",
+  "synthetic": true,
+  "freeze_sha256": "9b9093f48850e4a0b97bd3fc034517cd45fb1deffb6d079571c37a3a2b2c0f4c",
+  "altered_command_rejected": true,
+  "temporary_removed": true
+}

@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "phase_separation": "Two separately frozen matrices; no pooling",
+  "measured_processes": 192,
+  "native_processes": 144,
+  "native_samples": 7200,
+  "allocation_processes": 48,
+  "post_cleanup_replay": {
+    "analysis.json": "8b30947da741c9aedb4c5090b5d42a4cc68d3c8e3d14f71e2b3bb28a4a1e892d",
+    "audit.json": "7135f41b3ba6e4483b9b51ad3f0f16015dbde4b6b2c5df60f24e020124aed641",
+    "negative-contract.json": "d7ac0e425772095735cb965f570cf17ef9b7692cd1dae6598d2c83f8210ff780",
+    "source-equivalence.json": "1038908568811763ef5018aad43ebf5c98d761a75e897add5867ff583c1ddc54",
+    "argv-control/analysis.json": "622d1ffcaa62a3cd615fc13e1ed213e484d65bb4a20030bc6e968f5911fe505d",
+    "cleanup.json": "04c4699a720795838c93ff157480761d8d3cb5dd0b42ffc698d6075426cce48a"
+  }
+}

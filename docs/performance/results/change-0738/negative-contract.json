@@ -1,0 +1,90 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "name": "source-hash",
+      "status": "rejected",
+      "message": "('report contract', 'source_sha256')"
+    },
+    {
+      "name": "output-hash",
+      "status": "rejected",
+      "message": "('sample oracle', 0, 'output_sha256')"
+    },
+    {
+      "name": "nested-oracle",
+      "status": "rejected",
+      "message": "('sample oracle', 0, 'oracle')"
+    },
+    {
+      "name": "oracle-control",
+      "status": "rejected",
+      "message": "('report contract', 'oracle_controls')"
+    },
+    {
+      "name": "missing-warmup",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "warmup-oracle",
+      "status": "rejected",
+      "message": "('warmup oracle', 0, 'oracle')"
+    },
+    {
+      "name": "warmup-phase-missing",
+      "status": "rejected",
+      "message": "sample schema"
+    },
+    {
+      "name": "warmup-phase-null",
+      "status": "rejected",
+      "message": "native phase object"
+    },
+    {
+      "name": "warmup-index-type",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "sample-extra-field",
+      "status": "rejected",
+      "message": "sample schema"
+    },
+    {
+      "name": "top-retention",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "sample-retention",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "lifecycle",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "sample-index",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "negative-duration",
+      "status": "rejected",
+      "message": "native duration"
+    },
+    {
+      "name": "allocation-timing-claim",
+      "status": "rejected",
+      "message": ""
+    },
+    {
+      "name": "negative-allocation",
+      "status": "rejected",
+      "message": "allocation counters"
+    }
+  ]
+}

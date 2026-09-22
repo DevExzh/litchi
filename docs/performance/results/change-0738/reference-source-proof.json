@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "archive_identical_to": "change-0737/legacy-probe",
+  "prior_identical_to": "change-0737/probe",
+  "archive": {
+    "Cargo.lock": "92b5dcd648b8d781379beabd6e6e7b4105e0dc7123229ca2fae67d0b93da0b82",
+    "README.md": "27f8fb6c6e87ad3e1f750dcf6138dc46b4a4d4535190d89d3713afff5f183cf3",
+    "Cargo.toml": "b3fc41dae7535582c8fe69124eecf1ca08d3e096ec5a0e186971f631eafe7226",
+    "src/main.rs": "3cb58dc54c441a0a3c384b72cc709335e2464c9482a2d2d0ee99c324e3fb79d6",
+    "src/lib.rs": "2c0b7ba2572b34c4977b587fbacfbd8f1c27c7d83355e30ecfc44dfe29673e90",
+    "src/alloc_metrics.rs": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d",
+    "src/bin/alloc.rs": "6f7aba049b728a093a7a4750a0fa292878b1917464ef85b5e3e33702c58da423"
+  },
+  "prior": {
+    "Cargo.lock": "3630fc0275ab69c3f18b154d4d137a4c5f7014debf80209c485e86a8362fbfca",
+    "README.md": "0fbece1b07ba4bf025bf258835234a6be88a3e2e3720cfa6638b1105bdb63951",
+    "Cargo.toml": "4b10325680d603b7325f425dfe1afed00af2ac6c2caac0f9915f82796e0117d7",
+    "src/main.rs": "7603ec8d21ac86f441e94f92bf6ce949dfd84892e946d402e1e9c2d4bdc4addd",
+    "src/lib.rs": "bafa3cf2ba761af1a25046730718be16487442afd6a6a00f164fb9df8158161f",
+    "src/alloc_metrics.rs": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d",
+    "src/bin/alloc.rs": "1aaf89977c9e324c402db84ceb13c9fd71b34fe16adb838dd54026b2eb0bf375"
+  }
+}
