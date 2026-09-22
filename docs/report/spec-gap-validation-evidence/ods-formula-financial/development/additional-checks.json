@@ -17,6 +17,13 @@
       "command": "cargo test --locked --offline -p litchi-ods --lib financial -- --quiet",
       "exit_code": 0,
       "passed": 35
+    },
+    {
+      "command": "python3 -B tools/check_crate_boundaries.py",
+      "exit_code": 0,
+      "workspace_packages": 65,
+      "internal_dependency_declarations": 241,
+      "explicit_migration_debt_items": 11
     }
   ]
 }
