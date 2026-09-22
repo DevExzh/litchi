@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub use litchi_core::Position;
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
@@ -388,10 +388,15 @@ pub enum DiagnosticPhase {
     /// Captures persisted slide payloads after public reopen. The expected
     /// payload comparison remains explicit residual commit work.
     AfterPayloadCapture,
-    /// Computes the structural artifact digest before publication.
-    ArtifactHashBefore,
-    /// Computes the structural artifact digest after publication.
-    ArtifactHashAfter,
+    /// Computes the SHA-256 of the intermediate artifact that structural
+    /// publication started from.
+    ///
+    /// Only a transaction that stages both formatting and structural changes
+    /// reports this phase: the patch retains its source and target artifacts
+    /// but not that intermediate, so its digest is computed at commit. Every
+    /// other artifact digest is computed on demand by durable serialization
+    /// ([`Patch::to_durable`]) rather than by commit.
+    IntermediateArtifactHash,
     /// The staged live-document commit was an exact structural no-op; other
     /// formatting owners may still have staged changes in the root
     /// transaction.
@@ -456,10 +461,45 @@ impl fmt::Debug for Lineage {
     }
 }
 
+/// Lazily memoized SHA-256 content address of one snapshot's exact artifact.
+///
+/// A snapshot never mutates its bytes, and every clone shares both the byte
+/// allocation and this memo, so the digest is computed at most once per
+/// artifact, from exactly those bytes, and only when a durable-patch or
+/// transfer consumer asks for it. Commit and in-memory patch application
+/// never need it: they authorize by exact byte equality.
+///
+/// Equality and `Debug` ignore the memo. The digest is a pure function of the
+/// bytes that the owning snapshot already compares, and whether it has been
+/// filled depends only on call history.
+#[derive(Clone, Default)]
+struct ArtifactDigest(Arc<OnceLock<String>>);
+
+impl ArtifactDigest {
+    fn hex(&self, bytes: &[u8]) -> &str {
+        self.0.get_or_init(|| artifact_hash(bytes))
+    }
+}
+
+impl PartialEq for ArtifactDigest {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for ArtifactDigest {}
+
+impl fmt::Debug for ArtifactDigest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ArtifactDigest(..)")
+    }
+}
+
 /// Immutable exact whole-package snapshot used by slide-order edits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     bytes: Arc<[u8]>,
+    digest: ArtifactDigest,
     document: document_structure::Snapshot,
     document_persist_id: u32,
     limits: RecordLimits,
@@ -539,6 +579,7 @@ impl Snapshot {
         drop(package);
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
+            digest: ArtifactDigest::default(),
             document,
             document_persist_id,
             limits,
@@ -587,6 +628,7 @@ impl Snapshot {
         }
         Ok(Self {
             bytes,
+            digest: ArtifactDigest::default(),
             document: self.document.clone(),
             document_persist_id: self.document_persist_id,
             limits: self.limits,
@@ -637,6 +679,7 @@ impl Snapshot {
         Ok((
             Self {
                 bytes,
+                digest: ArtifactDigest::default(),
                 document: self.document.clone(),
                 document_persist_id: self.document_persist_id,
                 limits: self.limits,
@@ -846,7 +889,7 @@ impl Snapshot {
         let payload = slide_payload(group, record)?;
         require_master_closure(self, donor, payload.master_id)?;
         Ok(TransferPlan {
-            target_artifact: artifact_hash(self.bytes()),
+            target_artifact: self.artifact_digest().to_owned(),
             payload: normalized_payload(&SlidePayload {
                 pictures: closure.pictures,
                 ..payload
@@ -918,7 +961,10 @@ impl Snapshot {
                 continue;
             }
 
-            let structural_artifact = artifact_hash(current.bytes());
+            // The transaction's source is a clone of `current`, so its
+            // insertion target check reuses this memoized digest, and the
+            // inner commit computes none.
+            let structural_artifact = current.artifact_digest().to_owned();
             let mut transaction = current.edit()?;
             while index < operations.len() && !is_formatting_operation(&operations[index].op) {
                 apply_durable_structural(
@@ -958,6 +1004,12 @@ impl Snapshot {
 
     fn lineage(&self) -> Lineage {
         Lineage(self.bytes.clone())
+    }
+
+    /// Lowercase hexadecimal SHA-256 of the exact artifact, computed on first
+    /// use and shared by every clone of this snapshot.
+    fn artifact_digest(&self) -> &str {
+        self.digest.hex(&self.bytes)
     }
 }
 
@@ -1929,7 +1981,7 @@ impl Transaction {
     /// Returns a typed refusal for a stale/different target or a package error
     /// when identifier allocation or structural validation fails.
     pub fn insert_transfer(&mut self, position: Position, plan: &TransferPlan) -> Result<()> {
-        if plan.target_artifact != litchi_core::patch::BlobId::of(self.source.bytes()).as_hex() {
+        if plan.target_artifact != self.source.artifact_digest() {
             return Err(Error::Refused(Refusal::TransferTargetMismatch));
         }
         if position.get() > self.slide_count() {
@@ -2006,6 +2058,8 @@ impl Transaction {
         let source = self.source;
         let working = self.working;
         if document_commit.patch().is_empty() {
+            // Any staged structural operations net to the published working
+            // artifact, which the patch retains as its target.
             let patch = Patch {
                 before: source,
                 after: working.clone(),
@@ -2020,8 +2074,8 @@ impl Transaction {
                 media_playback_changes: self.media_playback_changes,
                 formatting: self.formatting,
                 formatting_first: true,
-                structural_before_artifact: artifact_hash(working.bytes()),
-                structural_after_artifact: artifact_hash(working.bytes()),
+                structural_before: StructuralArtifact::After,
+                structural_after: StructuralArtifact::After,
             };
             return Ok(Commit {
                 snapshot: working,
@@ -2083,6 +2137,7 @@ impl Transaction {
             .into());
         }
         validate_transferred_pictures(&snapshot, &self.inserted_pictures)?;
+        let structural_before = StructuralArtifact::structural_source(&source, &working);
         let patch = Patch {
             before: source,
             after: snapshot.clone(),
@@ -2097,8 +2152,8 @@ impl Transaction {
             media_playback_changes: self.media_playback_changes,
             formatting: self.formatting,
             formatting_first: true,
-            structural_before_artifact: artifact_hash(working.bytes()),
-            structural_after_artifact: artifact_hash(snapshot.bytes()),
+            structural_before,
+            structural_after: StructuralArtifact::After,
         };
         Ok(Commit { snapshot, patch })
     }
@@ -2150,16 +2205,8 @@ impl Transaction {
                 media_playback_changes: self.media_playback_changes,
                 formatting: self.formatting,
                 formatting_first: true,
-                structural_before_artifact: observe_phase(
-                    &mut observer,
-                    DiagnosticPhase::ArtifactHashBefore,
-                    || Ok(artifact_hash(working.bytes())),
-                )?,
-                structural_after_artifact: observe_phase(
-                    &mut observer,
-                    DiagnosticPhase::ArtifactHashAfter,
-                    || Ok(artifact_hash(working.bytes())),
-                )?,
+                structural_before: StructuralArtifact::After,
+                structural_after: StructuralArtifact::After,
             };
             return Ok(Commit {
                 snapshot: working,
@@ -2245,6 +2292,16 @@ impl Transaction {
             .into());
         }
         validate_transferred_pictures(&snapshot, &self.inserted_pictures)?;
+        let structural_before = if StructuralArtifact::retains_structural_source(&source, &working)
+        {
+            StructuralArtifact::Before
+        } else {
+            observe_phase(
+                &mut observer,
+                DiagnosticPhase::IntermediateArtifactHash,
+                || Ok(StructuralArtifact::intermediate(&working)),
+            )?
+        };
         let patch = Patch {
             before: source,
             after: snapshot.clone(),
@@ -2259,16 +2316,8 @@ impl Transaction {
             media_playback_changes: self.media_playback_changes,
             formatting: self.formatting,
             formatting_first: true,
-            structural_before_artifact: observe_phase(
-                &mut observer,
-                DiagnosticPhase::ArtifactHashBefore,
-                || Ok(artifact_hash(working.bytes())),
-            )?,
-            structural_after_artifact: observe_phase(
-                &mut observer,
-                DiagnosticPhase::ArtifactHashAfter,
-                || Ok(artifact_hash(snapshot.bytes())),
-            )?,
+            structural_before,
+            structural_after: StructuralArtifact::After,
         };
         Ok(Commit { snapshot, patch })
     }
@@ -2334,8 +2383,60 @@ pub struct Patch {
     media_playback_changes: Vec<ExternalMediaPlaybackChange>,
     formatting: Vec<FormattingChange>,
     formatting_first: bool,
-    structural_before_artifact: String,
-    structural_after_artifact: String,
+    structural_before: StructuralArtifact,
+    structural_after: StructuralArtifact,
+}
+
+/// The exact artifact that one side of a patch's structural operations is
+/// bound to, in that patch's own direction.
+///
+/// Durable structural operations carry the SHA-256 of these artifacts as
+/// `artifact_sha256` preconditions. When the artifact is one the patch already
+/// retains, the digest is computed on demand from those retained bytes by
+/// [`Patch::to_durable`] and memoized with the snapshot; commit computes none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum StructuralArtifact {
+    /// The patch's retained source artifact, [`Patch::before`].
+    Before,
+    /// The patch's retained target artifact, [`Patch::after`].
+    After,
+    /// The lowercase hexadecimal SHA-256 of an intermediate artifact between
+    /// formatting and structural publication. The patch does not retain that
+    /// artifact, so its digest was computed when the patch was built.
+    Intermediate(String),
+}
+
+impl StructuralArtifact {
+    /// Whether the committed source artifact is exactly the working artifact
+    /// that structural publication started from. Without staged formatting the
+    /// working snapshot shares the source allocation.
+    fn retains_structural_source(source: &Snapshot, working: &Snapshot) -> bool {
+        Arc::ptr_eq(&source.bytes, &working.bytes) || source.bytes() == working.bytes()
+    }
+
+    /// Binds the artifact that structural publication started from.
+    fn structural_source(source: &Snapshot, working: &Snapshot) -> Self {
+        if Self::retains_structural_source(source, working) {
+            Self::Before
+        } else {
+            Self::intermediate(working)
+        }
+    }
+
+    /// Captures the digest of a working artifact the patch will not retain.
+    fn intermediate(working: &Snapshot) -> Self {
+        Self::Intermediate(working.artifact_digest().to_owned())
+    }
+
+    /// The same artifact seen from the inverse patch, whose retained source
+    /// and target artifacts are swapped.
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Before => Self::After,
+            Self::After => Self::Before,
+            Self::Intermediate(digest) => Self::Intermediate(digest.clone()),
+        }
+    }
 }
 
 impl Patch {
@@ -2574,8 +2675,18 @@ impl Patch {
                 })
                 .collect(),
             formatting_first: !self.formatting_first,
-            structural_before_artifact: self.structural_after_artifact.clone(),
-            structural_after_artifact: self.structural_before_artifact.clone(),
+            structural_before: self.structural_after.inverse(),
+            structural_after: self.structural_before.inverse(),
+        }
+    }
+
+    /// Resolves one structural artifact binding to its SHA-256, computing a
+    /// retained artifact's digest on first use.
+    fn structural_artifact_digest<'a>(&'a self, artifact: &'a StructuralArtifact) -> &'a str {
+        match artifact {
+            StructuralArtifact::Before => self.before.artifact_digest(),
+            StructuralArtifact::After => self.after.artifact_digest(),
+            StructuralArtifact::Intermediate(digest) => digest,
         }
     }
 
@@ -2584,6 +2695,12 @@ impl Patch {
     /// Operations use only semantic zero-based positions, exact artifact
     /// SHA-256, and a content-free order fingerprint; native slide and persist
     /// identifiers are never serialized.
+    ///
+    /// Structural operations bind the SHA-256 of the exact artifacts they
+    /// start from and end at. Commit does not compute those digests: the
+    /// first serialization that needs one computes it from the artifact bytes
+    /// this patch retains, and every clone of that snapshot, including the
+    /// inverse patch and a later edit of the committed snapshot, reuses it.
     ///
     /// # Errors
     ///
@@ -2712,14 +2829,14 @@ impl Patch {
                         limits,
                         move_change.from,
                         move_change.destination,
-                        &self.structural_before_artifact,
+                        self.structural_artifact_digest(&self.structural_before),
                         move_change.before_order,
                     )?,
                     durable_operation(
                         limits,
                         move_change.destination,
                         move_change.from,
-                        &self.structural_after_artifact,
+                        self.structural_artifact_digest(&self.structural_after),
                         move_change.after_order,
                     )?,
                 ),
@@ -2733,13 +2850,13 @@ impl Patch {
                         durable_remove_operation(
                             limits,
                             list_change,
-                            &self.structural_before_artifact,
+                            self.structural_artifact_digest(&self.structural_before),
                             list_change.before_order,
                         )?,
                         durable_insert_operation(
                             limits,
                             list_change,
-                            &self.structural_after_artifact,
+                            self.structural_artifact_digest(&self.structural_after),
                             list_change.after_order,
                             &reverse_blob.as_hex(),
                         )?,
@@ -2755,14 +2872,14 @@ impl Patch {
                         durable_insert_operation(
                             limits,
                             list_change,
-                            &self.structural_before_artifact,
+                            self.structural_artifact_digest(&self.structural_before),
                             list_change.before_order,
                             &forward_blob.as_hex(),
                         )?,
                         durable_remove_operation(
                             limits,
                             list_change,
-                            &self.structural_after_artifact,
+                            self.structural_artifact_digest(&self.structural_after),
                             list_change.after_order,
                         )?,
                     )
@@ -7935,6 +8052,561 @@ mod tests {
         assert_eq!(edit.commit().unwrap().snapshot(), &source);
     }
 
+    fn memoized_digest(snapshot: &Snapshot) -> Option<&str> {
+        snapshot.digest.0.get().map(String::as_str)
+    }
+
+    fn exact_digest(bytes: &[u8]) -> String {
+        litchi_core::patch::BlobId::of(bytes).as_hex()
+    }
+
+    fn artifact_preconditions(operations: &[litchi_core::patch::PatchOperation]) -> Vec<&str> {
+        operations
+            .iter()
+            .filter_map(|operation| operation.preconditions.get("artifact_sha256"))
+            .map(|value| value.as_str().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn commit_defers_artifact_digests_to_durable_serialization() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        let commit = edit.commit().unwrap();
+        let patch = commit.patch();
+        assert_eq!(patch.structural_before, StructuralArtifact::Before);
+        assert_eq!(patch.structural_after, StructuralArtifact::After);
+        // Commit and exact in-memory application compute no artifact digest.
+        assert_eq!(patch.apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(patch.inverse().apply(commit.snapshot()).unwrap(), source);
+        for snapshot in [&source, &patch.before, &patch.after, commit.snapshot()] {
+            assert_eq!(memoized_digest(snapshot), None);
+        }
+
+        let durable = patch.to_durable(transfer_patch_limits()).unwrap();
+        let source_digest = exact_digest(source.bytes());
+        let target_digest = exact_digest(commit.snapshot().bytes());
+        assert_ne!(source_digest, target_digest);
+        // The digests were computed from exactly the retained bytes and are
+        // shared with every clone: the caller's source and committed snapshot.
+        for (snapshot, expected) in [
+            (&source, &source_digest),
+            (&patch.before, &source_digest),
+            (&patch.after, &target_digest),
+            (commit.snapshot(), &target_digest),
+        ] {
+            assert_eq!(memoized_digest(snapshot), Some(expected.as_str()));
+        }
+        assert_eq!(
+            artifact_preconditions(durable.operations()),
+            [source_digest.as_str()]
+        );
+        assert_eq!(
+            artifact_preconditions(durable.inverse().operations()),
+            [target_digest.as_str()]
+        );
+        // The inverse patch reuses both memoized digests with swapped roles.
+        let inverse = patch.inverse().to_durable(transfer_patch_limits()).unwrap();
+        assert_eq!(
+            artifact_preconditions(inverse.operations()),
+            [target_digest.as_str()]
+        );
+        assert_eq!(
+            artifact_preconditions(inverse.inverse().operations()),
+            [source_digest.as_str()]
+        );
+        // Repeated serialization is deterministic and byte-identical.
+        assert_eq!(
+            patch
+                .to_durable(transfer_patch_limits())
+                .unwrap()
+                .to_deterministic_json()
+                .unwrap(),
+            durable.to_deterministic_json().unwrap()
+        );
+
+        // A following edit of the committed snapshot starts from its memo.
+        let mut next = commit.snapshot().edit().unwrap();
+        next.remove_slide(Position::new(1)).unwrap();
+        let next = next.commit().unwrap();
+        assert_eq!(
+            memoized_digest(&next.patch().before),
+            Some(target_digest.as_str())
+        );
+        assert_eq!(memoized_digest(&next.patch().after), None);
+        let next_durable = next.patch().to_durable(transfer_patch_limits()).unwrap();
+        assert_eq!(
+            artifact_preconditions(next_durable.operations()),
+            [target_digest.as_str()]
+        );
+        assert_eq!(
+            artifact_preconditions(next_durable.inverse().operations()),
+            [exact_digest(next.snapshot().bytes()).as_str()]
+        );
+    }
+
+    /// Asserts the SHA-256 and length of a commit's forward and inverse
+    /// deterministic durable JSON.
+    fn assert_durable_wire(
+        label: &str,
+        commit: &Commit,
+        committed: (&str, usize),
+        forward: (&str, usize),
+        inverse: (&str, usize),
+    ) {
+        let digest = |bytes: &[u8]| (exact_digest(bytes), bytes.len());
+        let wire = |patch: &Patch| {
+            patch
+                .to_durable(transfer_patch_limits())
+                .unwrap()
+                .to_deterministic_json()
+                .unwrap()
+        };
+        let expected = |(sha, len): (&str, usize)| (sha.to_string(), len);
+        assert_eq!(
+            digest(commit.snapshot().bytes()),
+            expected(committed),
+            "{label}: committed artifact"
+        );
+        assert_eq!(
+            digest(&wire(commit.patch())),
+            expected(forward),
+            "{label}: forward durable JSON"
+        );
+        assert_eq!(
+            digest(&wire(&commit.patch().inverse())),
+            expected(inverse),
+            "{label}: inverse durable JSON"
+        );
+    }
+
+    /// The expected values were produced by the implementation that computed
+    /// both structural artifact digests eagerly at commit (base `009d515bef`),
+    /// using change 0745's probe over the same fixtures, edits and limits.
+    /// Deferring the digests must leave every durable byte unchanged.
+    #[test]
+    fn durable_wire_bytes_match_the_eager_digest_implementation() {
+        let deck = || Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+
+        let source = deck();
+        let mut edit = source.edit().unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        assert_durable_wire(
+            "45543 remove slide 1",
+            &edit.commit().unwrap(),
+            (
+                "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859",
+                390_144,
+            ),
+            (
+                "dba5682ef8d8f68fa1900c5791dfa88d1330d706df17d551ae749531287af87f",
+                8_351,
+            ),
+            (
+                "2f481aa5e19dbb60c3f80c0f77bdfe5da9677eb8e0ca5e1ae6c53f211334a8ba",
+                8_351,
+            ),
+        );
+
+        let source = deck();
+        let mut edit = source.edit().unwrap();
+        edit.move_slide(Position::new(0), Position::new(source.slide_count() - 1))
+            .unwrap();
+        assert_durable_wire(
+            "45543 move slide 0 to last",
+            &edit.commit().unwrap(),
+            (
+                "119e23514488f04f97c8c0b04a27b85a05553cf572efaa8ce0cfd8260c0df4ce",
+                390_144,
+            ),
+            (
+                "649801102f8397b5537f8312c50f03d2ec8dfb0fe048f7246bf1f11cfb696305",
+                592,
+            ),
+            (
+                "6a5c47191214e68a2b493bf629359efd969b94cf9437ba04ff4d12891a56e3d8",
+                592,
+            ),
+        );
+
+        let source = deck();
+        let hidden = source.slide_hidden(Position::new(0)).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), !hidden).unwrap();
+        assert_durable_wire(
+            "45543 formatting-only hide",
+            &edit.commit().unwrap(),
+            (
+                "8209e62cf70be791091cca8593490bc0dbf49184234f7d28c29ce8cdbc79c9cc",
+                397_312,
+            ),
+            (
+                "8caf2cb4ec56b99ee58a4872ac12c35aeaf0e15bf167453f8242b251de899fca",
+                318,
+            ),
+            (
+                "d643a40400d4ff6e5cff7562344b909879355b5937cf1e26e021eee4135574e2",
+                318,
+            ),
+        );
+
+        let source = deck();
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), !hidden).unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        assert_durable_wire(
+            "45543 hide then remove (intermediate artifact)",
+            &edit.commit().unwrap(),
+            (
+                "13b7b21048729ccb068e7ee7cd372060feb4ddedbd93a121d59a75f75841a5e2",
+                402_432,
+            ),
+            (
+                "650d815733819b44225ec159001b63bccd90fde5a815f2a361f85fb5d61a412c",
+                8_581,
+            ),
+            (
+                "7c54b006f5e2d46bd2b288c14e08fd3e0345e63d1625f14eb1170f6fc9253e35",
+                8_581,
+            ),
+        );
+
+        let source = deck();
+        let mut edit = source.edit().unwrap();
+        edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+        edit.move_slide(Position::new(1), Position::new(0)).unwrap();
+        let net_zero = (
+            "1328c0225965fbe9fd74eaf240e202ff77d3fba075c212604cd7a287b159bb1a",
+            1_092,
+        );
+        assert_durable_wire(
+            "45543 net-zero moves",
+            &edit.commit().unwrap(),
+            (
+                "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf",
+                385_024,
+            ),
+            net_zero,
+            net_zero,
+        );
+
+        let authored = || Snapshot::from_bytes(authored_fixture()).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+
+        let source = authored();
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_text(target, "golden replacement").unwrap();
+        edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+        assert_durable_wire(
+            "authored text then move (intermediate artifact)",
+            &edit.commit().unwrap(),
+            (
+                "719cc3c9e888d8f26e050d26c499fe8607f793192af977f337d01b1495af4b7d",
+                9_216,
+            ),
+            (
+                "ca74b8104062c56283053b080911a3e4e91dbeb7c175b86c8edae49976f0aad6",
+                989,
+            ),
+            (
+                "d3b26915f3a722280b2759d2f8729215fc0a942235c11c7ade9556f62f66674f",
+                989,
+            ),
+        );
+
+        let source = authored();
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_anchor(target, crate::Anchor::small(25, 35, 325, 235).unwrap())
+            .unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        assert_durable_wire(
+            "authored anchor then remove (intermediate artifact)",
+            &edit.commit().unwrap(),
+            (
+                "c024ea35d572a5d83ddb009041c0c26fc949038efba2dbc051a473daa12b3b0d",
+                9_216,
+            ),
+            (
+                "c25870460dfc2b979fb643d8fb737f7263f394c1acaff777993cc435b820cac7",
+                2_046,
+            ),
+            (
+                "76e51674df051c182a4353dd44a27aafeff53949211b1a555c290918a65ca8fe",
+                2_046,
+            ),
+        );
+
+        let donor = authored();
+        let mut remove = donor.edit().unwrap();
+        remove.remove_slide(Position::new(1)).unwrap();
+        let receiver = remove.commit().unwrap().snapshot().clone();
+        let plan = receiver
+            .plan_transfer_from(&donor, Position::new(0))
+            .unwrap();
+        let mut edit = receiver.edit().unwrap();
+        edit.insert_transfer(Position::new(1), &plan).unwrap();
+        assert_durable_wire(
+            "authored transfer insert",
+            &edit.commit().unwrap(),
+            (
+                "fc73e8a5aed23674f7f0f2abb107dd2b2facd010845ed6c68eed7f750470c204",
+                9_728,
+            ),
+            (
+                "37cced31a154e508262ab213bc97b1be0a1b1925b1d8a8970b4d681a1b50d366",
+                1_543,
+            ),
+            (
+                "5c880f90a56401a573f312b1aca6e2267c6825c4789b7f83a15cb44001d52c00",
+                1_543,
+            ),
+        );
+    }
+
+    #[test]
+    fn exact_noop_and_formatting_only_commits_compute_no_artifact_digest() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let noop = source.edit().unwrap().commit().unwrap();
+        assert!(noop.patch().is_empty());
+        assert!(std::ptr::eq(
+            source.bytes().as_ptr(),
+            noop.snapshot().bytes().as_ptr()
+        ));
+        assert_eq!(noop.patch().structural_before, StructuralArtifact::After);
+        assert_eq!(noop.patch().structural_after, StructuralArtifact::After);
+        assert_eq!(memoized_digest(&source), None);
+        let noop_durable = noop.patch().to_durable(patch_limits()).unwrap();
+        assert!(noop_durable.operations().is_empty());
+        assert_eq!(memoized_digest(&source), None);
+
+        let hidden = source.slide_hidden(Position::new(0)).unwrap();
+        let mut format = source.edit().unwrap();
+        format.set_slide_hidden(Position::new(0), !hidden).unwrap();
+        let format = format.commit().unwrap();
+        assert!(!format.patch().is_empty());
+        assert_eq!(memoized_digest(&format.patch().before), None);
+        assert_eq!(memoized_digest(&format.patch().after), None);
+        // Formatting operations bind semantic values, not artifact digests,
+        // so durable serialization of a formatting-only patch needs none.
+        let durable = format.patch().to_durable(patch_limits()).unwrap();
+        assert!(artifact_preconditions(durable.operations()).is_empty());
+        assert_eq!(memoized_digest(&format.patch().before), None);
+        assert_eq!(memoized_digest(&format.patch().after), None);
+        assert_eq!(
+            source.apply_durable(&durable).unwrap().bytes(),
+            format.snapshot().bytes()
+        );
+
+        // Net-zero staged moves serialize against the retained target.
+        let mut round_trip = source.edit().unwrap();
+        round_trip
+            .move_slide(Position::new(0), Position::new(1))
+            .unwrap();
+        round_trip
+            .move_slide(Position::new(1), Position::new(0))
+            .unwrap();
+        let round_trip = round_trip.commit().unwrap();
+        assert!(round_trip.patch().is_empty());
+        let round_trip_durable = round_trip.patch().to_durable(patch_limits()).unwrap();
+        let digest = exact_digest(source.bytes());
+        assert_eq!(
+            artifact_preconditions(round_trip_durable.operations()),
+            [digest.as_str(), digest.as_str()]
+        );
+        assert_eq!(
+            source.apply_durable(&round_trip_durable).unwrap().bytes(),
+            source.bytes()
+        );
+    }
+
+    #[test]
+    fn mixed_formatting_and_structural_patch_binds_the_unretained_intermediate() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let hidden = source.slide_hidden(Position::new(0)).unwrap();
+        // The formatting-only publication is exactly the intermediate working
+        // artifact that the mixed transaction's structural phase starts from.
+        let mut format = source.edit().unwrap();
+        format.set_slide_hidden(Position::new(0), !hidden).unwrap();
+        let intermediate = format.commit().unwrap().snapshot().clone();
+        let intermediate_digest = exact_digest(intermediate.bytes());
+
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), !hidden).unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        let commit = edit.commit().unwrap();
+        let patch = commit.patch();
+        assert_eq!(
+            patch.structural_before,
+            StructuralArtifact::Intermediate(intermediate_digest.clone())
+        );
+        assert_eq!(patch.structural_after, StructuralArtifact::After);
+        // The retained artifacts are still untouched until serialization.
+        assert_eq!(memoized_digest(&patch.before), None);
+        assert_eq!(memoized_digest(&patch.after), None);
+
+        let durable = patch.to_durable(transfer_patch_limits()).unwrap();
+        let target_digest = exact_digest(commit.snapshot().bytes());
+        assert_eq!(
+            artifact_preconditions(durable.operations()),
+            [intermediate_digest.as_str()]
+        );
+        assert_eq!(
+            artifact_preconditions(durable.inverse().operations()),
+            [target_digest.as_str()]
+        );
+        let inverse = patch.inverse();
+        assert_eq!(inverse.structural_before, StructuralArtifact::Before);
+        assert_eq!(
+            inverse.structural_after,
+            StructuralArtifact::Intermediate(intermediate_digest.clone())
+        );
+        // Removal payloads are normalized by inversion, so compare the
+        // artifact bindings rather than the whole double inverse.
+        let double = inverse.inverse();
+        assert_eq!(double.structural_before, patch.structural_before);
+        assert_eq!(double.structural_after, patch.structural_after);
+        let inverse_durable = inverse.to_durable(transfer_patch_limits()).unwrap();
+        assert_eq!(
+            artifact_preconditions(inverse_durable.operations()),
+            [target_digest.as_str()]
+        );
+
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert_eq!(applied.slide_hidden(Position::new(0)).unwrap(), !hidden);
+        // A structural precondition over the wrong artifact still conflicts.
+        assert!(intermediate.apply_durable(&durable).is_err());
+
+        // Complete durable round trip through an unretained intermediate on a
+        // deck whose re-inserted slide needs no second picture store.
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let anchor = crate::Anchor::small(25, 35, 325, 235).unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_anchor(target, anchor).unwrap();
+        edit.remove_slide(Position::new(1)).unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(matches!(
+            commit.patch().structural_before,
+            StructuralArtifact::Intermediate(_)
+        ));
+        let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        let restored = applied.apply_durable(&durable.inverse()).unwrap();
+        assert_eq!(restored.slide_count(), source.slide_count());
+        assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
+        assert_eq!(
+            restored.shape_anchor(target).unwrap(),
+            source.shape_anchor(target).unwrap()
+        );
+        assert!(
+            commit
+                .snapshot()
+                .apply_durable(&durable)
+                .is_err_and(|error| error.to_string().contains("does not match"))
+        );
+    }
+
+    #[test]
+    fn artifact_digest_memo_follows_every_snapshot_construction() {
+        let source = Snapshot::from_bytes(authored_batch_fixture()).unwrap();
+        let clone = source.clone();
+        assert!(Arc::ptr_eq(&source.digest.0, &clone.digest.0));
+        assert_eq!(clone.artifact_digest(), exact_digest(source.bytes()));
+        assert_eq!(
+            memoized_digest(&source),
+            Some(exact_digest(source.bytes()).as_str())
+        );
+
+        let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_text(first, "single replacement").unwrap();
+        let text = edit.working.clone();
+        edit.set_shape_texts(&[ShapeTextReplacement::new(second, "batch replacement")])
+            .unwrap();
+        let batch = edit.working.clone();
+        edit.set_shape_anchor(first, crate::Anchor::small(20, 30, 220, 130).unwrap())
+            .unwrap();
+        let anchor = edit.working.clone();
+        for (label, snapshot) in [
+            ("single text", &text),
+            ("batch text", &batch),
+            ("anchor", &anchor),
+        ] {
+            assert!(
+                !Arc::ptr_eq(&source.digest.0, &snapshot.digest.0),
+                "{label} publication must not inherit the source memo"
+            );
+            assert_eq!(memoized_digest(snapshot), None, "{label}");
+            assert_eq!(
+                snapshot.artifact_digest(),
+                exact_digest(snapshot.bytes()),
+                "{label}"
+            );
+        }
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.snapshot().bytes(), anchor.bytes());
+        assert_eq!(
+            commit.snapshot().artifact_digest(),
+            exact_digest(anchor.bytes())
+        );
+    }
+
+    #[test]
+    fn snapshot_and_patch_equality_ignore_digest_memo_state() {
+        let bytes = authored_fixture();
+        let hashed = Snapshot::from_bytes(bytes.clone()).unwrap();
+        let fresh = Snapshot::from_bytes(bytes).unwrap();
+        let _digest = hashed.artifact_digest();
+        assert_eq!(memoized_digest(&fresh), None);
+        assert_eq!(hashed, fresh);
+        assert_eq!(format!("{hashed:?}"), format!("{fresh:?}"));
+
+        let mut left = hashed.edit().unwrap();
+        left.move_slide(Position::new(0), Position::new(1)).unwrap();
+        let left = left.commit().unwrap();
+        let mut right = fresh.edit().unwrap();
+        right
+            .move_slide(Position::new(0), Position::new(1))
+            .unwrap();
+        let right = right.commit().unwrap();
+        let _serialized = left.patch().to_durable(patch_limits()).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left.patch().inverse().inverse(), *right.patch());
+    }
+
+    #[test]
+    fn transfer_target_check_reuses_the_memoized_receiver_digest() {
+        let donor = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let mut remove = donor.edit().unwrap();
+        remove.remove_slide(Position::new(1)).unwrap();
+        let receiver = remove.commit().unwrap().snapshot().clone();
+        assert_eq!(memoized_digest(&receiver), None);
+        let plan = receiver
+            .plan_transfer_from(&donor, Position::new(0))
+            .unwrap();
+        assert_eq!(plan.target_artifact, exact_digest(receiver.bytes()));
+        assert_eq!(
+            memoized_digest(&receiver),
+            Some(plan.target_artifact.as_str())
+        );
+        let mut edit = receiver.edit().unwrap();
+        assert!(Arc::ptr_eq(&edit.source.digest.0, &receiver.digest.0));
+        edit.insert_transfer(Position::new(1), &plan).unwrap();
+        assert_eq!(edit.commit().unwrap().snapshot().slide_count(), 2);
+
+        // A plan for another exact target is still refused before staging.
+        let mut stale = donor.edit().unwrap();
+        assert!(matches!(
+            stale.insert_transfer(Position::new(0), &plan),
+            Err(Error::Refused(Refusal::TransferTargetMismatch))
+        ));
+        assert_eq!(stale.slide_count(), donor.slide_count());
+    }
+
     #[cfg(feature = "performance-diagnostics")]
     fn started_phases(events: &[DiagnosticEvent]) -> Vec<DiagnosticPhase> {
         events
@@ -7995,8 +8667,6 @@ mod tests {
                 DiagnosticPhase::UnrelatedStreamValidation,
                 DiagnosticPhase::PublicReopen,
                 DiagnosticPhase::AfterPayloadCapture,
-                DiagnosticPhase::ArtifactHashBefore,
-                DiagnosticPhase::ArtifactHashAfter,
             ]
         );
         assert!(events.iter().all(|event| {
@@ -8064,8 +8734,6 @@ mod tests {
             [
                 DiagnosticPhase::DocumentCommit,
                 DiagnosticPhase::StructuralNoOp,
-                DiagnosticPhase::ArtifactHashBefore,
-                DiagnosticPhase::ArtifactHashAfter,
             ]
         );
         assert_ne!(profiled.snapshot().bytes(), source.bytes());
@@ -8073,7 +8741,7 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     #[test]
-    fn profiled_structural_noop_keeps_source_allocation_and_hash_behavior() {
+    fn profiled_structural_noop_keeps_source_allocation_without_hashing() {
         let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
         let ordinary = source.edit().unwrap().commit().unwrap();
         let mut events = Vec::new();
@@ -8089,8 +8757,6 @@ mod tests {
             [
                 DiagnosticPhase::DocumentCommit,
                 DiagnosticPhase::StructuralNoOp,
-                DiagnosticPhase::ArtifactHashBefore,
-                DiagnosticPhase::ArtifactHashAfter,
             ]
         );
         assert_eq!(profiled, ordinary);
@@ -8111,6 +8777,57 @@ mod tests {
                 .apply(profiled.snapshot())
                 .unwrap(),
             source
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_mixed_commit_reports_only_the_intermediate_artifact_hash() {
+        let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
+        let hidden = source.slide_hidden(Position::new(0)).unwrap();
+        let stage = || {
+            let mut edit = source.edit().unwrap();
+            edit.set_slide_hidden(Position::new(0), !hidden).unwrap();
+            edit.remove_slide(Position::new(1)).unwrap();
+            edit
+        };
+        let ordinary = stage().commit().unwrap();
+        let mut events = Vec::new();
+        let profiled = stage().commit_profiled(|event| events.push(event)).unwrap();
+
+        assert_balanced_events(&events);
+        assert_eq!(
+            started_phases(&events),
+            [
+                DiagnosticPhase::DocumentCommit,
+                DiagnosticPhase::BeforePayloadCapture,
+                DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::LiveDocumentRead,
+                DiagnosticPhase::EmbeddedFinish,
+                DiagnosticPhase::UnrelatedStreamValidation,
+                DiagnosticPhase::PublicReopen,
+                DiagnosticPhase::AfterPayloadCapture,
+                DiagnosticPhase::IntermediateArtifactHash,
+            ]
+        );
+        assert_eq!(profiled, ordinary);
+        assert!(matches!(
+            profiled.patch().structural_before,
+            StructuralArtifact::Intermediate(_)
+        ));
+        assert_eq!(
+            profiled
+                .patch()
+                .to_durable(transfer_patch_limits())
+                .unwrap()
+                .to_deterministic_json()
+                .unwrap(),
+            ordinary
+                .patch()
+                .to_durable(transfer_patch_limits())
+                .unwrap()
+                .to_deterministic_json()
+                .unwrap()
         );
     }
 
