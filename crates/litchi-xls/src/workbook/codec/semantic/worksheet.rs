@@ -886,30 +886,38 @@ impl<R: Read + Seek> Workbook<R> {
             });
         }
 
-        for (position, link) in &ptg_exp_cells {
-            let Some(anchor) = link.anchor else {
-                continue;
-            };
-            let resolved_array = !link.shared
-                && array_formula_by_anchor.get(&anchor).is_some_and(|owner| {
-                    owner.range().contains(FormulaCell::new(
-                        position.0,
-                        u8::try_from(position.1).unwrap_or(u8::MAX),
-                    ))
-                });
-            let resolved_shared = link.shared
-                && shared_formulas
-                    .get(&anchor)
-                    .is_some_and(|owner| owner.contains(position.0, position.1));
-            if !resolved_array && !resolved_shared {
-                return Err(Error::InvalidRecord {
-                    record_type: 0x0006,
-                    message: format!(
-                        "Formula at ({}, {}) contains an orphan PtgExp",
-                        position.0, position.1
-                    ),
-                });
-            }
+        // Several orphans are refused by naming the lowest position, so the
+        // refusal is the same on every open of the same bytes; the map's
+        // hash iteration order differs between two maps and would not be.
+        let orphan = ptg_exp_cells
+            .iter()
+            .filter(|(position, link)| {
+                let Some(anchor) = link.anchor else {
+                    return false;
+                };
+                let resolved_array = !link.shared
+                    && array_formula_by_anchor.get(&anchor).is_some_and(|owner| {
+                        owner.range().contains(FormulaCell::new(
+                            position.0,
+                            u8::try_from(position.1).unwrap_or(u8::MAX),
+                        ))
+                    });
+                let resolved_shared = link.shared
+                    && shared_formulas
+                        .get(&anchor)
+                        .is_some_and(|owner| owner.contains(position.0, position.1));
+                !resolved_array && !resolved_shared
+            })
+            .map(|(position, _)| *position)
+            .min();
+        if let Some(position) = orphan {
+            return Err(Error::InvalidRecord {
+                record_type: 0x0006,
+                message: format!(
+                    "Formula at ({}, {}) contains an orphan PtgExp",
+                    position.0, position.1
+                ),
+            });
         }
 
         if !array_formulas.is_empty() && dimensions.is_none() {

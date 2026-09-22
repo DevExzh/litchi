@@ -293,10 +293,16 @@ impl CommentCollector {
                 "worksheet ended with an incomplete comment object sequence".to_string(),
             );
         }
-        for object_id in self.objects.keys() {
-            if !self.note_object_ids.contains(object_id) {
-                return invalid(format!("comment OBJ {object_id} has no matching NOTE"));
-            }
+        // Several unmatched objects are refused by naming the lowest id, so
+        // the refusal is the same on every open of the same bytes; the map's
+        // hash iteration order differs between two maps and would not be.
+        if let Some(object_id) = self
+            .objects
+            .keys()
+            .filter(|object_id| !self.note_object_ids.contains(object_id))
+            .min()
+        {
+            return invalid(format!("comment OBJ {object_id} has no matching NOTE"));
         }
         let mut comments = Vec::new();
         comments

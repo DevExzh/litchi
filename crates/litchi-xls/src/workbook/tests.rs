@@ -282,6 +282,51 @@ fn worksheet_resolves_formula_value_from_following_string_record() {
     ));
 }
 
+/// Several orphan `PtgExp` formulas are refused by naming the lowest
+/// position, on every parse: the choice must not follow hash iteration order.
+#[test]
+fn worksheet_refuses_several_orphan_ptg_exp_formulas_deterministically() {
+    fn orphan(row: u16, column: u16) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&row.to_le_bytes());
+        payload.extend_from_slice(&column.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&1.5_f64.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&5u16.to_le_bytes());
+        payload.push(0x01);
+        payload.extend_from_slice(&row.to_le_bytes());
+        payload.extend_from_slice(&column.to_le_bytes());
+        payload
+    }
+    let mut stream = Vec::new();
+    for (row, column) in [(40, 1), (7, 3), (7, 2), (12, 0), (90, 9)] {
+        push_record(&mut stream, 0x0006, &orphan(row, column));
+    }
+    push_record(&mut stream, 0x000A, &[]);
+    for _ in 0..32 {
+        let mut records = Records::new(&stream);
+        let error = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            stream.len() as u64,
+            0,
+            0,
+            &Encoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(Formatting::default()),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid record 0x0006: Formula at (7, 2) contains an orphan PtgExp"
+        );
+    }
+}
+
 #[test]
 fn worksheet_rejects_formula_missing_its_string_record() {
     let mut stream = Vec::new();
