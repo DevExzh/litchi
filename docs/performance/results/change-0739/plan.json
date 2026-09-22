@@ -1,0 +1,24 @@
+{
+  "purpose": "Fresh descriptive PPTX cross-slide-copy lifecycle and allocation baseline; no candidate, speedup or historical timing comparison",
+  "cpu": 12,
+  "cases": [
+    "pptx_cross_copy_plain_lifecycle",
+    "pptx_cross_copy_media_rich_lifecycle"
+  ],
+  "native": {
+    "repeats": 9,
+    "samples": 30,
+    "warmups": 3
+  },
+  "allocation": {
+    "repeats": 3,
+    "samples": 1,
+    "warmups": 0,
+    "interpretation": "all reported allocator values retained; region peak includes entry live bytes, excludes allocator-internal realloc overlap and RSS; no phase allocation attribution"
+  },
+  "schedule": "native then allocation; alternate case order by repeat; fresh process per case; serial execution",
+  "qualification": "one sample, zero warmups for both cases and both binaries before freeze; exact current structural projection, corpus identity, full in-process semantic/preservation checks",
+  "statistics": "Per-process midpoint median, arithmetic mean, nearest-rank p95/p99/max. Bootstrap 95% median of process medians, 10000 resamples seed7339. Phase shares are within-sample phase/lifecycle then process medians; do not add medians. Reopen is outside lifecycle. Unassigned residual is lifecycle minus plan/commit/publication, not a pure open timer.",
+  "flags": "All native metric across-process max/min spreads above5% and per-process last10/first10 lifecycle median changes above5% in either direction are diagnostic flags, not candidate retention decisions. No exclusions or retries based on timing.",
+  "constraints": "Existing production and Rust harness unchanged. Separate native and allocation executables. Complete argv, executable path, source hashes, outputs, and logs retained. No cross-build timing equivalence inferred. Current source baseline cannot be compared directly with0738 or0656. No internal graph/reopen causal fraction inferred from outer plan clock. No physical cold-cache, producer, remote, concurrency or full-process memory claims."
+}

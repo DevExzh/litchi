@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0739 — current owned PPTX cross-copy planning baseline
+
+[0739](0739-pptx-cross-copy-current-baseline.md) measures 540 native samples
+across 18 fresh processes plus six separate allocation processes. Media-rich
+planning is 71.06% of the observed 403.95 ms lifecycle; application is 22.00%.
+Plain lifecycle p50 is 8.33 ms. All 14 process-spread flags remain visible,
+including substantial publication variability. Next profile inside planning;
+outer clocks do not identify removable work. Production and harness are
+unchanged, and no historical speedup or CRUD coverage promotion is claimed.
+[Evidence](results/change-0739/README.md). The non-iWork goal stays active.
+
 ## 0720 — DOCX structural scan qualification
 
 [0720](0720-docx-structural-scan-qualification.md) adds an untimed diagnostic

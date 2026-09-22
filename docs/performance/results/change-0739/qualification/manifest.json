@@ -1,0 +1,126 @@
+[
+  {
+    "lane": "native",
+    "repeat": 0,
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0739/qualification/000.json"
+    ],
+    "started": 1790090250.7937062,
+    "ended": 1790090251.179799,
+    "monotonic_start": 981907939788408,
+    "monotonic_end": 981908325873286,
+    "exit": 0,
+    "files": {
+      "qualification/000.json": "b1b8bdf0f57b415e9f23ea5d101955accaee32c518c686bffa9b2933e2d199f4",
+      "qualification/000.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "qualification/000.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "lane": "native",
+    "repeat": 0,
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0739/qualification/001.json"
+    ],
+    "started": 1790090251.2292733,
+    "ended": 1790090254.4935803,
+    "monotonic_start": 981908375348450,
+    "monotonic_end": 981911639655074,
+    "exit": 0,
+    "files": {
+      "qualification/001.json": "b15b2ecef52a6a8782338e94e261058ba5e660648c9468e94d35321cd10e398a",
+      "qualification/001.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "qualification/001.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "lane": "allocation",
+    "repeat": 0,
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline-alloc",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0739/qualification/002.json"
+    ],
+    "started": 1790090254.5439754,
+    "ended": 1790090254.9306803,
+    "monotonic_start": 981911690050109,
+    "monotonic_end": 981912076753700,
+    "exit": 0,
+    "files": {
+      "qualification/002.json": "9db8e49806a2bb55b1581091ba63059d134920e4d53c0b4aed73019ac59ecfd7",
+      "qualification/002.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "qualification/002.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "lane": "allocation",
+    "repeat": 0,
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0739/release/litchi-perf-baseline-alloc",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0739/qualification/003.json"
+    ],
+    "started": 1790090254.9798005,
+    "ended": 1790090258.225861,
+    "monotonic_start": 981912125874999,
+    "monotonic_end": 981915371935888,
+    "exit": 0,
+    "files": {
+      "qualification/003.json": "c2fab8d51f6c0a45622ce0dc512ed5e5de48ce5c870ba648a56d816e3ca010ef",
+      "qualification/003.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "qualification/003.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

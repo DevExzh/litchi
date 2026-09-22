@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0739 — current owned PPTX cross-copy planning baseline
+
+[0739](0739-pptx-cross-copy-current-baseline.md) measures 540 native samples
+across 18 fresh processes plus six separate allocation processes. Media-rich
+planning is 71.06% of the observed 403.95 ms lifecycle; application is 22.00%.
+Plain lifecycle p50 is 8.33 ms. All 14 process-spread flags remain visible,
+including substantial publication variability. Next profile inside planning;
+outer clocks do not identify removable work. Production and harness are
+unchanged, and no historical speedup or CRUD coverage promotion is claimed.
+[Evidence](results/change-0739/README.md). The non-iWork goal stays active.
+
 ## 0738 — startup arguments change unchanged-owner timings
 
 [0738](0738-ppt-sample-layout-and-startup-controls.md) records two separately

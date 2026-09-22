@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "controls": [
+    {
+      "name": "derived process median",
+      "rejected": true
+    },
+    {
+      "name": "group bootstrap interval",
+      "rejected": true
+    },
+    {
+      "name": "omitted process",
+      "rejected": true
+    },
+    {
+      "name": "changed command",
+      "rejected": true
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "controls": [
+    {
+      "name": "output digest",
+      "rejected": true
+    },
+    {
+      "name": "semantic gate",
+      "rejected": true
+    },
+    {
+      "name": "missing gate",
+      "rejected": true
+    },
+    {
+      "name": "corpus digest",
+      "rejected": true
+    },
+    {
+      "name": "sample order",
+      "rejected": true
+    },
+    {
+      "name": "phase nesting",
+      "rejected": true
+    },
+    {
+      "name": "missing sample",
+      "rejected": true
+    },
+    {
+      "name": "wrong executable",
+      "rejected": true
+    },
+    {
+      "name": "wrong affinity",
+      "rejected": true
+    },
+    {
+      "name": "wrong warmups",
+      "rejected": true
+    },
+    {
+      "name": "missing allocation",
+      "rejected": true
+    },
+    {
+      "name": "negative allocation",
+      "rejected": true
+    }
+  ]
+}

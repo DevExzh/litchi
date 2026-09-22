@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "post_cleanup_replay": {
+    "analysis.json": "0f78a6e966f7fc4e007f64f28242edf3ff84c763c10534e469f048c743b9ba7c",
+    "audit.json": "b58315d675df2f834be067dccf31e1a252774ab3c618784feb03371b86fad22a",
+    "negative.json": "55a27bdb3f2dea953a834ea6e9b4b425b91b64d5e7c175ca304d889d77f7db9e",
+    "audit-negative.json": "8bb6d8878a7e009530f1fb79fb2f0cf06665be73510231628854514a5ae5cfd5",
+    "cleanup.json": "401166d0ec0b976ef11742758be17fb0dd422c8d127d0be763af1c0feb0d003e",
+    "gates.json": "0396806aaf521346a19c388b3ff10abd4ef19acf408a2d972ecc0d2f88465508"
+  },
+  "source_files": 7281,
+  "workspace_inputs": 4,
+  "constraints": 34,
+  "native_processes": 18,
+  "native_samples": 540,
+  "allocation_processes": 6,
+  "qualification_processes": 4,
+  "scratch_absent": true
+}

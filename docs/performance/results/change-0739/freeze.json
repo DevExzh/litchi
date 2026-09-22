@@ -1,0 +1,32 @@
+{
+  "utc": "2026-09-22T15:18:49.708595+00:00",
+  "files": {
+    "hypothesis.md": "f329feaa1ea5657bb7b1661e991d610af5eae156a5ae7dc9c8c28ffde9dfcfad",
+    "plan.json": "9c7481c55fcae3ad4480cb8edd295e1a0ae9c8d92a9962d6681a5cc4ca8357fe",
+    "source.json": "099bce30261e964fcbcfdc5ee257955d5b6ca13526c4215a7b47e2a51b394b50",
+    "workspace-inputs.json": "787a92bade0c164dc86b91af0125c7590b6b84cf591df8255f805cb622ddf0f3",
+    "constraints.json": "13fbdce87065a406b83b58f85ca2f32668a49f4b8306f5012afd2a3092a20863",
+    "environment.json": "d4b766d404f835852346fdfd779cbfd84518475d4478fcddaf78dd2fd4eeeffe",
+    "build.py": "42234e966f4660f4afec4e43fd08d703eaeeeac65aa1ca5358a3bc5e355da01a",
+    "run.py": "c3bd24f8addebae5b537a3c9f528151b46f99c643d82720dd3cf1e8032d78db7",
+    "analyze.py": "8e1e7032b1d6986acbfd0853c5ac4d39ffddfc5dbac92bf5651b2d6738337a9c",
+    "negative.py": "78177f920ef3b8a6f29f663917e6c393c1ae6e240bdc7ecbf7a897227bc05390",
+    "negative.json": "55a27bdb3f2dea953a834ea6e9b4b425b91b64d5e7c175ca304d889d77f7db9e",
+    "build.json": "b5a60f01ef081be3a396ed1c272569dc1b85a038bc5457a47ada56a9611b3545",
+    "oracle.json": "f83e4021d217df2dea45432559144fef2bdec921dffc180db37a7d557c511959",
+    "source-review.md": "ae5fc593bb0d3ed37ed3cb3c952e76f16d20724375029fbdcd27cbd9755f97cc",
+    "qualification/000.json": "b1b8bdf0f57b415e9f23ea5d101955accaee32c518c686bffa9b2933e2d199f4",
+    "qualification/000.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/000.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/001.json": "b15b2ecef52a6a8782338e94e261058ba5e660648c9468e94d35321cd10e398a",
+    "qualification/001.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/001.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/002.json": "9db8e49806a2bb55b1581091ba63059d134920e4d53c0b4aed73019ac59ecfd7",
+    "qualification/002.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/002.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/003.json": "c2fab8d51f6c0a45622ce0dc512ed5e5de48ce5c870ba648a56d816e3ca010ef",
+    "qualification/003.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/003.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qualification/manifest.json": "49fb1e10d2362ed4e5981dc884e7ff514710b1eca43b13b2b7ed2db0e6ad1be9"
+  }
+}

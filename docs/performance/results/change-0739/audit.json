@@ -1,0 +1,18 @@
+{
+  "allocation_processes": 6,
+  "analysis_match": true,
+  "analysis_sha256": "0f78a6e966f7fc4e007f64f28242edf3ff84c763c10534e469f048c743b9ba7c",
+  "bootstrap_ci_indices": [
+    249,
+    9749
+  ],
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 7339,
+  "capture_sha256": "fbfb7fc2f875a6c4820aac6ffb45a0097a7fe262dc018cceaabd515472b9b1cb",
+  "freeze_sha256": "0ae362c073dd4816c3fb104896cdef84421f1af1913a3d7ece9783faf12602fe",
+  "native_processes": 18,
+  "native_samples": 540,
+  "phase_share_definition": "median of paired within-sample phase/lifecycle ratios; unassigned is lifecycle minus plan, commit, and publication",
+  "schema_version": 1,
+  "status": "passed"
+}
