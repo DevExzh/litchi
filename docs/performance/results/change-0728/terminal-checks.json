@@ -1,0 +1,103 @@
+{
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0728/source-guard.py"
+      ],
+      "exit_code": 0,
+      "log": "terminal-0.log",
+      "sha256": "b661e58bd6dff5c53ae073d3dc72df55682e0b072d9c1daf9020fcdf31a1eac6"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0728/analyze.py"
+      ],
+      "exit_code": 0,
+      "log": "terminal-1.log",
+      "sha256": "2960e91e27f6bae99cfbff8733fc8955b68ab9297792fe6bb4559ea895b88b76"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0728/report-tables.py"
+      ],
+      "exit_code": 0,
+      "log": "terminal-2.log",
+      "sha256": "5e9f9167b9c5caf2c616ea6d2e7aacf5159a38a47168fd5bc0c9b88963081bdb"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0728/audit.py"
+      ],
+      "exit_code": 0,
+      "log": "terminal-3.log",
+      "sha256": "7caf1e4e36812706878a8bd35e5528e7671f4396a254310b870f64e788a47ef1"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0728/negative-checks.py"
+      ],
+      "exit_code": 0,
+      "log": "terminal-4.log",
+      "sha256": "8fd43ca3e689419b2875af464897ff7649d599c0df41661acf628d9126a7274f"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--registry",
+        "docs/performance/report-claim-classification-v1.json",
+        "--repo-root",
+        "."
+      ],
+      "exit_code": 0,
+      "log": "terminal-5.log",
+      "sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--mode",
+        "structural"
+      ],
+      "exit_code": 0,
+      "log": "terminal-6.log",
+      "sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/non_iwork_gate.py",
+        "verify"
+      ],
+      "exit_code": 0,
+      "log": "terminal-7.log",
+      "sha256": "ee00f27a8544e2d4e689d057a625b075f66fdeee6f70364a1e3dbb6f270d1fe2"
+    }
+  ],
+  "exact_replay_sha256": {
+    "analysis.json": "ba26d61d3089c0d8794ce0fe386e84058a089145d48f44a7ca5c583951f27b68",
+    "analysis.md": "6b05d0c27d8fc17ff95fe45948d6f0f734b89351d0cc09a1b440ffe48c2f2f5f",
+    "report-summary.json": "822cf047315188247d3108ef821c2e1d29189f193052c8c86d98102a599370b1",
+    "audit.json": "b507a3486ede938da005a209967d789bce541bfb47b343c3fbfad3a58ddffd5f",
+    "negative-checks.json": "ab8b7ac71d78ed518b72ebbbe0ca43f768c0adf18499b5fab6933665dc7bfd19"
+  },
+  "cleanup_verified": true
+}

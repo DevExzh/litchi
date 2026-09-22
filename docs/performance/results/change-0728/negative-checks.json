@@ -1,0 +1,81 @@
+{
+  "analyzer_sha256": "400fc7b7fbb40d46d91e7d82c73b60e81fdeacd57bdcaba2a346ff644b3c5ad8",
+  "script_sha256": "a04ff4388c1acd2e39001841db67b62f656482739d31aa8ee30496c6cb64707a",
+  "checks": [
+    {
+      "name": "complete capture accepted",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "name": "raw hash mismatch rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "false semantic oracle despite aggregate true rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "physical-only length proof rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing corruption control rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "semantic witness corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "format length witness removed rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "metadata inventory claim removed rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "source identity corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "policy scope relabel rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "stream corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "duplicate process rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "command count corruption rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing end binding rejected",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "name": "missing process rejected",
+      "accepted": false,
+      "expected": false
+    }
+  ]
+}

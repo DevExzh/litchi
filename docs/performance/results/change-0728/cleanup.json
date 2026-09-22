@@ -1,0 +1,19 @@
+{
+  "roots": [
+    "/home/zhuhe/code/litchi-target-0728",
+    "/home/zhuhe/code/litchi-0728-bin"
+  ],
+  "identities": [
+    {
+      "path": "/home/zhuhe/code/litchi-0728-bin/ole_format_save_probe",
+      "bytes": 76159072,
+      "sha256": "6b93df68287f43b4fb8dc1f273d750cb34a93ad5a8ce7ee9007a6ef4162493ea"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-0728-bin/ole_format_save_probe_alloc",
+      "bytes": 76162760,
+      "sha256": "37083368f5de22cc98de7c5125b8acde295449e2b3aa3d7bac184f6685f4e078"
+    }
+  ],
+  "removed": true
+}

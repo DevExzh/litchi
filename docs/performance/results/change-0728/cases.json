@@ -1,0 +1,26 @@
+[
+  {
+    "case": "docfloat",
+    "format": "doc",
+    "path": "test-data/ole/doc/FloatingPictures.doc",
+    "edit": "replace paragraph0 with different-length text",
+    "bytes": 335360,
+    "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+  },
+  {
+    "case": "docnohf",
+    "format": "doc",
+    "path": "test-data/ole/doc/NoHeadFoot.doc",
+    "edit": "replace paragraph0 with different-length text",
+    "bytes": 26112,
+    "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+  },
+  {
+    "case": "ppt45543",
+    "format": "ppt",
+    "path": "test-data/poi/test-data/slideshow/45543.ppt",
+    "edit": "remove slide1",
+    "bytes": 385024,
+    "sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+  }
+]

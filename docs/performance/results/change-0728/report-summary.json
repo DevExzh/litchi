@@ -1,0 +1,338 @@
+[
+  {
+    "case": "docfloat",
+    "operation": "format",
+    "policy": "reuse",
+    "whole_p50_us": [
+      984.82,
+      1089.01
+    ],
+    "whole_mean_us": [
+      991.1379666666667,
+      1078.8491666666666
+    ],
+    "stage_median_percent": null,
+    "finish_median_percent": null,
+    "allocations": {
+      "whole": {
+        "allocated_bytes": 15512580,
+        "deallocated_bytes": 15170052,
+        "allocation_calls": 15756,
+        "peak_live_bytes": 3128190,
+        "retained_bytes": 342528
+      }
+    }
+  },
+  {
+    "case": "docfloat",
+    "operation": "container",
+    "policy": "reuse",
+    "whole_p50_us": [
+      243.046,
+      247.636
+    ],
+    "whole_mean_us": [
+      243.66413333333333,
+      247.44889999999998
+    ],
+    "stage_median_percent": [
+      53.825300938212536,
+      54.100314785672424
+    ],
+    "finish_median_percent": [
+      30.133198192858202,
+      30.668626934307557
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 1364644,
+        "deallocated_bytes": 697990,
+        "allocation_calls": 309,
+        "peak_live_bytes": 1191678,
+        "retained_bytes": 666654
+      },
+      "stage": {
+        "allocated_bytes": 2115416,
+        "deallocated_bytes": 2115416,
+        "allocation_calls": 974,
+        "peak_live_bytes": 1114042,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 1397553,
+        "deallocated_bytes": 1476431,
+        "allocation_calls": 615,
+        "peak_live_bytes": 625378,
+        "retained_bytes": -78878
+      }
+    }
+  },
+  {
+    "case": "docfloat",
+    "operation": "container",
+    "policy": "rewrite",
+    "whole_p50_us": [
+      166.801,
+      177.666
+    ],
+    "whole_mean_us": [
+      169.68386666666666,
+      178.16573333333335
+    ],
+    "stage_median_percent": [
+      53.802595799665255,
+      54.222568002150524
+    ],
+    "finish_median_percent": [
+      23.018375505564947,
+      24.93540194943772
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 1364644,
+        "deallocated_bytes": 697990,
+        "allocation_calls": 309,
+        "peak_live_bytes": 1191678,
+        "retained_bytes": 666654
+      },
+      "stage": {
+        "allocated_bytes": 1842939,
+        "deallocated_bytes": 1842939,
+        "allocation_calls": 823,
+        "peak_live_bytes": 1199674,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 1124304,
+        "deallocated_bytes": 1117550,
+        "allocation_calls": 465,
+        "peak_live_bytes": 710379,
+        "retained_bytes": 6754
+      }
+    }
+  },
+  {
+    "case": "docnohf",
+    "operation": "format",
+    "policy": "reuse",
+    "whole_p50_us": [
+      108.0055,
+      110.826
+    ],
+    "whole_mean_us": [
+      110.4305,
+      112.88719999999999
+    ],
+    "stage_median_percent": null,
+    "finish_median_percent": null,
+    "allocations": {
+      "whole": {
+        "allocated_bytes": 1061429,
+        "deallocated_bytes": 1033781,
+        "allocation_calls": 1907,
+        "peak_live_bytes": 209515,
+        "retained_bytes": 27648
+      }
+    }
+  },
+  {
+    "case": "docnohf",
+    "operation": "container",
+    "policy": "reuse",
+    "whole_p50_us": [
+      43.875,
+      44.805
+    ],
+    "whole_mean_us": [
+      44.59556666666666,
+      45.30123333333333
+    ],
+    "stage_median_percent": [
+      56.51925928595901,
+      57.423173242045735
+    ],
+    "finish_median_percent": [
+      28.950896998013675,
+      29.29199027493047
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 111084,
+        "deallocated_bytes": 59348,
+        "allocation_calls": 122,
+        "peak_live_bytes": 85468,
+        "retained_bytes": 51736
+      },
+      "stage": {
+        "allocated_bytes": 187546,
+        "deallocated_bytes": 187546,
+        "allocation_calls": 387,
+        "peak_live_bytes": 72919,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 125206,
+        "deallocated_bytes": 140078,
+        "allocation_calls": 249,
+        "peak_live_bytes": 46234,
+        "retained_bytes": -14872
+      }
+    }
+  },
+  {
+    "case": "docnohf",
+    "operation": "container",
+    "policy": "rewrite",
+    "whole_p50_us": [
+      32.98,
+      33.6755
+    ],
+    "whole_mean_us": [
+      33.16846666666667,
+      34.3495
+    ],
+    "stage_median_percent": [
+      56.06224483958274,
+      56.841415575750986
+    ],
+    "finish_median_percent": [
+      24.49718758467393,
+      24.970235523101515
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 111084,
+        "deallocated_bytes": 59348,
+        "allocation_calls": 122,
+        "peak_live_bytes": 85468,
+        "retained_bytes": 51736
+      },
+      "stage": {
+        "allocated_bytes": 160484,
+        "deallocated_bytes": 160484,
+        "allocation_calls": 296,
+        "peak_live_bytes": 86487,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 98144,
+        "deallocated_bytes": 99448,
+        "allocation_calls": 158,
+        "peak_live_bytes": 60926,
+        "retained_bytes": -1304
+      }
+    }
+  },
+  {
+    "case": "ppt45543",
+    "operation": "format",
+    "policy": "reuse",
+    "whole_p50_us": [
+      1128.81,
+      1140.6555
+    ],
+    "whole_mean_us": [
+      1115.5478333333333,
+      1132.0293666666666
+    ],
+    "stage_median_percent": null,
+    "finish_median_percent": null,
+    "allocations": {
+      "whole": {
+        "allocated_bytes": 11776674,
+        "deallocated_bytes": 11386530,
+        "allocation_calls": 5663,
+        "peak_live_bytes": 2686521,
+        "retained_bytes": 390144
+      }
+    }
+  },
+  {
+    "case": "ppt45543",
+    "operation": "container",
+    "policy": "reuse",
+    "whole_p50_us": [
+      271.526,
+      278.341
+    ],
+    "whole_mean_us": [
+      278.43170000000003,
+      286.67903333333334
+    ],
+    "stage_median_percent": [
+      43.57982932960722,
+      43.77016924114386
+    ],
+    "finish_median_percent": [
+      17.96121656799773,
+      18.78072890198953
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 1558857,
+        "deallocated_bytes": 791927,
+        "allocation_calls": 112,
+        "peak_live_bytes": 1465046,
+        "retained_bytes": 766930
+      },
+      "stage": {
+        "allocated_bytes": 2471952,
+        "deallocated_bytes": 2471952,
+        "allocation_calls": 380,
+        "peak_live_bytes": 1408357,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 1671614,
+        "deallocated_bytes": 1737104,
+        "allocation_calls": 255,
+        "peak_live_bytes": 722312,
+        "retained_bytes": -65490
+      }
+    }
+  },
+  {
+    "case": "ppt45543",
+    "operation": "container",
+    "policy": "rewrite",
+    "whole_p50_us": [
+      210.361,
+      211.626
+    ],
+    "whole_mean_us": [
+      207.06023333333334,
+      209.1503
+    ],
+    "stage_median_percent": [
+      41.65922845353607,
+      41.83187385647274
+    ],
+    "finish_median_percent": [
+      9.60827779164051,
+      9.739251981814895
+    ],
+    "allocations": {
+      "open": {
+        "allocated_bytes": 1558857,
+        "deallocated_bytes": 791927,
+        "allocation_calls": 112,
+        "peak_live_bytes": 1465046,
+        "retained_bytes": 766930
+      },
+      "stage": {
+        "allocated_bytes": 2119800,
+        "deallocated_bytes": 2119800,
+        "allocation_calls": 275,
+        "peak_live_bytes": 1470515,
+        "retained_bytes": 0
+      },
+      "finish": {
+        "allocated_bytes": 1319462,
+        "deallocated_bytes": 1322794,
+        "allocation_calls": 150,
+        "peak_live_bytes": 780333,
+        "retained_bytes": -3332
+      }
+    }
+  }
+]

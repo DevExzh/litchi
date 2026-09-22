@@ -1,0 +1,31 @@
+   Compiling ole-format-save-probe-0728 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0728/probe)
+error[E0618]: expected function, found `bool`
+    --> src/lib.rs:2141:9
+     |
+1402 | fn changed_stream_paths_allowed(case: Case, source: &Inventory, expected: &Inventory) -> bool {
+     | --------------------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+2139 |     let changed_stream_paths_allowed = changed_stream_paths_allowed(args.case, source, expected);
+     |         ---------------------------- `changed_stream_paths_allowed` has type `bool`
+2140 |     let actual_changed_stream_paths_allowed =
+2141 |         changed_stream_paths_allowed(args.case, source, output);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------------------
+     |         |
+     |         call expression requires function
+
+error[E0599]: no method named `clone` found for struct `Args` in the current scope
+    --> src/lib.rs:2764:32
+     |
+ 115 | struct Args {
+     | ----------- method `clone` not found for this struct
+...
+2764 |                 ..control_args.clone()
+     |                                ^^^^^ method not found in `Args`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `clone`, perhaps you need to implement it:
+             candidate #1: `Clone`
+
+Some errors have detailed explanations: E0599, E0618.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `ole-format-save-probe-0728` (lib) due to 2 previous errors

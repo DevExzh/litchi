@@ -1,0 +1,8 @@
+Diff in /home/zhuhe/code/litchi/docs/performance/results/change-0728/probe/src/lib.rs:1173:
+         .collect()
+ }
+ 
+[31m-
+[m fn doc_witness(value: DocSemanticWitness) -> SemanticWitness {
+     SemanticWitness::Doc(Box::new(value))
+ }

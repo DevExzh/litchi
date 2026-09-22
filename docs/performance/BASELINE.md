@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0728 — current DOC/PPT length-changing saves
+
+[0728](0728-doc-ppt-current-save-baseline.md) refreshes the baseline under the
+implemented Reuse policy: 54 native processes/1,620 lifecycles and 27 separate
+allocation processes across three fixtures and public/common-editor routes.
+All source, output, semantic and policy checks pass, as do independent replay
+and 15 evidence corruption controls. Process ranges and phase fractions remain
+scoped to their actual owners; no production change or speedup is claimed.
+[Sealed evidence](results/change-0728/README.md).
+
 ## 0727 — prospective XLS warm-tail replication
 
 [0727](0727-xls-warm-tail-replication.md) rebuilds the exact 0726 candidate and
