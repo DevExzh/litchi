@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "files": {
+    "freeze.json": "43abb88e5ec1d986482c8128e482845b6bd93f14cb65a05bd65dd1383bb57980",
+    "output.log": "c78b1779fbb23725dcd45fa6334e38d00ed5704ad40bbc44611ce58249acce42",
+    "audit.py": "6d0c74f004f93e19555d52c59730a3d87deb35d7905400e1569cfde1fa4eba44",
+    "preflight.py": "5297c14543ecc6026b6911936948beccf5008c2b468e9ef82d59f23fcc8a0a5b",
+    "analyze.py": "cb9cdae7046766dd623af060c82de65542e1452cd5fe43f021ebe26e4000ef9e"
+  }
+}

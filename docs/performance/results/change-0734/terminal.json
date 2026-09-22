@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "runs": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0734/analyze.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS 0734 custody, exact PPT oracles, 36 native processes, 12 allocation processes, paired bootstrap statistics\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0734/audit.py"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS independent 0734 custody, oracle, 48-process replay, paired bootstrap, and allocation audit\n",
+      "stderr": ""
+    }
+  ],
+  "cleanup_sha256": "cb3b6931176d32cd48a9f87cc034a737a83acd5135fb70d89c90323153eb802c",
+  "post_cleanup_negative_checks": {
+    "command": [
+      "python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0734/negative-checks.py"
+    ],
+    "exit_code": 0,
+    "status": "passed",
+    "controls": 19,
+    "sha256": "ce49e9fdd780e21fe87bfd4fc0848bfaa1124f821cc2f2ddf35d0d6a4b0ba83e"
+  }
+}

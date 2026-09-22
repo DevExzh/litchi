@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0734 — PPT writer payload copies removed
+
+[0734](0734-ppt-owned-stream-handoff.md) retains existing-vector handoff into
+CFB owned ingress, preserving layout adoption, duplicate-path behavior, limits,
+Reuse-plan validation, PPT rewrite validation and public publication checks.
+The exact five-payload allocation reduction is reproduced on both fixtures;
+primary paired p50 improves 5.55%, secondary timing remains inconclusive.
+One +9.56% primary tail flag is retained. Next inspect remaining whole-editor
+or payload copying with fresh attribution; do not remove required validation
+or artifact hashes, or infer native savings from old Callgrind fractions.
+The broader non-iWork goal remains active.
+
 ## 0733 — qualify owned PPT stream handoff next
 
 [0733](0733-ppt-finish-instruction-partition.md) identifies avoidable copying:

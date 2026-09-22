@@ -1,0 +1,16 @@
+[
+  {
+    "id": "primary",
+    "case": "ppt45543",
+    "path": "test-data/poi/test-data/slideshow/45543.ppt",
+    "bytes": 385024,
+    "sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+  },
+  {
+    "id": "secondary",
+    "case": "ppt-secondary",
+    "path": "test-data/poi/test-data/slideshow/41246-1.ppt",
+    "bytes": 275456,
+    "sha256": "10596758d092302d1efc22282c31addd3ec2f994fdc763b561cef80fe2a6e147"
+  }
+]

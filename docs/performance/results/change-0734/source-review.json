@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "status": "approved_for_measurement",
+  "blocking_findings": [],
+  "findings": [
+    {
+      "id": "ownership-order",
+      "severity": "pass",
+      "summary": "Source-layout adoption and the existing pre-transfer finish checks precede owned payload transfer; post-write validate_rewrite remains after emission, and stream insertion order and policy remain unchanged."
+    },
+    {
+      "id": "duplicate-path-fallback",
+      "severity": "pass",
+      "summary": "Exact selected-path occurrence counts retain the borrowed writer path for duplicate synthetic or malformed Editor states; ordinary unique paths move once."
+    },
+    {
+      "id": "typed-failure-surface",
+      "severity": "advisory",
+      "summary": "Removing the payload clone removes its artificial allocation failure point; path/table allocation failures can become the first low-level allocation error while typed output, writer, mapping, and reopen failures remain."
+    },
+    {
+      "id": "focused-test-scope",
+      "severity": "advisory",
+      "summary": "Focused tests omit injected writer-I/O failure and a same-leaf/different-complete-path fixture; both are non-blocking because production branches and broader gates retain the existing boundaries."
+    }
+  ],
+  "base_head": "769f9824ce92274643db9f5566c69ff37f094754",
+  "files": {
+    "baseline": {
+      "path": "docs/performance/results/change-0734/source-archive/before/crates/litchi-ppt/src/embedded/object/editor/transaction/finish.rs",
+      "sha256": "0de96a64f79de8c5aacda28fb2387b45966ca5736d1c1b1963b16e29826701e1"
+    },
+    "candidate": {
+      "path": "docs/performance/results/change-0734/candidate/crates/litchi-ppt/src/embedded/object/editor/transaction/finish.rs",
+      "sha256": "b7ded351a1ea0afb48204f90e675e7bba77f8fd14543e3d9049daa4125142931"
+    },
+    "live_formatted": {
+      "path": "crates/litchi-ppt/src/embedded/object/editor/transaction/finish.rs",
+      "sha256": "31132455baead9b66dbea9a7760cdaac202e45c87e81ce969b6d290a3d158834"
+    },
+    "implementation_notes": {
+      "path": "docs/performance/results/change-0734/candidate/implementation-notes.md",
+      "sha256": "77657aae4ab987f3f38b4e2f87865c17cec249da41644b2c7454e61dc0e3eaa5"
+    }
+  },
+  "source_equivalence": {
+    "live_matches_candidate_after_rustfmt": true,
+    "production_files_reviewed": 1,
+    "production_files_edited_by_reviewer": 0
+  },
+  "adr_hashes": {
+    "docs/adr/0001-priorities-and-api-layers.md": "813bf4faf62cedac56fbfa3bf9b7600121b42a3ed5d4cec0028f8c8f2ac2798e",
+    "docs/adr/0002-crate-topology.md": "73f4372ef6948f5a36c83fbf27a96f0b1f680225f331f201c470e04913417719",
+    "docs/adr/0003-snapshots-edits-and-patches.md": "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+    "docs/adr/0005-io-memory-and-performance.md": "bf18abe9b3cebf9602db31e7da6ddf3c23c0c8e35a4e302897d3b678c23bb397",
+    "docs/adr/0006-validation-security-and-compatibility.md": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+    "docs/adr/0008-migration-and-verification.md": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+    "docs/adr/0010-facade-archive-ownership.md": "4e1af2c4019842d187804f8356299aa80ba8a6abd8d35a4a021e1bce3c2a6590",
+    "docs/adr/0011-ooxml-physical-package-ownership.md": "3a1644536af0b66fed47c1a154e829c0e0008cccb89dec679a0328036d305e04",
+    "docs/adr/0024-current-topology.md": "bdeefc52ba2486ca307c378e1081baafac5565c327b622981782f1aed74c55ce"
+  },
+  "constraints_sha256": "13fbdce87065a406b83b58f85ca2f32668a49f4b8306f5012afd2a3092a20863"
+}

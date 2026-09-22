@@ -101,7 +101,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
     )?;
     editor.current_user[16..20].copy_from_slice(&new_edit_offset.to_le_bytes());
 
-    let bytes = write_package(&editor, &appended)?;
+    let bytes = write_package(&mut editor, appended)?;
     validate_rewrite(&editor, bytes)
 }
 
@@ -119,19 +119,60 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
     )
 }
 
-fn write_package(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
+fn write_package(editor: &mut Editor, appended: Vec<u8>) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
     writer.set_sector_layout_policy(editor.layout);
     writer.adopt_source_layout(&editor.original)?;
-    for (path, data) in &editor.streams {
-        let stream_data = if path == &editor.document_path {
-            appended
-        } else if path == &editor.current_user_path {
-            &editor.current_user
+
+    // `find_stream` selects the first matching leaf name.  A valid CFB
+    // directory cannot contain the same complete path twice, but a malformed
+    // or synthetic Editor can still carry duplicate complete paths.  Keep the
+    // old borrowed-copy behavior for those paths so the ownership handoff does
+    // not narrow the reachable error or replacement semantics.
+    let document_matches = editor
+        .streams
+        .iter()
+        .filter(|(path, _data)| path == &editor.document_path)
+        .count();
+    let current_user_matches = editor
+        .streams
+        .iter()
+        .filter(|(path, _data)| path == &editor.current_user_path)
+        .count();
+    let mut appended = Some(appended);
+    let current_user = std::mem::take(&mut editor.current_user);
+    let mut current_user = Some(current_user);
+    let streams = std::mem::take(&mut editor.streams);
+
+    for (path, data) in streams {
+        let path_refs = stream_refs(&path);
+        if path == editor.document_path {
+            if document_matches == 1 {
+                let payload = appended.take().ok_or_else(|| {
+                    Error::Corrupted("PPT Document stream payload was consumed twice".into())
+                })?;
+                writer.create_stream_owned(&path_refs, payload)?;
+            } else {
+                let payload = appended.as_deref().ok_or_else(|| {
+                    Error::Corrupted("PPT Document stream payload is missing".into())
+                })?;
+                writer.create_stream(&path_refs, payload)?;
+            }
+        } else if path == editor.current_user_path {
+            if current_user_matches == 1 {
+                let payload = current_user.take().ok_or_else(|| {
+                    Error::Corrupted("PPT Current User stream payload was consumed twice".into())
+                })?;
+                writer.create_stream_owned(&path_refs, payload)?;
+            } else {
+                let payload = current_user.as_deref().ok_or_else(|| {
+                    Error::Corrupted("PPT Current User stream payload is missing".into())
+                })?;
+                writer.create_stream(&path_refs, payload)?;
+            }
         } else {
-            data
-        };
-        writer.create_stream(&stream_refs(path), stream_data)?;
+            writer.create_stream_owned(&path_refs, data)?;
+        }
     }
     let mut output = BoundedCursor::new(editor.max_output_bytes);
     if let Err(error) = writer.write_to(&mut output) {
@@ -299,5 +340,260 @@ mod bounded_cursor_tests {
         assert!(cursor.write_all(b"!").is_err());
         assert!(cursor.seek(SeekFrom::Start(5)).is_err());
         assert_eq!(cursor.into_inner(), b"four");
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    reason = "these tests compare the complete old and candidate finish paths"
+)]
+mod candidate_finish_tests {
+    use super::super::super::{Editor, Result};
+    use super::{
+        BoundedCursor, append_checked, checked_projected_len, output_limit_error,
+        persist_directory_record_len, stream_refs, validate_rewrite,
+    };
+    use crate::package::Error;
+    use crate::writer::{PersistPtrBuilder, UserEditAtom};
+    use litchi_cfb::{OleFile, OleWriter, SectorLayoutPolicy};
+    use std::io::Cursor;
+    use std::sync::Arc;
+
+    fn fixture() -> Vec<u8> {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/poi/test-data/slideshow/45543.ppt"),
+        )
+        .expect("PPT fixture")
+    }
+
+    /// This is deliberately test-only: it is the pre-0734 writer ingress used
+    /// as a byte-parity oracle for the ownership handoff.
+    fn write_package_reference(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
+        let mut writer = OleWriter::new();
+        writer.set_sector_layout_policy(editor.layout);
+        writer.adopt_source_layout(&editor.original)?;
+        for (path, data) in &editor.streams {
+            let stream_data = if path == &editor.document_path {
+                appended
+            } else if path == &editor.current_user_path {
+                &editor.current_user
+            } else {
+                data
+            };
+            writer.create_stream(&stream_refs(path), stream_data)?;
+        }
+        let mut output = BoundedCursor::new(editor.max_output_bytes);
+        if let Err(error) = writer.write_to(&mut output) {
+            if output.limit_exceeded() {
+                return Err(output_limit_error(editor.max_output_bytes, "OLE package"));
+            }
+            return Err(error.into());
+        }
+        Ok(output.into_inner())
+    }
+
+    fn finish_reference(mut editor: Editor) -> Result<Vec<u8>> {
+        assert!(
+            editor.changed,
+            "the reference helper covers changed commits"
+        );
+
+        for id in &editor.removed_persist_ids {
+            editor.mappings.remove(id);
+        }
+
+        let mut projected_len = editor.document.len();
+        super::ensure_output_limit(
+            projected_len,
+            editor.max_output_bytes,
+            "incremental document stream",
+        )?;
+        for (id, record) in &editor.staged_storage {
+            editor.mappings.insert(
+                *id,
+                u32::try_from(projected_len)
+                    .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?,
+            );
+            projected_len =
+                checked_projected_len(projected_len, record.len(), editor.max_output_bytes)?;
+        }
+
+        let rewritten_document = if editor.rewrite_object_list {
+            let document = super::rewritten_object_list(&editor)?;
+            editor.mappings.insert(
+                editor.document_persist_id,
+                u32::try_from(projected_len)
+                    .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?,
+            );
+            projected_len =
+                checked_projected_len(projected_len, document.len(), editor.max_output_bytes)?;
+            Some(document)
+        } else {
+            None
+        };
+
+        let persist_dir_offset = u32::try_from(projected_len)
+            .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?;
+        projected_len = checked_projected_len(
+            projected_len,
+            persist_directory_record_len(&editor.mappings)?,
+            editor.max_output_bytes,
+        )?;
+        let new_edit_offset = u32::try_from(projected_len)
+            .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?;
+        projected_len = checked_projected_len(projected_len, 36, editor.max_output_bytes)?;
+
+        let mut appended = Vec::new();
+        appended
+            .try_reserve_exact(projected_len)
+            .map_err(|_err| Error::AllocationFailed("PowerPoint incremental document stream"))?;
+        append_checked(&mut appended, &editor.document, editor.max_output_bytes)?;
+        for record in editor.staged_storage.values() {
+            append_checked(&mut appended, record, editor.max_output_bytes)?;
+        }
+        if let Some(document) = &rewritten_document {
+            append_checked(&mut appended, document, editor.max_output_bytes)?;
+        }
+
+        let mut builder = PersistPtrBuilder::new();
+        for (id, offset) in &editor.mappings {
+            builder.set_offset(*id, *offset);
+        }
+        append_checked(
+            &mut appended,
+            &builder.generate_incremental_record(),
+            editor.max_output_bytes,
+        )?;
+
+        let max_id = editor
+            .mappings
+            .keys()
+            .next_back()
+            .copied()
+            .unwrap_or(editor.document_persist_id);
+        let mut edit =
+            UserEditAtom::new_minimal(persist_dir_offset, editor.document_persist_id, max_id, 0);
+        edit.offset_last_edit = editor.current_edit_offset;
+        append_checked(
+            &mut appended,
+            &edit.generate_record(),
+            editor.max_output_bytes,
+        )?;
+        editor.current_user[16..20].copy_from_slice(&new_edit_offset.to_le_bytes());
+
+        let bytes = write_package_reference(&editor, &appended)?;
+        validate_rewrite(&editor, bytes)
+    }
+
+    #[test]
+    fn owned_writer_matches_borrowed_writer_for_reuse_and_rewrite() {
+        let source = fixture();
+        for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
+            let mut candidate = Editor::open_records(source.clone()).unwrap();
+            candidate.set_sector_layout_policy(policy);
+            let reference = candidate.clone();
+            let appended = candidate.document.clone();
+            let expected = write_package_reference(&reference, &appended).unwrap();
+            let actual = super::write_package(&mut candidate, appended).unwrap();
+            assert_eq!(actual, expected, "policy {policy:?}");
+        }
+    }
+
+    #[test]
+    fn changed_record_finish_matches_borrowed_finish_and_reopens() {
+        let source = fixture();
+        let persist_id = Editor::open_records(source.clone())
+            .unwrap()
+            .document_persist_id;
+        for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
+            let mut candidate = Editor::open_records(source.clone()).unwrap();
+            let replacement = candidate.persisted_record(persist_id).unwrap();
+            candidate
+                .replace_persisted_record(persist_id, replacement.clone())
+                .unwrap();
+            candidate.set_sector_layout_policy(policy);
+
+            let mut reference = Editor::open_records(source.clone()).unwrap();
+            reference
+                .replace_persisted_record(persist_id, replacement.clone())
+                .unwrap();
+            reference.set_sector_layout_policy(policy);
+
+            let expected = finish_reference(reference).unwrap();
+            let actual = candidate.finish().unwrap();
+            assert_eq!(actual, expected, "policy {policy:?}");
+            let reopened = Editor::open_records(actual).unwrap();
+            assert_eq!(
+                reopened.persisted_record(persist_id).unwrap(),
+                replacement,
+                "policy {policy:?} replacement record"
+            );
+        }
+    }
+
+    #[test]
+    fn exact_noop_and_changed_finish_leave_the_source_immutable() {
+        let source = fixture();
+        let source_arc: Arc<[u8]> = Arc::from(source.clone());
+        let noop = Editor::open_records_arc_with_limit(source_arc.clone(), usize::MAX)
+            .unwrap()
+            .finish()
+            .unwrap();
+        assert_eq!(noop, source);
+        assert_eq!(source_arc.as_ref(), source.as_slice());
+
+        let mut changed =
+            Editor::open_records_arc_with_limit(source_arc.clone(), usize::MAX).unwrap();
+        let persist_id = changed.document_persist_id;
+        let record = changed.persisted_record(persist_id).unwrap();
+        changed
+            .replace_persisted_record(persist_id, record)
+            .unwrap();
+        changed.finish().unwrap();
+        assert_eq!(source_arc.as_ref(), source.as_slice());
+    }
+
+    #[test]
+    fn projected_output_limit_remains_typed() {
+        let source = fixture();
+        let mut editor = Editor::open_records(source).unwrap();
+        editor.max_output_bytes = editor.document.len();
+        let persist_id = editor.document_persist_id;
+        let record = editor.persisted_record(persist_id).unwrap();
+        editor.replace_persisted_record(persist_id, record).unwrap();
+        let error = editor.finish().unwrap_err();
+        assert!(matches!(
+            error,
+            Error::ResourceLimit(message) if message.contains("incremental document stream")
+        ));
+    }
+
+    #[test]
+    fn duplicate_selected_paths_keep_the_borrowed_fallback() {
+        let source = fixture();
+        let mut candidate = Editor::open_records(source).unwrap();
+        let duplicate_document = (candidate.document_path.clone(), candidate.document.clone());
+        let duplicate_current_user = (
+            candidate.current_user_path.clone(),
+            candidate.current_user.clone(),
+        );
+        candidate.streams.push(duplicate_document);
+        candidate.streams.push(duplicate_current_user);
+        let reference = candidate.clone();
+        let appended = candidate.document.clone();
+        let expected = write_package_reference(&reference, &appended).unwrap();
+        let actual = super::write_package(&mut candidate, appended).unwrap();
+        assert_eq!(actual, expected);
+
+        let mut ole = OleFile::open(Cursor::new(actual)).unwrap();
+        assert!(
+            !ole.open_stream(&stream_refs(&reference.document_path))
+                .unwrap()
+                .is_empty()
+        );
     }
 }

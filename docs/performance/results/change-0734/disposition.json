@@ -1,0 +1,307 @@
+{
+  "status": "retain",
+  "scope": "Ordinary public PPT slide-index-1 removal on 45543.ppt and 41246-1.ppt",
+  "analysis_sha256": "6d8f01ca477f0b5d8c2dee88152c851b0d5f44424f8e0730030e4e6c0ada3a4d",
+  "all_native_flags": [
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 0,
+      "field": "maximum",
+      "after": 1129215.0,
+      "before": 1218936.0,
+      "delta": -89721.0,
+      "flag_gt_5pct": true,
+      "percent": -7.360599736163342
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 0,
+      "field": "mean",
+      "after": 976100.28,
+      "before": 1062415.24,
+      "delta": -86314.95999999996,
+      "flag_gt_5pct": true,
+      "percent": -8.124409058740532
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 0,
+      "field": "p50",
+      "after": 993644.0,
+      "before": 1063405.0,
+      "delta": -69761.0,
+      "flag_gt_5pct": true,
+      "percent": -6.560153469280284
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 0,
+      "field": "p99",
+      "after": 1129215.0,
+      "before": 1218936.0,
+      "delta": -89721.0,
+      "flag_gt_5pct": true,
+      "percent": -7.360599736163342
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 1,
+      "field": "mean",
+      "after": 979056.7,
+      "before": 1055328.88,
+      "delta": -76272.17999999993,
+      "flag_gt_5pct": true,
+      "percent": -7.22733751017976
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 1,
+      "field": "p50",
+      "after": 999890.0,
+      "before": 1056215.0,
+      "delta": -56325.0,
+      "flag_gt_5pct": true,
+      "percent": -5.332721084248945
+    },
+    {
+      "case": "primary",
+      "cycle": 0,
+      "repeat": 2,
+      "field": "mean",
+      "after": 978732.8,
+      "before": 1056259.54,
+      "delta": -77526.73999999999,
+      "flag_gt_5pct": true,
+      "percent": -7.339743411926958
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 0,
+      "field": "maximum",
+      "after": 1122265.0,
+      "before": 1181445.0,
+      "delta": -59180.0,
+      "flag_gt_5pct": true,
+      "percent": -5.00912018756692
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 0,
+      "field": "mean",
+      "after": 976693.36,
+      "before": 1057682.38,
+      "delta": -80989.0199999999,
+      "flag_gt_5pct": true,
+      "percent": -7.657215581108566
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 0,
+      "field": "p50",
+      "after": 998530.0,
+      "before": 1052895.0,
+      "delta": -54365.0,
+      "flag_gt_5pct": true,
+      "percent": -5.163382863438424
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 0,
+      "field": "p99",
+      "after": 1122265.0,
+      "before": 1181445.0,
+      "delta": -59180.0,
+      "flag_gt_5pct": true,
+      "percent": -5.00912018756692
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 1,
+      "field": "maximum",
+      "after": 1125566.0,
+      "before": 1187585.0,
+      "delta": -62019.0,
+      "flag_gt_5pct": true,
+      "percent": -5.222278826357693
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 1,
+      "field": "mean",
+      "after": 976893.46,
+      "before": 1058187.02,
+      "delta": -81293.56000000006,
+      "flag_gt_5pct": true,
+      "percent": -7.682343334734918
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 1,
+      "field": "p50",
+      "after": 995720.0,
+      "before": 1061680.0,
+      "delta": -65960.0,
+      "flag_gt_5pct": true,
+      "percent": -6.212794815763695
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 1,
+      "field": "p99",
+      "after": 1125566.0,
+      "before": 1187585.0,
+      "delta": -62019.0,
+      "flag_gt_5pct": true,
+      "percent": -5.222278826357693
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 2,
+      "field": "maximum",
+      "after": 1123825.0,
+      "before": 1187385.0,
+      "delta": -63560.0,
+      "flag_gt_5pct": true,
+      "percent": -5.352939442556543
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 2,
+      "field": "mean",
+      "after": 974211.24,
+      "before": 1054000.4,
+      "delta": -79789.15999999992,
+      "flag_gt_5pct": true,
+      "percent": -7.570126159344904
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 2,
+      "field": "p50",
+      "after": 996080.0,
+      "before": 1054590.5,
+      "delta": -58510.5,
+      "flag_gt_5pct": true,
+      "percent": -5.5481724897009785
+    },
+    {
+      "case": "primary",
+      "cycle": 1,
+      "repeat": 2,
+      "field": "p99",
+      "after": 1123825.0,
+      "before": 1187385.0,
+      "delta": -63560.0,
+      "flag_gt_5pct": true,
+      "percent": -5.352939442556543
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 0,
+      "field": "maximum",
+      "after": 1282706.0,
+      "before": 1170776.0,
+      "delta": 111930.0,
+      "flag_gt_5pct": true,
+      "percent": 9.560325801007195
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 0,
+      "field": "mean",
+      "after": 985875.82,
+      "before": 1057544.44,
+      "delta": -71668.62,
+      "flag_gt_5pct": true,
+      "percent": -6.776889678508451
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 0,
+      "field": "p99",
+      "after": 1282706.0,
+      "before": 1170776.0,
+      "delta": 111930.0,
+      "flag_gt_5pct": true,
+      "percent": 9.560325801007195
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 1,
+      "field": "mean",
+      "after": 979158.72,
+      "before": 1054873.66,
+      "delta": -75714.93999999994,
+      "flag_gt_5pct": true,
+      "percent": -7.1776311108194655
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 1,
+      "field": "p50",
+      "after": 995674.5,
+      "before": 1058445.0,
+      "delta": -62770.5,
+      "flag_gt_5pct": true,
+      "percent": -5.930445134135454
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 2,
+      "field": "mean",
+      "after": 975628.7,
+      "before": 1057484.42,
+      "delta": -81855.71999999997,
+      "flag_gt_5pct": true,
+      "percent": -7.740607658314246
+    },
+    {
+      "case": "primary",
+      "cycle": 2,
+      "repeat": 2,
+      "field": "p50",
+      "after": 997334.5,
+      "before": 1056630.5,
+      "delta": -59296.0,
+      "flag_gt_5pct": true,
+      "percent": -5.611800908643088
+    }
+  ],
+  "assessment": [
+    "Primary p50 improves in all nine process pairs; paired median -5.5481724897009785%, process-pair bootstrap 95%[-6.212794815763695,-4.963394903279988].",
+    "Secondary latency is inconclusive: p50 paired median +0.34886070192572743% and interval[-0.4119868177244292,0.8725896348466133] crosses zero; no speedup claim.",
+    "Only positive >5% native flags are primary cycle 2 repeat 0 p99/maximum +9.560326%. Nearest-rank p99 on 50 samples equalsmaximum; this is one event, not two independent failures.",
+    "Accept observed tailflag as a retained limitation: no p50/mean regression above 5%, every primary p50/mean pair improves, no secondary flag, unchanged semantics and concrete allocation benefit. No universal tail improvement claim.",
+    "All three allocation repeats agree per case and variant: exactly 384,906/279,817 fewer allocated bytes and five fewer calls. Primary peak falls25.819116991826974%;secondary unchanged. Retained output bytes unchanged.",
+    "All absolute >5% negative native flags are reported as improvements; none suppressed. Allocation peak reduction is the only >5% memory flag, and no peak growth is observed."
+  ],
+  "limits": [
+    "Two warm fixtures, one public operation, one host.",
+    "No RSS, cold-I/O, instruction, concurrency or broad producer claim.",
+    "Independent review advisories: no injected writer-I/O failure or same-leaf/different-path focused fixture."
+  ],
+  "next_action": "Inspect remaining measured PPT work for repeated full-editor/payload copies with fresh attribution; retain required validation and artifact hashes. Broader non-iWork goal stays active."
+}

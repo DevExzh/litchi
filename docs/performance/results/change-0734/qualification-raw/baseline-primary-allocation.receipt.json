@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-0734-bin/baseline-ole_format_save_probe_alloc",
+    "--case",
+    "ppt45543",
+    "--input",
+    "test-data/poi/test-data/slideshow/45543.ppt",
+    "--operation",
+    "format",
+    "--samples",
+    "1",
+    "--warmups",
+    "0"
+  ],
+  "exit_code": 0,
+  "output": "qualification-raw/baseline-primary-allocation.json",
+  "sha256": "757b8323d91227dd3f443f3b3e34e799dea6b0a5b64aa8597e68d0a6fcdd05ba",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
