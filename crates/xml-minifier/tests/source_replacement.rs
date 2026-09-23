@@ -370,6 +370,90 @@ fn position_sensitive_tokens_inside_a_window_are_judged_as_the_complete_audit_ju
     }
 }
 
+/// Change 0750: under the source policy a token's verdict also depends on the
+/// namespace bindings in scope and on whether it is the document's first. A
+/// window starts with the bindings the original's audit had in scope there
+/// and knows it is not at the start of the document, so it reaches the
+/// complete audit's verdict: a proof where the edit is well-formed in its
+/// place, and the complete audit's own error where it is not.
+#[test]
+fn a_window_replays_the_namespace_bindings_and_position_of_its_place() {
+    let pad = "<w:pad>padding padding padding padding padding padding padding padding</w:pad>";
+    let document = |first: &str, cell: &str| {
+        format!(
+            "<?xml version=\"1.0\"?>\n<w:document xmlns:w=\"urn:w\"><w:body>{first}<w:tbl xmlns:x=\"urn:x\"><w:tc>{cell}</w:tc></w:tbl>{pad}{pad}</w:body></w:document>"
+        )
+    };
+    let first = "<w:p><w:r><w:t>keep</w:t></w:r></w:p>";
+    let cell = "<w:p><w:r><w:t>0</w:t></w:r></w:p>";
+    let original = document(first, cell);
+
+    // Bound by the document element, by an enclosing element, or inside the
+    // window itself: each edit is proved by a window.
+    for edited in [
+        "<w:p><w:r><w:t>1</w:t></w:r></w:p>",
+        "<w:p><x:y w:a=\"1\" x:b=\"2\"/></w:p>",
+        "<w:p xmlns:z=\"urn:z\"><z:q z:a=\"1\"/><w:r><w:t>0</w:t></w:r></w:p>",
+        "<w:p xmlns:x=\"urn:other\"><x:y x:a=\"1\"/><w:r><w:t>0</w:t></w:r></w:p>",
+    ] {
+        let replacement = document(first, edited);
+        let proof = checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{edited}: {error:?}"));
+        assert!(
+            matches!(proof, ReplacementProof::Window { .. }),
+            "{edited}: {proof:?}"
+        );
+    }
+
+    // Defects that depend on the place: each is refused with the complete
+    // audit's error, whether or not a window was found first.
+    for edited in [
+        // `q` is bound nowhere.
+        "<w:p><q:r/></w:p>",
+        // Two prefixes bound to one namespace name, the same local name.
+        "<w:p><w:r xmlns:a=\"u\" xmlns:b=\"u\" a:x=\"1\" b:x=\"2\"/></w:p>",
+        // The window is never at the start of the document.
+        "<w:p><?xml version=\"1.0\"?></w:p>",
+        // Lexical defects inside the window.
+        "<w:p>&nbsp;</w:p>",
+        "<w:p>\u{1}</w:p>",
+        "<w:p><!--a--b--></w:p>",
+        "<w:p a=\"&#0;\"/>",
+    ] {
+        let replacement = document(first, edited);
+        let expected = verify_source(replacement.as_bytes(), Limits::default())
+            .expect_err("the replacement is not well-formed");
+        assert!(matches!(expected, Error::Malformed { .. }), "{expected:?}");
+        assert_eq!(
+            checked(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default()
+            ),
+            Err(ReplacementError::Replacement(expected)),
+            "{edited}"
+        );
+    }
+
+    // `x` is bound only inside the table, so the first paragraph, a sibling
+    // subtree the window's copy of the bindings must not see, cannot use it.
+    let replacement = document("<w:p><x:y/></w:p>", cell);
+    let expected = verify_source(replacement.as_bytes(), Limits::default())
+        .expect_err("x is not bound in the first paragraph");
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default()
+        ),
+        Err(ReplacementError::Replacement(expected))
+    );
+}
+
 fn narrow(resource: Resource, maximum: usize) -> Limits {
     Limits::default().narrow(resource, maximum)
 }
@@ -522,10 +606,13 @@ impl Rng {
     }
 }
 
+/// Element names. `x:y` is bound only where some enclosing element (usually
+/// the document element) declares `x`.
 const NAMES: &[&str] = &["a", "b", "c", "row", "v", "x:y", "p", "q"];
 /// `ATTRIBUTES[0]` and `[1]` have distinct keys, `[2..4]` share
 /// `xml:space`, `[4]` is valid with a `>` in its value; the rest are
-/// malformed or refused by the audit.
+/// malformed or refused by the audit (the prefixed ones where no enclosing
+/// element binds their prefix).
 const ATTRIBUTES: &[&str] = &[
     " r=\"1\"",
     " s='2'",
@@ -540,12 +627,24 @@ const ATTRIBUTES: &[&str] = &[
     " k",
     " m=\"",
     " e='<'",
+    " f=\"&bogus;\"",
+    " xmlns:n=\"\"",
+    " n:k=\"1\"",
+    " 9=\"1\"",
+];
+/// Namespace attributes that are valid wherever `x` is bound: a declaration,
+/// a prefixed attribute, and an alias of `x`'s namespace name whose attribute
+/// repeats the expanded name of `x:k` when both are present.
+const NAMESPACE_ATTRIBUTES: &[&str] = &[
+    " xmlns:x=\"urn:x\"",
+    " x:k=\"1\"",
+    " xmlns:z=\"urn:x\" z:k=\"2\"",
 ];
 /// The first nine are valid character data; the rest are not, or are
 /// refused outside the document element.
 const TEXTS: &[&str] = &[
     "0", "12", " ", "\n  ", "a&amp;b", "&#65;", "a>b", "&lt;&gt;", "\u{e9}", "&bogus;", "x]]>y",
-    "t\tt", "&", "<",
+    "t\tt", "&", "<", "&#0;", "a\u{b}b", "\u{ffff}",
 ];
 const VALID_TEXTS: usize = 9;
 /// The first seven are valid markup, several with a `>` or `<` inside the
@@ -566,6 +665,9 @@ const MISC: &[&str] = &[
     "<b></b>",
     "<v>1</v>",
     "<c r=\"A1\"><v>7</v></c>",
+    "<!--a--b-->",
+    "<?XML x?>",
+    "<n:e/>",
 ];
 const VALID_MISC: usize = 7;
 
@@ -587,6 +689,13 @@ fn element(rng: &mut Rng, depth: usize, out: &mut String, spans: &mut Vec<(usize
     }
     if rng.chance(10) {
         out.push_str(ATTRIBUTES[4]);
+    }
+    // Two picks now and then: `x:k` with the alias repeats an expanded
+    // name, and a repeated pick repeats a qualified name.
+    for chance in [8, 2] {
+        if rng.chance(chance) {
+            out.push_str(rng.pick(NAMESPACE_ATTRIBUTES));
+        }
     }
     if rng.chance(3) {
         out.push_str(rng.pick(ATTRIBUTES));
@@ -631,7 +740,13 @@ fn document(rng: &mut Rng) -> (Vec<u8>, Vec<(usize, usize)>) {
             out.push('\n');
         }
     }
-    out.push_str("<root>");
+    // The document element binds `x` for its whole tree 19 times in 20;
+    // otherwise an `x:y` element is bound only where an ancestor declares it.
+    out.push_str(if rng.chance(95) {
+        "<root xmlns:x=\"urn:x\">"
+    } else {
+        "<root>"
+    });
     for _ in 0..1 + rng.below(4) {
         element(rng, 4, &mut out, &mut spans);
         if rng.chance(30) {
