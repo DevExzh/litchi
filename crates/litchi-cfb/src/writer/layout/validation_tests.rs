@@ -31,7 +31,11 @@ enum Verdict {
 }
 
 fn build(streams: &[(&[&str], Vec<u8>)]) -> Vec<u8> {
-    let mut writer = OleWriter::new();
+    build_with(512, streams)
+}
+
+fn build_with(sector_size: usize, streams: &[(&[&str], Vec<u8>)]) -> Vec<u8> {
+    let mut writer = OleWriter::with_sector_size(sector_size).unwrap();
     for (path, data) in streams {
         writer.create_stream(path, data).unwrap();
     }
@@ -204,15 +208,22 @@ const REPEAT: &[&str] = &["Repeat"];
 /// length-changing model over it: growth that appends, a shrink that
 /// reclaims, mini growth and a mini-to-regular migration.
 fn synthetic() -> (Vec<u8>, Model) {
-    let source = build(&[
-        (BIG, pattern(10_000, 1)),
-        (OTHER, pattern(6_000, 2)),
-        (SMALL, pattern(700, 3)),
-        (TINY, pattern(100, 4)),
-        (NESTED, pattern(300, 5)),
-        (&["Empty"], Vec::new()),
-        (REPEAT, vec![0xAB; 4_096]),
-    ]);
+    synthetic_with(512)
+}
+
+fn synthetic_with(sector_size: usize) -> (Vec<u8>, Model) {
+    let source = build_with(
+        sector_size,
+        &[
+            (BIG, pattern(10_000, 1)),
+            (OTHER, pattern(6_000, 2)),
+            (SMALL, pattern(700, 3)),
+            (TINY, pattern(100, 4)),
+            (NESTED, pattern(300, 5)),
+            (&["Empty"], Vec::new()),
+            (REPEAT, vec![0xAB; 4_096]),
+        ],
+    );
     let mut model = read_model(&source);
     for (path, bytes) in &mut model {
         match path.join("/").as_str() {
@@ -719,6 +730,39 @@ fn random_faults_reach_the_readback_verdict() {
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     sweep_agreement("synthetic", &base, &streams, 2_000, 0x0749_5eed);
+}
+
+/// Version 4 geometry: 4096-byte sectors hold 64 mini sectors each and
+/// 1,024 FAT entries, so runs, mini-stream offsets and table images differ.
+#[test]
+fn version_4_plans_reach_the_readback_verdict() {
+    let (source, model) = synthetic_with(4096);
+    let layout = SourceLayout::parse(&source).unwrap();
+    assert_eq!(layout.sector_size, 4096);
+    let streams = inputs(&model);
+    let base = plan(&layout, &streams);
+    assert!(base.report().reused_source_layout());
+    assert_verdict(&base, &streams, Verdict::Accepted, "version 4 plan");
+    let big = stream_sectors(&base, index_of(&model, BIG));
+    let other = stream_sectors(&base, index_of(&model, OTHER));
+    let mut swapped = base.clone();
+    swap_sectors(&mut swapped, big[0], other[0]);
+    assert_verdict(
+        &swapped,
+        &streams,
+        Verdict::Declined,
+        "version 4 chunks swapped",
+    );
+    let mut truncated = base.clone();
+    let keep = truncated.ministream_image.len() - truncated.sector_size;
+    truncated.ministream_image.truncate(keep);
+    assert_verdict(
+        &truncated,
+        &streams,
+        Verdict::Declined,
+        "version 4 mini image truncated",
+    );
+    sweep_agreement("version 4", &base, &streams, 1_000, 0x0749_4096);
 }
 
 fn repository_root() -> PathBuf {
