@@ -1,0 +1,19 @@
+label,side,bytes,measure,p10_ns,p50_ns,p90_ns,detail
+dense-sparse-worksheet,original,462568,verify_source,1914741,1916026,1922084,events=82183 attributes=16514
+dense-sparse-worksheet,original,462568,tokenize_only,1018410,1038202,1039731,events=82183
+dense-sparse-worksheet,original,462568,utf8_only,6511,6519,6528,
+dense-sparse-worksheet,replacement,462568,verify_source,1915038,1918646,1923589,events=82183 attributes=16514
+dense-sparse-worksheet,replacement,462568,tokenize_only,1038344,1038877,1039662,events=82183
+dense-sparse-worksheet,replacement,462568,utf8_only,6439,6444,6449,
+dense-sparse-worksheet,pair,462568,two_verify_source,3834132,3839863,3847288,
+dense-sparse-worksheet,pair,462568,verify_source_replacement,1976939,1985417,1990854,Window { original: 191..199, replacement: 191..199 }
+dense-sparse-worksheet,pair,462568,prefix_suffix_compare,145464,145540,149805,prefix=194 suffix=462373 window_original=1 window_replacement=1
+dense-sparse-workbook,original,424,verify_source,651,652,657,events=10 attributes=14
+dense-sparse-workbook,original,424,tokenize_only,261,261,261,events=10
+dense-sparse-workbook,original,424,utf8_only,9,9,9,
+dense-sparse-workbook,replacement,527,verify_source,838,841,845,events=11 attributes=19
+dense-sparse-workbook,replacement,527,tokenize_only,314,314,317,events=11
+dense-sparse-workbook,replacement,527,utf8_only,12,12,12,
+dense-sparse-workbook,pair,424,two_verify_source,1514,1516,1518,
+dense-sparse-workbook,pair,424,verify_source_replacement,1627,1629,1633,Complete
+dense-sparse-workbook,pair,424,prefix_suffix_compare,119,120,120,prefix=414 suffix=10 window_original=0 window_replacement=103

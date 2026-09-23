@@ -1,0 +1,19 @@
+label,side,bytes,measure,p10_ns,p50_ns,p90_ns,detail
+medium-worksheet,original,63294,verify_source,276184,277268,278094,events=11623 attributes=2354
+medium-worksheet,original,63294,tokenize_only,144808,144960,145109,events=11623
+medium-worksheet,original,63294,utf8_only,913,914,915,
+medium-worksheet,replacement,63294,verify_source,276678,277027,277638,events=11623 attributes=2354
+medium-worksheet,replacement,63294,tokenize_only,145002,146974,147172,events=11623
+medium-worksheet,replacement,63294,utf8_only,912,913,916,
+medium-worksheet,pair,63294,two_verify_source,548513,555696,557389,
+medium-worksheet,pair,63294,verify_source_replacement,282921,283484,283839,Window { original: 190..198, replacement: 190..198 }
+medium-worksheet,pair,63294,prefix_suffix_compare,19966,19988,20038,prefix=193 suffix=63100 window_original=1 window_replacement=1
+medium-workbook,original,424,verify_source,688,690,691,events=10 attributes=14
+medium-workbook,original,424,tokenize_only,282,283,283,events=10
+medium-workbook,original,424,utf8_only,9,9,9,
+medium-workbook,replacement,527,verify_source,845,847,850,events=11 attributes=19
+medium-workbook,replacement,527,tokenize_only,320,320,320,events=11
+medium-workbook,replacement,527,utf8_only,12,12,12,
+medium-workbook,pair,424,two_verify_source,1537,1540,1548,
+medium-workbook,pair,424,verify_source_replacement,1604,1608,1612,Complete
+medium-workbook,pair,424,prefix_suffix_compare,118,118,118,prefix=414 suffix=10 window_original=0 window_replacement=103

@@ -1,0 +1,317 @@
+[
+  {
+    "case": "eager_one_medium",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p50",
+    "before_ms": 5.738,
+    "after_ms": 6.18,
+    "change_pct": 7.7
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 5.843,
+    "after_ms": 6.307,
+    "change_pct": 7.93
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 5.748,
+    "after_ms": 6.191,
+    "change_pct": 7.72
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p50",
+    "before_ms": 6.08,
+    "after_ms": 5.68,
+    "change_pct": -6.58
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 6.17,
+    "after_ms": 5.843,
+    "change_pct": -5.3
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 6.087,
+    "after_ms": 5.704,
+    "change_pct": -6.28
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p50",
+    "before_ms": 6.353,
+    "after_ms": 5.784,
+    "change_pct": -8.97
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_ms": 6.577,
+    "after_ms": 5.905,
+    "change_pct": -10.21
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_ms": 6.367,
+    "after_ms": 5.774,
+    "change_pct": -9.31
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p50",
+    "before_ms": 6.539,
+    "after_ms": 6.085,
+    "change_pct": -6.95
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 6.696,
+    "after_ms": 6.318,
+    "change_pct": -5.64
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 6.526,
+    "after_ms": 6.115,
+    "change_pct": -6.3
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p50",
+    "before_ms": 5.767,
+    "after_ms": 6.165,
+    "change_pct": 6.9
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_ms": 5.868,
+    "after_ms": 6.206,
+    "change_pct": 5.77
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_ms": 5.759,
+    "after_ms": 6.166,
+    "change_pct": 7.06
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "p50",
+    "before_ms": 6.292,
+    "after_ms": 5.817,
+    "change_pct": -7.55
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_ms": 6.611,
+    "after_ms": 6.015,
+    "change_pct": -9.01
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_ms": 6.357,
+    "after_ms": 5.835,
+    "change_pct": -8.2
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 6,
+    "pair": "4-3",
+    "metric": "p50",
+    "before_ms": 6.367,
+    "after_ms": 5.763,
+    "change_pct": -9.49
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 6,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 6.539,
+    "after_ms": 5.882,
+    "change_pct": -10.05
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 6,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 6.374,
+    "after_ms": 5.778,
+    "change_pct": -9.36
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 7,
+    "pair": "4-3",
+    "metric": "p50",
+    "before_ms": 5.676,
+    "after_ms": 6.166,
+    "change_pct": 8.64
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 7,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 5.719,
+    "after_ms": 6.203,
+    "change_pct": 8.47
+  },
+  {
+    "case": "eager_one_medium",
+    "round": 7,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 5.68,
+    "after_ms": 6.166,
+    "change_pct": 8.56
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p50",
+    "before_ms": 6.674,
+    "after_ms": 6.254,
+    "change_pct": -6.29
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_ms": 7.094,
+    "after_ms": 6.38,
+    "change_pct": -10.06
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_ms": 6.729,
+    "after_ms": 6.266,
+    "change_pct": -6.88
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "p50",
+    "before_ms": 7.492,
+    "after_ms": 7.9,
+    "change_pct": 5.45
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_ms": 9.939,
+    "after_ms": 12.795,
+    "change_pct": 28.74
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 5,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_ms": 7.77,
+    "after_ms": 8.851,
+    "change_pct": 13.92
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 5,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 7.091,
+    "after_ms": 8.231,
+    "change_pct": 16.09
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 5,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 6.704,
+    "after_ms": 7.243,
+    "change_pct": 8.05
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 6,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 6.84,
+    "after_ms": 7.406,
+    "change_pct": 8.27
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 8,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 9.906,
+    "after_ms": 8.069,
+    "change_pct": -18.55
+  },
+  {
+    "case": "pptx_sb_one",
+    "round": 8,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_ms": 7.851,
+    "after_ms": 7.228,
+    "change_pct": -7.94
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "record": "0747",
+  "performed": "2026-09-22, after every cited artifact was copied into this packet and the gates passed",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0747",
+      "bytes": 76312000281,
+      "what": "candidate Cargo target directory: debug test builds of the touched and dependent crates, release harness, release probe and differential-test builds"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0747-before",
+      "bytes": 1050757842,
+      "what": "release harness build of base 009d515bef for the final campaign's before leg"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0747-before-src",
+      "bytes": 10150292201,
+      "what": "detached worktree of base 009d515bef (removed with git worktree remove --force, then git worktree prune)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0747/*",
+      "bytes": 223916784,
+      "what": "scratch: harness JSON reports and logs (kept here gzip-compressed), raw callgrind profiles (summaries kept), gdb-captured payload bytes (hashes kept), perf probe data, binary copies (hashes in binaries.txt), draft text, build and test logs"
+    }
+  ],
+  "verified_after_removal": {
+    "targets/0747": "absent",
+    "targets/0747-before": "absent",
+    "0747-before-src": "absent and not listed by git worktree list",
+    "scratch/0747": "0 entries"
+  },
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0747-xlsx-publication-audit-reuse (worktree) and branch perf/0747-xlsx-publication-audit-reuse",
+    "the coordinator's shared read-only base checkout and prebuilt base binary, untouched"
+  ],
+  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout"
+}

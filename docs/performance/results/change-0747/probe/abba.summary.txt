@@ -1,0 +1,36 @@
+dense-sparse-workbook    original     tokenize_only              A          268 B          268 0.9981
+dense-sparse-workbook    original     utf8_only                  A           10 B            9 0.9000
+dense-sparse-workbook    original     verify_source              A          673 B          680 1.0104
+dense-sparse-workbook    pair         prefix_suffix_compare      A          119 B          118 0.9916
+dense-sparse-workbook    pair         two_verify_source          A            - B        1,543 
+dense-sparse-workbook    pair         verify_source_replacement  A            - B        1,654 
+dense-sparse-workbook    replacement  tokenize_only              A          316 B          319 1.0079
+dense-sparse-workbook    replacement  utf8_only                  A           13 B           12 0.9231
+dense-sparse-workbook    replacement  verify_source              A          838 B          853 1.0185
+dense-sparse-worksheet   original     tokenize_only              A      985,102 B    1,024,410 1.0399
+dense-sparse-worksheet   original     utf8_only                  A        6,542 B        6,497 0.9930
+dense-sparse-worksheet   original     verify_source              A    1,968,814 B    1,918,642 0.9745
+dense-sparse-worksheet   pair         prefix_suffix_compare      A      147,213 B      146,826 0.9974
+dense-sparse-worksheet   pair         two_verify_source          A            - B    3,860,196 
+dense-sparse-worksheet   pair         verify_source_replacement  A            - B    2,046,474 
+dense-sparse-worksheet   replacement  tokenize_only              A      988,194 B    1,023,878 1.0361
+dense-sparse-worksheet   replacement  utf8_only                  A        6,546 B        6,498 0.9927
+dense-sparse-worksheet   replacement  verify_source              A    1,973,936 B    1,927,058 0.9763
+medium-workbook          original     tokenize_only              A          272 B          272 1.0000
+medium-workbook          original     utf8_only                  A           10 B            9 0.9000
+medium-workbook          original     verify_source              A          672 B          703 1.0469
+medium-workbook          pair         prefix_suffix_compare      A          119 B          118 0.9916
+medium-workbook          pair         two_verify_source          A            - B        1,568 
+medium-workbook          pair         verify_source_replacement  A            - B        1,656 
+medium-workbook          replacement  tokenize_only              A          319 B          320 1.0016
+medium-workbook          replacement  utf8_only                  A           13 B           12 0.9231
+medium-workbook          replacement  verify_source              A          858 B          867 1.0111
+medium-worksheet         original     tokenize_only              A      139,798 B      145,172 1.0384
+medium-worksheet         original     utf8_only                  A          929 B          920 0.9898
+medium-worksheet         original     verify_source              A      279,565 B      272,848 0.9760
+medium-worksheet         pair         prefix_suffix_compare      A       20,074 B       20,097 1.0012
+medium-worksheet         pair         two_verify_source          A            - B      553,402 
+medium-worksheet         pair         verify_source_replacement  A            - B      289,636 
+medium-worksheet         replacement  tokenize_only              A      139,797 B      146,188 1.0457
+medium-worksheet         replacement  utf8_only                  A          928 B          920 0.9914
+medium-worksheet         replacement  verify_source              A      279,759 B      274,460 0.9811
