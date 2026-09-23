@@ -935,9 +935,15 @@ impl<R: Read + Seek> Workbook<R> {
             });
         }
 
-        // Several orphans are refused by naming the lowest position, so the
-        // refusal is the same on every open of the same bytes; the map's
-        // hash iteration order differs between two maps and would not be.
+        // Several orphans are refused by naming the lowest `(row, column)`,
+        // so the refusal is the same on every open of the same bytes; the
+        // map's hash iteration order differs between two maps and would not
+        // be. This is the lowest position, not the first orphan in record
+        // order: the map keeps positions, not arrival order, and the minimum
+        // is found in the one pass the check already makes, with no ordering
+        // state added to the per-record walk. Any orphan refuses the sheet
+        // with the same error kind, so which one is named changes only the
+        // message, never the outcome.
         let orphan = ptg_exp_cells
             .iter()
             .filter(|(position, link)| {
