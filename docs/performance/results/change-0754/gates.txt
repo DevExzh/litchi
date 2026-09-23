@@ -1,0 +1,111 @@
+# Change 0754 gates, run on the final commit 2c467b3e66 in the branch worktree
+# (CARGO_TARGET_DIR=targets/0754, TMPDIR under the scratch dir, CARGO_BUILD_JOBS=6).
+# Runner: scripts/run_gate.sh; one section per gate: command, exit status and
+# duration, test totals summed over every 'test result' line, and the log's tail.
+
+## fmt
+command: cargo fmt --all --check
+exit: 0  (18s)
+
+## check-touched
+command: cargo check -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-pptx -p litchi-ppt -p litchi-xlsx -p litchi-xlsb -p litchi-imgconv --all-targets --locked --offline
+exit: 0  (19s)
+    Checking litchi-xlsb v0.0.1 (<worktree>/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.39s
+
+## check-facade
+command: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit: 0  (12s)
+    Checking litchi v0.0.1 (<worktree>/crates/litchi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.09s
+
+## check-odf-dependents
+command: cargo check -p litchi-odf-common -p litchi-odt -p litchi-ods -p litchi-odp -p litchi-odg -p litchi-odf --locked --offline
+exit: 0  (0s)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+
+## clippy-lib
+command: cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --lib --no-deps --locked --offline -- -D warnings
+exit: 0  (10s)
+    Checking litchi-docx v0.0.1 (<worktree>/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.76s
+
+## clippy-all-targets
+command: cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --all-targets --no-deps --locked --offline -- -D warnings
+exit: 0  (13s)
+    Checking litchi-docx v0.0.1 (<worktree>/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.69s
+
+## rustdoc
+command: env RUSTDOCFLAGS=-D warnings cargo doc -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --no-deps --locked --offline
+exit: 0  (6s)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.36s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0754/doc/litchi_docx/index.html and 3 other files
+
+## non-iwork
+command: python3 tools/non_iwork_gate.py verify
+exit: 0  (4s)
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+
+## perf-claims
+command: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit: 0  (0s)
+OK: 10 performance claims validated (structural)
+
+## crate-boundaries
+command: python3 tools/check_crate_boundaries.py
+exit: 0  (265s)
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+
+## test-lower
+command: cargo test -p xml-minifier -p litchi-ooxml-common -p litchi-opc --locked --offline
+exit: 0  (35s)
+tests: passed 1193 failed 0 ignored 2
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+## test-docx
+command: cargo test -p litchi-docx --locked --offline
+exit: 0  (16s)
+tests: passed 1542 failed 0 ignored 31
+
+all doctests ran in 0.78s; merged doctests compilation took 0.78s
+
+## test-pptx
+command: cargo test -p litchi-pptx --locked --offline
+exit: 0  (22s)
+tests: passed 966 failed 0 ignored 2
+
+all doctests ran in 0.48s; merged doctests compilation took 0.42s
+
+## test-xlsx
+command: cargo test -p litchi-xlsx --locked --offline
+exit: 0  (61s)
+tests: passed 1420 failed 0 ignored 0
+
+all doctests ran in 0.21s; merged doctests compilation took 0.21s
+
+## test-drawing-xlsb-ppt
+command: cargo test -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-xlsb -p litchi-ppt -p litchi-imgconv --locked --offline
+exit: 0  (29s)
+tests: passed 2327 failed 0 ignored 25
+
+all doctests ran in 0.51s; merged doctests compilation took 0.42s
+
+## test-facade
+command: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit: 0  (41s)
+tests: passed 382 failed 0 ignored 7
+
+all doctests ran in 0.62s; merged doctests compilation took 0.62s
+
+## totals
+tests passed 7,830, failed 0, ignored 67 (the suites' own #[ignore] tests; this change adds none)
+
+## mutation checks of the new tests (each mutation applied, the named tests run, the file restored)
+scanner: resolve body only at depth 2 -> 4 of 7 scan_differential tests fail; do not classify sectPr -> 5 of 7 fail
+tracker: no cache invalidation on pop -> 2 fail; none on a new declaration -> 2 fail; no prefix-index maintenance on scope close -> 2 fail; no default-stack pop -> 3 fail
+text: stop resolving start tags while the fragment prefix is unknown -> lazy_resolution_matches_oracle_on_name_shapes_and_shadowing fails
+writer: trust any Verified payload regardless of the slice -> a_custom_part_cannot_borrow_a_proof_for_other_bytes fails

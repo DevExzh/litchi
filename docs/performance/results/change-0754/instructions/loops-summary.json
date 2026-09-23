@@ -1,0 +1,130 @@
+[
+ {
+  "loop": "scan",
+  "input": "semantic-large-document.xml",
+  "A": {
+   "instructions": 69933202.54,
+   "cycles": 19528258.86,
+   "allocations": 70040.0,
+   "requested_bytes": 2275376.0
+  },
+  "B": {
+   "instructions": 33801707.7,
+   "cycles": 6696125.7,
+   "allocations": 31.0,
+   "requested_bytes": 1384684.0
+  }
+ },
+ {
+  "loop": "scan",
+  "input": "semantic-medium-document.xml",
+  "A": {
+   "instructions": 1425631.1,
+   "cycles": 396632.4,
+   "allocations": 1434.0,
+   "requested_bytes": 47528.0
+  },
+  "B": {
+   "instructions": 699475.58,
+   "cycles": 139875.74,
+   "allocations": 25.0,
+   "requested_bytes": 29036.0
+  }
+ },
+ {
+  "loop": "noop",
+  "input": "semantic-large.docx",
+  "A": {
+   "instructions": 70572588.66,
+   "cycles": 19038267.2,
+   "allocations": 70166.0,
+   "requested_bytes": 1279742.0
+  },
+  "B": {
+   "instructions": 33923533.28,
+   "cycles": 6683503.3,
+   "allocations": 157.0,
+   "requested_bytes": 390250.0
+  }
+ },
+ {
+  "loop": "noop",
+  "input": "semantic-medium.docx",
+  "A": {
+   "instructions": 1491726.84,
+   "cycles": 410676.32,
+   "allocations": 1560.0,
+   "requested_bytes": 42818.0
+  },
+  "B": {
+   "instructions": 753209.86,
+   "cycles": 165535.02,
+   "allocations": 151.0,
+   "requested_bytes": 25526.0
+  }
+ },
+ {
+  "loop": "one",
+  "input": "semantic-large.docx",
+  "A": {
+   "instructions": 196481172.72,
+   "cycles": 43353115.24,
+   "allocations": 90629.0,
+   "requested_bytes": 6575831.78
+  },
+  "B": {
+   "instructions": 112050376.88,
+   "cycles": 21869260.98,
+   "allocations": 10600.0,
+   "requested_bytes": 4004755.78
+  }
+ },
+ {
+  "loop": "one",
+  "input": "semantic-medium.docx",
+  "A": {
+   "instructions": 4649068.68,
+   "cycles": 1096850.92,
+   "allocations": 2424.0,
+   "requested_bytes": 702146.0
+  },
+  "B": {
+   "instructions": 2911784.2,
+   "cycles": 637779.46,
+   "allocations": 795.0,
+   "requested_bytes": 649670.0
+  }
+ },
+ {
+  "loop": "text",
+  "input": "semantic-large.docx",
+  "A": {
+   "instructions": 75540317.22,
+   "cycles": 13843249.7,
+   "allocations": 28.0,
+   "requested_bytes": 1640117.0
+  },
+  "B": {
+   "instructions": 50989273.28,
+   "cycles": 8642760.74,
+   "allocations": 28.0,
+   "requested_bytes": 1640117.0
+  }
+ },
+ {
+  "loop": "text",
+  "input": "semantic-medium.docx",
+  "A": {
+   "instructions": 1539262.2,
+   "cycles": 287294.6,
+   "allocations": 22.0,
+   "requested_bytes": 27317.0
+  },
+  "B": {
+   "instructions": 1042062.9,
+   "cycles": 176607.24,
+   "allocations": 22.0,
+   "requested_bytes": 27317.0
+  }
+ }
+]

@@ -1,0 +1,2 @@
+label                shape        A p50 ms  B p50 ms   ratio            95% CI    A p95    B p95 proc instr  proc cyc digest
+sb_one               media-rich     1.8205    1.7116  0.9372 [0.9331, 0.9453]   1.8736   1.7498     0.9953    0.9974 same

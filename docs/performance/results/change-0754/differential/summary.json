@@ -1,0 +1,47 @@
+{
+ "docx": {
+  "differing_rows": 0,
+  "outcomes": {
+   "document:err": 279,
+   "edit:err": 265,
+   "edit:ok": 366,
+   "multi:ok": 87,
+   "multi:publish-err": 6,
+   "multi:stage-err": 273,
+   "noop:edit-err": 265,
+   "noop:ok": 366,
+   "one:ok": 356,
+   "one:publish-err": 39,
+   "one:stage-err": 393,
+   "one_whole:ok": 356,
+   "one_whole:publish-err": 39,
+   "one_whole:stage-err": 393,
+   "open:ok": 631,
+   "open:open": 88,
+   "para_texts:err": 26,
+   "para_texts:ok": 326,
+   "sb_mid:ok": 28,
+   "sb_mid:sb-edit-err": 338,
+   "sink_text:err": 58,
+   "sink_text:ok": 294,
+   "text:err": 26,
+   "text:ok": 326
+  },
+  "rows": 719
+ },
+ "pptx": {
+  "differing_rows": 0,
+  "outcomes": {
+   "text:ok": 78
+  },
+  "rows": 78
+ },
+ "snapxml": {
+  "differing_rows": 0,
+  "outcomes": {
+   "snapshot:err": 309,
+   "snapshot:ok": 410
+  },
+  "rows": 719
+ }
+}
