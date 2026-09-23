@@ -183,6 +183,22 @@ pub trait Part: PartClone + Send + Sync {
         }
     }
 
+    /// Replace content with an allocation that already passed the source
+    /// publication audit, carrying the proof.
+    ///
+    /// Built-in parts adopt the proof's allocation and keep the proof, so the
+    /// package writer need not audit the same bytes again: it skips its audit
+    /// of this part only while the bytes it is about to publish are exactly
+    /// the proof's — the same address and length — and the proof was issued
+    /// under the writer's [`xml_minifier::audit::Limits::default`]. Replacing
+    /// the payload again drops the proof. Custom part implementations need not
+    /// override this method; the default adopts the bytes through
+    /// [`Self::set_blob_shared`] and drops the proof, so their payload is
+    /// audited as before.
+    fn set_blob_verified(&mut self, verified: xml_minifier::audit::VerifiedSource) {
+        self.set_blob_shared(Arc::clone(verified.bytes()));
+    }
+
     /// Replace the content type of this part.
     ///
     /// Callers are responsible for selecting a content type permitted by the
@@ -351,6 +367,10 @@ impl Part for BlobPart {
 
     fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
         self.blob = PartPayload::ready(blob);
+    }
+
+    fn set_blob_verified(&mut self, verified: xml_minifier::audit::VerifiedSource) {
+        self.blob = PartPayload::Verified(verified);
     }
 
     fn rels(&self) -> &Relationships {
@@ -627,6 +647,11 @@ impl Part for XmlPart {
 
     fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
         self.xml_bytes = PartPayload::ready(blob);
+        self.element_cache.clear();
+    }
+
+    fn set_blob_verified(&mut self, verified: xml_minifier::audit::VerifiedSource) {
+        self.xml_bytes = PartPayload::Verified(verified);
         self.element_cache.clear();
     }
 

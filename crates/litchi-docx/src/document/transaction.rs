@@ -1,11 +1,16 @@
 //! Source-preserving main-document snapshots, edits, and reversible patches.
 
 mod durable;
+#[cfg(test)]
+mod publication_proof_tests;
+#[cfg(test)]
+mod scan_differential_tests;
 
 use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, Position, Reservation, Resource, SourceVersion};
+use litchi_ooxml_common::private::{BindingTracker, split_qualified_name};
 use litchi_opc::{PackURI, PartData, SourceLineage, SourceXmlPart};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -857,6 +862,11 @@ pub struct Snapshot {
     content_end: u32,
     conformance: Conformance,
     admission: Option<Arc<ManagedAdmission>>,
+    /// Proof that these exact bytes passed the package writer's source
+    /// publication audit, set only by [`Edit::commit`] on the preserving route
+    /// (change 0754). Every other constructor leaves it empty, and a derived
+    /// snapshot never inherits it, because a proof covers one allocation.
+    publication: Option<xml_minifier::audit::VerifiedSource>,
 }
 
 impl Snapshot {
@@ -884,6 +894,7 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: layout.conformance,
             admission: None,
+            publication: None,
         })
     }
 
@@ -904,6 +915,7 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: layout.conformance,
             admission: None,
+            publication: None,
         })
     }
 
@@ -1100,6 +1112,7 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: self.conformance,
             admission: None,
+            publication: None,
         }
     }
 
@@ -1139,6 +1152,7 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: layout.conformance,
             admission: Some(admission),
+            publication: None,
         })
     }
 
@@ -1178,6 +1192,7 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: layout.conformance,
             admission: Some(admission),
+            publication: None,
         })
     }
 
@@ -1214,7 +1229,27 @@ impl Snapshot {
             content_end: layout.content_end,
             conformance: layout.conformance,
             admission: Some(admission),
+            publication: None,
         })
+    }
+
+    /// The proof that these exact bytes passed the package writer's source
+    /// publication audit, when the commit that produced this snapshot
+    /// established one.
+    pub(crate) fn publication_proof(&self) -> Option<&xml_minifier::audit::VerifiedSource> {
+        self.publication
+            .as_ref()
+            .filter(|proof| proof.covers(self.xml_bytes(), xml_minifier::audit::Limits::default()))
+    }
+
+    /// Attach a publication audit proof. A proof that does not cover exactly
+    /// these bytes is dropped, so a snapshot never carries a proof for other
+    /// bytes.
+    fn with_publication_proof(mut self, proof: xml_minifier::audit::VerifiedSource) -> Self {
+        if proof.covers(self.xml_bytes(), xml_minifier::audit::Limits::default()) {
+            self.publication = Some(proof);
+        }
+        self
     }
 
     pub(crate) fn shared_xml(&self) -> TransactionResult<Arc<Vec<u8>>> {
@@ -1344,7 +1379,12 @@ impl Snapshot {
     }
 
     fn same_source(&self, other: &Self) -> bool {
-        if self.xml.bytes() != other.xml.bytes() {
+        // The retained bytes are immutable, so the same address and length
+        // is an exact equality proof; distinct allocations still receive the
+        // full byte comparison. An edit's projection shares its base's
+        // allocation until it changes, so an exact no-op settles here.
+        let (left, right) = (self.xml.bytes(), other.xml.bytes());
+        if !std::ptr::eq(left, right) && left != right {
             return false;
         }
         match (self.xml.identity(), other.xml.identity()) {
@@ -4703,24 +4743,10 @@ impl Edit {
             self.projected
         } else {
             match self.compaction {
-                CompactionPolicy::PreserveUnmodified
-                    if publication_accepts_preserved_xml(self.base.xml_bytes()) =>
-                {
-                    compact_changed_paragraphs(&self.base, &self.projected)?
+                CompactionPolicy::PreserveUnmodified => {
+                    commit_preserving_unmodified(&self.base, &self.projected)?
                 },
-                // The opt-in, and the preserving policy's fallback when the
-                // source cannot publish preserved: byte for byte what every
-                // committed edit published before this policy existed.
-                CompactionPolicy::PreserveUnmodified | CompactionPolicy::WholeDocument => {
-                    let source =
-                        std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
-                            crate::Error::InvalidFormat(format!(
-                                "changed main-document XML is not UTF-8: {error}"
-                            ))
-                        })?;
-                    let compact = compact_changed_document_preserving_bom(source)?;
-                    self.projected.with_rewritten_xml(compact.into_bytes())?
-                },
+                CompactionPolicy::WholeDocument => compact_whole_document(&self.projected)?,
             }
         };
         if let Some(context) = managed_context.as_ref() {
@@ -5331,6 +5357,77 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
     xml_minifier::audit::verify_source(xml, xml_minifier::audit::Limits::default()).is_ok()
 }
 
+/// Commit under [`CompactionPolicy::PreserveUnmodified`].
+///
+/// The route is the source gate's, exactly as before: when the package writer
+/// accepts the *source* snapshot's bytes preserved
+/// ([`publication_accepts_preserved_xml`]), the changed paragraphs are
+/// compacted in place ([`compact_changed_paragraphs`]); otherwise the whole
+/// document is compacted ([`compact_whole_document`]).
+///
+/// Change 0754 answers the gate with the pair audit
+/// [`xml_minifier::audit::VerifiedSource::verify_replacement`], whose verdict
+/// on the source is `verify_source`'s own, so the route cannot differ. When
+/// the candidate passes too, the same pass has audited the candidate's exact
+/// allocation, mostly inside the one element the edit replaced, and the
+/// resulting proof travels with the snapshot to the package writer, which
+/// then does not audit those bytes again. The package writer's audit stays the
+/// last line of defence for everything else: bytes without a proof, and any
+/// bytes other than the proof's own allocation, are audited there.
+///
+/// The candidate is compacted before the gate's verdict is known, because the
+/// pair audit needs it. Compaction only reads the two snapshots, so when the
+/// source fails the gate its candidate — or its error — is dropped as if it
+/// had never been computed, and when the source passes a compaction error is
+/// returned exactly where it was. A candidate whose bytes cannot be shared
+/// (a managed projection) takes the historical gate and carries no proof.
+fn commit_preserving_unmodified(
+    base: &Snapshot,
+    projected: &Snapshot,
+) -> TransactionResult<Snapshot> {
+    let compacted = compact_changed_paragraphs(base, projected);
+    let replacement = compacted
+        .as_ref()
+        .ok()
+        .and_then(|candidate| candidate.shared_xml().ok());
+    let (source_publishes, proof) = match replacement {
+        Some(replacement) => match xml_minifier::audit::VerifiedSource::verify_replacement(
+            base.xml_bytes(),
+            replacement,
+            xml_minifier::audit::Limits::default(),
+        ) {
+            Ok((proof, _how)) => (true, Some(proof)),
+            // The source's own `verify_source` error: the gate refuses.
+            Err(xml_minifier::audit::ReplacementError::Original(_)) => (false, None),
+            // The source passes and the candidate does not. Publish it
+            // unproven, so the writer's own audit refuses it where it always
+            // has.
+            Err(_) => (true, None),
+        },
+        None => (publication_accepts_preserved_xml(base.xml_bytes()), None),
+    };
+    if !source_publishes {
+        return compact_whole_document(projected);
+    }
+    let candidate = compacted?;
+    Ok(match proof {
+        Some(proof) => candidate.with_publication_proof(proof),
+        None => candidate,
+    })
+}
+
+/// Compact the whole projected main document: the
+/// [`CompactionPolicy::WholeDocument`] opt-in, and the preserving policy's
+/// fallback when the source cannot publish preserved — byte for byte what
+/// every committed edit published before the policy existed.
+fn compact_whole_document(projected: &Snapshot) -> TransactionResult<Snapshot> {
+    let source = std::str::from_utf8(projected.xml_bytes()).map_err(|error| {
+        crate::Error::InvalidFormat(format!("changed main-document XML is not UTF-8: {error}"))
+    })?;
+    let compact = compact_changed_document_preserving_bom(source)?;
+    projected.with_rewritten_xml(compact.into_bytes())
+}
+
 /// Compact a whole-document edit while carrying a leading UTF-8 byte order
 /// mark through the quick-xml based compactor.
 ///
@@ -5714,7 +5811,364 @@ fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
     scan_document_with_context(xml, None)
 }
 
+/// Count the namespace-declaring attributes of one start or empty tag, for
+/// the managed scan's namespace work charge.
+///
+/// Every counted key is `xmlns` or begins with `xmlns:`, and every key is a
+/// slice of the tag's raw attribute bytes, so a tag whose attribute bytes do
+/// not contain `xmlns` counts zero without iterating its attributes. The
+/// count is otherwise the historical one, including its `filter_map` over
+/// malformed attributes.
 fn event_namespace_binding_count(event: &Event<'_>) -> usize {
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            if !contains_namespace_declaration_marker(element.attributes_raw()) {
+                return 0;
+            }
+            element
+                .attributes()
+                .with_checks(false)
+                .filter_map(Result::ok)
+                .filter(|attribute| attribute.key.as_namespace_binding().is_some())
+                .count()
+        },
+        _ => 0,
+    }
+}
+
+/// Whether `bytes` contain `xmlns`, the prefix every namespace-declaring
+/// attribute key starts with.
+fn contains_namespace_declaration_marker(bytes: &[u8]) -> bool {
+    bytes
+        .windows(b"xmlns".len())
+        .any(|window| window == b"xmlns")
+}
+
+/// Whether a direct-body child with this local name is classified by
+/// [`scan_document_with_context`], which is only when it is in a
+/// `WordprocessingML` namespace.
+fn is_classified_body_child(local: &[u8]) -> bool {
+    matches!(local, b"p" | b"tbl" | b"sdt" | b"sectPr")
+}
+
+fn scan_document_with_context(
+    xml: &[u8],
+    context: Option<&ExecutionContext>,
+) -> TransactionResult<Layout> {
+    // A plain `Reader` and the shared binding tracker replace `NsReader`
+    // (change 0229's pattern for the paragraph text scanner, applied here by
+    // change 0754). `NsReader::from_reader` is `Reader::from_reader` with the
+    // default configuration, so the tokenizer and every tokenizer error are
+    // unchanged, and `BindingTracker` reproduces the resolver's push, deferred
+    // pop and namespace errors byte for byte. Events borrow the input instead
+    // of being copied, and a name is resolved only where a verdict reads its
+    // namespace: the document root, every `body`, and the four classified
+    // direct-body children. `scan_document_with_context_nsreader_oracle`
+    // keeps the previous implementation for the differential tests.
+    let mut reader = Reader::from_reader(xml);
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
+    let mut paragraphs = Vec::new();
+    let mut tables = Vec::new();
+    let mut block_controls = Vec::new();
+    let mut body_depth = None;
+    let mut body_end = None;
+    let mut final_section_start = None;
+    let mut pending = None::<(bool, bool, bool, bool, usize)>;
+    let mut conformance = None;
+    let mut saw_document = false;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    // Namespace accounting is only needed for the managed work charge. Keep
+    // this state out of ordinary/unmanaged layout scans so they retain their
+    // prior allocation and parsing behavior.
+    let mut namespace_bindings = context.map(|_| 2usize);
+    let mut namespace_scopes = context.map(|_| Vec::<usize>::new());
+    // quick-xml consumes a leading UTF-8 BOM before its first event and does
+    // not include those bytes in `buffer_position()`. Layout ranges address
+    // the retained source buffer, so carry the prefix into every event span
+    // used below. This keeps managed and unmanaged scans on the same source
+    // coordinates and preserves exact paragraph/table slices.
+    let bom_offset =
+        usize::from(xml.starts_with(UTF8_BYTE_ORDER_MARK)) * UTF8_BYTE_ORDER_MARK.len();
+
+    loop {
+        if let Some(context) = context {
+            context.check().map_err(managed_execution)?;
+        }
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_conversion_error| {
+                crate::Error::InvalidFormat("document offset does not fit usize".into())
+            })?
+            .checked_add(bom_offset)
+            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        // `NsReader` applies the deferred pop of the previous `End` or `Empty`
+        // scope when it is asked for the next event.
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
+        let event = reader
+            .read_event()
+            .map_err(|error| crate::Error::Xml(error.to_string()))?;
+        // `NsReader` pushes a `Start`/`Empty` scope before it returns the
+        // event, so a namespace error preempts the event exactly where its
+        // `read_event` returned `Err`. The tracker's error text is the
+        // `NamespaceError` display that `quick_xml::Error::Namespace`
+        // forwards, so the `Error::Xml` message is unchanged.
+        match &event {
+            Event::Start(element) => tracker
+                .push(element)
+                .map_err(|error| crate::Error::Xml(error.to_string()))?,
+            Event::Empty(element) => {
+                tracker
+                    .push(element)
+                    .map_err(|error| crate::Error::Xml(error.to_string()))?;
+                pending_pop = true;
+            },
+            Event::End(_) => pending_pop = true,
+            _ => {},
+        }
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_conversion_error| {
+                crate::Error::InvalidFormat("document offset does not fit usize".into())
+            })?
+            .checked_add(bom_offset)
+            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        let event_bytes = event_end.saturating_sub(event_start).max(1);
+        let (event_namespace_bindings, active_namespace_bindings) = if namespace_bindings.is_some()
+        {
+            let event_namespace_bindings = event_namespace_binding_count(&event);
+            let current_bindings = namespace_bindings.ok_or_else(|| {
+                crate::Error::InvalidFormat("managed namespace accounting state disappeared".into())
+            })?;
+            let active_namespace_bindings = current_bindings
+                .checked_add(event_namespace_bindings)
+                .ok_or(TransactionError::Limit {
+                    resource: "document namespace binding count",
+                    max: usize::MAX,
+                    actual: usize::MAX,
+                })?;
+            (event_namespace_bindings, active_namespace_bindings)
+        } else {
+            (0, 0)
+        };
+        if let Some(context) = context {
+            // NamespaceResolver resolves a qualified name by scanning the
+            // in-scope binding list. Charge the observed event span against
+            // that list before any later layout/index allocation; this keeps
+            // namespace-heavy input bounded without blind XML-size-squared
+            // prepayment for ordinary documents.
+            let lookup_work = event_bytes
+                .checked_mul(active_namespace_bindings.saturating_add(1))
+                .ok_or(TransactionError::Limit {
+                    resource: "document namespace lookup work",
+                    max: usize::MAX,
+                    actual: usize::MAX,
+                })?;
+            consume_managed(context, Resource::Work, lookup_work)?;
+        }
+        if matches!(&event, Event::Start(_))
+            && let (Some(bindings), Some(scopes)) =
+                (namespace_bindings.as_mut(), namespace_scopes.as_mut())
+        {
+            *bindings = active_namespace_bindings;
+            scopes.push(event_namespace_bindings);
+        }
+
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            nodes = nodes.checked_add(1).ok_or_else(|| {
+                crate::Error::InvalidFormat("document element counter overflow".into())
+            })?;
+            if nodes > MAX_DOCUMENT_NODES {
+                return Err(TransactionError::Limit {
+                    resource: "XML elements",
+                    max: MAX_DOCUMENT_NODES,
+                    actual: nodes,
+                });
+            }
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("document XML nesting is too deep".into())
+                })?;
+                if depth > MAX_DOCUMENT_DEPTH {
+                    return Err(TransactionError::Limit {
+                        resource: "XML depth",
+                        max: MAX_DOCUMENT_DEPTH,
+                        actual: depth,
+                    });
+                }
+                // `QName::local_name` and `QName::prefix` split at the same
+                // first colon as this.
+                let (prefix, local) = split_qualified_name(element.name().into_inner());
+                let direct_body_child = body_depth.is_some_and(|body| depth == body + 1);
+                // Every verdict below that reads the namespace also requires
+                // one of these local names, so any other element's name is
+                // never resolved. Resolution has no effect but its result.
+                let namespace = ((depth == 1 && local == b"document")
+                    || local == b"body"
+                    || (direct_body_child && is_classified_body_child(local)))
+                .then(|| tracker.resolve_prefix_bytes(prefix));
+                let is_word = namespace.as_ref().is_some_and(is_wordprocessing_namespace);
+                if depth == 1 && is_word && local == b"document" {
+                    saw_document = true;
+                }
+                if is_word && local == b"body" {
+                    if depth != 2 || !saw_document {
+                        return Err(crate::Error::InvalidFormat(
+                            "WordprocessingML body is not a direct child of the document root"
+                                .into(),
+                        )
+                        .into());
+                    }
+                    if body_depth.is_some() || body_end.is_some() {
+                        return Err(crate::Error::InvalidFormat(
+                            "main document contains multiple bodies".into(),
+                        )
+                        .into());
+                    }
+                    body_depth = Some(depth);
+                    conformance = namespace.as_ref().and_then(conformance_from_namespace);
+                } else if direct_body_child {
+                    let is_paragraph = is_word && local == b"p";
+                    let is_table = is_word && local == b"tbl";
+                    let is_control = is_word && local == b"sdt";
+                    let is_section = is_word && local == b"sectPr";
+                    if final_section_start.is_some() {
+                        return Err(crate::Error::InvalidFormat(
+                            "body-final section properties are not the final body child".into(),
+                        )
+                        .into());
+                    }
+                    pending = Some((is_paragraph, is_table, is_control, is_section, event_start));
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("document XML nesting is too deep".into())
+                })?;
+                if body_depth.is_some_and(|body| child_depth == body + 1) {
+                    let (prefix, local) = split_qualified_name(element.name().into_inner());
+                    let is_word = is_classified_body_child(local)
+                        && is_wordprocessing_namespace(&tracker.resolve_prefix_bytes(prefix));
+                    if final_section_start.is_some() {
+                        return Err(crate::Error::InvalidFormat(
+                            "body-final section properties are not the final body child".into(),
+                        )
+                        .into());
+                    }
+                    if is_word && local == b"p" {
+                        paragraphs.push(checked_range(event_start, event_end)?);
+                    }
+                    if is_word && local == b"tbl" {
+                        tables.push(checked_range(event_start, event_end)?);
+                    }
+                    if is_word && local == b"sdt" {
+                        block_controls.push(checked_range(event_start, event_end)?);
+                    }
+                    if is_word && local == b"sectPr" {
+                        final_section_start = Some(event_start);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let Some((is_paragraph, is_table, is_control, is_section, start)) = pending
+                    && body_depth.is_some_and(|body| depth == body + 1)
+                {
+                    if is_paragraph {
+                        paragraphs.push(checked_range(start, event_end)?);
+                    }
+                    if is_table {
+                        tables.push(checked_range(start, event_end)?);
+                    }
+                    if is_control {
+                        block_controls.push(checked_range(start, event_end)?);
+                    }
+                    if is_section {
+                        final_section_start = Some(start);
+                    }
+                    pending = None;
+                }
+                // The name resolves in the scope its own start tag opened:
+                // the pop is deferred to the next read, as in `NsReader`.
+                if body_depth == Some(depth)
+                    && let (prefix, b"body") = split_qualified_name(element.name().into_inner())
+                    && is_wordprocessing_namespace(&tracker.resolve_prefix_bytes(prefix))
+                {
+                    body_end = Some(event_start);
+                    body_depth = None;
+                }
+                if let (Some(bindings), Some(scopes)) =
+                    (namespace_bindings.as_mut(), namespace_scopes.as_mut())
+                {
+                    let scope_bindings = scopes.pop().ok_or_else(|| {
+                        crate::Error::InvalidFormat("document namespace scope underflow".into())
+                    })?;
+                    *bindings = bindings.checked_sub(scope_bindings).ok_or_else(|| {
+                        crate::Error::InvalidFormat("document namespace binding underflow".into())
+                    })?;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    crate::Error::InvalidFormat("invalid document XML nesting".into())
+                })?;
+            },
+            Event::DocType(_) => {
+                return Err(crate::Error::InvalidFormat(
+                    "DTD declarations are forbidden in a Word main document".into(),
+                )
+                .into());
+            },
+            Event::PI(_) => {
+                return Err(crate::Error::InvalidFormat(
+                    "processing instructions are forbidden in a Word main document".into(),
+                )
+                .into());
+            },
+            Event::Eof if depth != 0 || pending.is_some() => {
+                return Err(crate::Error::InvalidFormat(
+                    "unterminated Word main document XML".into(),
+                )
+                .into());
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    let body_end_offset = body_end.ok_or_else(|| {
+        crate::Error::InvalidFormat("main document has no WordprocessingML body".into())
+    })?;
+    let document_conformance = conformance.ok_or_else(|| {
+        crate::Error::InvalidFormat("main document body has no supported namespace".into())
+    })?;
+    if !saw_document {
+        return Err(crate::Error::InvalidFormat(
+            "main document has no WordprocessingML document root".into(),
+        )
+        .into());
+    }
+    let content_end = u32::try_from(final_section_start.unwrap_or(body_end_offset)).map_err(
+        |_conversion_error| {
+            crate::Error::InvalidFormat("document insertion offset exceeds u32".into())
+        },
+    )?;
+    Ok(Layout {
+        paragraphs,
+        tables,
+        block_controls,
+        content_end,
+        conformance: document_conformance,
+    })
+}
+
+#[cfg(test)]
+fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
     match event {
         Event::Start(element) | Event::Empty(element) => element
             .attributes()
@@ -5726,7 +6180,12 @@ fn event_namespace_binding_count(event: &Event<'_>) -> usize {
     }
 }
 
-fn scan_document_with_context(
+/// Change-0754 differential oracle: the `NsReader` layout scanner that
+/// [`scan_document_with_context`] replaced, retained test-only so the
+/// tracker-driven scan is pinned to its layouts and errors (the change-0229
+/// pattern of `extract_word_text_nsreader_oracle`).
+#[cfg(test)]
+fn scan_document_with_context_nsreader_oracle(
     xml: &[u8],
     context: Option<&ExecutionContext>,
 ) -> TransactionResult<Layout> {
@@ -5778,7 +6237,7 @@ fn scan_document_with_context(
         let event_bytes = event_end.saturating_sub(event_start).max(1);
         let (event_namespace_bindings, active_namespace_bindings) = if namespace_bindings.is_some()
         {
-            let event_namespace_bindings = event_namespace_binding_count(&raw_event);
+            let event_namespace_bindings = oracle_event_namespace_binding_count(&raw_event);
             let current_bindings = namespace_bindings.ok_or_else(|| {
                 crate::Error::InvalidFormat("managed namespace accounting state disappeared".into())
             })?;

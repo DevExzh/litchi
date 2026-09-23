@@ -1025,6 +1025,104 @@ pub fn verify_source_replacement(
         .map_err(ReplacementError::Replacement)
 }
 
+/// A shared allocation whose exact bytes passed [`verify_source`] under
+/// recorded [`Limits`].
+///
+/// A publisher that has already run the source audit on the bytes it is about
+/// to publish can hand this to the writer instead of having the writer audit
+/// the same bytes again. It is a proof, not a claim:
+///
+/// * Its only constructors run the audit, [`Self::verify`] alone or
+///   [`Self::verify_replacement`] as the second half of
+///   [`verify_source_replacement`], and a value exists only when the bytes
+///   passed.
+/// * It keeps the audited allocation alive. `Arc<Vec<u8>>` gives only shared
+///   access while more than one reference exists, and this proof never gives
+///   out another kind, so the audited bytes cannot change while it lives, and
+///   no other allocation can occupy their address.
+/// * [`Self::covers`] accepts a slice only when it has the audited bytes'
+///   exact address and length and the audit ran under the caller's limits.
+///   A slice with that address and length, while the allocation is alive and
+///   immutable, *is* the audited bytes; any copy, substitution or
+///   modification has a different address or length and is not covered.
+///
+/// A writer that receives bytes it cannot prove this way audits them.
+#[derive(Clone)]
+pub struct VerifiedSource {
+    bytes: std::sync::Arc<Vec<u8>>,
+    limits: Limits,
+}
+
+impl VerifiedSource {
+    /// Audit `bytes` with [`verify_source`] and return the proof when they
+    /// pass.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Error`] [`verify_source`] reports for `bytes`.
+    pub fn verify(bytes: std::sync::Arc<Vec<u8>>, limits: Limits) -> Result<Self, Error> {
+        let _report = verify_source(&bytes, limits)?;
+        Ok(Self { bytes, limits })
+    }
+
+    /// Audit `original` and then `replacement` with
+    /// [`verify_source_replacement`], and return the proof for the
+    /// replacement, with how it was established, when both pass.
+    ///
+    /// The verdict and error are exactly those of
+    /// [`verify_source_replacement`], so this answers the source audit of
+    /// `original` too: [`ReplacementError::Original`] carries the error
+    /// `verify_source(original, limits)` reports.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`ReplacementError`] [`verify_source_replacement`] reports.
+    pub fn verify_replacement(
+        original: &[u8],
+        replacement: std::sync::Arc<Vec<u8>>,
+        limits: Limits,
+    ) -> Result<(Self, ReplacementProof), ReplacementError> {
+        let proof = verify_source_replacement(original, &replacement, limits)?;
+        Ok((
+            Self {
+                bytes: replacement,
+                limits,
+            },
+            proof,
+        ))
+    }
+
+    /// The audited allocation.
+    #[must_use]
+    pub const fn bytes(&self) -> &std::sync::Arc<Vec<u8>> {
+        &self.bytes
+    }
+
+    /// The limits the audit ran under.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Whether `bytes` is exactly the audited slice — the same address and
+    /// the same length — and the audit ran under `limits`.
+    #[must_use]
+    pub fn covers(&self, bytes: &[u8], limits: Limits) -> bool {
+        self.limits == limits && core::ptr::eq(self.bytes.as_slice(), bytes)
+    }
+}
+
+impl fmt::Debug for VerifiedSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The payload itself is never printed.
+        formatter
+            .debug_struct("VerifiedSource")
+            .field("bytes", &self.bytes.len())
+            .field("limits", &self.limits)
+            .finish()
+    }
+}
+
 /// Re-derive a window proof from a complete audit of the replacement.
 ///
 /// Debug builds run this for every window proof, so each debug test that
