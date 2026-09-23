@@ -879,6 +879,10 @@ pub fn verify_source_replacement(
     let suffix = common_suffix_len(&original[prefix..], &replacement[prefix..]);
     let mut search =
         WindowSearch::new(replacement, original.len(), prefix, original.len() - suffix);
+    // Every window contains the replacement's differing bytes, and a window
+    // larger than half the replacement is never used: when the difference
+    // alone is that large, do not look for one.
+    search.stopped = (replacement.len() - suffix - prefix).saturating_mul(2) > replacement.len();
     let report = verify_observed(original, limits, Policy::SOURCE, &mut search)
         .map_err(ReplacementError::Original)?;
     if let Some(proof) = search
@@ -1539,7 +1543,12 @@ fn scan<O: Observer>(
         let raw = input
             .get(start..end)
             .ok_or_else(|| Error::malformed(start, "parser position escaped input"))?;
-        let before = Counters::of(state);
+        let listening = observer.listening();
+        let before = if listening {
+            Counters::of(state)
+        } else {
+            Counters::default()
+        };
 
         state.events = checked_add(state.events, 1, Resource::Events, limits.events, start)?;
         check_limit(Resource::TokenBytes, limits.token_bytes, raw.len(), start)?;
@@ -1649,7 +1658,9 @@ fn scan<O: Observer>(
                 break;
             },
         };
-        observer.accepted(token, start, end, before, state);
+        if listening {
+            observer.accepted(token, start, end, before, state);
+        }
     }
     Ok(())
 }
@@ -1726,12 +1737,23 @@ enum Token {
 /// An observer sees each token after it passed every check and updated the
 /// state, and only reads that state, so it cannot change a verdict.
 trait Observer {
+    /// Whether the observer still wants tokens. Once it answers `false`, the
+    /// scan charges it nothing but this question.
+    fn listening(&self) -> bool {
+        true
+    }
+
     /// `before` holds the counters as they stood before `token` was charged;
     /// `state` is the auditor's state after it.
     fn accepted(&mut self, token: Token, start: usize, end: usize, before: Counters, state: &State);
 }
 
 impl Observer for () {
+    #[inline(always)]
+    fn listening(&self) -> bool {
+        false
+    }
+
     #[inline(always)]
     fn accepted(
         &mut self,
@@ -1814,6 +1836,12 @@ impl<'r> WindowSearch<'r> {
 }
 
 impl Observer for WindowSearch<'_> {
+    #[inline]
+    fn listening(&self) -> bool {
+        !self.stopped
+    }
+
+    #[inline]
     fn accepted(
         &mut self,
         token: Token,
@@ -1822,9 +1850,6 @@ impl Observer for WindowSearch<'_> {
         before: Counters,
         state: &State,
     ) {
-        if self.stopped {
-            return;
-        }
         match token {
             Token::Start if start <= self.prefix => {
                 if self.open.try_reserve(1).is_err() {
