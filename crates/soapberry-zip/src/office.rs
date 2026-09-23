@@ -4786,23 +4786,21 @@ where
     /// capture's is, so a capture that follows repeats none of it.
     ///
     /// `Ok(false)` means the archive's own bytes disprove the layout; it is a
-    /// deterministic property of the archive. Only failures that are not a
-    /// property of the bytes — allocation, transport I/O and cancellation —
-    /// are returned as errors.
+    /// deterministic property of the archive ([`Error::is_content_fault`]).
+    /// Every other failure — allocation, limits, transport I/O, cancellation
+    /// — is returned as an error.
     ///
     /// # Errors
     ///
     /// Returns an unknown-entry error for an `entry_id` this archive did not
-    /// issue, and the allocation, I/O or cancellation error that stopped the
-    /// proof.
+    /// issue, and any failure that stopped the proof and is not a content
+    /// fault.
     pub fn precompressed_layout_provable(&self, entry_id: EntryId) -> Result<bool, Error> {
         fn disproven(error: Error) -> Result<bool, Error> {
-            match error.kind() {
-                ErrorKind::Allocation { .. }
-                | ErrorKind::IO(_)
-                | ErrorKind::Io(_)
-                | ErrorKind::Cancelled => Err(error),
-                _ => Ok(false),
+            if error.is_content_fault() {
+                Ok(false)
+            } else {
+                Err(error)
             }
         }
         let indexed = self.indexed_entry(entry_id)?;

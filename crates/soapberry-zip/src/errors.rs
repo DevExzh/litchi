@@ -44,6 +44,34 @@ impl Error {
     pub fn into_kind(self) -> ErrorKind {
         self.inner.kind
     }
+
+    /// Whether this error is a property of the archive's own bytes — a
+    /// malformed, inconsistent or unsupported record or payload — rather than
+    /// of resources, transport, cancellation or caller policy.
+    ///
+    /// Reading the same bytes again under the same limits reproduces a
+    /// content fault exactly, so a caller may treat it as a deterministic
+    /// verdict about the archive. Every other error — allocation, a declared
+    /// size above a caller's limit, I/O, cancellation, worker or spool
+    /// failures, and any kind added later — is not a content fault.
+    #[must_use]
+    pub fn is_content_fault(&self) -> bool {
+        matches!(
+            self.inner.kind,
+            ErrorKind::MissingEndOfCentralDirectory
+                | ErrorKind::MissingZip64EndOfCentralDirectory
+                | ErrorKind::InvalidSignature { .. }
+                | ErrorKind::InvalidChecksum { .. }
+                | ErrorKind::InvalidSize { .. }
+                | ErrorKind::InvalidUtf8(_)
+                | ErrorKind::InvalidInput { .. }
+                | ErrorKind::InvalidEndOfCentralDirectory
+                | ErrorKind::Eof
+                | ErrorKind::FileNotFound(_)
+                | ErrorKind::UnsupportedCompressionMethod(_)
+                | ErrorKind::UnsupportedPreservation { .. }
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -367,5 +395,49 @@ mod tests {
                 .downcast_ref::<std::collections::TryReserveError>()
                 .is_some()
         );
+    }
+
+    #[test]
+    fn content_faults_are_properties_of_the_bytes_and_nothing_else_is() {
+        let faults = [
+            ErrorKind::MissingEndOfCentralDirectory,
+            ErrorKind::InvalidSignature {
+                expected: 1,
+                actual: 2,
+            },
+            ErrorKind::InvalidChecksum {
+                expected: 1,
+                actual: 2,
+            },
+            ErrorKind::InvalidSize {
+                expected: 193,
+                actual: 177,
+            },
+            ErrorKind::InvalidInput {
+                msg: "trailing input".to_owned(),
+            },
+            ErrorKind::Eof,
+            ErrorKind::UnsupportedCompressionMethod(99),
+        ];
+        for kind in faults {
+            assert!(Error::from(kind).is_content_fault());
+        }
+        let others = [
+            ErrorKind::Allocation {
+                resource: "test allocation",
+                source: Vec::<u8>::new().try_reserve_exact(usize::MAX).unwrap_err(),
+            },
+            ErrorKind::LimitExceeded {
+                resource: super::LimitResource::CompressedSize,
+                actual: 2,
+                maximum: 1,
+            },
+            ErrorKind::IO(std::io::Error::other("transport")),
+            ErrorKind::Cancelled,
+            ErrorKind::BufferTooSmall,
+        ];
+        for kind in others {
+            assert!(!Error::from(kind).is_content_fault());
+        }
     }
 }
