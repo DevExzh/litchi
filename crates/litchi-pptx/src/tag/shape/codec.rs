@@ -302,16 +302,79 @@ fn selected_layout(owner: &dyn OpcPart, key: crate::shape::Key<'_>) -> Result<La
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
     let scene = crate::shape::read(xml)?;
     let shape = scene.shape(key)?;
-    selected_raw_span_for_shape(xml, shape, scene.len())
+    selected_raw_span_for_shape(xml, &scene, shape)
 }
 
+/// Map `shape`, selected from `scene`, back to its span in the raw owner XML.
+///
+/// `scene` must have been read from `xml`; when it read these very bytes
+/// without markup-compatibility processing, its successful read is reused as
+/// the proof the separate raw offset pass would establish.
 pub(crate) fn selected_raw_span_for_shape(
     xml: &[u8],
+    scene: &crate::shape::Scene<'_>,
     shape: crate::shape::Shape<'_>,
-    scene_len: usize,
 ) -> Result<Range<usize>> {
     let family = selected_family(shape)?;
-    raw_shape_span(xml, shape.common().index(), scene_len, family)
+    let index = shape.common().index();
+    if !scene_proves_unmarked_owner(scene, xml) {
+        return raw_shape_span(xml, index, scene.len(), family, false);
+    }
+    let span = raw_shape_span(xml, index, scene.len(), family, true);
+    // Test and debug builds re-run the separate offset pass and the MCE
+    // offset selection, so the crate's suite proves the unmarked route
+    // returns exactly the span, or exactly the refusal, of the full route.
+    #[cfg(debug_assertions)]
+    {
+        let full = raw_shape_span(xml, index, scene.len(), family, false);
+        debug_assert_eq!(
+            format!("{span:?}"),
+            format!("{full:?}"),
+            "the unmarked raw-span route disagrees with the full route"
+        );
+    }
+    span
+}
+
+/// Whether a successful read of `scene` proves everything the raw offset
+/// pass and the MCE offset selection would establish for `xml`.
+///
+/// The scene read these very bytes (the same allocation and length) and
+/// needed no markup-compatibility rewrite, so the MCE namespace occurs
+/// nowhere in them and the offset selection would keep every offset. The
+/// scene's reader has the configuration the raw passes use, so those bytes
+/// raise no reader error, and its element ceiling is no looser than the raw
+/// passes' node ceiling, so they count no more elements than that ceiling
+/// allows. Its input ceiling is likewise no looser than the raw owner limit.
+fn scene_proves_unmarked_owner(scene: &crate::shape::Scene<'_>, xml: &[u8]) -> bool {
+    !scene.is_rewritten()
+        && std::ptr::eq(scene.xml(), xml)
+        && scene.limits().nodes() <= MAX_OWNER_NODES
+        && scene.limits().input_bytes() <= MAX_OWNER_BYTES
+}
+
+/// Which shape-tree and candidate elements markup compatibility leaves
+/// active: every one of them in unmarked XML, else exactly the offsets the
+/// MCE offset selection returned, consumed in source order.
+enum ActiveShapes {
+    Every,
+    Offsets(std::iter::Peekable<std::vec::IntoIter<u32>>),
+}
+
+impl ActiveShapes {
+    fn take(&mut self, start: usize) -> Result<bool> {
+        match self {
+            Self::Every => offset_u32(start).map(|_| true),
+            Self::Offsets(active) => take_active(active, start),
+        }
+    }
+
+    fn is_exhausted(&mut self) -> bool {
+        match self {
+            Self::Every => true,
+            Self::Offsets(active) => active.peek().is_none(),
+        }
+    }
 }
 
 fn selected_family(shape: crate::shape::Shape<'_>) -> Result<Family> {
@@ -336,15 +399,27 @@ fn raw_shape_span(
     selected_index: usize,
     scene_len: usize,
     expected_family: Family,
+    unmarked: bool,
 ) -> Result<Range<usize>> {
-    let offsets = raw_shape_offsets(xml)?;
-    let active = active_offsets(
-        xml,
-        &offsets,
-        &shape_mce_capabilities(),
-        &OffsetLimits::default(),
-    )?;
-    let mut active = active.into_iter().peekable();
+    let mut active = if unmarked {
+        // The raw offset pass would refuse an oversized owner first.
+        if xml.len() > MAX_OWNER_BYTES {
+            return Err(Error::Limit {
+                resource: "shape-tag owner XML bytes",
+                limit: MAX_OWNER_BYTES,
+            });
+        }
+        ActiveShapes::Every
+    } else {
+        let offsets = raw_shape_offsets(xml)?;
+        let active = active_offsets(
+            xml,
+            &offsets,
+            &shape_mce_capabilities(),
+            &OffsetLimits::default(),
+        )?;
+        ActiveShapes::Offsets(active.into_iter().peekable())
+    };
     let mut reader = NsReader::from_reader(xml);
     let mut frames = Vec::new();
     let mut nodes = 0usize;
@@ -369,8 +444,7 @@ fn raw_shape_span(
                 bump_nodes(&mut nodes)?;
                 let (shape_tree, candidate) = classification
                     .ok_or_else(|| invalid("raw shape start lost its classification"))?;
-                let active_event =
-                    (shape_tree || candidate.is_some()) && take_active(&mut active, start)?;
+                let active_event = (shape_tree || candidate.is_some()) && active.take(start)?;
                 let active_tree = shape_tree && active_event;
                 let active_candidate = candidate.filter(|_| active_event);
 
@@ -416,8 +490,7 @@ fn raw_shape_span(
                 bump_nodes(&mut nodes)?;
                 let (shape_tree, candidate) = classification
                     .ok_or_else(|| invalid("raw empty shape lost its classification"))?;
-                let active_event =
-                    (shape_tree || candidate.is_some()) && take_active(&mut active, start)?;
+                let active_event = (shape_tree || candidate.is_some()) && active.take(start)?;
                 let active_tree = shape_tree && active_event;
                 let active_candidate = candidate.filter(|_| active_event);
                 if active_tree {
@@ -470,7 +543,7 @@ fn raw_shape_span(
     if !frames.is_empty() {
         return Err(invalid("raw shape-map XML is unterminated"));
     }
-    if active.peek().is_some() {
+    if !active.is_exhausted() {
         return Err(invalid("raw shape-map active offsets were not consumed"));
     }
     if mapped != scene_len {

@@ -72,12 +72,15 @@ pub(crate) fn limit(resource: &'static str, limit: usize) -> crate::Error {
     crate::Error::Limit { resource, limit }
 }
 
-pub(crate) fn resolved(value: quick_xml::name::ResolveResult<'_>) -> crate::Result<String> {
+/// The namespace a resolved XML name is bound to, borrowed from the resolver.
+///
+/// An unbound name is the empty namespace; an undeclared prefix is refused.
+pub(crate) fn resolved<'a>(value: quick_xml::name::ResolveResult<'a>) -> crate::Result<&'a str> {
     match value {
         quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(value)) => {
-            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+            std::str::from_utf8(value).map_err(xml_error)
         },
-        quick_xml::name::ResolveResult::Unbound => Ok(String::new()),
+        quick_xml::name::ResolveResult::Unbound => Ok(""),
         quick_xml::name::ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound XML prefix '{}'",
             String::from_utf8_lossy(prefix.as_ref())

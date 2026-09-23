@@ -1,5 +1,7 @@
 //! Borrowed slide, layout, and master part views.
 
+use std::borrow::Cow;
+
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -341,62 +343,72 @@ fn semantic_mce_limits() -> MceLimits {
     }
 }
 
-fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
-    if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "semantic slide raw XML bytes",
-            limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
-        });
-    }
-
+/// A reader configured exactly as both semantic-text passes configure theirs.
+fn semantic_text_reader(xml: &[u8]) -> NsReader<&[u8]> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
-    let mut budget = SemanticTextXmlBudget::default();
-    let mut root_seen = false;
-    let mut declaration_seen = false;
-    let mut document_event_seen = false;
+    reader
+}
 
-    loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
-        let declaration_is_first = !document_event_seen;
-        if !matches!(&event, Event::Eof) {
-            document_event_seen = true;
+/// Raw-byte validation of one slide for semantic text, one event at a time.
+///
+/// [`Self::observe`] applies to each event exactly the checks the raw scan
+/// applies, in the same order, so the stand-alone scan and the single-pass
+/// route refuse the same event with the same error.
+#[derive(Default)]
+struct RawTextScan {
+    budget: SemanticTextXmlBudget,
+    root_seen: bool,
+    declaration_seen: bool,
+    document_event_seen: bool,
+}
+
+impl RawTextScan {
+    /// Validate one event; returns `true` once the document is complete.
+    ///
+    /// `namespace` is the element namespace `read_resolved_event` returned
+    /// with `event`. For a start, empty or end element that is the value
+    /// `resolve_element(name)` returns against the same bindings, which is
+    /// what the scan validates.
+    fn observe(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: &ResolveResult<'_>,
+        event: &Event<'_>,
+    ) -> Result<bool> {
+        let declaration_is_first = !self.document_event_seen;
+        if !matches!(event, Event::Eof) {
+            self.document_event_seen = true;
         }
-        budget.observe_event(semantic_event_bytes(&event))?;
+        self.budget.observe_event(semantic_event_bytes(event))?;
         match event {
             Event::Start(element) => {
-                let _ = namespace;
-                validate_semantic_attributes(&element)?;
-                validate_semantic_attribute_names(&reader, &element)?;
-                let namespace = reader.resolver().resolve_element(element.name()).0;
-                validate_semantic_element_namespace(&namespace)?;
-                if budget.depth == 0 {
-                    if root_seen {
+                validate_semantic_attributes(element)?;
+                validate_semantic_attribute_names(reader, element)?;
+                validate_semantic_element_namespace(namespace)?;
+                if self.budget.depth == 0 {
+                    if self.root_seen {
                         return Err(invalid("semantic slide XML has multiple roots"));
                     }
-                    root_seen = true;
+                    self.root_seen = true;
                 }
-                budget.start()?;
+                self.budget.start()?;
             },
             Event::Empty(element) => {
-                let _ = namespace;
-                validate_semantic_attributes(&element)?;
-                validate_semantic_attribute_names(&reader, &element)?;
-                let namespace = reader.resolver().resolve_element(element.name()).0;
-                validate_semantic_element_namespace(&namespace)?;
-                if budget.depth == 0 {
-                    if root_seen {
+                validate_semantic_attributes(element)?;
+                validate_semantic_attribute_names(reader, element)?;
+                validate_semantic_element_namespace(namespace)?;
+                if self.budget.depth == 0 {
+                    if self.root_seen {
                         return Err(invalid("semantic slide XML has multiple roots"));
                     }
-                    root_seen = true;
+                    self.root_seen = true;
                 }
             },
             Event::End(_) => {
-                validate_semantic_element_namespace(&namespace)?;
-                budget.end()?;
+                validate_semantic_element_namespace(namespace)?;
+                self.budget.end()?;
             },
             Event::DocType(_) => {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
@@ -407,10 +419,10 @@ fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
                 ));
             },
             Event::Decl(_) => {
-                if declaration_seen || !declaration_is_first || root_seen {
+                if self.declaration_seen || !declaration_is_first || self.root_seen {
                     return Err(invalid("XML declarations must be the first document event"));
                 }
-                declaration_seen = true;
+                self.declaration_seen = true;
             },
             Event::Text(text) => {
                 let decoded = text
@@ -423,11 +435,12 @@ fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
                         limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
-                if budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace) {
+                if self.budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
+                {
                     return Err(invalid("semantic slide XML has text outside its root"));
                 }
             },
-            Event::CData(_) if budget.depth == 0 => {
+            Event::CData(_) if self.budget.depth == 0 => {
                 return Err(invalid("slide XML has CDATA outside its document root"));
             },
             Event::CData(text) => {
@@ -449,7 +462,7 @@ fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
                 validate_xml_comment(&decoded)?;
             },
             Event::GeneralRef(reference) => {
-                if budget.depth == 0 {
+                if self.budget.depth == 0 {
                     return Err(invalid("XML entity reference is outside the document root"));
                 }
                 if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
@@ -460,14 +473,43 @@ fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
                 }
             },
             Event::Eof => {
-                if !root_seen {
+                if !self.root_seen {
                     return Err(invalid("semantic slide XML lacks an element root"));
                 }
-                if budget.depth != 0 {
+                if self.budget.depth != 0 {
                     return Err(invalid("semantic slide XML has unbalanced elements"));
                 }
-                return Ok(());
+                return Ok(true);
             },
+        }
+        Ok(false)
+    }
+}
+
+fn check_semantic_text_raw_len(xml: &[u8]) -> Result<()> {
+    if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "semantic slide raw XML bytes",
+            limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
+    check_semantic_text_raw_len(xml)?;
+    let mut reader = semantic_text_reader(xml);
+    let mut scan = RawTextScan::default();
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        if scan.observe(&reader, &namespace, &event)? {
+            return Ok(());
         }
     }
 }
@@ -506,6 +548,14 @@ struct SemanticTextParser<'a> {
     runs: usize,
     objects: usize,
     paragraph_separator: &'a str,
+    /// Whether the raw scan validates each event before this parser reads it.
+    ///
+    /// Only the single-pass route sets it. There the raw scan has already
+    /// accepted the element's attribute values and attribute-name prefixes
+    /// for this very event against these very bindings; both checks are pure
+    /// functions of the two, so repeating them cannot fail and is skipped.
+    /// Every check that is not a repetition of the raw scan still runs.
+    raw_validated: bool,
 }
 
 impl<'a> SemanticTextParser<'a> {
@@ -521,7 +571,48 @@ impl<'a> SemanticTextParser<'a> {
             runs: 0,
             objects: 0,
             paragraph_separator,
+            raw_validated: false,
         }
+    }
+
+    /// The parser for the single-pass route, whose raw scan validates every
+    /// event first.
+    fn after_raw_scan(paragraph_separator: &'a str) -> Self {
+        Self {
+            raw_validated: true,
+            ..Self::new(paragraph_separator)
+        }
+    }
+
+    /// The attribute-value check of the semantic pass, which on the
+    /// single-pass route repeats the raw scan's check of the same element.
+    fn validate_attributes(&self, element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+        if self.raw_validated {
+            debug_assert!(
+                validate_semantic_attributes(element).is_ok(),
+                "the raw scan accepted attributes the semantic pass refuses"
+            );
+            return Ok(());
+        }
+        validate_semantic_attributes(element)
+    }
+
+    /// The attribute-name check of the semantic pass, which on the
+    /// single-pass route repeats the raw scan's check of the same element
+    /// against the same bindings.
+    fn validate_attribute_names(
+        &self,
+        reader: &NsReader<&[u8]>,
+        element: &quick_xml::events::BytesStart<'_>,
+    ) -> Result<()> {
+        if self.raw_validated {
+            debug_assert!(
+                validate_semantic_attribute_names(reader, element).is_ok(),
+                "the raw scan accepted attribute names the semantic pass refuses"
+            );
+            return Ok(());
+        }
+        validate_semantic_attribute_names(reader, element)
     }
 }
 
@@ -583,7 +674,7 @@ impl<'a> SemanticTextParser<'a> {
         namespace: &ResolveResult<'_>,
         element: &quick_xml::events::BytesStart<'_>,
     ) -> Result<()> {
-        validate_semantic_attributes(element)?;
+        self.validate_attributes(element)?;
         if element.name().local_name().as_ref() == b"t" {
             if !is_drawingml_element(namespace, element.name(), b"t") {
                 return Err(invalid(
@@ -615,7 +706,7 @@ impl<'a> SemanticTextParser<'a> {
         namespace: &ResolveResult<'_>,
         element: &quick_xml::events::BytesStart<'_>,
     ) -> Result<()> {
-        validate_semantic_attributes(element)?;
+        self.validate_attributes(element)?;
         if element.name().local_name().as_ref() == b"t" {
             if !is_drawingml_element(namespace, element.name(), b"t") {
                 return Err(invalid(
@@ -709,6 +800,30 @@ impl<'a> SemanticTextParser<'a> {
             });
         }
         self.append_text_fragment(&decoded)
+    }
+
+    /// Consume one event read from `reader`, with the element-name check the
+    /// semantic pass applies before the event itself.
+    ///
+    /// `namespace` is the element namespace `read_resolved_event` returned,
+    /// the value `resolve_element(name)` returns against the same bindings.
+    fn consume_event(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: ResolveResult<'_>,
+        event: Event<'_>,
+    ) -> Result<bool> {
+        match event {
+            Event::Start(element) => {
+                self.validate_attribute_names(reader, &element)?;
+                self.consume(namespace, Event::Start(element))
+            },
+            Event::Empty(element) => {
+                self.validate_attribute_names(reader, &element)?;
+                self.consume(namespace, Event::Empty(element))
+            },
+            event => self.consume(namespace, event),
+        }
     }
 
     fn consume(&mut self, namespace: ResolveResult<'_>, event: Event<'_>) -> Result<bool> {
@@ -819,41 +934,99 @@ impl<'a> SemanticTextParser<'a> {
 
 fn semantic_text_from_part(part: &dyn Part, paragraph_separator: &str) -> Result<String> {
     let raw = part.blob();
-    scan_raw_semantic_text_xml(raw)?;
+    check_semantic_text_raw_len(raw)?;
+    // Markup-compatibility processing is a pure function of the raw bytes,
+    // so running it before the raw scan changes no value; only the order in
+    // which failures are reported could move, and both routes below restore
+    // the scan-first order.
     let processed =
-        process_markup_compatibility(raw, &Capabilities::ooxml_baseline(), &semantic_mce_limits())?;
+        process_markup_compatibility(raw, &Capabilities::ooxml_baseline(), &semantic_mce_limits());
+    // The single pass drops the processed-size check below. A borrowed MCE
+    // output is the raw slice, already within the raw ceiling, so that check
+    // cannot fire while the processed ceiling is at least the raw one (both
+    // are 64 MiB). Changing either limit must keep this ordering or restore
+    // the check on the single-pass route.
+    const _: () = assert!(
+        MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES >= MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+        "the single-pass semantic text route relies on the processed ceiling covering the raw one"
+    );
+    if let Ok(output) = &processed
+        && let Cow::Borrowed(unchanged) = &output.xml
+        && std::ptr::eq(*unchanged, raw)
+    {
+        // A marker-free slide: the processed bytes are the raw bytes, which
+        // are within both ceilings, so the two passes would read one event
+        // stream. Read it once.
+        return semantic_text_single_pass(raw, paragraph_separator);
+    }
+    scan_raw_semantic_text_xml(raw)?;
+    let processed = processed?;
     if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
         return Err(Error::Limit {
             resource: "semantic slide processed XML bytes",
             limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
         });
     }
+    parse_semantic_text(processed.xml.as_ref(), paragraph_separator)
+}
 
-    let mut reader = NsReader::from_reader(processed.xml.as_ref());
-    reader.config_mut().trim_text(false);
-    reader.config_mut().check_end_names = true;
+/// The semantic pass over already-scanned, MCE-processed slide XML.
+fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<String> {
+    let mut reader = semantic_text_reader(xml);
     let mut parser = SemanticTextParser::new(paragraph_separator);
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let finished = match event {
-            Event::Start(element) => {
-                let _ = namespace;
-                validate_semantic_attribute_names(&reader, &element)?;
-                let namespace = reader.resolver().resolve_element(element.name()).0;
-                parser.consume(namespace, Event::Start(element))?
-            },
-            Event::Empty(element) => {
-                let _ = namespace;
-                validate_semantic_attribute_names(&reader, &element)?;
-                let namespace = reader.resolver().resolve_element(element.name()).0;
-                parser.consume(namespace, Event::Empty(element))?
-            },
-            event => parser.consume(namespace, event)?,
-        };
-        if finished {
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        if parser.consume_event(&reader, namespace, event)? {
             return Ok(parser.output);
+        }
+    }
+}
+
+/// Both passes over one event stream, for a slide whose processed bytes are
+/// its raw bytes.
+///
+/// The raw scan refuses before the semantic pass ever starts, so a raw
+/// failure at any event outranks a semantic failure at any event, earlier or
+/// later. Each event is therefore validated by the raw scan first, and a raw
+/// failure is returned at once; a semantic failure is only recorded, the
+/// semantic pass stops, and the raw scan continues to the end, where the
+/// recorded failure is returned only if the raw scan passed. The semantic
+/// pass consumes exactly the prefix of the stream it would have consumed
+/// alone, so its value and its first failure are unchanged.
+fn semantic_text_single_pass(xml: &[u8], paragraph_separator: &str) -> Result<String> {
+    let mut reader = semantic_text_reader(xml);
+    let mut scan = RawTextScan::default();
+    let mut parser = SemanticTextParser::after_raw_scan(paragraph_separator);
+    let mut deferred = None;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let complete = scan.observe(&reader, &namespace, &event)?;
+        if deferred.is_none() {
+            match parser.consume_event(&reader, namespace, event) {
+                Ok(finished) => debug_assert_eq!(
+                    finished, complete,
+                    "the semantic pass finished on a different event from the raw scan"
+                ),
+                Err(error) => deferred = Some(error),
+            }
+        }
+        if complete {
+            return match deferred {
+                Some(error) => Err(error),
+                None => Ok(parser.output),
+            };
         }
     }
 }
@@ -1285,6 +1458,198 @@ mod tests {
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::part::BlobPart;
 
+    // The two semantic-text passes as they stood before change 0743,
+    // verbatim: a complete raw scan, then markup-compatibility processing,
+    // then the semantic pass over the processed bytes. The single-pass route
+    // must return exactly their value and exactly their first refusal.
+    use super::{
+        Capabilities, Event, MAX_SEMANTIC_TEXT_EVENT_BYTES, MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+        MAX_SEMANTIC_TEXT_RAW_XML_BYTES, MAX_SEMANTIC_TEXT_REFERENCE_BYTES, NsReader, Part, Result,
+        SemanticTextParser, SemanticTextXmlBudget, invalid, process_markup_compatibility,
+        semantic_event_bytes, semantic_mce_limits, validate_semantic_attribute_names,
+        validate_semantic_attributes, validate_semantic_element_namespace, validate_xml_characters,
+        validate_xml_comment,
+    };
+
+    fn oracle_scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
+        if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
+            return Err(Error::Limit {
+                resource: "semantic slide raw XML bytes",
+                limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+            });
+        }
+
+        let mut reader = NsReader::from_reader(xml);
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        let mut budget = SemanticTextXmlBudget::default();
+        let mut root_seen = false;
+        let mut declaration_seen = false;
+        let mut document_event_seen = false;
+
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let declaration_is_first = !document_event_seen;
+            if !matches!(&event, Event::Eof) {
+                document_event_seen = true;
+            }
+            budget.observe_event(semantic_event_bytes(&event))?;
+            match event {
+                Event::Start(element) => {
+                    let _ = namespace;
+                    validate_semantic_attributes(&element)?;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    validate_semantic_element_namespace(&namespace)?;
+                    if budget.depth == 0 {
+                        if root_seen {
+                            return Err(invalid("semantic slide XML has multiple roots"));
+                        }
+                        root_seen = true;
+                    }
+                    budget.start()?;
+                },
+                Event::Empty(element) => {
+                    let _ = namespace;
+                    validate_semantic_attributes(&element)?;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    validate_semantic_element_namespace(&namespace)?;
+                    if budget.depth == 0 {
+                        if root_seen {
+                            return Err(invalid("semantic slide XML has multiple roots"));
+                        }
+                        root_seen = true;
+                    }
+                },
+                Event::End(_) => {
+                    validate_semantic_element_namespace(&namespace)?;
+                    budget.end()?;
+                },
+                Event::DocType(_) => {
+                    return Err(invalid("DTD declarations are not permitted in slide text"));
+                },
+                Event::PI(_) => {
+                    return Err(invalid(
+                        "processing instructions are not permitted in slide text",
+                    ));
+                },
+                Event::Decl(_) => {
+                    if declaration_seen || !declaration_is_first || root_seen {
+                        return Err(invalid("XML declarations must be the first document event"));
+                    }
+                    declaration_seen = true;
+                },
+                Event::Text(text) => {
+                    let decoded = text
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_characters(&decoded)?;
+                    if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                        return Err(Error::Limit {
+                            resource: "semantic slide decoded text event bytes",
+                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        });
+                    }
+                    if budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
+                    {
+                        return Err(invalid("semantic slide XML has text outside its root"));
+                    }
+                },
+                Event::CData(_) if budget.depth == 0 => {
+                    return Err(invalid("slide XML has CDATA outside its document root"));
+                },
+                Event::CData(text) => {
+                    let decoded = text
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_characters(&decoded)?;
+                    if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                        return Err(Error::Limit {
+                            resource: "semantic slide decoded text event bytes",
+                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        });
+                    }
+                },
+                Event::Comment(comment) => {
+                    let decoded = comment
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_comment(&decoded)?;
+                },
+                Event::GeneralRef(reference) => {
+                    if budget.depth == 0 {
+                        return Err(invalid("XML entity reference is outside the document root"));
+                    }
+                    if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                        return Err(Error::Limit {
+                            resource: "semantic slide XML reference bytes",
+                            limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        });
+                    }
+                },
+                Event::Eof => {
+                    if !root_seen {
+                        return Err(invalid("semantic slide XML lacks an element root"));
+                    }
+                    if budget.depth != 0 {
+                        return Err(invalid("semantic slide XML has unbalanced elements"));
+                    }
+                    return Ok(());
+                },
+            }
+        }
+    }
+
+    fn oracle_semantic_text_from_part(
+        part: &dyn Part,
+        paragraph_separator: &str,
+    ) -> Result<String> {
+        let raw = part.blob();
+        oracle_scan_raw_semantic_text_xml(raw)?;
+        let processed = process_markup_compatibility(
+            raw,
+            &Capabilities::ooxml_baseline(),
+            &semantic_mce_limits(),
+        )?;
+        if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
+            return Err(Error::Limit {
+                resource: "semantic slide processed XML bytes",
+                limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+            });
+        }
+
+        let mut reader = NsReader::from_reader(processed.xml.as_ref());
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        let mut parser = SemanticTextParser::new(paragraph_separator);
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let finished = match event {
+                Event::Start(element) => {
+                    let _ = namespace;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    parser.consume(namespace, Event::Start(element))?
+                },
+                Event::Empty(element) => {
+                    let _ = namespace;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    parser.consume(namespace, Event::Empty(element))?
+                },
+                event => parser.consume(namespace, event)?,
+            };
+            if finished {
+                return Ok(parser.output);
+            }
+        }
+    }
+
     fn slide_part(xml: &[u8]) -> BlobPart {
         BlobPart::new(
             PackURI::new("/ppt/slides/slide1.xml").unwrap(),
@@ -1385,5 +1750,246 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    fn slide(body: &str) -> Vec<u8> {
+        format!(r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}"><p:cSld><p:spTree>{body}</p:spTree></p:cSld></p:sld>"#)
+            .into_bytes()
+    }
+
+    type TextOutcome = std::result::Result<String, String>;
+
+    fn text_outcome(result: Result<String>) -> TextOutcome {
+        result.map_err(|error| format!("{error:?}"))
+    }
+
+    /// Compare the routed semantic text with the three-pass oracle for one
+    /// input and both separators. Returns (compared, accepted).
+    fn assert_text_routes_agree(label: &str, xml: &[u8]) -> (usize, usize) {
+        let part = slide_part(xml);
+        let mut accepted = 0;
+        for separator in ["\n", " | "] {
+            let expected = text_outcome(oracle_semantic_text_from_part(&part, separator));
+            let actual = text_outcome(semantic_text_from_part(&part, separator));
+            assert_eq!(actual, expected, "{label}: separator {separator:?}");
+            accepted += usize::from(expected.is_ok());
+        }
+        (2, accepted)
+    }
+
+    fn text_seeds() -> Vec<Vec<u8>> {
+        let run = |text: &str| {
+            format!("<p:sp><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp>")
+        };
+        let deep = format!("{}{}", "<a:g>".repeat(130), "</a:g>".repeat(130));
+        let mut seeds: Vec<Vec<u8>> = vec![
+            slide(&format!("{}{}", run("one &amp; two"), run("three"))),
+            slide(&run("<![CDATA[raw <text>]]>")),
+            slide(&run("x&#65;y&#x42;z")),
+            slide(&format!("{}<a:br/><a:t/>{}", run("a"), run("b"))),
+            slide(&run("<a:t>nested</a:t>")),
+            slide(&format!("{}<!-- bad -- comment -->", run("<a:t>nested</a:t>"))),
+            slide(&format!("<!-- bad -- comment -->{}", run("<a:t>nested</a:t>"))),
+            slide(&format!("{}<p:x a=\"&#1;\"/>", run("<a:t>nested</a:t>"))),
+            slide(&format!("<q:t>foreign</q:t>{}", run("x"))),
+            slide(&format!("<p:t>foreign</p:t>{}", run("x"))),
+            slide("<![CDATA[outside text]]>"),
+            slide("&amp;"),
+            slide(&run("&unknown;")),
+            slide(&format!("{}<p:x q:a=\"1\"/>", run("x"))),
+            slide(&format!("{}<p:x a=\"1\" a=\"2\"/>", run("x"))),
+            slide(&deep),
+            slide(&format!("<p:x>\u{1}</p:x>{}", run("y"))),
+            format!(r#"<p:notSld xmlns:p="{PML}" xmlns:a="{DML}">{}</p:notSld>"#, run("x")).into_bytes(),
+            format!(r#"<?xml version="1.0"?><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/><?xml version="1.0"?>"#).into_bytes(),
+            format!(r#"<!DOCTYPE d><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"><?pi x?></p:sld>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/>text"#).into_bytes(),
+            format!(r#"<![CDATA[x]]><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"&amp;<p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"><p:a></p:b></p:sld>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}">"#).into_bytes(),
+            format!("\u{feff}<p:sld xmlns:p=\"{PML}\"/>").into_bytes(),
+            format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}" xmlns:mc="{MCE}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree>{}<x:ext><a:t>ignored</a:t></x:ext><mc:AlternateContent><mc:Choice Requires="x"><a:t>choice</a:t></mc:Choice><mc:Fallback><a:t>fallback</a:t></mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#,
+                run("marked")
+            )
+            .into_bytes(),
+            format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}" xmlns:mc="{MCE}"><!-- bad -- --><mc:AlternateContent/></p:sld>"#
+            )
+            .into_bytes(),
+            Vec::new(),
+        ];
+        let mut invalid_utf8 = slide(&run("ok"));
+        invalid_utf8.splice(10..10, b"\xff\xfe".iter().copied());
+        seeds.push(invalid_utf8);
+        seeds
+    }
+
+    fn text_mutations(seed: &[u8], budget: usize) -> Vec<Vec<u8>> {
+        const BYTES: &[u8] = b"<>&\"'/!?=:;\x00\x01\xff x";
+        const SNIPPETS: &[&[u8]] = &[
+            b"<![CDATA[c]]>",
+            b"<?pi x?>",
+            b"<!DOCTYPE d>",
+            b"<!-- c -->",
+            b"<!-- c -- d -->",
+            b"<q:x/>",
+            b"<a:t>t</a:t>",
+            b"<a:t/>",
+            b"&amp;",
+            b"&bad;",
+            b"&#1;",
+            b"</a:t>",
+            b" a=\"&#1;\"",
+        ];
+        let mut output = Vec::new();
+        if seed.is_empty() {
+            return output;
+        }
+        let step = (seed.len() / budget.max(1)).max(1);
+        let mut state = 0x2545_f491_4f6c_dd1d_u64 ^ seed.len() as u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            usize::try_from(state >> 8).unwrap_or(0)
+        };
+        for position in (0..seed.len()).step_by(step) {
+            output.push(seed[..position].to_vec());
+            let mut replaced = seed.to_vec();
+            replaced[position] = BYTES[next() % BYTES.len()];
+            output.push(replaced);
+            let mut inserted = seed[..position].to_vec();
+            inserted.extend_from_slice(SNIPPETS[next() % SNIPPETS.len()]);
+            inserted.extend_from_slice(&seed[position..]);
+            output.push(inserted);
+        }
+        output
+    }
+
+    #[test]
+    fn single_pass_semantic_text_matches_the_three_pass_oracle_on_handcrafted_xml() {
+        let mut compared = 0;
+        let mut accepted = 0;
+        for (index, seed) in text_seeds().iter().enumerate() {
+            let (count, ok) = assert_text_routes_agree(&format!("seed {index}"), seed);
+            compared += count;
+            accepted += ok;
+            for (variant, mutated) in text_mutations(seed, 60).iter().enumerate() {
+                let (count, ok) =
+                    assert_text_routes_agree(&format!("seed {index} variant {variant}"), mutated);
+                compared += count;
+                accepted += ok;
+            }
+        }
+        println!("0743-text-oracle handcrafted compared={compared} accepted={accepted}");
+        assert!(accepted > 0 && accepted < compared);
+    }
+
+    #[test]
+    fn single_pass_semantic_text_matches_the_three_pass_oracle_on_the_pptx_corpus() {
+        fn collect(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(directory) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect(&path, found);
+                } else if path
+                    .extension()
+                    .is_some_and(|extension| extension == "pptx")
+                {
+                    found.push(path);
+                }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut fixtures = Vec::new();
+        collect(&root, &mut fixtures);
+        fixtures.sort();
+        let mut parts = 0;
+        let mut compared = 0;
+        let mut accepted = 0;
+        for fixture in fixtures {
+            let Ok(bytes) = std::fs::read(&fixture) else {
+                continue;
+            };
+            let Ok(package) = litchi_opc::OpcPackage::from_vec(bytes) else {
+                continue;
+            };
+            // Package parts iterate in hash order; visit them by name so the
+            // oracle compares, and mutates, the same parts on every run.
+            let mut named: Vec<_> = package.try_iter_parts().flatten().collect();
+            named.sort_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
+            for part in named {
+                if !part.content_type().ends_with("+xml") {
+                    continue;
+                }
+                let label = format!("{} {}", fixture.display(), part.partname());
+                let (count, ok) = assert_text_routes_agree(&label, part.blob());
+                compared += count;
+                accepted += ok;
+                if part.content_type() == ct::PML_SLIDE && parts % 4 == 0 {
+                    for (variant, mutated) in text_mutations(part.blob(), 16).iter().enumerate() {
+                        let (count, ok) = assert_text_routes_agree(
+                            &format!("{label} variant {variant}"),
+                            mutated,
+                        );
+                        compared += count;
+                        accepted += ok;
+                    }
+                }
+                parts += 1;
+            }
+        }
+        println!("0743-text-oracle corpus parts={parts} compared={compared} accepted={accepted}");
+        assert!(parts >= 300 && accepted > 0 && accepted < compared);
+    }
+
+    /// The precedence the single pass must keep, stated independently of the
+    /// oracle: any raw-scan refusal outranks any semantic refusal, wherever
+    /// either occurs, and a semantic refusal alone is the first one in order.
+    #[test]
+    fn single_pass_keeps_raw_refusals_ahead_of_earlier_semantic_refusals() {
+        let run =
+            "<p:sp><p:txBody><a:p><a:r><a:t>x<a:t>nested</a:t></a:t></a:r></a:p></p:txBody></p:sp>";
+        let foreign = "<q:t>foreign</q:t>";
+        let bad_comment = "<!-- bad -- comment -->";
+        let cases: [(String, &str); 5] = [
+            (format!("{run}{bad_comment}"), "invalid comment"),
+            (format!("{bad_comment}{run}"), "invalid comment"),
+            (
+                run.to_owned(),
+                "nested DrawingML text elements are not permitted",
+            ),
+            (
+                format!("{run}<p:t>second semantic refusal</p:t>"),
+                "nested DrawingML text elements are not permitted",
+            ),
+            (
+                format!("{run}{foreign}"),
+                "unresolved semantic slide element namespace prefix 'q'",
+            ),
+        ];
+        for (body, expected) in cases {
+            let xml = slide(&body);
+            let part = slide_part(&xml);
+            let error = semantic_text_from_part(&part, "\n")
+                .expect_err("each case must refuse")
+                .to_string();
+            assert!(
+                error.contains(expected),
+                "{body}: expected {expected:?}, got {error:?}"
+            );
+        }
     }
 }

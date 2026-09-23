@@ -1,6 +1,7 @@
 //! Detached composition of ordinary presentation-domain edits.
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::sync::{Arc, Weak};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
@@ -15,6 +16,15 @@ pub struct Transaction {
     working: OpcPackage,
     slides: Vec<Slide>,
     slide_name_index: SlideNameIndex,
+    /// Slide payloads this transaction read back as a complete scene when it
+    /// staged them, by part name.
+    ///
+    /// A record is a `Weak`, so it pins no payload, and it vouches only for
+    /// the exact allocation it names: a payload replaced or mutated in place
+    /// since then no longer matches (`Arc::make_mut` on a sole owner
+    /// disassociates weak references). Commit consults it to avoid reading
+    /// the same bytes as a scene a second time; a miss is the ordinary read.
+    scene_read: HashMap<PackURI, Weak<Vec<u8>>>,
 }
 
 impl std::fmt::Debug for Transaction {
@@ -33,8 +43,26 @@ impl Transaction {
             working: source.package.as_ref().clone(),
             slides: source.slides.clone(),
             slide_name_index: source.slide_name_index.clone(),
+            scene_read: HashMap::new(),
             source,
         }
+    }
+
+    /// Record that the payload now staged for `part_name` was read back as a
+    /// complete scene. A part whose shared allocation does not alias its
+    /// visible payload, or a record that cannot be reserved, is simply not
+    /// recorded, which only costs the commit a second read.
+    fn note_scene_read(&mut self, part_name: &PackURI) {
+        let Ok(part) = self.working.get_part(part_name) else {
+            return;
+        };
+        let payload = part.blob_arc();
+        if !std::ptr::eq(payload.as_slice(), part.blob()) || self.scene_read.try_reserve(1).is_err()
+        {
+            return;
+        }
+        self.scene_read
+            .insert(part_name.clone(), Arc::downgrade(&payload));
     }
 
     /// Immutable source root for this transaction.
@@ -199,11 +227,8 @@ impl Transaction {
                 "opened-presentation selected shape has no text body",
             ));
         }
-        let span = crate::tag::shape::selected_raw_span_for_shape(
-            owner.blob(),
-            selected_shape,
-            scene.len(),
-        )?;
+        let span =
+            crate::tag::shape::selected_raw_span_for_shape(owner.blob(), &scene, selected_shape)?;
         let xml = super::xml::rewrite_shape_text(
             owner.blob(),
             span,
@@ -220,6 +245,7 @@ impl Transaction {
         self.working
             .get_part_mut(&selected_slide.part_name)?
             .set_blob(xml);
+        self.note_scene_read(&selected_slide.part_name);
         Ok(true)
     }
 
@@ -251,6 +277,8 @@ impl Transaction {
             self.working
                 .get_part_mut(&selected_slide.part_name)?
                 .set_blob(xml);
+            // Staging read the batch's output back as a complete scene.
+            self.note_scene_read(&selected_slide.part_name);
         }
         Ok(changed)
     }
@@ -1210,7 +1238,12 @@ impl Transaction {
     /// the complete staged package cannot be captured as a coherent snapshot.
     pub fn commit(self) -> Result<Commit> {
         let mut working = self.working;
-        compact_changed_slides(&mut working, self.source.package.as_ref(), &self.slides)?;
+        compact_changed_slides(
+            &mut working,
+            self.source.package.as_ref(),
+            &self.slides,
+            &self.scene_read,
+        )?;
         // The staged package shares every untouched payload allocation with
         // the source snapshot, so the source memo answers every part the
         // transaction did not rewrite; the rewritten ones miss and are hashed.
@@ -1315,28 +1348,73 @@ fn compact_changed_slides(
     working: &mut OpcPackage,
     source: &OpcPackage,
     slides: &[Slide],
+    scene_read: &HashMap<PackURI, Weak<Vec<u8>>>,
 ) -> Result<()> {
     for slide in slides {
         let Ok(before) = source.get_part(&slide.part_name) else {
             continue;
         };
         let after = working.get_part(&slide.part_name)?;
-        if before.blob() == after.blob() {
+        let (before_blob, after_blob) = (before.blob(), after.blob());
+        // An untouched slide shares its payload allocation with the source,
+        // so identity decides equality without comparing every byte.
+        if std::ptr::eq(before_blob, after_blob) || before_blob == after_blob {
             continue;
         }
-        let expected = shape_semantics(after.blob())?;
+        // A payload the transaction already read back as a complete scene
+        // cannot fail that read now, so it is read again only if compaction
+        // changes a byte and the two scenes must be compared.
+        let staged_scene_read = scene_read
+            .get(&slide.part_name)
+            .and_then(Weak::upgrade)
+            .is_some_and(|read| std::ptr::eq(read.as_slice(), after_blob));
+        let expected = if staged_scene_read {
+            debug_assert!(
+                shape_semantics(after.blob()).is_ok(),
+                "a staged slide recorded as read back fails the scene read"
+            );
+            None
+        } else {
+            Some(compaction_scene(after.blob())?)
+        };
         let compact = super::xml::compact_changed_slide_xml(after.blob())?;
-        if shape_semantics(&compact)? != expected {
-            return Err(invalid(
-                "opened-presentation slide compaction changed shape semantics",
-            ));
+        // Compaction that reproduces the staged bytes exactly reads back as
+        // the scene read from those bytes; only different bytes are read
+        // again and compared.
+        if compact.as_slice() != after_blob {
+            let expected = match expected {
+                Some(expected) => expected,
+                None => compaction_scene(after.blob())?,
+            };
+            if compaction_scene(&compact)? != expected {
+                return Err(invalid(
+                    "opened-presentation slide compaction changed shape semantics",
+                ));
+            }
         }
         working.get_part_mut(&slide.part_name)?.set_blob(compact);
     }
     Ok(())
 }
 
-fn shape_semantics(xml: &[u8]) -> Result<Vec<(Option<u32>, Option<String>, Option<String>)>> {
+#[cfg(test)]
+thread_local! {
+    /// Scene reads made by commit compaction on this thread, for tests that
+    /// must show a read was skipped rather than only that the result held.
+    static COMPACTION_SCENE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+type ShapeSemantics = Vec<(Option<u32>, Option<String>, Option<String>)>;
+
+/// The scene read compaction performs, counted in tests. Debug re-derivations
+/// call [`shape_semantics`] directly and are not counted.
+fn compaction_scene(xml: &[u8]) -> Result<ShapeSemantics> {
+    #[cfg(test)]
+    COMPACTION_SCENE_READS.with(|reads| reads.set(reads.get() + 1));
+    shape_semantics(xml)
+}
+
+fn shape_semantics(xml: &[u8]) -> Result<ShapeSemantics> {
     let scene = crate::shape::Scene::read(xml)?;
     Ok(scene
         .iter()
@@ -1958,5 +2036,195 @@ impl Commit {
     #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
+    }
+}
+
+#[cfg(test)]
+mod compaction_tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "focused compaction tests use panic-on-fixture-failure assertions"
+    )]
+
+    use std::sync::Arc;
+
+    use super::{COMPACTION_SCENE_READS, compact_changed_slides};
+    use crate::{Package, Result};
+
+    fn take_scene_reads() -> usize {
+        COMPACTION_SCENE_READS.with(|reads| reads.replace(0))
+    }
+
+    fn three_slide_snapshot() -> Result<super::Snapshot> {
+        let mut package = Package::new()?;
+        for index in 0..3 {
+            let slide = package.presentation_mut()?.add_slide()?;
+            slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
+        }
+        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+    }
+
+    fn blob(package: &litchi_opc::OpcPackage, slide: &super::Slide) -> Arc<Vec<u8>> {
+        package.get_part(&slide.part_name).unwrap().blob_arc()
+    }
+
+    #[test]
+    fn untouched_slides_keep_their_allocation_and_a_reproduced_compaction_keeps_its_bytes()
+    -> Result<()> {
+        let snapshot = three_slide_snapshot()?;
+        let mut working = snapshot.package.as_ref().clone();
+        let edited = &snapshot.slides[1];
+        let staged = String::from_utf8(blob(&working, edited).to_vec())
+            .unwrap()
+            .replace("compaction 1", "compaction one");
+        working
+            .get_part_mut(&edited.part_name)?
+            .set_blob(staged.clone().into_bytes());
+        compact_changed_slides(
+            &mut working,
+            snapshot.package.as_ref(),
+            &snapshot.slides,
+            &std::collections::HashMap::new(),
+        )?;
+        for untouched in [&snapshot.slides[0], &snapshot.slides[2]] {
+            assert!(Arc::ptr_eq(
+                &blob(&working, untouched),
+                &blob(snapshot.package.as_ref(), untouched)
+            ));
+        }
+        assert_eq!(blob(&working, edited).as_slice(), staged.as_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn a_compaction_that_changes_bytes_is_read_back_and_compared() -> Result<()> {
+        let snapshot = three_slide_snapshot()?;
+        let mut working = snapshot.package.as_ref().clone();
+        let edited = &snapshot.slides[0];
+        let staged = String::from_utf8(blob(&working, edited).to_vec())
+            .unwrap()
+            .replace("<p:spTree>", "<p:spTree>\n  ")
+            .replace("</p:sp>", "</p:sp>\n  ");
+        working
+            .get_part_mut(&edited.part_name)?
+            .set_blob(staged.clone().into_bytes());
+        compact_changed_slides(
+            &mut working,
+            snapshot.package.as_ref(),
+            &snapshot.slides,
+            &std::collections::HashMap::new(),
+        )?;
+        let compacted = blob(&working, edited);
+        assert_ne!(compacted.as_slice(), staged.as_bytes());
+        assert_eq!(
+            super::shape_semantics(compacted.as_slice())?,
+            super::shape_semantics(staged.as_bytes())?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_staged_slide_the_scene_reader_refuses_is_still_refused() -> Result<()> {
+        let snapshot = three_slide_snapshot()?;
+        let mut working = snapshot.package.as_ref().clone();
+        let edited = &snapshot.slides[2];
+        let original = String::from_utf8(blob(&working, edited).to_vec()).unwrap();
+        let shape = original.find("<p:sp>").expect("text box shape");
+        let start = shape + original[shape..].find("<p:cNvPr ").expect("shape identity");
+        let end = start + original[start..].find("/>").expect("identity ends") + 2;
+        let duplicated = format!(
+            "{}{}{}",
+            &original[..end],
+            &original[start..end],
+            &original[end..]
+        );
+        working
+            .get_part_mut(&edited.part_name)?
+            .set_blob(duplicated.into_bytes());
+        let error = compact_changed_slides(
+            &mut working,
+            snapshot.package.as_ref(),
+            &snapshot.slides,
+            &std::collections::HashMap::new(),
+        )
+        .expect_err("a scene the reader refuses must refuse compaction");
+        assert!(
+            error
+                .to_string()
+                .contains("more than one direct non-visual property record"),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_staged_payload_read_back_by_its_verb_is_not_read_again_at_commit() -> Result<()> {
+        let snapshot = three_slide_snapshot()?;
+        let mut edit = snapshot.edit();
+        assert!(edit.set_shape_text(1, 0, "read once")?);
+        take_scene_reads();
+        let commit = edit.commit()?;
+        assert_eq!(take_scene_reads(), 0, "the staged scene was already read");
+        let text = crate::shape::Scene::read(
+            commit
+                .snapshot()
+                .package
+                .get_part(&snapshot.slides[1].part_name)?
+                .blob(),
+        )?
+        .at(0)
+        .map_err(|error| crate::Error::Invalid(error.to_string()))?
+        .common()
+        .text()
+        .map(str::to_owned);
+        assert_eq!(text.as_deref(), Some("read once"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_payload_replaced_after_its_scene_read_is_read_again_at_commit() -> Result<()> {
+        let mut package = Package::new()?;
+        let slide = package.presentation_mut()?.add_slide()?;
+        slide.add_text_box("first", 10, 20, 300, 400);
+        slide.add_text_box("second", 10, 500, 300, 400);
+        let snapshot = Package::from_vec(package.to_bytes()?)?.opened_presentation()?;
+        let mut edit = snapshot.edit();
+        assert!(edit.set_shape_text(0, 0, "recorded")?);
+        // Removing a shape stages new bytes without recording a scene read.
+        assert!(edit.remove_shape(0, 1)?);
+        take_scene_reads();
+        edit.commit()?;
+        assert!(
+            take_scene_reads() >= 1,
+            "unrecorded bytes are read at commit"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_for_another_allocation_does_not_vouch_for_the_staged_bytes() -> Result<()> {
+        let snapshot = three_slide_snapshot()?;
+        let mut working = snapshot.package.as_ref().clone();
+        let edited = &snapshot.slides[0];
+        let staged = String::from_utf8(blob(&working, edited).to_vec())
+            .unwrap()
+            .replace("compaction 0", "compaction zero");
+        working
+            .get_part_mut(&edited.part_name)?
+            .set_blob(staged.into_bytes());
+        // A record naming the source allocation, not the staged one.
+        let stale = blob(snapshot.package.as_ref(), edited);
+        let mut records = std::collections::HashMap::new();
+        records.insert(edited.part_name.clone(), Arc::downgrade(&stale));
+        take_scene_reads();
+        compact_changed_slides(
+            &mut working,
+            snapshot.package.as_ref(),
+            &snapshot.slides,
+            &records,
+        )?;
+        assert_eq!(take_scene_reads(), 1, "the staged bytes are read once");
+        Ok(())
     }
 }

@@ -1613,7 +1613,9 @@ fn drawing_text_elements_for_owners(
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let drawing_namespace = is_drawing(&namespace);
-        let event = event.into_owned();
+        // The event borrows the input slice, not the reader; only the
+        // namespace holds the reader, so ending that borrow needs no copy of
+        // the event.
         drop(namespace);
         let end = position(&reader)?;
         match event {

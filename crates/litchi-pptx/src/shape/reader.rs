@@ -172,6 +172,7 @@ pub struct Scene<'a> {
     xml: Cow<'a, [u8]>,
     records: Vec<Record>,
     strings: String,
+    limits: Limits,
 }
 
 impl<'a> Scene<'a> {
@@ -224,7 +225,14 @@ impl<'a> Scene<'a> {
             xml: output,
             records,
             strings,
+            limits,
         })
+    }
+
+    /// The finite limits this scene was read under. A successful read proves
+    /// the owner XML is within them.
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Processed owner XML against which every [`Span`] is defined.
@@ -426,10 +434,13 @@ impl<'a> Scanner<'a> {
         loop {
             let start = position(&reader)?;
             let decoder = reader.decoder();
-            let event = reader.read_event()?.into_owned();
+            // A slice reader's events borrow the input, not the reader, and the
+            // resolved namespace borrows the reader only until the next read.
+            // Neither needs a per-event copy: owning the event or cloning the
+            // resolver would reproduce exactly these bytes and bindings.
+            let event = reader.read_event()?;
             let end = position(&reader)?;
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
+            let (namespace, event) = reader.resolver().resolve_event(event);
             match event {
                 Event::Start(element) => {
                     self.count_node()?;
@@ -525,11 +536,14 @@ impl<'a> Scanner<'a> {
         empty: bool,
         end: usize,
     ) -> Result<()> {
-        if is_pml(namespace, element.name(), b"cSld") && self.common_slide_depth.is_none() {
+        // Every classification below compares this element's local name;
+        // split the qualified name once rather than once per comparison.
+        let local_name = element.local_name().into_inner();
+        if is_pml(namespace, local_name, b"cSld") && self.common_slide_depth.is_none() {
             self.common_slide_depth = Some(event_depth);
         }
 
-        let is_tree = is_pml(namespace, element.name(), b"spTree")
+        let is_tree = is_pml(namespace, local_name, b"spTree")
             && (event_depth == 1 || self.common_slide_depth == Some(self.depth));
         if is_tree {
             if self.seen_tree {
@@ -544,7 +558,7 @@ impl<'a> Scanner<'a> {
         let parent = self.direct_shape_parent();
         let in_tree = self.tree_depth == Some(self.depth);
         if (in_tree || parent.is_some())
-            && let Some(kind) = classify_shape(namespace, element.name())
+            && let Some(kind) = classify_shape(namespace, local_name)
         {
             let index = self.begin_shape(kind, parent, element, start, event_depth)?;
             if empty {
@@ -553,7 +567,7 @@ impl<'a> Scanner<'a> {
             return Ok(());
         }
 
-        if (in_tree || parent.is_some()) && is_shape_like_extension(namespace, element.name()) {
+        if (in_tree || parent.is_some()) && is_shape_like_extension(namespace, local_name) {
             let index = self.begin_shape(Kind::Unknown, parent, element, start, event_depth)?;
             if empty {
                 self.finish_shape(index, end)?;
@@ -571,7 +585,7 @@ impl<'a> Scanner<'a> {
             .depth;
         let relative = event_depth.saturating_sub(active_depth);
 
-        if is_pml(namespace, element.name(), b"cNvPr") && relative <= 2 {
+        if is_pml(namespace, local_name, b"cNvPr") && relative <= 2 {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -600,7 +614,7 @@ impl<'a> Scanner<'a> {
             })?;
             record.name = name;
             record.id = id;
-        } else if is_pml(namespace, element.name(), b"ph") && relative <= 3 {
+        } else if is_pml(namespace, local_name, b"ph") && relative <= 3 {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -627,7 +641,7 @@ impl<'a> Scanner<'a> {
                 Error::Invalid("shape placeholder metadata lost its record".into())
             })?;
             record.placeholder = Some(PlaceholderRecord { kind, index });
-        } else if is_dml(namespace, element.name(), b"off") && relative <= 3 {
+        } else if is_dml(namespace, local_name, b"off") && relative <= 3 {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -636,7 +650,7 @@ impl<'a> Scanner<'a> {
                 active.x = Some(parse_i64(element, b"x", decoder)?);
                 active.y = Some(parse_i64(element, b"y", decoder)?);
             }
-        } else if is_dml(namespace, element.name(), b"ext") && relative <= 3 {
+        } else if is_dml(namespace, local_name, b"ext") && relative <= 3 {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -647,13 +661,13 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        let marker = if is_dml(namespace, element.name(), b"tbl") {
+        let marker = if is_dml(namespace, local_name, b"tbl") {
             TABLE
-        } else if is_chart(namespace, element.name(), b"chart") {
+        } else if is_chart(namespace, local_name, b"chart") {
             CHART
-        } else if is_diagram(namespace, element.name(), b"relIds") {
+        } else if is_diagram(namespace, local_name, b"relIds") {
             DIAGRAM_MARKER
-        } else if is_pml(namespace, element.name(), b"oleObj") {
+        } else if is_pml(namespace, local_name, b"oleObj") {
             OLE
         } else {
             0
@@ -666,7 +680,7 @@ impl<'a> Scanner<'a> {
             active.markers |= marker;
         }
 
-        if is_dml(namespace, element.name(), b"p") {
+        if is_dml(namespace, local_name, b"p") {
             let needs_separator = self.active.get(active_offset).is_some_and(|active| {
                 active.seen_paragraph && active.text.as_ref().is_some_and(|text| !text.is_empty())
             });
@@ -678,7 +692,7 @@ impl<'a> Scanner<'a> {
                 .get_mut(active_offset)
                 .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
             active.seen_paragraph = true;
-        } else if is_dml(namespace, element.name(), b"t") && !empty {
+        } else if is_dml(namespace, local_name, b"t") && !empty {
             let active = self
                 .active
                 .get_mut(active_offset)
@@ -687,9 +701,9 @@ impl<'a> Scanner<'a> {
                 return Err(Error::Invalid("nested DrawingML text elements".into()));
             }
             active.text_depth = Some(event_depth);
-        } else if is_dml(namespace, element.name(), b"br") {
+        } else if is_dml(namespace, local_name, b"br") {
             self.append_text("\n")?;
-        } else if is_dml(namespace, element.name(), b"tab") {
+        } else if is_dml(namespace, local_name, b"tab") {
             self.append_text("\t")?;
         }
         Ok(())
@@ -706,7 +720,7 @@ impl<'a> Scanner<'a> {
                 "shape XML contains an unmatched end tag".into(),
             ));
         }
-        if is_dml(namespace, name, b"t")
+        if is_dml(namespace, name.local_name().into_inner(), b"t")
             && let Some(active) = self.active.last_mut()
             && active.text_depth == Some(self.depth)
         {
@@ -953,19 +967,19 @@ impl<'a> Scanner<'a> {
     }
 }
 
-fn classify_shape(namespace: &ResolveResult<'_>, name: QName<'_>) -> Option<Kind> {
-    if is_pml(namespace, name, b"sp") {
+fn classify_shape(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Option<Kind> {
+    if is_pml(namespace, local_name, b"sp") {
         Some(Kind::Auto)
-    } else if is_pml(namespace, name, b"pic") {
+    } else if is_pml(namespace, local_name, b"pic") {
         Some(Kind::Picture)
-    } else if is_pml(namespace, name, b"graphicFrame") {
+    } else if is_pml(namespace, local_name, b"graphicFrame") {
         Some(Kind::Frame)
-    } else if is_pml(namespace, name, b"grpSp") {
+    } else if is_pml(namespace, local_name, b"grpSp") {
         Some(Kind::Group)
-    } else if is_pml(namespace, name, b"cxnSp") {
+    } else if is_pml(namespace, local_name, b"cxnSp") {
         Some(Kind::Connector)
-    } else if is_pml(namespace, name, b"contentPart")
-        || (name.local_name().as_ref() == b"contentPart"
+    } else if is_pml(namespace, local_name, b"contentPart")
+        || (local_name == b"contentPart"
             && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14.as_bytes() || *value == P15.as_bytes()))
     {
         Some(Kind::Content)
@@ -974,32 +988,35 @@ fn classify_shape(namespace: &ResolveResult<'_>, name: QName<'_>) -> Option<Kind
     }
 }
 
-fn is_shape_like_extension(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+fn is_shape_like_extension(namespace: &ResolveResult<'_>, local_name: &[u8]) -> bool {
     const MICROSOFT_POWERPOINT: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/";
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.starts_with(MICROSOFT_POWERPOINT))
         && matches!(
-            name.local_name().as_ref(),
+            local_name,
             b"sp" | b"pic" | b"graphicFrame" | b"grpSp" | b"cxnSp" | b"contentPart"
         )
 }
 
-fn is_pml(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
-    name.local_name().as_ref() == local
+// Each classifier takes the element's local name, split once per element by
+// the caller, and compares the namespace only when the local name matches.
+
+fn is_pml(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
+    local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == PML || *value == STRICT_PML)
 }
 
-fn is_dml(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
-    name.local_name().as_ref() == local
+fn is_dml(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
+    local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE)
 }
 
-fn is_chart(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
-    name.local_name().as_ref() == local
+fn is_chart(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
+    local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_CHART_NAMESPACE || *value == STRICT_DRAWINGML_CHART_NAMESPACE)
 }
 
-fn is_diagram(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
-    name.local_name().as_ref() == local
+fn is_diagram(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
+    local_name == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DIAGRAM || *value == STRICT_DIAGRAM)
 }
 
