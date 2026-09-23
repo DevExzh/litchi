@@ -5376,7 +5376,8 @@ fn a_superseded_slide_removal_patch_is_refused_by_name() -> Result<()> {
     Ok(())
 }
 
-/// The same for the cross-presentation copy family and its `LPCP0002` magic.
+/// The same for the cross-presentation copy family and both of its
+/// superseded magics, `LPCP0002` and `LPCP0003`.
 #[test]
 fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
     let mut authored_source = Package::new()?;
@@ -5397,29 +5398,36 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
     let current = plan.patch().to_bytes()?;
     assert_eq!(
         &current[..8],
-        crate::DurablePatchFormat::CrossSlideCopyV3.magic(),
-        "the current durable cross-copy magic must be LPCP0003"
+        crate::DurablePatchFormat::CrossSlideCopyV4.magic(),
+        "the current durable cross-copy magic must be LPCP0004"
     );
     assert_eq!(CrossSlideCopyPatch::from_bytes(&current)?, *plan.patch());
 
     let inverse = plan.patch().inverse().to_bytes()?;
     for (label, encoded) in [("forward", &current), ("inverse", &inverse)] {
-        let superseded = with_magic(encoded, crate::DurablePatchFormat::CrossSlideCopyV2.magic());
-        for parsed in [
-            CrossSlideCopyPatch::from_bytes(&superseded),
-            CrossSlideCopyPatch::from_bytes_with_limits(&superseded, Limits::default()),
+        for found in [
+            crate::DurablePatchFormat::CrossSlideCopyV2,
+            crate::DurablePatchFormat::CrossSlideCopyV3,
         ] {
-            let error = parsed.expect_err("a superseded durable patch must be refused");
-            assert!(
-                matches!(
-                    error,
-                    Error::DurablePatchRevisionFormat {
-                        found: crate::DurablePatchFormat::CrossSlideCopyV2,
-                        expected: crate::DurablePatchFormat::CrossSlideCopyV3,
-                    }
-                ),
-                "{label}: expected the superseded-format refusal, got {error}"
-            );
+            let superseded = with_magic(encoded, found.magic());
+            for parsed in [
+                CrossSlideCopyPatch::from_bytes(&superseded),
+                CrossSlideCopyPatch::from_bytes_with_limits(&superseded, Limits::default()),
+            ] {
+                let error = parsed.expect_err("a superseded durable patch must be refused");
+                assert!(
+                    matches!(
+                        error,
+                        Error::DurablePatchRevisionFormat {
+                            found: refused,
+                            expected: crate::DurablePatchFormat::CrossSlideCopyV4,
+                        } if refused == found
+                    ),
+                    "{label}: expected the {found} refusal, got {error}"
+                );
+                assert!(error.to_string().contains(&found.to_string()));
+                assert!(error.to_string().contains("LPCP0004"));
+            }
         }
     }
 

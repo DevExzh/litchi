@@ -261,11 +261,16 @@ impl Package {
     /// ingress (`from_vec`, `open`, or `from_reader`) so discarded ZIP
     /// ordering and extra fields cannot alias the authorization revision.
     ///
+    /// A plan whose candidate transfers source-compressed media
+    /// ([`crate::opened::CrossSlideCopyPlan::transfers_source_compressed_media`])
+    /// publishes only into an unmodified owned destination; plan the copy
+    /// against a destination that has been edited since it was opened.
+    ///
     /// # Errors
     ///
     /// Returns an error for stale source/destination graphs, a foreign source,
-    /// package mutation policy, or a candidate graph that no longer applies
-    /// exactly.
+    /// package mutation policy, a transferring plan applied to a modified
+    /// destination, or a candidate graph that no longer applies exactly.
     pub fn apply_cross_slide_copy_plan(
         &mut self,
         source: &Self,
@@ -312,11 +317,16 @@ impl Package {
     /// the destination when the same source revision and the corresponding
     /// destination target revision are still present.
     /// Both packages must retain source-preserving physical provenance.
+    /// A forward patch that transfers source-compressed media
+    /// ([`crate::opened::CrossSlideCopyPatch::transfers_source_compressed_media`])
+    /// publishes only into an unmodified owned destination; its inverse has no
+    /// such requirement.
     ///
     /// # Errors
     ///
     /// Returns an error for stale or foreign packages, malformed forged patch
-    /// descriptors, rejected mutation policy, or candidate validation failure.
+    /// descriptors, rejected mutation policy, a transferring forward patch
+    /// applied to a modified destination, or candidate validation failure.
     pub fn apply_cross_slide_copy_patch(
         &mut self,
         source: &Self,

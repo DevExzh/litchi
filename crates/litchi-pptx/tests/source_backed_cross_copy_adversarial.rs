@@ -85,9 +85,10 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
 
     let mut tampered_bytes = plan.patch().to_bytes()?;
-    // LPCP0002 stores the source physical revision after the three semantic
-    // revisions. Changing it keeps the durable patch well-formed while
-    // invalidating its source authorization.
+    // LPCP0004, like LPCP0002 and LPCP0003 before it, stores the source
+    // physical revision after the three semantic revisions. Changing it keeps
+    // the durable patch well-formed while invalidating its source
+    // authorization.
     let source_physical_revision_offset = 8 + 32 * 3;
     tampered_bytes[source_physical_revision_offset] ^= 1;
     let tampered = CrossSlideCopyPatch::from_bytes(&tampered_bytes)?;

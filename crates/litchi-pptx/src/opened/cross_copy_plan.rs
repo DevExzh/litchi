@@ -27,14 +27,22 @@ use crate::{Error, Result, SlideCopyRefusal};
 
 /// Current durable cross-slide-copy header magic.
 ///
-/// Bumped from `LPCP0002` by change 0655: three of the six revisions this
-/// header embeds are complete-package revisions, now `litchi-pptx-opened-v2`.
-/// The other three are physical archive revisions under
-/// `litchi-pptx-cross-physical-v2` and are unchanged.
-const PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::CrossSlideCopyV3.magic();
-/// Recognized but superseded durable cross-slide-copy header magic.
-const SUPERSEDED_PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::CrossSlideCopyV2.magic();
-const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + (6 * 32) + (4 * 4) + 8 + 4 + 8;
+/// Bumped from `LPCP0003` by change 0742: a candidate may carry eligible copied
+/// image members' verified source-compressed bytes instead of deflating them
+/// again, which changes the serialized-archive revisions this header embeds,
+/// and the header now records which of the two encodings the candidate used.
+/// `LPCP0003` was itself bumped from `LPCP0002` by change 0655, when three of
+/// the six embedded revisions became `litchi-pptx-opened-v2` complete-package
+/// revisions; the physical revisions remain `litchi-pptx-cross-physical-v2`.
+const PATCH_FORMAT: crate::DurablePatchFormat = crate::DurablePatchFormat::CrossSlideCopyV4;
+const PATCH_MAGIC: &[u8; 8] = PATCH_FORMAT.magic();
+/// Recognized but superseded durable cross-slide-copy formats, refused by
+/// name before any header field is read.
+const SUPERSEDED_PATCH_FORMATS: [crate::DurablePatchFormat; 2] = [
+    crate::DurablePatchFormat::CrossSlideCopyV2,
+    crate::DurablePatchFormat::CrossSlideCopyV3,
+];
+const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + (6 * 32) + (4 * 4) + 8 + 4 + 1 + 8;
 const TRANSITIONAL_PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 const TRANSITIONAL_DML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -52,6 +60,66 @@ const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationship
 const TRANSITIONAL_REL_NS: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+/// How a cross-presentation candidate archive encodes its copied image
+/// members.
+///
+/// The encoding is decided when a copy is first planned and recorded in the
+/// plan and in its durable patch, because it determines the serialized-archive
+/// revisions both carry. Every later proof of the same copy — application,
+/// durable-patch application in either direction — rebuilds the candidate
+/// under the recorded encoding rather than deciding it again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CopiedMedia {
+    /// Every copied member is deflated again from its decoded bytes. This is
+    /// the only encoding before change 0742, and the encoding of a copy
+    /// planned against a destination that is not an unmodified owned source.
+    Recompressed,
+    /// At least one copied member is an eligible image whose verified
+    /// source-compressed bytes were framed verbatim; every other copied member
+    /// is deflated again.
+    SourceCompressed,
+}
+
+impl CopiedMedia {
+    const fn wire(self) -> u8 {
+        match self {
+            Self::Recompressed => 0,
+            Self::SourceCompressed => 1,
+        }
+    }
+
+    fn from_wire(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(Self::Recompressed),
+            1 => Ok(Self::SourceCompressed),
+            _ => Err(invalid(
+                "cross-slide durable patch has an unknown copied-media encoding",
+            )),
+        }
+    }
+}
+
+/// Which copied-media encoding one candidate build may use.
+#[derive(Clone, Copy)]
+enum MediaPolicy {
+    /// First planning: transfer eligible images when the destination is an
+    /// unmodified owned source, so that application publishes the reopened
+    /// candidate and no package ever retains a capture after it returns.
+    FromDestination,
+    /// Re-proving a plan or durable patch: use the encoding it recorded.
+    Recorded(CopiedMedia),
+}
+
+/// What one candidate build does about its archive and its copied media.
+///
+/// Carried as one argument because [`build_candidate`] already takes the
+/// crate's maximum and `clippy::too_many_arguments` is deny.
+#[derive(Clone, Copy)]
+struct CandidateBuild<'a> {
+    archive: CandidateArchive<'a>,
+    media: MediaPolicy,
+}
 
 /// An immutable plan to copy one source slide into a different destination
 /// presentation.
@@ -98,6 +166,14 @@ pub struct CrossSlideCopyPlan {
 /// `bound` is the archive bound the bytes were accepted under.  A later build
 /// under a different bound is not a reuse.
 ///
+/// `transferred` names, in plan part order, the copied members whose verified
+/// source-compressed bytes the archive frames (change 0742). Which members
+/// are transferred depends on the source package's payload provenance as
+/// well as on the two revisions an application re-proves, so a later build
+/// whose own classification differs is not a reuse either: it serializes its
+/// own candidate, which then fails the comparison with the plan exactly as it
+/// would without retention.
+///
 /// This type deliberately does **not** derive `Debug`: a derived one would
 /// print the whole archive, and the slot below formats the retained length
 /// instead.
@@ -105,6 +181,7 @@ pub struct CrossSlideCopyPlan {
 struct RetainedCandidate {
     archive: Arc<Vec<u8>>,
     bound: usize,
+    transferred: Box<[PackURI]>,
 }
 
 /// A plan's retained candidate archive, which is not part of the plan's value.
@@ -128,6 +205,10 @@ impl fmt::Debug for RetainedCandidateSlot {
                 &self.0.as_ref().map(|held| held.archive.len()),
             )
             .field("bound", &self.0.as_ref().map(|held| held.bound))
+            .field(
+                "transferred_members",
+                &self.0.as_ref().map(|held| held.transferred.len()),
+            )
             .finish()
     }
 }
@@ -286,6 +367,16 @@ impl CrossSlideCopyPlan {
     pub const fn patch(&self) -> &CrossSlideCopyPatch {
         &self.patch
     }
+
+    /// Whether this plan's candidate frames at least one copied image
+    /// member from the source member's verified compressed bytes instead of
+    /// deflating it again.
+    ///
+    /// See [`CrossSlideCopyPatch::transfers_source_compressed_media`].
+    #[must_use]
+    pub fn transfers_source_compressed_media(&self) -> bool {
+        self.patch.transfers_source_compressed_media()
+    }
 }
 
 /// Durable exact cross-presentation copy patch.
@@ -307,10 +398,29 @@ pub struct CrossSlideCopyPatch {
     position: usize,
     slide_id: u32,
     presentation_relationship_id: String,
+    copied_media: CopiedMedia,
     patch: Patch,
 }
 
 impl CrossSlideCopyPatch {
+    /// Whether the forward candidate frames at least one copied image member
+    /// from the source member's verified compressed bytes instead of
+    /// deflating it again.
+    ///
+    /// A copy transfers source-compressed media only when it was planned
+    /// against a destination that is an unmodified owned source (opened with
+    /// `Package::from_vec`, `open` or `from_reader` and not edited since), and
+    /// only for relationship-free, non-XML `image/*` members whose payloads are
+    /// still the allocations the source package was opened with. Applying
+    /// such a copy in the forward direction therefore requires the destination
+    /// to be an unmodified owned source again; a modified destination is
+    /// refused with [`crate::Error::UnsafeEdit`] and the copy must be planned
+    /// against it afresh. The inverse direction has no such requirement.
+    #[must_use]
+    pub fn transfers_source_compressed_media(&self) -> bool {
+        self.copied_media == CopiedMedia::SourceCompressed
+    }
+
     /// Complete source-package revision required for either direction.
     #[must_use]
     pub const fn source_revision(&self) -> [u8; 32] {
@@ -374,11 +484,12 @@ impl CrossSlideCopyPatch {
             position: self.position,
             slide_id: self.slide_id,
             presentation_relationship_id: self.presentation_relationship_id.clone(),
+            copied_media: self.copied_media,
             patch: self.patch.inverse(),
         }
     }
 
-    /// Serialize this patch into the stable `LPCP0003` binary format.
+    /// Serialize this patch into the stable `LPCP0004` binary format.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.patch.to_bytes()?;
         let mut output = Vec::new();
@@ -436,6 +547,7 @@ impl CrossSlideCopyPatch {
             &self.presentation_relationship_id,
             "presentation relationship ID",
         )?;
+        output.push(self.copied_media.wire());
         let payload_len = u64::try_from(payload.len())
             .map_err(|_error| invalid("cross-slide durable patch payload exceeds u64"))?;
         put_u64(&mut output, payload_len)?;
@@ -448,24 +560,26 @@ impl CrossSlideCopyPatch {
     /// # Errors
     ///
     /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
-    /// under the superseded `LPCP0002` format, and an error for malformed,
-    /// trailing, or unbounded input.
+    /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
+    /// malformed, trailing, or unbounded input.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, Limits::default())
     }
 
     /// Parse a stable durable patch under caller-selected finite limits.
     ///
-    /// A patch whose header carries the superseded `LPCP0002` magic is refused
-    /// here, before any header field is read: three of its six embedded
-    /// revisions come from the `litchi-pptx-opened-v1` algebra. Re-plan the
-    /// copy against the source and destination packages.
+    /// A patch whose header carries a superseded magic is refused here,
+    /// before any header field is read. `LPCP0002` embeds three revisions from
+    /// the `litchi-pptx-opened-v1` algebra; `LPCP0003` embeds serialized-archive
+    /// revisions of a candidate that deflated every copied member again, which
+    /// no current application reproduces when the copy carries eligible image
+    /// members. Re-plan the copy against the source and destination packages.
     ///
     /// # Errors
     ///
     /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
-    /// under the superseded `LPCP0002` format, and an error for malformed,
-    /// trailing, or unbounded input.
+    /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
+    /// malformed, trailing, or unbounded input.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
@@ -478,13 +592,16 @@ impl CrossSlideCopyPatch {
             });
         }
         // See `SlideRemovalPatch::from_bytes_with_limits`: a superseded magic
-        // is refused by name before any header field is read, so a semantic
-        // revision from the previous algebra never reaches a caller.
-        if bytes.get(..SUPERSEDED_PATCH_MAGIC.len()) == Some(SUPERSEDED_PATCH_MAGIC.as_slice()) {
-            return Err(Error::DurablePatchRevisionFormat {
-                found: crate::DurablePatchFormat::CrossSlideCopyV2,
-                expected: crate::DurablePatchFormat::CrossSlideCopyV3,
-            });
+        // is refused by name before any header field is read, so a revision
+        // from a superseded proof never reaches a caller.
+        for superseded in SUPERSEDED_PATCH_FORMATS {
+            let magic = superseded.magic();
+            if bytes.get(..magic.len()) == Some(magic.as_slice()) {
+                return Err(Error::DurablePatchRevisionFormat {
+                    found: superseded,
+                    expected: PATCH_FORMAT,
+                });
+            }
         }
         let mut input = WireInput::new(bytes);
         if input.take(PATCH_MAGIC.len())? != PATCH_MAGIC {
@@ -509,6 +626,7 @@ impl CrossSlideCopyPatch {
                 "cross-slide durable patch has an empty presentation relationship ID",
             ));
         }
+        let copied_media = CopiedMedia::from_wire(input.u8()?)?;
         let payload_len = input.usize64("patch payload")?;
         if payload_len > limits.max_patch_bytes() {
             return Err(Error::Limit {
@@ -543,6 +661,7 @@ impl CrossSlideCopyPatch {
             position,
             slide_id,
             presentation_relationship_id,
+            copied_media,
             patch,
         })
     }
@@ -562,6 +681,14 @@ impl Snapshot {
     /// [`crate::Package::from_vec`], [`crate::Package::open`], or
     /// [`crate::Package::from_reader`]; borrowed graph-only ingress is refused
     /// because it cannot authorize discarded ZIP ordering and extras.
+    ///
+    /// When this destination is an unmodified owned source, each copied
+    /// relationship-free, non-XML `image/*` member whose source payload is
+    /// still the allocation the source package was opened with is published
+    /// from the source member's verified compressed bytes, in fresh
+    /// known-size framing, instead of being deflated again (change 0742). See
+    /// [`CrossSlideCopyPatch::transfers_source_compressed_media`] for what
+    /// that asks of application.
     pub fn plan_cross_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
@@ -577,7 +704,10 @@ impl Snapshot {
             source_slide,
             destination_slide,
             position,
-            CandidateArchive::BuildAndRetain,
+            CandidateBuild {
+                archive: CandidateArchive::BuildAndRetain,
+                media: MediaPolicy::FromDestination,
+            },
         )
     }
 
@@ -649,10 +779,14 @@ pub(crate) fn apply_plan(
         plan.source.clone(),
         plan.destination.clone(),
         plan.position,
-        plan.candidate
-            .0
-            .as_ref()
-            .map_or(CandidateArchive::Build, CandidateArchive::Reuse),
+        CandidateBuild {
+            archive: plan
+                .candidate
+                .0
+                .as_ref()
+                .map_or(CandidateArchive::Build, CandidateArchive::Reuse),
+            media: MediaPolicy::Recorded(plan.patch.copied_media),
+        },
     )?;
     if fresh.source_revision != plan.source_revision
         || fresh.destination_revision != plan.destination_revision
@@ -670,10 +804,11 @@ pub(crate) fn apply_plan(
     let (candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
-        &plan.patch.patch,
+        &plan.patch,
         plan.target_revision,
         destination_physical_source_provenance,
         true,
+        "apply_cross_slide_copy_plan",
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
@@ -745,7 +880,10 @@ pub(crate) fn apply_patch(
         source_slide.clone(),
         destination_slide.clone(),
         patch.position,
-        CandidateArchive::Build,
+        CandidateBuild {
+            archive: CandidateArchive::Build,
+            media: MediaPolicy::Recorded(patch.copied_media),
+        },
     )
     .ok()
     .and_then(|(fresh, candidate)| {
@@ -794,7 +932,10 @@ pub(crate) fn apply_patch(
                         source_slide,
                         restored_destination,
                         patch.position,
-                        CandidateArchive::Build,
+                        CandidateBuild {
+                            archive: CandidateArchive::Build,
+                            media: MediaPolicy::Recorded(patch.copied_media),
+                        },
                     )
                     .ok()?;
                     Some(forward.patch.inverse() == *patch)
@@ -810,10 +951,11 @@ pub(crate) fn apply_patch(
     let (candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
-        &patch.patch,
+        patch,
         patch.target_revision,
         destination_physical_source_provenance,
         reopened,
+        "apply_cross_slide_copy_patch",
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
@@ -830,15 +972,30 @@ pub(crate) fn apply_patch(
 fn validate_application_candidate(
     destination: &OpcPackage,
     candidate: OpcPackage,
-    patch: &Patch,
+    cross_patch: &CrossSlideCopyPatch,
     target_revision: [u8; 32],
     physical_source_provenance: bool,
     reopened: bool,
+    operation: &'static str,
 ) -> Result<(OpcPackage, Snapshot, bool)> {
+    let patch = &cross_patch.patch;
     // Reopening preserves the observable state of untouched owned ingress.
     // Dirty packages can carry caller-defined parts or save preferences that
     // are absent from the archive, so retain their clone-and-apply behavior.
     if reopened && !destination.is_unmodified_owned_source() {
+        // Clone-and-apply publishes the patch's decoded resources, which the
+        // targeted writer deflates again, so it cannot reproduce a candidate
+        // that framed source-compressed media. Keeping the captures inside
+        // the published package instead would retain copies of source bytes
+        // in a caller's package for its whole lifetime (ADR 0005's retained
+        // state rule), so the copy is refused and has to be planned against
+        // the current destination, which records the recompressed encoding.
+        if cross_patch.copied_media == CopiedMedia::SourceCompressed {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "a cross-slide copy that transfers source-compressed media requires an unmodified owned destination; plan the copy against the current destination",
+            });
+        }
         drop(candidate);
         let mut candidate = destination.clone();
         let snapshot = super::patch::apply_exact_revision(
@@ -889,7 +1046,7 @@ fn plan_cross_slide_copy_for_slides(
     source_slide: Slide,
     destination_slide: Slide,
     position: usize,
-    archive: CandidateArchive<'_>,
+    build: CandidateBuild<'_>,
 ) -> Result<CrossSlideCopyPlan> {
     prepare_cross_slide_copy_for_slides(
         source,
@@ -897,7 +1054,7 @@ fn plan_cross_slide_copy_for_slides(
         source_slide,
         destination_slide,
         position,
-        archive,
+        build,
     )
     .map(|(plan, _candidate)| plan)
 }
@@ -910,7 +1067,7 @@ fn prepare_cross_slide_copy_for_slides(
     source_slide: Slide,
     destination_slide: Slide,
     position: usize,
-    archive: CandidateArchive<'_>,
+    build: CandidateBuild<'_>,
 ) -> Result<(CrossSlideCopyPlan, OpcPackage)> {
     if position > destination.slides.len() {
         return Err(Error::SlideIndexOutOfBounds {
@@ -1079,21 +1236,26 @@ fn prepare_cross_slide_copy_for_slides(
     preflight_parts(destination, &parts, planned_bytes)?;
     let source_physical_revision = snapshot_physical_revision(source, limits)?;
     let destination_physical_revision = snapshot_physical_revision(destination, limits)?;
-    let (candidate, candidate_revision, candidate_archive_revision, retained_candidate) =
-        build_candidate(
-            source,
-            destination,
-            &source_slide,
-            &destination_slide,
-            position,
-            slide_id,
-            &presentation_relationship_id,
-            &source_layout,
-            &destination_layout,
-            &parts,
-            limits,
-            archive,
-        )?;
+    let BuiltCandidate {
+        candidate,
+        revision: candidate_revision,
+        archive_revision: candidate_archive_revision,
+        retained: retained_candidate,
+        copied_media,
+    } = build_candidate(
+        source,
+        destination,
+        &source_slide,
+        &destination_slide,
+        position,
+        slide_id,
+        &presentation_relationship_id,
+        &source_layout,
+        &destination_layout,
+        &parts,
+        limits,
+        build,
+    )?;
     let patch = Patch::capture(
         destination.package.as_ref(),
         &candidate,
@@ -1118,6 +1280,7 @@ fn prepare_cross_slide_copy_for_slides(
         position,
         slide_id,
         presentation_relationship_id: presentation_relationship_id.clone(),
+        copied_media,
         patch,
     };
     validate_patch_descriptor(
@@ -1154,6 +1317,37 @@ fn prepare_cross_slide_copy_for_slides(
     ))
 }
 
+/// One built, reopened and captured candidate.
+struct BuiltCandidate {
+    /// The candidate reopened from its serialized archive.
+    candidate: OpcPackage,
+    /// Complete-package revision of `candidate`.
+    revision: [u8; 32],
+    /// Physical revision of the archive when the reopen republishes it
+    /// verbatim.
+    archive_revision: Option<[u8; 32]>,
+    retained: RetainedCandidateSlot,
+    copied_media: CopiedMedia,
+}
+
+/// Whether one copied member may carry its source member's compressed bytes.
+///
+/// The format-level half of the rule: a relationship-free `image/*` part that
+/// is not XML by name or content type (an SVG is `image/svg+xml` and is XML).
+/// The package-level half — owned source archive, source member present,
+/// payload still the opened allocation, content type unchanged, no signature
+/// infrastructure — is [`OpcPackage::compressed_transfer_eligible`]. Neither
+/// half decodes anything, so the classification cannot depend on memory
+/// pressure or call order.
+fn is_transferable_media(part: &dyn Part) -> bool {
+    let content_type = part.content_type();
+    content_type
+        .get(..6)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("image/"))
+        && !is_xml_part(part.partname(), content_type)
+        && part.rels().is_empty()
+}
+
 fn build_candidate(
     source: &Snapshot,
     destination: &Snapshot,
@@ -1166,14 +1360,52 @@ fn build_candidate(
     destination_layout: &PackURI,
     parts: &[super::SlideCopyPart],
     limits: Limits,
-    archive: CandidateArchive<'_>,
-) -> Result<(
-    OpcPackage,
-    [u8; 32],
-    Option<[u8; 32]>,
-    RetainedCandidateSlot,
-)> {
+    build: CandidateBuild<'_>,
+) -> Result<BuiltCandidate> {
+    let archive = build.archive;
     let archive_limit = limits.max_patch_bytes();
+    let transfer_media = match build.media {
+        MediaPolicy::FromDestination => destination.package.is_unmodified_owned_source(),
+        MediaPolicy::Recorded(recorded) => recorded == CopiedMedia::SourceCompressed,
+    };
+    // Classify every copied member before building anything. Neither half of
+    // the rule decodes, so the classification is fixed by the two packages.
+    let mut transfers = Vec::new();
+    let mut transferred = Vec::new();
+    transfers
+        .try_reserve_exact(parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "cross-slide transferred media",
+            source,
+        })?;
+    for planned in parts {
+        let transfer = transfer_media
+            && is_transferable_media(source.package.get_part(&planned.source)?)
+            && source
+                .package
+                .compressed_transfer_eligible(&planned.source)?;
+        if transfer {
+            transferred
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "cross-slide transferred media",
+                    source,
+                })?;
+            transferred.push(planned.target.clone());
+        }
+        transfers.push(transfer);
+    }
+    let reuses_archive = matches!(
+        archive,
+        CandidateArchive::Reuse(held)
+            if held.bound == archive_limit
+                && held.archive.len() <= archive_limit
+                && *held.transferred == *transferred
+    );
+    // A reused archive is published as retained, so its captures are needed
+    // only by the debug re-derivation below; a release build that reuses the
+    // archive issues no capture.
+    let capture_media = !reuses_archive || cfg!(debug_assertions);
     let mut mapping = HashMap::new();
     mapping
         .try_reserve(parts.len())
@@ -1197,13 +1429,29 @@ fn build_candidate(
         .cloned()
         .ok_or_else(|| invalid("cross-slide candidate omitted the selected source slide"))?;
     let mut candidate = destination.package.as_ref().clone();
-    for planned in parts {
+    for (planned, &transfer) in parts.iter().zip(&transfers) {
         let original = source.package.get_part(&planned.source)?;
-        let mut copied = BlobPart::new_shared(
-            planned.target.clone(),
-            planned.content_type.clone(),
-            original.blob_arc(),
-        );
+        let mut copied = if transfer && capture_media {
+            // Eligible means the capture must succeed: a decode, layout,
+            // checksum, limit or allocation failure is a typed error here,
+            // never a quiet return to the recompressing route, so the
+            // candidate's bytes stay a function of the two packages alone.
+            let capture = source
+                .package
+                .authorize_compressed_transfer(&planned.source)?;
+            if capture.content_type() != planned.content_type {
+                return Err(invalid(
+                    "cross-slide compressed transfer changed the copied content type",
+                ));
+            }
+            BlobPart::with_compressed_transfer(planned.target.clone(), capture)
+        } else {
+            BlobPart::new_shared(
+                planned.target.clone(),
+                planned.content_type.clone(),
+                original.blob_arc(),
+            )
+        };
         for relationship in original.rels().iter() {
             let (target, mode) = if relationship.is_external() {
                 (relationship.target_ref().to_owned(), TargetMode::External)
@@ -1269,9 +1517,7 @@ fn build_candidate(
     // plus the recomputed archive and graph revisions taken below from the
     // bytes it is about to publish.
     let (serialized, archive_digest) = match archive {
-        CandidateArchive::Reuse(held)
-            if held.bound == archive_limit && held.archive.len() <= archive_limit =>
-        {
+        CandidateArchive::Reuse(held) if reuses_archive => {
             debug_assert!(
                 bounded_package_bytes(&candidate, archive_limit)
                     .is_ok_and(|(fresh, _)| fresh == *held.archive),
@@ -1333,6 +1579,7 @@ fn build_candidate(
         .map(|shared| RetainedCandidate {
             archive: shared,
             bound: archive_limit,
+            transferred: transferred.clone().into_boxed_slice(),
         }),
     );
     let captured = super::model::capture(
@@ -1357,7 +1604,17 @@ fn build_candidate(
         ));
     }
     let revision = captured.revision;
-    Ok((reopened, revision, archive_revision, retained_candidate))
+    Ok(BuiltCandidate {
+        candidate: reopened,
+        revision,
+        archive_revision,
+        retained: retained_candidate,
+        copied_media: if transferred.is_empty() {
+            CopiedMedia::Recompressed
+        } else {
+            CopiedMedia::SourceCompressed
+        },
+    })
 }
 
 fn preflight_parts(
@@ -2492,6 +2749,13 @@ impl<'a> WireInput<'a> {
         Ok(value)
     }
 
+    fn u8(&mut self) -> Result<u8> {
+        self.take(1)?
+            .first()
+            .copied()
+            .ok_or_else(|| invalid("cross-slide durable patch u8 is malformed"))
+    }
+
     fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().map_err(
             |_error| invalid("cross-slide durable patch u32 is malformed"),
@@ -2534,6 +2798,8 @@ impl<'a> WireInput<'a> {
 
 #[cfg(test)]
 mod bounded_writer_tests;
+#[cfg(test)]
+mod media_transfer_tests;
 #[cfg(test)]
 mod retention_tests;
 #[cfg(test)]
