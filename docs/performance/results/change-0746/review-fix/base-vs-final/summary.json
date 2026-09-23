@@ -1,0 +1,1367 @@
+[
+ {
+  "case": "54016.xls:open",
+  "metric": "open_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 10462078.0,
+  "b_median_p50": 4866473.0,
+  "a_median_p95": 10793062.075,
+  "b_median_p95": 4903824.775,
+  "a_median_mean": 10518127.35,
+  "b_median_mean": 4870779.7,
+  "paired_p50_ratios": [
+   0.4632138535402939,
+   0.4671154807451983,
+   0.47821436797343014,
+   0.45233502691032973
+  ],
+  "paired_mean_ratios": [
+   0.4622539964058076,
+   0.4634925187609781,
+   0.47609379667858115,
+   0.4484836487064081
+  ],
+  "median_paired_p50_ratio": 0.46516466714274607,
+  "paired_p50_ratio_range": [
+   0.45233502691032973,
+   0.47821436797343014
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-open-0-A.json",
+    "p50": 10521556.0,
+    "p95": 10784262.1,
+    "mean": 10550214.25,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-open-1-B.json",
+    "p50": 4873730.5,
+    "p95": 4908966.5,
+    "mean": 4876878.7,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-open-2-B.json",
+    "p50": 4859215.5,
+    "p95": 4888819.5,
+    "mean": 4860201.3,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-open-3-A.json",
+    "p50": 10402600.0,
+    "p95": 10801862.05,
+    "mean": 10486040.45,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-open-4-A.json",
+    "p50": 10220314.0,
+    "p95": 10517354.05,
+    "mean": 10269866.85,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-open-5-B.json",
+    "p50": 4887501.0,
+    "p95": 4918727.0,
+    "mean": 4889419.9,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-open-6-B.json",
+    "p50": 4856070.5,
+    "p95": 4898683.05,
+    "mean": 4864680.7,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-open-7-A.json",
+    "p50": 10735561.5,
+    "p95": 11409426.05,
+    "mean": 10846952.2,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "54016.xls:comments-open",
+  "metric": "open_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 10239916.75,
+  "b_median_p50": 4315255.25,
+  "a_median_p95": 10565854.3,
+  "b_median_p95": 4347699.25,
+  "a_median_mean": 10243113.850000001,
+  "b_median_mean": 4320283.875,
+  "paired_p50_ratios": [
+   0.40458644350889683,
+   0.4237669034897809,
+   0.41757141838714673,
+   0.43253845314454686
+  ],
+  "paired_mean_ratios": [
+   0.41181734248239105,
+   0.4243633791865743,
+   0.41629374112276657,
+   0.4320048706869701
+  ],
+  "median_paired_p50_ratio": 0.42066916093846385,
+  "paired_p50_ratio_range": [
+   0.40458644350889683,
+   0.43253845314454686
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-comments-open-0-A.json",
+    "p50": 10657691.5,
+    "p95": 10823498.05,
+    "mean": 10505438.95,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-comments-open-1-B.json",
+    "p50": 4311957.5,
+    "p95": 4386025.5,
+    "mean": 4326321.95,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-comments-open-2-B.json",
+    "p50": 4318553.0,
+    "p95": 4339689.5,
+    "mean": 4314245.8,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-comments-open-3-A.json",
+    "p50": 10190869.0,
+    "p95": 10308210.55,
+    "mean": 10166395.15,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-comments-open-4-A.json",
+    "p50": 10288964.5,
+    "p95": 10899164.200000001,
+    "mean": 10319832.55,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-comments-open-5-B.json",
+    "p50": 4296377.5,
+    "p95": 4320894.0,
+    "mean": 4296081.7,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-comments-open-6-B.json",
+    "p50": 4336448.0,
+    "p95": 4355709.0,
+    "mean": 4333914.4,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-comments-open-7-A.json",
+    "p50": 10025578.0,
+    "p95": 10204908.0,
+    "mean": 10032096.15,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "54016.xls:visibility-open",
+  "metric": "open_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 9937202.5,
+  "b_median_p50": 4127886.75,
+  "a_median_p95": 10111057.275,
+  "b_median_p95": 4156985.275,
+  "a_median_mean": 9931429.875,
+  "b_median_mean": 4131442.625,
+  "paired_p50_ratios": [
+   0.41015692813502624,
+   0.4269532952806513,
+   0.41631938475299096,
+   0.4140116731998353
+  ],
+  "paired_mean_ratios": [
+   0.4102842458633997,
+   0.4283257107675505,
+   0.41081593484034,
+   0.41680236234527507
+  ],
+  "median_paired_p50_ratio": 0.4151655289764131,
+  "paired_p50_ratio_range": [
+   0.41015692813502624,
+   0.4269532952806513
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-visibility-open-0-A.json",
+    "p50": 10017133.0,
+    "p95": 10160866.0,
+    "mean": 10015764.05,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-visibility-open-1-B.json",
+    "p50": 4108596.5,
+    "p95": 4129148.0,
+    "mean": 4109310.2,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-visibility-open-2-B.json",
+    "p50": 4148392.0,
+    "p95": 4284236.05,
+    "mean": 4166528.5,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-visibility-open-3-A.json",
+    "p50": 9716266.5,
+    "p95": 9947398.0,
+    "mean": 9727477.0,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-visibility-open-4-A.json",
+    "p50": 9961527.5,
+    "p95": 11022174.0,
+    "mean": 10110550.0,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-visibility-open-5-B.json",
+    "p50": 4147177.0,
+    "p95": 4184202.55,
+    "mean": 4153575.05,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-visibility-open-6-B.json",
+    "p50": 4104047.0,
+    "p95": 4129768.0,
+    "mean": 4104292.75,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-visibility-open-7-A.json",
+    "p50": 9912877.5,
+    "p95": 10061248.55,
+    "mean": 9847095.7,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "54016.xls:number-generic",
+  "metric": "commit_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 23241880.25,
+  "b_median_p50": 10118093.75,
+  "a_median_p95": 24394416.525,
+  "b_median_p95": 10210354.025,
+  "a_median_mean": 23417549.25,
+  "b_median_mean": 10133562.600000001,
+  "paired_p50_ratios": [
+   0.4392381675408436,
+   0.4335887042183808,
+   0.43711019586188243,
+   0.43438547524484855
+  ],
+  "paired_mean_ratios": [
+   0.43518686656009675,
+   0.4311120596694906,
+   0.434372941733632,
+   0.42917638149656095
+  ],
+  "median_paired_p50_ratio": 0.4357478355533655,
+  "paired_p50_ratio_range": [
+   0.4335887042183808,
+   0.4392381675408436
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-generic-0-A.json",
+    "p50": 22980092.0,
+    "p95": 23906341.5,
+    "mean": 23193375.25,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-generic-1-B.json",
+    "p50": 10093733.5,
+    "p95": 10161213.55,
+    "mean": 10093452.3,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-generic-2-B.json",
+    "p50": 10138003.5,
+    "p95": 10233181.0,
+    "mean": 10150116.15,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-generic-3-A.json",
+    "p50": 23381613.5,
+    "p95": 24609471.05,
+    "mean": 23544032.05,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-generic-4-A.json",
+    "p50": 23102147.0,
+    "p95": 24179362.0,
+    "mean": 23291066.45,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-generic-5-B.json",
+    "p50": 10098184.0,
+    "p95": 10188223.0,
+    "mean": 10117009.05,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-generic-6-B.json",
+    "p50": 10176784.0,
+    "p95": 10232485.05,
+    "mean": 10191249.2,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-generic-7-A.json",
+    "p50": 23428002.5,
+    "p95": 24752686.15,
+    "mean": 23746062.55,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "54016.xls:number-source-backed",
+  "metric": "commit_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 15889993.5,
+  "b_median_p50": 8704484.25,
+  "a_median_p95": 16663114.55,
+  "b_median_p95": 9228227.275,
+  "a_median_mean": 15845959.35,
+  "b_median_mean": 8778238.4,
+  "paired_p50_ratios": [
+   0.559332461989847,
+   0.540592084145885,
+   0.5387733683767748,
+   0.5635376787576463
+  ],
+  "paired_mean_ratios": [
+   0.5635477256194452,
+   0.5448396231210291,
+   0.5436029334667349,
+   0.5712301707789675
+  ],
+  "median_paired_p50_ratio": 0.5499622730678659,
+  "paired_p50_ratio_range": [
+   0.5387733683767748,
+   0.5635376787576463
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-source-backed-0-A.json",
+    "p50": 15673115.0,
+    "p95": 16646304.55,
+    "mean": 15668764.15,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-source-backed-1-B.json",
+    "p50": 8766482.0,
+    "p95": 9273648.5,
+    "mean": 8830096.4,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-source-backed-2-B.json",
+    "p50": 8634786.0,
+    "p95": 9182806.05,
+    "mean": 8726380.4,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-source-backed-3-A.json",
+    "p50": 15972831.0,
+    "p95": 16639279.0,
+    "mean": 16016420.3,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-source-backed-4-A.json",
+    "p50": 16041042.5,
+    "p95": 16782020.05,
+    "mean": 15912844.5,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-source-backed-5-B.json",
+    "p50": 8642486.5,
+    "p95": 8790243.05,
+    "mean": 8650268.95,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-number-source-backed-6-B.json",
+    "p50": 8907928.0,
+    "p95": 9503702.0,
+    "mean": 9013483.25,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-number-source-backed-7-A.json",
+    "p50": 15807156.0,
+    "p95": 16679924.55,
+    "mean": 15779074.2,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "54016.xls:reader-open",
+  "metric": "open_ns",
+  "warmups": 3,
+  "samples": 20,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 10429955.5,
+  "b_median_p50": 9909810.0,
+  "a_median_p95": 11830188.3,
+  "b_median_p95": 11031033.325,
+  "a_median_mean": 10574665.575,
+  "b_median_mean": 10018010.075,
+  "paired_p50_ratios": [
+   0.972011364342636,
+   0.9209612867830133,
+   1.0611558372639756,
+   0.8599389736272959
+  ],
+  "paired_mean_ratios": [
+   0.9667237899370771,
+   0.9285737374253488,
+   1.0010564392649948,
+   0.8697666932624191
+  ],
+  "median_paired_p50_ratio": 0.9464863255628246,
+  "paired_p50_ratio_range": [
+   0.8599389736272959,
+   1.0611558372639756
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/54016.xls-reader-open-0-A.json",
+    "p50": 10667401.0,
+    "p95": 12181893.0,
+    "mean": 10876799.05,
+    "n": 20
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/54016.xls-reader-open-1-B.json",
+    "p50": 10368835.0,
+    "p95": 11711908.55,
+    "mean": 10514860.4,
+    "n": 20
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/54016.xls-reader-open-2-B.json",
+    "p50": 9450785.0,
+    "p95": 10611170.6,
+    "mean": 9537399.8,
+    "n": 20
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/54016.xls-reader-open-3-A.json",
+    "p50": 10261870.0,
+    "p95": 11075464.0,
+    "mean": 10271020.4,
+    "n": 20
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/54016.xls-reader-open-4-A.json",
+    "p50": 10253943.5,
+    "p95": 11893477.05,
+    "mean": 10487540.9,
+    "n": 20
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/54016.xls-reader-open-5-B.json",
+    "p50": 10881032.0,
+    "p95": 11450896.05,
+    "mean": 10498620.35,
+    "n": 20
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/54016.xls-reader-open-6-B.json",
+    "p50": 9113668.5,
+    "p95": 10116944.1,
+    "mean": 9273270.05,
+    "n": 20
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/54016.xls-reader-open-7-A.json",
+    "p50": 10598041.0,
+    "p95": 11766899.55,
+    "mean": 10661790.25,
+    "n": 20
+   }
+  ]
+ },
+ {
+  "case": "sparse-bands-minimal.xls:open",
+  "metric": "open_ns",
+  "warmups": 2,
+  "samples": 10,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 60283892.25,
+  "b_median_p50": 27342696.5,
+  "a_median_p95": 61188042.599999994,
+  "b_median_p95": 27954321.799999997,
+  "a_median_mean": 60368908.3,
+  "b_median_mean": 27348681.7,
+  "paired_p50_ratios": [
+   0.4462571484691758,
+   0.44682525782955096,
+   0.4600861272397864,
+   0.46274871258125083
+  ],
+  "paired_mean_ratios": [
+   0.44620847488423127,
+   0.448441492686413,
+   0.4572359935197481,
+   0.4628106326528063
+  ],
+  "median_paired_p50_ratio": 0.45345569253466866,
+  "paired_p50_ratio_range": [
+   0.4462571484691758,
+   0.46274871258125083
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-open-0-A.json",
+    "p50": 60278640.0,
+    "p95": 61363116.15,
+    "mean": 60366065.9,
+    "n": 10
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-open-1-B.json",
+    "p50": 26899774.0,
+    "p95": 27219178.5,
+    "mean": 26935850.2,
+    "n": 10
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-open-2-B.json",
+    "p50": 27009575.0,
+    "p95": 27532446.599999998,
+    "mean": 27073198.0,
+    "n": 10
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-open-3-A.json",
+    "p50": 60447735.5,
+    "p95": 60659243.0,
+    "mean": 60371750.7,
+    "n": 10
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-open-4-A.json",
+    "p50": 60153559.0,
+    "p95": 62001059.599999994,
+    "mean": 60415553.0,
+    "n": 10
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-open-5-B.json",
+    "p50": 27675818.0,
+    "p95": 28376197.0,
+    "mean": 27624165.4,
+    "n": 10
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-open-6-B.json",
+    "p50": 27898724.0,
+    "p95": 28740531.65,
+    "mean": 27919113.2,
+    "n": 10
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-open-7-A.json",
+    "p50": 60289144.5,
+    "p95": 61012969.05,
+    "mean": 60325133.5,
+    "n": 10
+   }
+  ]
+ },
+ {
+  "case": "sparse-bands-minimal.xls:comments-open",
+  "metric": "open_ns",
+  "warmups": 2,
+  "samples": 10,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 59496312.75,
+  "b_median_p50": 26587015.25,
+  "a_median_p95": 60918237.125,
+  "b_median_p95": 27442292.85,
+  "a_median_mean": 59433093.75,
+  "b_median_mean": 26609928.25,
+  "paired_p50_ratios": [
+   0.45093342819326576,
+   0.461872164929667,
+   0.44282949010794165,
+   0.43414418540427807
+  ],
+  "paired_mean_ratios": [
+   0.4481487546655168,
+   0.46411419680923965,
+   0.44731220373957686,
+   0.4341185104594905
+  ],
+  "median_paired_p50_ratio": 0.44688145915060373,
+  "paired_p50_ratio_range": [
+   0.43414418540427807,
+   0.461872164929667
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-0-A.json",
+    "p50": 59302874.5,
+    "p95": 61324073.199999996,
+    "mean": 59243517.3,
+    "n": 10
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-1-B.json",
+    "p50": 26741648.5,
+    "p95": 26821687.55,
+    "mean": 26549908.5,
+    "n": 10
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-2-B.json",
+    "p50": 26764858.5,
+    "p95": 28694891.249999996,
+    "mean": 27042353.8,
+    "n": 10
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-3-A.json",
+    "p50": 57948628.5,
+    "p95": 59932219.199999996,
+    "mean": 58266594.7,
+    "n": 10
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-4-A.json",
+    "p50": 59689751.0,
+    "p95": 60512401.05,
+    "mean": 59622670.2,
+    "n": 10
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-5-B.json",
+    "p50": 26432382.0,
+    "p95": 28062898.15,
+    "mean": 26669948.0,
+    "n": 10
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-6-B.json",
+    "p50": 25961204.5,
+    "p95": 26611210.05,
+    "mean": 25992314.8,
+    "n": 10
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-comments-open-7-A.json",
+    "p50": 59798577.0,
+    "p95": 61382284.949999996,
+    "mean": 59873776.8,
+    "n": 10
+   }
+  ]
+ },
+ {
+  "case": "sparse-bands-minimal.xls:visibility-open",
+  "metric": "open_ns",
+  "warmups": 2,
+  "samples": 10,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 56658965.5,
+  "b_median_p50": 24587252.5,
+  "a_median_p95": 57562429.075,
+  "b_median_p95": 25367260.05,
+  "a_median_mean": 56605179.4,
+  "b_median_mean": 24647064.75,
+  "paired_p50_ratios": [
+   0.44352710876393275,
+   0.4293728087240955,
+   0.4338068611179714,
+   0.43298815182771194
+  ],
+  "paired_mean_ratios": [
+   0.45694331345170686,
+   0.4260739870444574,
+   0.43424491902290113,
+   0.4325390708608674
+  ],
+  "median_paired_p50_ratio": 0.4333975064728417,
+  "paired_p50_ratio_range": [
+   0.4293728087240955,
+   0.44352710876393275
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-0-A.json",
+    "p50": 56487682.5,
+    "p95": 57079270.0,
+    "mean": 56408899.4,
+    "n": 10
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-1-B.json",
+    "p50": 25053818.5,
+    "p95": 28815962.749999996,
+    "mean": 25775669.4,
+    "n": 10
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-2-B.json",
+    "p50": 24550012.5,
+    "p95": 25174508.1,
+    "mean": 24658695.7,
+    "n": 10
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-3-A.json",
+    "p50": 57176449.0,
+    "p95": 61546608.99999999,
+    "mean": 57874210.7,
+    "n": 10
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-4-A.json",
+    "p50": 56763723.0,
+    "p95": 57709297.6,
+    "mean": 56731657.0,
+    "n": 10
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-5-B.json",
+    "p50": 24624492.5,
+    "p95": 25560012.0,
+    "mean": 24635433.8,
+    "n": 10
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-6-B.json",
+    "p50": 24487302.0,
+    "p95": 24840932.5,
+    "mean": 24429245.2,
+    "n": 10
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-visibility-open-7-A.json",
+    "p50": 56554208.0,
+    "p95": 57415560.55,
+    "mean": 56478701.8,
+    "n": 10
+   }
+  ]
+ },
+ {
+  "case": "sparse-bands-minimal.xls:reader-open",
+  "metric": "open_ns",
+  "warmups": 2,
+  "samples": 10,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 54749979.25,
+  "b_median_p50": 50362531.5,
+  "a_median_p95": 56006149.3,
+  "b_median_p95": 51796418.775,
+  "a_median_mean": 54954137.95,
+  "b_median_mean": 50469465.55,
+  "paired_p50_ratios": [
+   0.8825171093375681,
+   0.9201580510410176,
+   0.9193293795986367,
+   0.919568583896874
+  ],
+  "paired_mean_ratios": [
+   0.8847098212523258,
+   0.9170157656366851,
+   0.9174649086533454,
+   0.919776570738653
+  ],
+  "median_paired_p50_ratio": 0.9194489817477554,
+  "paired_p50_ratio_range": [
+   0.8825171093375681,
+   0.9201580510410176
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-0-A.json",
+    "p50": 58529297.0,
+    "p95": 59361081.0,
+    "mean": 58448754.9,
+    "n": 10
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-1-B.json",
+    "p50": 51653106.0,
+    "p95": 52113102.55,
+    "mean": 51710187.5,
+    "n": 10
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-2-B.json",
+    "p50": 50484644.0,
+    "p95": 52201169.75,
+    "mean": 50529442.7,
+    "n": 10
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-3-A.json",
+    "p50": 54865187.5,
+    "p95": 56039378.5,
+    "mean": 55102043.6,
+    "n": 10
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-4-A.json",
+    "p50": 54605586.0,
+    "p95": 55580850.6,
+    "mean": 54619548.2,
+    "n": 10
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-5-B.json",
+    "p50": 50200519.5,
+    "p95": 50980837.0,
+    "mean": 50111518.8,
+    "n": 10
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-6-B.json",
+    "p50": 50240419.0,
+    "p95": 51479735.0,
+    "mean": 50409488.4,
+    "n": 10
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/sparse-bands-minimal.xls-reader-open-7-A.json",
+    "p50": 54634771.0,
+    "p95": 55972920.1,
+    "mean": 54806232.3,
+    "n": 10
+   }
+  ]
+ },
+ {
+  "case": "xls-large.xls:open",
+  "metric": "open_ns",
+  "warmups": 5,
+  "samples": 60,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 1528103.0,
+  "b_median_p50": 679726.0,
+  "a_median_p95": 1584591.5,
+  "b_median_p95": 686736.5249999999,
+  "a_median_mean": 1535138.6166666667,
+  "b_median_mean": 678909.525,
+  "paired_p50_ratios": [
+   0.4389105450244616,
+   0.445929944211482,
+   0.44860568996764694,
+   0.4415155776112719
+  ],
+  "paired_mean_ratios": [
+   0.4363590184663007,
+   0.4422593330838786,
+   0.44709665065567855,
+   0.4406487339514463
+  ],
+  "median_paired_p50_ratio": 0.44372276091137697,
+  "paired_p50_ratio_range": [
+   0.4389105450244616,
+   0.44860568996764694
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-open-0-A.json",
+    "p50": 1548958.0,
+    "p95": 1630894.0,
+    "mean": 1557641.8833333333,
+    "n": 60
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-open-1-B.json",
+    "p50": 679854.0,
+    "p95": 687140.5,
+    "mean": 679691.0833333334,
+    "n": 60
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-open-2-B.json",
+    "p50": 679743.5,
+    "p95": 685673.05,
+    "mean": 679061.55,
+    "n": 60
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-open-3-A.json",
+    "p50": 1524328.0,
+    "p95": 1599866.0,
+    "mean": 1535437.4666666666,
+    "n": 60
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-open-4-A.json",
+    "p50": 1515158.0,
+    "p95": 1554075.05,
+    "mean": 1518144.9,
+    "n": 60
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-open-5-B.json",
+    "p50": 679708.5,
+    "p95": 686738.0499999999,
+    "mean": 678757.5,
+    "n": 60
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-open-6-B.json",
+    "p50": 676348.0,
+    "p95": 686735.0,
+    "mean": 676325.2,
+    "n": 60
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-open-7-A.json",
+    "p50": 1531878.0,
+    "p95": 1569317.0,
+    "mean": 1534839.7666666666,
+    "n": 60
+   }
+  ]
+ },
+ {
+  "case": "xls-large.xls:number-generic",
+  "metric": "commit_ns",
+  "warmups": 5,
+  "samples": 60,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 3442149.5,
+  "b_median_p50": 1565718.0,
+  "a_median_p95": 3520117.475,
+  "b_median_p95": 1587683.975,
+  "a_median_mean": 3456062.566666667,
+  "b_median_mean": 1566922.9083333332,
+  "paired_p50_ratios": [
+   0.4624849284216132,
+   0.4455174048700245,
+   0.45308479713551236,
+   0.4589542559017669
+  ],
+  "paired_mean_ratios": [
+   0.4621201458162713,
+   0.4434861847014273,
+   0.45245842087129495,
+   0.4563266321302072
+  ],
+  "median_paired_p50_ratio": 0.45601952651863964,
+  "paired_p50_ratio_range": [
+   0.4455174048700245,
+   0.4624849284216132
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-number-generic-0-A.json",
+    "p50": 3391317.0,
+    "p95": 3457844.0,
+    "mean": 3396511.6666666665,
+    "n": 60
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-number-generic-1-B.json",
+    "p50": 1568433.0,
+    "p95": 1588546.0,
+    "mean": 1569596.4666666666,
+    "n": 60
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-number-generic-2-B.json",
+    "p50": 1541052.5,
+    "p95": 1555778.0,
+    "mean": 1539397.4833333334,
+    "n": 60
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-number-generic-3-A.json",
+    "p50": 3459017.5,
+    "p95": 3562350.0,
+    "mean": 3471128.3833333333,
+    "n": 60
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-number-generic-4-A.json",
+    "p50": 3449692.0,
+    "p95": 3514238.5,
+    "mean": 3457222.316666667,
+    "n": 60
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-number-generic-5-B.json",
+    "p50": 1563003.0,
+    "p95": 1586821.95,
+    "mean": 1564249.35,
+    "n": 60
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-number-generic-6-B.json",
+    "p50": 1576327.5,
+    "p95": 1590119.5,
+    "mean": 1576564.1666666667,
+    "n": 60
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-number-generic-7-A.json",
+    "p50": 3434607.0,
+    "p95": 3525996.45,
+    "mean": 3454902.816666667,
+    "n": 60
+   }
+  ]
+ },
+ {
+  "case": "xls-large.xls:reader-open",
+  "metric": "open_ns",
+  "warmups": 5,
+  "samples": 60,
+  "a_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-before",
+  "b_bin": "/home/zhuhe/code/litchi-worktrees/scratch/0746/bin/probe-after",
+  "a_median_p50": 1452324.5,
+  "b_median_p50": 1360821.75,
+  "a_median_p95": 1519803.525,
+  "b_median_p95": 1408035.75,
+  "a_median_mean": 1457117.1583333332,
+  "b_median_mean": 1363628.6833333333,
+  "paired_p50_ratios": [
+   0.9470193640837937,
+   0.8956564908536434,
+   0.9460937702741647,
+   0.9206424546146716
+  ],
+  "paired_mean_ratios": [
+   0.9489812337582705,
+   0.8941818541544897,
+   0.9476533063517835,
+   0.9201563837892542
+  ],
+  "median_paired_p50_ratio": 0.9333681124444182,
+  "paired_p50_ratio_range": [
+   0.8956564908536434,
+   0.9470193640837937
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-reader-open-0-A.json",
+    "p50": 1440347.0,
+    "p95": 1509493.55,
+    "mean": 1444818.6833333333,
+    "n": 60
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-reader-open-1-B.json",
+    "p50": 1364036.5,
+    "p95": 1409812.0,
+    "mean": 1371105.8166666667,
+    "n": 60
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-reader-open-2-B.json",
+    "p50": 1357607.0,
+    "p95": 1406259.5,
+    "mean": 1356151.55,
+    "n": 60
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-reader-open-3-A.json",
+    "p50": 1515767.5,
+    "p95": 1557633.0,
+    "mean": 1516639.5333333334,
+    "n": 60
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-reader-open-4-A.json",
+    "p50": 1464302.0,
+    "p95": 1517076.5499999998,
+    "mean": 1469415.6333333333,
+    "n": 60
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-reader-open-5-B.json",
+    "p50": 1385367.0,
+    "p95": 1430643.0,
+    "mean": 1392496.5833333333,
+    "n": 60
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls-large.xls-reader-open-6-B.json",
+    "p50": 1313151.0,
+    "p95": 1378465.0,
+    "mean": 1323393.4333333333,
+    "n": 60
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls-large.xls-reader-open-7-A.json",
+    "p50": 1426342.0,
+    "p95": 1522530.5,
+    "mean": 1438226.65,
+    "n": 60
+   }
+  ]
+ }
+]

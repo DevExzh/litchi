@@ -1,25 +1,28 @@
-HEAD b85d3e534cee7111805a6bbc0617e9ae77aa510e
+HEAD 0cd989bb1529faec1f70a797b7220b375bbdeb6e
 rustc rustc 1.95.0 (59807616e 2026-04-14)
 
 $ cargo fmt --all --check
 exit 0
 
 $ cargo check -p litchi-xls --all-targets --locked --offline
+        Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-ograph)
+        Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-crypto)
         Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
-        Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.34s
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.28s
 exit 0
 
 $ cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
-        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-pptx)
+        Checking clap v4.4.18
         Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi)
-        Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.57s
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.83s
 exit 0
 
 $ cargo clippy -p litchi-xls --lib --no-deps --locked --offline -- -D warnings
         Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-ograph)
         Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-crypto)
         Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
-        Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.78s
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.11s
 exit 0
 
 $ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
@@ -30,37 +33,40 @@ $ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D wa
 exit 101
 
 $ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
-        Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-vba)
+        Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-sign)
         Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-crypto)
         Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
-        Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.90s
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.24s
 exit 0
 
 $ cargo test -p litchi-xls --locked --offline
     
     test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
     
-    all doctests ran in 2.46s; merged doctests compilation took 2.46s
+    all doctests ran in 0.33s; merged doctests compilation took 0.32s
+    totals: 73 suites, 1492 passed, 0 failed, 1 ignored
 exit 0
 
 $ cargo test --release -p litchi-xls --lib --locked --offline -- generic_commit_publishes validation_only_tests deterministically
     test workbook::validation_only_tests::worksheet_parse_agrees_with_the_complete_reader_under_mutation ... ok
     
-    test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 4.57s
+    test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1094 filtered out; finished in 4.25s
     
+    totals: 1 suites, 13 passed, 0 failed, 0 ignored
 exit 0
 
 $ cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
     
     test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
     
-    all doctests ran in 0.93s; merged doctests compilation took 0.93s
+    all doctests ran in 0.67s; merged doctests compilation took 0.67s
+    totals: 29 suites, 382 passed, 0 failed, 7 ignored
 exit 0
 
 $ RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-xls --no-deps --locked --offline
      Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
-        Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.80s
-       Generated /home/zhuhe/code/litchi-worktrees/targets/0746/doc/litchi_xls/index.html
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.12s
+       Generated /home/zhuhe/code/litchi-worktrees/targets/0746/gates-final/doc/litchi_xls/index.html
 exit 0
 
 $ python3 tools/check_crate_boundaries.py

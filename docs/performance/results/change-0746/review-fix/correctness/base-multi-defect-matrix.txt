@@ -1,0 +1,28 @@
+MATRIX-XF	15
+MATRIX	dup-then-bad-xf	Invalid record 0x00E0: cell references out-of-range XF 4095
+MATRIX	bad-xf-then-truncated	Invalid record 0x00E0: cell references out-of-range XF 4095
+MATRIX	truncated-then-bad-xf	Invalid length: expected 14, found 10
+MATRIX	reserved-xf-then-bad-xf	Invalid record 0x00E0: cell references reserved style-XF slot 3
+MATRIX	pending-string-formula-then-stray-string	Invalid record 0x0203: String-valued Formula must be followed by a String record
+MATRIX	stray-string-then-orphan	Invalid record 0x0207: String record has no pending string-valued Formula
+MATRIX	string-continuation-not-continue-then-bad-xf	Invalid record 0x0203: String result continuation must be a Continue record
+MATRIX	orphan-then-array-without-dimensions	Invalid record 0x0006: Formula at (2, 2) contains an orphan PtgExp
+MATRIX	array-without-dimensions-then-duplicate-member	Invalid record 0x0221: Array formulas require worksheet Dimensions
+MATRIX	array-duplicate-anchor-then-missing-member	Invalid record 0x0221: Array range cell (4, 0) is not exactly one Formula/PtgExp to its anchor
+MATRIX	array-duplicate-member-before-missing-member	Invalid record 0x0221: Array range cell (5, 0) is not exactly one Formula/PtgExp to its anchor
+MATRIX	second-array-duplicate-member	Invalid record 0x0221: Array range cell (5, 1) is not exactly one Formula/PtgExp to its anchor
+MATRIX	array-outside-dimensions-with-duplicates	Invalid record 0x0221: Array range is outside worksheet Dimensions
+MATRIX	shrfmla-without-formula-then-bad-xf	Invalid record 0x04BC: Shared must immediately follow its Formula record
+MATRIX	duplicate-anchor-claims-second-companion	Invalid record 0x0221: Formula at (1, 1) already owns a Shared companion
+MATRIX	mulblank-bad-xf-then-mulrk-bad-range	Invalid record 0x00E0: cell references out-of-range XF 4095
+MATRIX	mulrk-bad-range-then-bad-xf	Invalid data: MulRk column range 2..=9 does not match 2 cells
+MATRIX	mulrk-over-number-then-reserved-xf	Invalid record 0x00E0: cell references reserved style-XF slot 3
+MATRIX	unmaterialized-member-behind-orphan	Invalid record 0x0006: Formula at (3, 3) contains an orphan PtgExp
+MATRIX	unmaterialized-member	Invalid record 0x0221: Array Formula cell was not materialized
+MATRIX	non-formula-member-with-duplicates	Invalid record 0x0221: Array owner cannot attach to a non-Formula cell
+MATRIX	outside-grid-duplicates-then-bad-xf	Invalid record 0x00E0: cell references out-of-range XF 4095
+MATRIX	custom-view-end-without-begin-then-bad-xf	Invalid record 0x01AB: UserSViewEnd without a matching UserSViewBegin
+MATRIX	dval-cut-short-by-a-cell-then-bad-xf	Invalid record 0x0203: DVAL must be followed immediately by its declared DV records
+MATRIX	dval-cut-short-by-eof-after-duplicates	Invalid record 0x000A: DVAL must be followed immediately by its declared DV records
+MATRIX	valid-duplicates-shared-and-array	ok
+MATRIX	no-eof-pending-string-formula-after-duplicates	ok

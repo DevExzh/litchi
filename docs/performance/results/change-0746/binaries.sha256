@@ -29,3 +29,18 @@ fd472e23bfd890c463eb8a9a285478eb525d566b1372439427962f66f27b42f2  matrix-fix
 fdf4360b5aead4141555a30c17f26fd4f35dd9e3f00e93d830f094cce383b4cd  probe-before-fp
 9117c4891f776b3e0ba861343bee0173ff5384df3dc12bfbe2d640da6e3a6183  probe-c4
 f7476cc74c2fe817ee135c312653d98f41a1c165fe5d6ed15d9bfaf99f4a58c3  probe-fix
+# Review fixes (review-fix/): scratch probe crate with the sparse-band generators (probe/main.rs as retained now), rustc 1.98.1, release debug=1,
+#   every leg built with the identical command from identical probe source (probe/Cargo-{before,banded,after}.toml):
+#   probe-review-before: base 009d515bef; probe-review-banded: b85d3e534c (the reviewed build); probe-review-first-fix: 8fa1d4b54a;
+#   probe-review-final: 3d49e03044 (0cd989bb15 changes only a doc comment); *-alloc: --features alloc-count
+#   matrix-review-final / corpus-review-final / mutate-review-final: the correctness binaries built from 3d49e03044
+7546641e10caae8635098e5a38430de56a2f1f241b4809dde2d3c887734297e5  probe-review-before
+c8e39c9ddc5a180c35a50f72d844e45de5804fd04eb44e932b26cecf98aac4e0  probe-review-before-alloc
+768744efad041fecd3db9fde29198439e8c70ae563bad45b6fbf2affe8af6b18  probe-review-banded
+00c923f9f4f865294a79b3e2c0b68d00bdde9b48185e6b4ea9dd7dfa5c9c6188  probe-review-banded-alloc
+1912a68fcc1bf9229bdf8c0482697a2ecd54332dd89b78b0b12037321e4f8596  probe-review-first-fix
+0d6f56e9d2813c91bcfb9b7168157322fa5f61335356824441b990dedbe3ad8b  probe-review-final
+e2aabf09cac7a85e9c91f6046d2ca1b025a10647d6f016eba308ce6f336cbe8b  probe-review-final-alloc
+6df38bd76fa72a9f17bed8fbf824855f66e6b2fb9278759e33f7bf746f05ffab  matrix-review-final
+e4f373bf574b9ecbee0e4653f7d9efef6cd6855f941a4767c722a39a0edcb91e  corpus-review-final
+9c32ace903eb542e462f8bd25ce60a70230d029bf5416d44f6b22ec058f090d5  mutate-review-final

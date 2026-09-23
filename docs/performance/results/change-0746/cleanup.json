@@ -52,5 +52,74 @@
   "targets/base-009d515bef (the shared prebuilt harness, copied for use)",
   "other implementers' worktrees and target dirs"
  ],
- "tmp_usage": "no files left under /tmp; the session scratchpad was not used for artifacts"
+ "tmp_usage": "no files left under /tmp; the session scratchpad was not used for artifacts",
+ "review_fix": {
+  "performed_after": "the final gates at 0cd989bb15 passed and every binary SHA-256 was recorded in binaries.sha256; before the review-fix record commit, which carries this entry",
+  "deleted": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/gates-fresh",
+    "bytes": 42683571560,
+    "what": "the first review-fix gate run (at 7f3c6c4b78), superseded by gates-final"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/gates-final",
+    "bytes": 42651663478,
+    "what": "the fresh target directory of the final gates at 0cd989bb15 (fmt, check, clippy, litchi-xls and facade tests, release tests, rustdoc)"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/debug",
+    "bytes": 2419171438,
+    "what": "focused test and clippy builds while implementing the review fixes"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/base-matrix",
+    "bytes": 1232795596,
+    "what": "the base-checkout test build that generated the frozen multi-defect matrix's expectations"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/probe-before",
+    "bytes": 626299696,
+    "what": "base probe builds (plain and alloc-count) for the review-fix measurements"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/probe-prefix",
+    "bytes": 614379197,
+    "what": "reviewed-build (b85d3e534c) probe builds (plain and alloc-count)"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/probe-after",
+    "bytes": 773564396,
+    "what": "first-fix and final probe builds (plain and alloc-count) and the final correctness binaries"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0746/tmp",
+    "bytes": 0,
+    "what": "empty cargo tmp directory"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/0746-before-src",
+    "bytes": 10150306927,
+    "method": "git worktree remove --force",
+    "what": "detached worktree re-created for the review fixes: the reviewed build (b85d3e534c) probe leg, then the base (009d515bef) with the temporary matrix generator (scripts/base-multi-defect-matrix-generator.diff)"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0746/*",
+    "bytes": 519842003,
+    "what": "staged probe binaries, the sparse-band fixtures (35 MB writer output and 4.7 MB minimal), perf.data and annotate files, the 9.4 MB final mutation output, drafts, edit scripts and intermediate JSON; the evidence the record cites was first copied into review-fix/, scripts/, probe/ and correctness/"
+   }
+  ],
+  "retained_in_packet": [
+   "review-fix/ (ABBA summaries and raw reports, isolation pairs, allocation counts, the first window, the base-generated matrix)",
+   "probe/main.rs with the sparse-band generators and probe/Cargo-banded.toml",
+   "scripts/abba_legs.py, isolate_legs.py, fix_final_run.sh, gates-final.sh, base-multi-defect-matrix-generator.diff",
+   "binaries.sha256 and correctness/output-sha256.txt entries for every review-fix binary and output",
+   "gates.txt (final head)"
+  ],
+  "kept": [
+   "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse (worktree)",
+   "perf/0746-xls-validation-only-parse (branch)",
+   "/home/zhuhe/code/litchi-worktrees/scratch/0746 (empty directory)"
+  ],
+  "tmp_usage": "nothing written under /tmp by this change's commands; background-task logs are the harness's own"
+ }
 }

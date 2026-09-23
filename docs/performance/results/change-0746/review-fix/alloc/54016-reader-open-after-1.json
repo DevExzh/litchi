@@ -1,0 +1,1 @@
+{"input":"fixtures/54016.xls","operation":"reader-open","alloc_counting":true,"source_bytes":984576,"worksheets":1,"samples":1,"allocations":40102,"allocated_bytes":16987030,"peak_live_bytes":14417145,"open_ns":[10688292],"stage_ns":[],"commit_ns":[],"publish_ns":[]}
