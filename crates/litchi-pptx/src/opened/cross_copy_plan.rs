@@ -242,7 +242,8 @@ impl CrossSlideCopyPlan {
     /// A plan retains the archive it built at planning when its length fits
     /// the intersected [`Limits::max_retained_candidate_bytes`] of the two
     /// snapshots, so that applying the plan can reuse those bytes instead of
-    /// serializing and deflating the candidate a second time.  `None` means
+    /// serializing the candidate a second time (and capturing or deflating its
+    /// copied members again).  `None` means
     /// the plan holds nothing and application rebuilds the archive: either the
     /// candidate was larger than the budget, or the archive was released, or
     /// the candidate reopen did not authorize an exact source.
@@ -261,7 +262,7 @@ impl CrossSlideCopyPlan {
     /// The plan keeps its value: it proves the same revisions, carries the
     /// same durable patch, compares equal to the plan it was, and still
     /// applies.  Only the reuse is given up, so a later application rebuilds
-    /// and re-deflates the candidate as it does for an unretained plan.
+    /// and re-serializes the candidate as it does for an unretained plan.
     pub fn release_retained_candidate(&mut self) {
         self.candidate.0 = None;
     }
@@ -415,7 +416,11 @@ impl CrossSlideCopyPatch {
     /// such a copy in the forward direction therefore requires the destination
     /// to be an unmodified owned source again; a modified destination is
     /// refused with [`crate::Error::UnsafeEdit`] and the copy must be planned
-    /// against it afresh. The inverse direction has no such requirement.
+    /// against it afresh. The inverse direction also publishes into a modified
+    /// destination. Both directions rebuild the forward candidate, so both
+    /// require the source package to still lend the transferred members —
+    /// the same images, still holding the allocations the source was opened
+    /// with; a source that no longer does is refused like a stale one.
     #[must_use]
     pub fn transfers_source_compressed_media(&self) -> bool {
         self.copied_media == CopiedMedia::SourceCompressed
@@ -570,10 +575,11 @@ impl CrossSlideCopyPatch {
     ///
     /// A patch whose header carries a superseded magic is refused here,
     /// before any header field is read. `LPCP0002` embeds three revisions from
-    /// the `litchi-pptx-opened-v1` algebra; `LPCP0003` embeds serialized-archive
-    /// revisions of a candidate that deflated every copied member again, which
-    /// no current application reproduces when the copy carries eligible image
-    /// members. Re-plan the copy against the source and destination packages.
+    /// the `litchi-pptx-opened-v1` algebra; `LPCP0003` predates the recorded
+    /// copied-media encoding that the embedded physical revisions now depend
+    /// on, and is refused by name, as change 0655 refused `LPCP0002`, rather
+    /// than read implicitly as the recompressed encoding. Re-plan the copy
+    /// against the source and destination packages.
     ///
     /// # Errors
     ///
@@ -1538,7 +1544,8 @@ fn build_candidate(
             // carried beside them, so the sealed physical revision stays a
             // hash of the bytes this call publishes. That hash is the one
             // `bounded_package_bytes` takes anyway, so what reuse removes is
-            // exactly the serialization and its deflate.
+            // exactly the serialization with its deflate and, in release
+            // builds, the copied media captures.
             let mut digest = Sha256::new();
             digest.update(&serialized);
             (serialized, digest.finalize().into())

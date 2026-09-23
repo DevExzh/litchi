@@ -4774,6 +4774,60 @@ where
         Ok((token, bytes))
     }
 
+    /// Whether a verified precompressed capture of one member can prove the
+    /// member's layout, without reading any of its payload.
+    ///
+    /// This runs the checks [`Self::read_entry_precompressed_with_progress`]
+    /// runs before it captures a byte: the member uses Store or Deflate, its
+    /// central metadata is a valid strict stream target (resolved ZIP64
+    /// fields, single disk, not encrypted), a Store member's sizes agree, and
+    /// its strict local layout — local header against central record, bounded
+    /// span, data descriptor — is proven. The proof is memoized exactly as a
+    /// capture's is, so a capture that follows repeats none of it.
+    ///
+    /// `Ok(false)` means the archive's own bytes disprove the layout; it is a
+    /// deterministic property of the archive. Only failures that are not a
+    /// property of the bytes — allocation, transport I/O and cancellation —
+    /// are returned as errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unknown-entry error for an `entry_id` this archive did not
+    /// issue, and the allocation, I/O or cancellation error that stopped the
+    /// proof.
+    pub fn precompressed_layout_provable(&self, entry_id: EntryId) -> Result<bool, Error> {
+        fn disproven(error: Error) -> Result<bool, Error> {
+            match error.kind() {
+                ErrorKind::Allocation { .. }
+                | ErrorKind::IO(_)
+                | ErrorKind::Io(_)
+                | ErrorKind::Cancelled => Err(error),
+                _ => Ok(false),
+            }
+        }
+        let indexed = self.indexed_entry(entry_id)?;
+        let method = indexed.info.compression_method;
+        if !matches!(
+            method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Ok(false);
+        }
+        let wayfinder = indexed.info.wayfinder;
+        if let Err(error) = self.archive.validate_strict_stream_target(wayfinder) {
+            return disproven(error);
+        }
+        if method == CompressionMethod::Store
+            && wayfinder.compressed_size_hint() != indexed.info.uncompressed_size
+        {
+            return Ok(false);
+        }
+        match self.strict_layout_for(wayfinder) {
+            Ok(_) => Ok(true),
+            Err(error) => disproven(error),
+        }
+    }
+
     fn capture_precompressed<E, F>(
         &self,
         entry_id: EntryId,
@@ -15802,6 +15856,58 @@ mod tests {
             assert_eq!(token.uncompressed_size(), payload.len() as u64);
             assert_eq!(token.crc32(), crate::crc32(payload));
         }
+    }
+
+    #[test]
+    fn precompressed_layout_proof_classifies_without_reading_payloads() {
+        let payload = b"layout proofs read headers, never payload bytes";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("deflated.bin", payload).unwrap();
+        writer.write_deflated_sized("sized.bin", payload).unwrap();
+        writer.write_stored("stored.bin", payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let archive = indexed_archive(bytes.clone());
+        for name in ["deflated.bin", "sized.bin", "stored.bin"] {
+            let entry_id = archive.entry_id(name).unwrap();
+            assert!(
+                archive.precompressed_layout_provable(entry_id).unwrap(),
+                "{name}"
+            );
+            // A provable member captures.
+            archive
+                .read_entry_precompressed_with_progress(entry_id, payload, |_| {
+                    Ok::<(), io::Error>(())
+                })
+                .unwrap();
+        }
+
+        // Rename one local header only: the lenient reader trusts the central
+        // record, but the layout is disproven and reported as `Ok(false)`.
+        let local = {
+            let source = ZipArchive::from_slice(&bytes).unwrap();
+            let mut entries = source.entries();
+            let mut offset = None;
+            while let Some(record) = entries.next_entry().unwrap() {
+                if record.file_path().as_ref() == b"sized.bin" {
+                    offset = Some(usize::try_from(record.local_header_offset()).unwrap());
+                }
+            }
+            offset.unwrap()
+        };
+        let mut renamed = bytes.clone();
+        assert_eq!(renamed[local + 30], b's');
+        renamed[local + 30] = b'S';
+        let archive = indexed_archive(renamed);
+        let sized = archive.entry_id("sized.bin").unwrap();
+        assert!(!archive.precompressed_layout_provable(sized).unwrap());
+        assert_eq!(archive.read_entry(sized).unwrap(), payload);
+        let error = archive
+            .read_entry_precompressed_with_progress(sized, payload, |_| Ok::<(), io::Error>(()))
+            .unwrap_err();
+        assert!(matches!(error, VerifiedPrecompressedError::Archive(_)));
+        let deflated = archive.entry_id("deflated.bin").unwrap();
+        assert!(archive.precompressed_layout_provable(deflated).unwrap());
     }
 
     #[test]

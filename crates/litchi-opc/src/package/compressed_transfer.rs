@@ -23,11 +23,13 @@
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedError};
+use soapberry_zip::office::{
+    EntryId, IndexedArchive, VerifiedPrecompressedEntry, VerifiedPrecompressedError,
+};
 
 use super::{OpcPackage, SourcePart};
-use crate::error::{OpcError, Result, map_io_error};
-use crate::limits::ReadResource;
+use crate::error::{OpcError, Result, map_io_error, replicate_deferred_error};
+use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
 use crate::part::Part;
 use crate::payload::{PartPayload, TransferredPayload};
@@ -85,32 +87,59 @@ impl std::fmt::Debug for CompressedPartTransfer {
     }
 }
 
+/// The retained-archive member a part's transfer is captured from.
+struct TransferMember<'package> {
+    index: &'package IndexedArchive<Arc<Vec<u8>>>,
+    entry_id: EntryId,
+    limits: ReadLimits,
+}
+
 impl OpcPackage {
     /// Whether [`Self::authorize_compressed_transfer`] may issue a verified
     /// compressed transfer for this part.
     ///
-    /// The answer is a deterministic function of the package and never
-    /// decodes a payload. A part is eligible only when all of the following
-    /// hold:
+    /// The answer is a deterministic function of the package's graph, its
+    /// provenance and its retained archive's bytes, and it never decodes a
+    /// payload. A part is eligible only when all of the following hold:
     ///
-    /// - the package retains the owned source archive it was opened from
-    ///   ([`Self::from_vec`], [`Self::open`], [`Self::from_reader`] and their
-    ///   `*_with_limits` forms), with a source member for this part;
+    /// - the package retains the owned source archive it was opened from —
+    ///   [`Self::from_vec`], [`Self::open`], [`Self::from_reader`], their
+    ///   `*_with_limits` forms, [`Self::from_vec_reusing_payloads`] and
+    ///   [`Self::from_vec_with_execution`] — with a source member for this
+    ///   part;
     /// - the part still holds the payload allocation it was opened with,
     ///   proven by provenance identity rather than by comparing bytes, so a
     ///   payload replaced even with equal bytes is not eligible;
     /// - the part still has the content type it was opened with;
     /// - the part has no relationships;
     /// - the part is not XML by name or content type;
-    /// - the package carries no digital-signature infrastructure.
+    /// - the package carries no digital-signature infrastructure;
+    /// - the member's Store or Deflate layout is provable from the archive's
+    ///   headers alone: the local header agrees with the central record, the
+    ///   span is bounded and the metadata is not encrypted or unresolved. A
+    ///   member the ordinary reader decodes but whose local header disagrees
+    ///   with its central record is therefore not eligible.
     ///
     /// # Errors
     ///
     /// Returns [`OpcError::PartNotFound`] when no part with `partname`
-    /// exists.
+    /// exists, and an allocation, I/O or index error that stopped the layout
+    /// proof — never a verdict about the member's bytes.
     pub fn compressed_transfer_eligible(&self, partname: &PackURI) -> Result<bool> {
         let part = self.transfer_part(partname)?;
-        Ok(self.compressed_transfer_source(part).is_some())
+        if self.is_signed() {
+            return Ok(false);
+        }
+        let Some(source_part) = self.transfer_provenance(part) else {
+            return Ok(false);
+        };
+        match self.transfer_member(part, source_part)? {
+            Some(member) => member
+                .index
+                .precompressed_layout_provable(member.entry_id)
+                .map_err(OpcError::from),
+            None => Ok(false),
+        }
     }
 
     /// Issue a verified compressed transfer for one eligible part.
@@ -129,8 +158,8 @@ impl OpcPackage {
     /// - [`OpcError::PartNotFound`] when no part with `partname` exists;
     /// - [`OpcError::SignedSourceRequiresExplicitPolicy`] for a package with
     ///   digital-signature infrastructure;
-    /// - [`OpcError::PreservationUnavailable`] when the part is not eligible
-    ///   (see [`Self::compressed_transfer_eligible`]);
+    /// - [`OpcError::PreservationUnavailable`] when the part is otherwise not
+    ///   eligible (see [`Self::compressed_transfer_eligible`]);
     /// - the part's own decode refusal when its deferred payload cannot be
     ///   decoded;
     /// - [`OpcError::ReadLimit`] when the member's declared sizes exceed the
@@ -146,10 +175,7 @@ impl OpcPackage {
         if self.is_signed() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        let Some(source_part) = self.compressed_transfer_source(part) else {
-            return Err(ineligible());
-        };
-        let Some(source_archive) = self.source_archive.as_ref() else {
+        let Some(source_part) = self.transfer_provenance(part) else {
             return Err(ineligible());
         };
         // Decode through the package's own route, so a deferred payload's
@@ -166,69 +192,17 @@ impl OpcPackage {
         {
             return Err(ineligible());
         }
-
-        let handle = part.payload_handle();
-        let built;
-        let (index, member, limits) = match handle.payload().as_deferred() {
-            Some(deferred) => {
-                // The provenance identity above proves this is the package's
-                // own deferred source; the archive identity is checked too so
-                // a capture can only ever come from `source_archive`.
-                if !Arc::ptr_eq(deferred.source().bytes(), source_archive) {
-                    return Err(ineligible());
-                }
-                (
-                    deferred.source().index()?,
-                    deferred.member(),
-                    deferred.source().limits(),
-                )
-            },
-            None => {
-                let limits = self.source_limits;
-                built = IndexedArchive::from_reader_with_limits(
-                    Arc::clone(source_archive),
-                    source_archive.len() as u64,
-                    limits.zip_limits(),
-                )
-                .map_err(OpcError::from)?;
-                (&built, partname_member(part.partname()), limits)
-            },
+        let Some(member) = self.transfer_member(part, source_part)? else {
+            return Err(ineligible());
         };
-        let entry_id = index.entry_id(member).ok_or_else(|| {
-            OpcError::ZipError(format!(
-                "compressed transfer source member {member} is missing from the retained archive"
-            ))
-        })?;
-        let metadata = index.metadata_for(entry_id).map_err(OpcError::from)?;
-        let logical_size = u64::try_from(decoded.len()).map_err(|_| {
-            OpcError::ZipError("compressed transfer decoded size exceeds u64".to_owned())
-        })?;
-        if metadata.uncompressed_size() != logical_size {
-            return Err(OpcError::ZipError(format!(
-                "compressed transfer expected {logical_size} decoded bytes but ZIP metadata declares {}",
-                metadata.uncompressed_size()
-            )));
+        if !member
+            .index
+            .precompressed_layout_provable(member.entry_id)
+            .map_err(OpcError::from)?
+        {
+            return Err(ineligible());
         }
-        limits.check(
-            ReadResource::ArchiveCompressedBytes,
-            metadata.compressed_size(),
-            limits.max_archive_compressed_bytes(),
-        )?;
-        limits.check(
-            ReadResource::ArchiveEntryBytes,
-            metadata.uncompressed_size(),
-            limits.max_archive_entry_bytes(),
-        )?;
-        limits.check(
-            ReadResource::PartBytes,
-            logical_size,
-            limits.max_part_bytes(),
-        )?;
-        let physical = index
-            .read_entry_precompressed_with_progress(entry_id, decoded.as_slice(), |_| {
-                Ok::<(), Infallible>(())
-            })
-            .map_err(map_precompressed_error)?;
+        let physical = verified_capture(&member, &decoded)?;
         let mut content_type = String::new();
         content_type
             .try_reserve_exact(part.content_type().len())
@@ -253,9 +227,10 @@ impl OpcPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
 
-    /// The source provenance of an eligible part, or `None` when the part is
-    /// not eligible. Never decodes.
-    fn compressed_transfer_source(&self, part: &dyn Part) -> Option<&SourcePart> {
+    /// The source provenance of a part the graph still holds as opened, or
+    /// `None`. Never decodes; the signature and layout conditions are
+    /// checked by the callers.
+    fn transfer_provenance(&self, part: &dyn Part) -> Option<&SourcePart> {
         self.source_archive.as_ref()?;
         let provenance = self.preservation.as_deref()?;
         let source_part = provenance.parts.get(part.partname())?;
@@ -266,7 +241,6 @@ impl OpcPackage {
                 part.partname().as_str(),
                 part.content_type(),
             )
-            || self.is_signed()
         {
             return None;
         }
@@ -284,11 +258,104 @@ impl OpcPackage {
         };
         untouched.then_some(source_part)
     }
+
+    /// The retained-archive member a part with transfer provenance is
+    /// captured from, or `None` when the archive's index has no such member.
+    ///
+    /// A deferred part is reached through its provenance payload, which is
+    /// the very cell the part holds, and uses the index that payload's decode
+    /// builds, after proving that index covers this package's retained
+    /// archive. A part the package materialized eagerly uses one index of the
+    /// retained archive per package open, built on first use under the limits
+    /// the archive was admitted under and shared by clones.
+    fn transfer_member<'package>(
+        &'package self,
+        part: &'package dyn Part,
+        source_part: &'package SourcePart,
+    ) -> Result<Option<TransferMember<'package>>> {
+        let Some(source_archive) = self.source_archive.as_ref() else {
+            return Ok(None);
+        };
+        let (index, member, limits) = match source_part.blob.as_deferred() {
+            Some(deferred) => {
+                if !Arc::ptr_eq(deferred.source().bytes(), source_archive) {
+                    return Ok(None);
+                }
+                (
+                    deferred.source().index()?,
+                    deferred.member(),
+                    deferred.source().limits(),
+                )
+            },
+            None => {
+                let limits = self.source_limits;
+                let index = self
+                    .transfer_index
+                    .get_or_init(|| {
+                        IndexedArchive::from_reader_with_limits(
+                            Arc::clone(source_archive),
+                            source_archive.len() as u64,
+                            limits.zip_limits(),
+                        )
+                        .map_err(OpcError::from)
+                    })
+                    .as_ref()
+                    .map_err(replicate_deferred_error)?;
+                (index, part.partname().membername(), limits)
+            },
+        };
+        Ok(index.entry_id(member).map(|entry_id| TransferMember {
+            index,
+            entry_id,
+            limits,
+        }))
+    }
 }
 
-/// The member name the owned reader used for a part it materialized eagerly.
-fn partname_member(partname: &PackURI) -> &str {
-    partname.membername()
+/// Capture one member's verified compressed span against `decoded`.
+///
+/// The member's declared sizes are re-checked against `limits` before any
+/// byte is captured; the ZIP reader then captures the exact span, decodes it,
+/// compares every decoded byte with `decoded` and records the actual CRC.
+fn verified_capture(
+    member: &TransferMember<'_>,
+    decoded: &[u8],
+) -> Result<VerifiedPrecompressedEntry> {
+    let limits = member.limits;
+    let metadata = member
+        .index
+        .metadata_for(member.entry_id)
+        .map_err(OpcError::from)?;
+    let logical_size = u64::try_from(decoded.len()).map_err(|_| {
+        OpcError::ZipError("compressed transfer decoded size exceeds u64".to_owned())
+    })?;
+    if metadata.uncompressed_size() != logical_size {
+        return Err(OpcError::ZipError(format!(
+            "compressed transfer expected {logical_size} decoded bytes but ZIP metadata declares {}",
+            metadata.uncompressed_size()
+        )));
+    }
+    limits.check(
+        ReadResource::ArchiveCompressedBytes,
+        metadata.compressed_size(),
+        limits.max_archive_compressed_bytes(),
+    )?;
+    limits.check(
+        ReadResource::ArchiveEntryBytes,
+        metadata.uncompressed_size(),
+        limits.max_archive_entry_bytes(),
+    )?;
+    limits.check(
+        ReadResource::PartBytes,
+        logical_size,
+        limits.max_part_bytes(),
+    )?;
+    member
+        .index
+        .read_entry_precompressed_with_progress(member.entry_id, decoded, |_| {
+            Ok::<(), Infallible>(())
+        })
+        .map_err(map_precompressed_error)
 }
 
 fn ineligible() -> OpcError {

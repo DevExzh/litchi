@@ -61,10 +61,11 @@ pub enum SlideCopyRefusal {
 /// algorithm. Change 0655 redefined that algorithm (`litchi-pptx-opened-v1` →
 /// `litchi-pptx-opened-v2`), so the two durable families carry a new magic and
 /// a patch serialized under the superseded magic is refused by name rather
-/// than compared across algebras. Change 0742 changed how a cross-presentation
-/// copy's candidate archive encodes copied image members, which changes the
-/// serialized-archive (physical) revisions that family embeds, so
-/// `LPCP0003` is superseded by `LPCP0004` the same way. See
+/// than compared across algebras. Change 0742 made a cross-presentation copy's
+/// serialized-archive (physical) revisions depend on how its candidate
+/// encodes copied image members, which the header now records; `LPCP0003`
+/// carries no such field, so it is superseded by `LPCP0004` and refused by
+/// name rather than read implicitly as either encoding. See
 /// [`Error::DurablePatchRevisionFormat`].
 ///
 /// This enum never carries attacker-supplied bytes: an unrecognized magic is
@@ -79,9 +80,9 @@ pub enum DurablePatchFormat {
     SlideRemovalV2,
     /// `LPCP0002`: cross-presentation slide copy, superseded semantic proof.
     CrossSlideCopyV2,
-    /// `LPCP0003`: cross-presentation slide copy, superseded physical proof:
-    /// its serialized-archive revisions describe a candidate that re-deflated
-    /// every copied member.
+    /// `LPCP0003`: cross-presentation slide copy without the recorded
+    /// copied-media encoding its physical revisions now depend on
+    /// (superseded by change 0742).
     CrossSlideCopyV3,
     /// `LPCP0004`: cross-presentation slide copy, current semantic and
     /// physical proofs, with the candidate's copied-media encoding recorded.

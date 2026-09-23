@@ -564,7 +564,7 @@ fn a_crc_mismatch_is_refused_with_a_typed_error() {
 }
 
 #[test]
-fn a_local_header_that_disagrees_with_its_central_record_is_refused() {
+fn a_local_header_that_disagrees_with_its_central_record_is_not_eligible() {
     let mut archive = source_archive(Mode::DeflatedSized, false);
     let (local, _central) = central_offset(&archive, PHOTO);
     // Rename the local header only: `photo.png` becomes `phot0.png`.
@@ -573,10 +573,23 @@ fn a_local_header_that_disagrees_with_its_central_record_is_refused() {
     assert_eq!(archive[position], b'o');
     archive[position] = b'0';
     // The ordinary reader treats the central record as authoritative and
-    // still decodes the payload; only the strict layout proof a compressed
-    // capture requires refuses it. The transfer therefore fails closed with
-    // a typed error rather than framing a span whose local header disagrees.
-    let source = OpcPackage::from_vec(archive.clone()).expect("the archive opens");
+    // still decodes the payload; the strict layout a compressed capture needs
+    // is disproven by the headers alone, so the part is classified
+    // ineligible, deterministically and without decoding, and a caller keeps
+    // its recompressing route. Other members stay eligible.
+    let source = OpcPackage::from_vec(archive).expect("the archive opens");
+    let before = source.deferred_decode_counters();
+    assert!(
+        !source
+            .compressed_transfer_eligible(&part_uri(PHOTO))
+            .expect("part")
+    );
+    assert!(
+        source
+            .compressed_transfer_eligible(&part_uri(STORED))
+            .expect("part")
+    );
+    assert_eq!(source.deferred_decode_counters(), before);
     assert_eq!(
         source
             .get_part(&part_uri(PHOTO))
@@ -584,11 +597,93 @@ fn a_local_header_that_disagrees_with_its_central_record_is_refused() {
             .blob(),
         photo_bytes().as_slice()
     );
-    assert!(matches!(
-        source.authorize_compressed_transfer(&part_uri(PHOTO)),
-        Err(OpcError::ZipError(message)) if message.contains("names differ")
+    assert!(is_ineligible(
+        &source
+            .authorize_compressed_transfer(&part_uri(PHOTO))
+            .expect_err("an unprovable layout is never captured")
     ));
-    assert_refused(archive);
+}
+
+/// The capture's own verification: bytes that are not the member's decode
+/// are refused with a typed error even when every header is consistent.
+#[test]
+fn a_capture_that_does_not_decode_to_the_payload_is_refused() {
+    let source =
+        OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
+    let photo = part_uri(PHOTO);
+    let part = source.get_part(&photo).expect("photo");
+    let source_part = source.transfer_provenance(part).expect("provenance");
+    let member = source
+        .transfer_member(part, source_part)
+        .expect("index")
+        .expect("member");
+    let mut wrong = part.blob().to_vec();
+    wrong[1024] ^= 0x01;
+    assert!(matches!(
+        super::verified_capture(&member, &wrong),
+        Err(OpcError::ZipError(_))
+    ));
+    let mut short = part.blob().to_vec();
+    short.pop();
+    assert!(matches!(
+        super::verified_capture(&member, &short),
+        Err(OpcError::ZipError(message)) if message.contains("decoded bytes")
+    ));
+    assert!(super::verified_capture(&member, part.blob()).is_ok());
+}
+
+/// A custom part that forwards its payload handle to a transferred part but
+/// shows different bytes publishes the bytes it shows.
+#[test]
+fn a_capture_is_framed_only_for_the_allocation_it_was_verified_against() {
+    #[derive(Clone)]
+    struct Forwarding {
+        inner: BlobPart,
+        shown: std::sync::Arc<Vec<u8>>,
+    }
+    impl Part for Forwarding {
+        fn blob(&self) -> &[u8] {
+            &self.shown
+        }
+        fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+            std::sync::Arc::clone(&self.shown)
+        }
+        fn content_type(&self) -> &str {
+            self.inner.content_type()
+        }
+        fn partname(&self) -> &PackURI {
+            self.inner.partname()
+        }
+        fn payload_handle(&self) -> crate::part::PayloadHandle {
+            self.inner.payload_handle()
+        }
+        fn rels(&self) -> &crate::Relationships {
+            self.inner.rels()
+        }
+        fn rels_mut(&mut self) -> &mut crate::Relationships {
+            self.inner.rels_mut()
+        }
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.shown = std::sync::Arc::new(blob);
+        }
+    }
+    let source =
+        OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
+    let transfer = source
+        .authorize_compressed_transfer(&part_uri(PHOTO))
+        .expect("transfer");
+    let copied = PackURI::new(COPIED).expect("URI");
+    let shown = stored_bytes();
+    let mut destination = OpcPackage::from_vec(destination_archive()).expect("destination");
+    destination
+        .try_add_part(Box::new(Forwarding {
+            inner: BlobPart::with_compressed_transfer(copied, transfer),
+            shown: std::sync::Arc::new(shown.clone()),
+        }))
+        .expect("forwarding part");
+    let output = PackageWriter::to_bytes(&destination).expect("publish");
+    assert_eq!(read_member(&output, COPIED), shown);
+    assert_eq!(raw_member(&output, &COPIED[1..]).method, 8);
 }
 
 #[test]

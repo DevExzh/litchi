@@ -16,8 +16,10 @@
 //! allocation that also carries a verified compressed representation of the
 //! same bytes, captured from another owned-source package's archive (change
 //! 0742). The targeted writer frames that representation instead of deflating
-//! the decoded bytes again; every mutation of the part replaces the payload,
-//! and with it the compressed representation.
+//! the decoded bytes again. Replacing the part's payload installs a different
+//! representation, and changing its content type demotes this one to
+//! `Ready`, so neither keeps the capture; relationship changes do not touch
+//! the payload.
 //!
 //! See [ADR 0030](../../../../docs/adr/0030-lazy-opc-part-decode.md) for the
 //! contract this implements, in particular which refusals stay at `open()` and
@@ -191,8 +193,9 @@ impl DeferredPayload {
 /// owned-source package's retained archive: it captured the member's exact
 /// compressed span, decoded that capture, compared every decoded byte with
 /// `decoded`, and recorded the actual CRC. The two fields therefore describe
-/// one payload, and neither can be replaced without the other: every mutation
-/// of a part installs a different [`PartPayload`].
+/// one payload, and neither can be replaced without the other: replacing a
+/// part's payload installs a different [`PartPayload`], and changing its
+/// content type demotes this one to `Ready`.
 pub(crate) struct TransferredPayload {
     decoded: Arc<Vec<u8>>,
     compressed: VerifiedPrecompressedEntry,
@@ -339,10 +342,15 @@ impl PartPayload {
         }
     }
 
-    /// The verified compressed representation this payload carries, if any.
-    pub(crate) fn compressed_transfer(&self) -> Option<&VerifiedPrecompressedEntry> {
+    /// The verified compressed representation this payload carries, with
+    /// the decoded allocation it was verified against, if any.
+    pub(crate) fn compressed_transfer(
+        &self,
+    ) -> Option<(&Arc<Vec<u8>>, &VerifiedPrecompressedEntry)> {
         match self {
-            Self::Transferred(transferred) => Some(transferred.compressed()),
+            Self::Transferred(transferred) => {
+                Some((transferred.decoded(), transferred.compressed()))
+            },
             Self::Ready(_) | Self::Deferred(_) => None,
         }
     }
