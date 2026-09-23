@@ -300,12 +300,14 @@ fn a_deflated_member_transfers_its_exact_compressed_span_in_fresh_sized_framing(
         let photo = part_uri(PHOTO);
         assert!(
             source
-                .compressed_transfer_eligible(&photo)
+                .compressed_transfer_size(&photo)
                 .expect("part exists")
+                .is_some()
         );
         let transfer = source
             .authorize_compressed_transfer(&photo)
-            .expect("an untouched binary leaf transfers");
+            .expect("an untouched binary leaf transfers")
+            .expect("its capture verifies");
         let source_member = raw_member(&source_bytes, PHOTO);
         assert_eq!(transfer.content_type(), "image/png");
         assert_eq!(transfer.decoded_size(), photo_bytes().len());
@@ -329,7 +331,8 @@ fn a_deflated_member_transfers_its_exact_compressed_span_in_fresh_sized_framing(
         let again = OpcPackage::from_vec(source_bytes).expect("source reopens");
         let transfer = again
             .authorize_compressed_transfer(&photo)
-            .expect("transfer is repeatable");
+            .expect("transfer is repeatable")
+            .expect("its capture verifies");
         assert_eq!(
             publish_into_destination(BlobPart::with_compressed_transfer(copied, transfer)),
             output
@@ -359,7 +362,8 @@ fn a_stored_member_stays_stored_and_drops_source_descriptor_timestamp_and_extras
     let source = OpcPackage::from_vec(source_bytes).expect("source opens");
     let transfer = source
         .authorize_compressed_transfer(&part_uri(PHOTO))
-        .expect("a stored binary leaf transfers");
+        .expect("a stored binary leaf transfers")
+        .expect("its capture verifies");
     let copied = PackURI::new(COPIED).expect("URI");
     let output = publish_into_destination(BlobPart::with_compressed_transfer(copied, transfer));
     let published = raw_member(&output, &COPIED[1..]);
@@ -376,19 +380,26 @@ fn an_eager_owned_package_issues_the_same_capture_as_a_deferred_one() {
     let eager = OpcPackage::from_vec_reusing_payloads(source_bytes, ReadLimits::default(), &donor)
         .expect("eager open");
     let photo = part_uri(PHOTO);
-    assert!(eager.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        eager
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_some()
+    );
     let copied = PackURI::new(COPIED).expect("URI");
     let from_deferred = publish_into_destination(BlobPart::with_compressed_transfer(
         copied.clone(),
         deferred
             .authorize_compressed_transfer(&photo)
-            .expect("deferred transfer"),
+            .expect("deferred transfer")
+            .expect("its capture verifies"),
     ));
     let from_eager = publish_into_destination(BlobPart::with_compressed_transfer(
         copied,
         eager
             .authorize_compressed_transfer(&photo)
-            .expect("eager transfer"),
+            .expect("eager transfer")
+            .expect("its capture verifies"),
     ));
     assert_eq!(from_deferred, from_eager);
 }
@@ -407,8 +418,9 @@ fn ineligible_parts_are_classified_without_decoding_and_refused_by_type() {
     ] {
         assert_eq!(
             source
-                .compressed_transfer_eligible(&part_uri(member))
-                .expect("part exists"),
+                .compressed_transfer_size(&part_uri(member))
+                .expect("part exists")
+                .is_some(),
             eligible,
             "{member}"
         );
@@ -425,7 +437,7 @@ fn ineligible_parts_are_classified_without_decoding_and_refused_by_type() {
         assert!(is_ineligible(&error), "{member}: {error}");
     }
     assert!(matches!(
-        source.compressed_transfer_eligible(&PackURI::new("/doc/media/absent.png").expect("URI")),
+        source.compressed_transfer_size(&PackURI::new("/doc/media/absent.png").expect("URI")),
         Err(OpcError::PartNotFound(_))
     ));
 
@@ -435,7 +447,12 @@ fn ineligible_parts_are_classified_without_decoding_and_refused_by_type() {
     let photo = part_uri(PHOTO);
     let same = replaced.get_part(&photo).expect("photo").blob().to_vec();
     replaced.get_part_mut(&photo).expect("photo").set_blob(same);
-    assert!(!replaced.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        replaced
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_none()
+    );
     assert!(is_ineligible(
         &replaced
             .authorize_compressed_transfer(&photo)
@@ -449,11 +466,21 @@ fn ineligible_parts_are_classified_without_decoding_and_refused_by_type() {
         .expect("photo")
         .set_content_type("image/x-litchi".to_owned())
         .expect("blob parts can be retyped");
-    assert!(!retyped.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        retyped
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_none()
+    );
 
     // Borrowed ingress retains no archive to capture from.
     let borrowed = OpcPackage::from_bytes(&source_bytes).expect("borrowed open");
-    assert!(!borrowed.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        borrowed
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_none()
+    );
 
     // A part authored in memory has no source member.
     let mut authored = OpcPackage::from_vec(source_bytes).expect("source opens");
@@ -465,8 +492,18 @@ fn ineligible_parts_are_classified_without_decoding_and_refused_by_type() {
             stored_bytes(),
         )))
         .expect("fresh part");
-    assert!(!authored.compressed_transfer_eligible(&fresh).expect("part"));
-    assert!(authored.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        authored
+            .compressed_transfer_size(&fresh)
+            .expect("part")
+            .is_none()
+    );
+    assert!(
+        authored
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_some()
+    );
 }
 
 #[test]
@@ -475,7 +512,12 @@ fn signed_packages_are_ineligible_and_refused_by_policy() {
         .expect("signed source opens");
     assert!(source.is_signed());
     let photo = part_uri(PHOTO);
-    assert!(!source.compressed_transfer_eligible(&photo).expect("part"));
+    assert!(
+        source
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_none()
+    );
     assert!(matches!(
         source.authorize_compressed_transfer(&photo),
         Err(OpcError::SignedSourceRequiresExplicitPolicy)
@@ -580,14 +622,16 @@ fn a_local_header_that_disagrees_with_its_central_record_is_not_eligible() {
     let source = OpcPackage::from_vec(archive).expect("the archive opens");
     let before = source.deferred_decode_counters();
     assert!(
-        !source
-            .compressed_transfer_eligible(&part_uri(PHOTO))
+        source
+            .compressed_transfer_size(&part_uri(PHOTO))
             .expect("part")
+            .is_none()
     );
     assert!(
         source
-            .compressed_transfer_eligible(&part_uri(STORED))
+            .compressed_transfer_size(&part_uri(STORED))
             .expect("part")
+            .is_some()
     );
     assert_eq!(source.deferred_decode_counters(), before);
     assert_eq!(
@@ -619,17 +663,14 @@ fn a_capture_that_does_not_decode_to_the_payload_is_refused() {
         .expect("member");
     let mut wrong = part.blob().to_vec();
     wrong[1024] ^= 0x01;
-    assert!(matches!(
-        super::verified_capture(&member, &wrong),
-        Err(OpcError::ZipError(_))
-    ));
+    assert!(matches!(super::verified_capture(&member, &wrong), Ok(None)));
     let mut short = part.blob().to_vec();
     short.pop();
+    assert!(matches!(super::verified_capture(&member, &short), Ok(None)));
     assert!(matches!(
-        super::verified_capture(&member, &short),
-        Err(OpcError::ZipError(message)) if message.contains("decoded bytes")
+        super::verified_capture(&member, part.blob()),
+        Ok(Some(_))
     ));
-    assert!(super::verified_capture(&member, part.blob()).is_ok());
 }
 
 /// A custom part that forwards its payload handle to a transferred part but
@@ -671,7 +712,8 @@ fn a_capture_is_framed_only_for_the_allocation_it_was_verified_against() {
         OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
     let transfer = source
         .authorize_compressed_transfer(&part_uri(PHOTO))
-        .expect("transfer");
+        .expect("transfer")
+        .expect("its capture verifies");
     let copied = PackURI::new(COPIED).expect("URI");
     let shown = stored_bytes();
     let mut destination = OpcPackage::from_vec(destination_archive()).expect("destination");
@@ -748,7 +790,8 @@ fn replacing_or_retyping_a_transferred_part_discards_its_capture() {
         OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
     let transfer = source
         .authorize_compressed_transfer(&part_uri(PHOTO))
-        .expect("transfer");
+        .expect("transfer")
+        .expect("its capture verifies");
     let copied = PackURI::new(COPIED).expect("URI");
 
     let replacement = stored_bytes();
@@ -776,7 +819,8 @@ fn a_transferred_part_that_replaces_a_source_member_is_regenerated_from_its_capt
     let source = OpcPackage::from_vec(source_bytes.clone()).expect("source opens");
     let transfer = source
         .authorize_compressed_transfer(&part_uri(STORED))
-        .expect("transfer");
+        .expect("transfer")
+        .expect("its capture verifies");
     // The destination is another open of the same archive whose photo is
     // replaced by the transferred stored payload under the same name.
     let mut destination = OpcPackage::from_vec(source_bytes.clone()).expect("destination");
@@ -814,7 +858,8 @@ fn the_full_writer_still_publishes_a_transferred_part_from_its_decoded_bytes() {
         OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
     let transfer = source
         .authorize_compressed_transfer(&part_uri(PHOTO))
-        .expect("transfer");
+        .expect("transfer")
+        .expect("its capture verifies");
     let mut authored = OpcPackage::new();
     let copied = PackURI::new(COPIED).expect("URI");
     authored
@@ -824,4 +869,307 @@ fn the_full_writer_still_publishes_a_transferred_part_from_its_decoded_bytes() {
         .expect("part");
     let output = PackageWriter::to_bytes(&authored).expect("full writer publishes");
     assert_eq!(read_member(&output, COPIED), photo_bytes());
+}
+
+/// Insert `padding` zero bytes after one sized member's compressed payload,
+/// fixing its compressed sizes and every later offset. A Deflate decoder stops
+/// at the final block, so the ordinary reader still decodes the member.
+fn pad_member_payload(archive: &[u8], name: &str, padding: usize) -> Vec<u8> {
+    let zip = ZipArchive::from_slice(archive).expect("parse ZIP");
+    let directory = usize::try_from(zip.directory_offset()).expect("offset");
+    let eocd = usize::try_from(zip.eocd_offset()).expect("offset");
+    let (local, central) = central_offset(archive, name);
+    let (_start, payload_end) = compressed_range(archive, name);
+    let grow = |bytes: &mut [u8], offset: usize| {
+        let value = u32_at(bytes, offset) + u32::try_from(padding).expect("padding");
+        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    };
+    let mut output = archive[..payload_end].to_vec();
+    output.extend(std::iter::repeat_n(0_u8, padding));
+    output.extend_from_slice(&archive[payload_end..]);
+    let shift = |offset: usize| {
+        if offset >= payload_end {
+            offset + padding
+        } else {
+            offset
+        }
+    };
+    grow(&mut output, local + 18);
+    grow(&mut output, shift(central) + 20);
+    let mut record = shift(directory);
+    let end = shift(eocd);
+    while record < end {
+        if usize::try_from(u32_at(&output, record + 42)).expect("offset") >= payload_end {
+            grow(&mut output, record + 42);
+        }
+        record += 46
+            + usize::from(u16_at(&output, record + 28))
+            + usize::from(u16_at(&output, record + 30))
+            + usize::from(u16_at(&output, record + 32));
+    }
+    grow(&mut output, end + 16);
+    output
+}
+
+/// Bytes after a member's final Deflate block: the ordinary reader decodes
+/// the member, the headers are consistent, and only the capture's
+/// consumed-input check disproves it. That is a deterministic `Ok(None)`, not
+/// an error, so a caller recompresses the part.
+#[test]
+fn bytes_after_the_final_block_disprove_the_capture_deterministically() {
+    let archive = pad_member_payload(&source_archive(Mode::DeflatedSized, false), PHOTO, 16);
+    let source = OpcPackage::from_vec(archive).expect("the padded archive opens");
+    let photo = part_uri(PHOTO);
+    assert_eq!(
+        source.get_part(&photo).expect("lenient decode").blob(),
+        photo_bytes().as_slice()
+    );
+    assert!(
+        source
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_some(),
+        "the headers are consistent"
+    );
+    for _ in 0..2 {
+        assert!(
+            source
+                .authorize_compressed_transfer(&photo)
+                .expect("a content fault is not an error")
+                .is_none()
+        );
+    }
+    // Another member of the same archive still transfers.
+    assert!(
+        source
+            .authorize_compressed_transfer(&part_uri(STORED))
+            .expect("stored member")
+            .is_some()
+    );
+}
+
+/// A Deflate stream padded with empty stored blocks decodes to the payload
+/// but is far larger than any encoder would emit; the header-only size guard
+/// makes it ineligible, so it is recompressed rather than published padded.
+#[test]
+fn a_member_padded_with_empty_stored_blocks_is_not_eligible() {
+    let payload = stored_bytes();
+    let build = |empty_blocks: usize| -> Vec<u8> {
+        let mut stream = Vec::new();
+        for _ in 0..empty_blocks {
+            stream.extend_from_slice(&[0x00, 0x00, 0x00, 0xff, 0xff]);
+        }
+        let len = u16::try_from(payload.len()).expect("one stored block");
+        stream.push(0x01);
+        stream.extend_from_slice(&len.to_le_bytes());
+        stream.extend_from_slice(&(!len).to_le_bytes());
+        stream.extend_from_slice(&payload);
+        let content_types = content_types(false);
+        let package_relationships = package_relationships(false);
+        let mut archive = ZipArchiveWriter::new(Vec::new());
+        for (name, bytes) in [
+            ("[Content_Types].xml", content_types.as_slice()),
+            ("_rels/.rels", package_relationships.as_slice()),
+            ("doc/main.xml", MAIN_XML),
+            ("doc/_rels/main.xml.rels", MAIN_RELATIONSHIPS),
+            (STORED, payload.as_slice()),
+            (VECTOR, VECTOR_XML),
+            (LINKED, payload.as_slice()),
+            ("doc/media/_rels/linked.png.rels", LINKED_RELATIONSHIPS),
+        ] {
+            archive.write_stored_file(name, bytes).expect("member");
+        }
+        archive
+            .write_precompressed_file(
+                PHOTO,
+                CompressionMethod::Deflate,
+                soapberry_zip::crc32(&payload),
+                payload.len() as u64,
+                &stream,
+            )
+            .expect("padded member");
+        archive.finish().expect("archive")
+    };
+    let photo = part_uri(PHOTO);
+    // 16 KiB decoded allows 20 block headers plus 64 bytes of slack.
+    let within = OpcPackage::from_vec(build(15)).expect("opens");
+    assert_eq!(
+        within.get_part(&photo).expect("decode").blob(),
+        payload.as_slice()
+    );
+    assert!(
+        within
+            .compressed_transfer_size(&photo)
+            .expect("part")
+            .is_some()
+    );
+    for padded in [build(17), build(20_000)] {
+        let source = OpcPackage::from_vec(padded).expect("opens");
+        assert_eq!(
+            source.get_part(&photo).expect("decode").blob(),
+            payload.as_slice()
+        );
+        assert!(
+            source
+                .compressed_transfer_size(&photo)
+                .expect("part")
+                .is_none()
+        );
+        assert!(is_ineligible(
+            &source
+                .authorize_compressed_transfer(&photo)
+                .expect_err("an ineligible member is never captured")
+        ));
+    }
+}
+
+/// A member framed with ZIP64 sizes and a ZIP64 data descriptor transfers,
+/// and is republished with fresh ZIP32 known-size framing.
+#[test]
+fn a_zip64_framed_member_transfers_with_fresh_zip32_framing() {
+    let payload = stored_bytes();
+    let content_types = content_types(false);
+    let package_relationships = package_relationships(false);
+    let mut archive = ZipArchiveWriter::new(Vec::new());
+    for (name, bytes) in [
+        ("[Content_Types].xml", content_types.as_slice()),
+        ("_rels/.rels", package_relationships.as_slice()),
+        ("doc/main.xml", MAIN_XML),
+        ("doc/_rels/main.xml.rels", MAIN_RELATIONSHIPS),
+    ] {
+        archive.write_stored_file(name, bytes).expect("member");
+    }
+    let (mut entry, config) = archive
+        .new_file(PHOTO)
+        .compression_method(CompressionMethod::Store)
+        .zip64(true)
+        .start()
+        .expect("zip64 member");
+    let mut data = config.wrap(&mut entry);
+    data.write_all(&payload).expect("payload");
+    let (_, descriptor) = data.finish().expect("payload finish");
+    entry.finish(descriptor).expect("member finish");
+    for (name, bytes) in [
+        (STORED, payload.as_slice()),
+        (VECTOR, VECTOR_XML),
+        (LINKED, payload.as_slice()),
+        ("doc/media/_rels/linked.png.rels", LINKED_RELATIONSHIPS),
+    ] {
+        archive.write_stored_file(name, bytes).expect("member");
+    }
+    let source_bytes = archive.finish().expect("archive");
+    let source_member = raw_member(&source_bytes, PHOTO);
+    assert_eq!(
+        source_member.local_sizes,
+        [u32::MAX, u32::MAX],
+        "ZIP64 sizes"
+    );
+    assert_ne!(source_member.flags & 0x08, 0, "a ZIP64 data descriptor");
+
+    let source = OpcPackage::from_vec(source_bytes).expect("source opens");
+    let transfer = source
+        .authorize_compressed_transfer(&part_uri(PHOTO))
+        .expect("zip64 member")
+        .expect("its capture verifies");
+    let copied = PackURI::new(COPIED).expect("URI");
+    let output = publish_into_destination(BlobPart::with_compressed_transfer(copied, transfer));
+    let published = raw_member(&output, &COPIED[1..]);
+    assert_eq!(published.compressed, payload);
+    assert_fresh_sized_framing(&published, 0);
+    assert!(published.local_extra.is_empty(), "no ZIP64 extra is needed");
+    assert_eq!(read_member(&output, COPIED), payload);
+}
+
+/// Two raw names that normalize to one member name are refused when the
+/// package is opened, so a transfer can never capture a different member
+/// than the one its part was decoded from.
+#[test]
+fn members_whose_names_normalize_to_one_name_are_refused_at_open() {
+    let mut archive = source_archive(Mode::DeflatedSized, false);
+    let (local, central) = central_offset(&archive, STORED);
+    // `doc/media/stored.png` and `doc/media//photo.png` have equal length;
+    // the second normalizes to `doc/media/photo.png`, the photo's own name.
+    let alias = b"doc/media//photo.png";
+    assert_eq!(alias.len(), STORED.len());
+    archive[local + 30..local + 30 + alias.len()].copy_from_slice(alias);
+    archive[central + 46..central + 46 + alias.len()].copy_from_slice(alias);
+    let error = OpcPackage::from_vec(archive).expect_err("an ambiguous member name is refused");
+    assert!(
+        matches!(&error, OpcError::ZipError(message) if message.contains("duplicate")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn the_admitted_read_limits_are_reported_while_the_source_archive_is_retained() {
+    let limits = ReadLimits::builder()
+        .max_part_bytes(1 << 20)
+        .and_then(crate::ReadLimitsBuilder::build)
+        .expect("limit");
+    let mut package =
+        OpcPackage::from_vec_with_limits(source_archive(Mode::DeflatedSized, false), limits)
+            .expect("source opens");
+    assert_eq!(package.source_read_limits(), Some(limits));
+    // An edit revokes exact publication but keeps the archive and its policy.
+    package
+        .get_part_mut(&part_uri(STORED))
+        .expect("part")
+        .set_blob(b"edited".to_vec());
+    assert!(!package.is_unmodified_owned_source());
+    assert_eq!(package.source_read_limits(), Some(limits));
+    assert_eq!(package.clone().source_read_limits(), Some(limits));
+    assert_eq!(OpcPackage::new().source_read_limits(), None);
+}
+
+/// soapberry-zip's own writer, like zlib at its default memory level, frames
+/// incompressible data in 16 KiB stored blocks: 5 bytes per 16 KiB. That is
+/// more than one header per 65,535 bytes plus a small constant allows for any
+/// member above about 273 KiB, so the size guard budgets one header per
+/// 4 KiB; such a member stays eligible and transfers.
+#[test]
+fn an_incompressible_member_from_a_default_encoder_stays_eligible() {
+    let photo = pseudo_random_bytes(1024 * 1024, 0x0742_4096);
+    let content_types = content_types(false);
+    let package_relationships = package_relationships(false);
+    let stored = stored_bytes();
+    let archive = streaming_archive(&[
+        ("[Content_Types].xml", &content_types, Mode::DeflatedSized),
+        ("_rels/.rels", &package_relationships, Mode::DeflatedSized),
+        ("doc/main.xml", MAIN_XML, Mode::DeflatedSized),
+        (
+            "doc/_rels/main.xml.rels",
+            MAIN_RELATIONSHIPS,
+            Mode::DeflatedSized,
+        ),
+        (PHOTO, &photo, Mode::DeflatedSized),
+        (STORED, &stored, Mode::Stored),
+        (VECTOR, VECTOR_XML, Mode::DeflatedSized),
+        (LINKED, &stored, Mode::DeflatedSized),
+        (
+            "doc/media/_rels/linked.png.rels",
+            LINKED_RELATIONSHIPS,
+            Mode::DeflatedSized,
+        ),
+    ]);
+    let member = raw_member(&archive, PHOTO);
+    assert_eq!(member.method, 8);
+    let decoded = u64::try_from(photo.len()).expect("size");
+    let compressed = u64::try_from(member.compressed.len()).expect("size");
+    // One 5-byte header per 16 KiB stored block, and a few bytes to end the
+    // stream.
+    let framing = compressed - decoded;
+    let headers = 5 * decoded.div_ceil(16 * 1024);
+    assert!((headers..=headers + 8).contains(&framing), "{framing}");
+    assert!(framing > 5 * decoded.div_ceil(65_535) + 64);
+    let source = OpcPackage::from_vec(archive).expect("source opens");
+    let part = part_uri(PHOTO);
+    assert_eq!(
+        source.compressed_transfer_size(&part).expect("part"),
+        Some(compressed)
+    );
+    let transfer = source
+        .authorize_compressed_transfer(&part)
+        .expect("capture")
+        .expect("verified");
+    assert_eq!(transfer.compressed_size(), compressed);
 }

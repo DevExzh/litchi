@@ -335,8 +335,13 @@ fn retained_released_and_durable_outputs_are_byte_identical() -> Result<()> {
     Ok(())
 }
 
+/// A source edited since it was opened lends exactly the members its own
+/// serialization carries: a payload replaced with equal bytes serializes as
+/// the original member, and a payload replaced with other bytes serializes as
+/// a regenerated one. Either is transferred from those bytes, and the plan
+/// equals the plan made over a fresh open of the same serialization.
 #[test]
-fn a_replaced_payload_keeps_the_recompressing_route_beside_a_transferred_one() -> Result<()> {
+fn a_modified_source_lends_the_members_it_publishes() -> Result<()> {
     let photo = photo_bytes();
     let flat = flat_bytes();
     let pictures: [(&str, &str, &[u8]); 2] =
@@ -346,36 +351,43 @@ fn a_replaced_payload_keeps_the_recompressing_route_beside_a_transferred_one() -
         |name| name.starts_with("ppt/media/"),
     );
     let destination_bytes = authored("destination", 2)?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
-    // Replace the photo with byte-identical bytes: the payload is now the
-    // caller's, not the source member's, so it is not transferred. The flat
-    // image is untouched and is.
     let photo_uri = PackURI::new(PHOTO).map_err(Error::Invalid)?;
-    let same = source.opc.get_part(&photo_uri)?.blob().to_vec();
-    source.opc.get_part_mut(&photo_uri)?.set_blob(same);
-    let mut destination = Package::from_vec(destination_bytes)?;
-    let plan = plan_copy(&source, &destination)?;
-    assert!(plan.transfers_source_compressed_media());
-    destination.apply_cross_slide_copy_plan(&source, &plan)?;
-    let output = destination.to_bytes()?;
-    let original_photo = raw_member(&source_bytes, &PHOTO[1..]);
-    let published_photo = raw_member(&output, images_target(&plan, PHOTO).membername());
-    assert_eq!(original_photo.method, 0, "the fixture stores its media");
-    assert_eq!(
-        published_photo.method, 8,
-        "the replaced photo is recompressed"
-    );
-    assert_ne!(published_photo.flags & 0x08, 0, "generated Deflate framing");
-    let original_flat = raw_member(&source_bytes, &FLAT[1..]);
-    let published_flat = raw_member(&output, images_target(&plan, FLAT).membername());
-    assert_eq!(published_flat.method, 0, "the untouched image stays stored");
-    assert_eq!(published_flat.compressed, original_flat.compressed);
-    assert_fresh_sized_framing(&published_flat);
-    let reopened = Package::from_vec(output)?;
-    assert_eq!(
-        reopened.opc.get_part(images_target(&plan, PHOTO))?.blob(),
-        photo.as_slice()
-    );
+    let changed = noisy(48 * 1024, 0x0742_3333);
+    for replacement in [photo.clone(), changed] {
+        let mut source = Package::from_vec(source_bytes.clone())?;
+        source
+            .opc
+            .get_part_mut(&photo_uri)?
+            .set_blob(replacement.clone());
+        assert!(!source.opc.is_unmodified_owned_source());
+        let published_source = source.to_bytes()?;
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        let plan = plan_copy(&source, &destination)?;
+        assert!(plan.transfers_source_compressed_media());
+        destination.apply_cross_slide_copy_plan(&source, &plan)?;
+        let output = destination.to_bytes()?;
+        for (name, bytes) in [(PHOTO, &replacement), (FLAT, &flat)] {
+            let published = raw_member(&output, images_target(&plan, name).membername());
+            assert_eq!(
+                published.compressed,
+                raw_member(&published_source, &name[1..]).compressed,
+                "{name}: the member the source publishes is transferred"
+            );
+            assert_fresh_sized_framing(&published);
+            let reopened = Package::from_vec(output.clone())?;
+            assert_eq!(
+                reopened.opc.get_part(images_target(&plan, name))?.blob(),
+                bytes.as_slice()
+            );
+        }
+        // The same plan and output from a fresh open of the serialization.
+        let clean = Package::from_vec(published_source)?;
+        let clean_plan = plan_copy(&clean, &Package::from_vec(destination_bytes.clone())?)?;
+        assert_eq!(clean_plan, plan);
+        let mut clean_destination = Package::from_vec(destination_bytes.clone())?;
+        clean_destination.apply_cross_slide_copy_plan(&clean, &plan)?;
+        assert_eq!(clean_destination.to_bytes()?, output);
+    }
     Ok(())
 }
 
@@ -414,49 +426,43 @@ fn presentation_uri() -> PackURI {
     PackURI::new("/ppt/presentation.xml").expect("presentation URI")
 }
 
+/// A destination edited since it was opened, but byte-identical, accepts a
+/// transferring plan and durable patch and publishes exactly what an
+/// unmodified destination publishes; planning against it gives the same plan.
 #[test]
-fn a_modified_destination_refuses_a_transferring_copy_until_it_is_replanned() -> Result<()> {
+fn a_byte_identical_modified_destination_accepts_the_same_copy() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
     let source = Package::from_vec(source_bytes)?;
     let plan = plan_copy(&source, &Package::from_vec(destination_bytes.clone())?)?;
     assert!(plan.transfers_source_compressed_media());
     let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let mut expected = Package::from_vec(destination_bytes.clone())?;
+    expected.apply_cross_slide_copy_plan(&source, &plan)?;
+    let expected = expected.to_bytes()?;
 
     // A mutable access without a change leaves both revisions intact but
     // revokes the destination's exact-source authorization.
-    let mut modified = Package::from_vec(destination_bytes.clone())?;
-    modified.opc.get_part_mut(&presentation_uri())?;
-    assert!(!modified.opc.is_unmodified_owned_source());
-    let before = modified.to_bytes()?;
-    assert_eq!(before, destination_bytes, "the revocation changed no byte");
+    let modified = || -> Result<Package> {
+        let mut modified = Package::from_vec(destination_bytes.clone())?;
+        modified.opc.get_part_mut(&presentation_uri())?;
+        assert!(!modified.opc.is_unmodified_owned_source());
+        Ok(modified)
+    };
+    let mut by_plan = modified()?;
+    assert_eq!(by_plan.to_bytes()?, destination_bytes, "no byte changed");
+    by_plan.apply_cross_slide_copy_plan(&source, &plan)?;
+    assert_eq!(by_plan.to_bytes()?, expected);
+    let mut by_patch = modified()?;
+    by_patch.apply_cross_slide_copy_patch(&source, &durable)?;
+    assert_eq!(by_patch.to_bytes()?, expected);
 
-    let error = modified
-        .apply_cross_slide_copy_plan(&source, &plan)
-        .expect_err("a transferring plan needs an unmodified owned destination");
-    assert_unsafe_edit(&error);
-    assert!(error.to_string().contains("unmodified owned destination"));
-    assert_eq!(modified.to_bytes()?, before);
-    let error = modified
-        .apply_cross_slide_copy_patch(&source, &durable)
-        .expect_err("a transferring durable patch needs an unmodified owned destination");
-    assert_unsafe_edit(&error);
-    assert!(error.to_string().contains("unmodified owned destination"));
-    assert_eq!(modified.to_bytes()?, before);
-
-    // Planning against the modified destination records the recompressed
-    // encoding and applies.
-    let replanned = plan_copy(&source, &modified)?;
-    assert!(!replanned.transfers_source_compressed_media());
-    assert_ne!(
-        replanned.target_physical_revision(),
-        plan.target_physical_revision()
-    );
-    assert_eq!(replanned.target_revision(), plan.target_revision());
-    modified.apply_cross_slide_copy_plan(&source, &replanned)?;
-    let output = modified.to_bytes()?;
-    for part in image_parts(&replanned) {
-        assert_eq!(raw_member(&output, part.target().membername()).method, 8);
-    }
+    // Planning against the modified destination is planning against its
+    // bytes.
+    let replanned = plan_copy(&source, &modified()?)?;
+    assert_eq!(replanned, plan);
+    let mut again = modified()?;
+    again.apply_cross_slide_copy_plan(&source, &replanned)?;
+    assert_eq!(again.to_bytes()?, expected);
     Ok(())
 }
 
@@ -479,7 +485,7 @@ fn the_inverse_of_a_transferring_copy_applies_to_a_modified_destination() -> Res
 }
 
 #[test]
-fn stale_foreign_and_reprovenanced_sources_are_refused() -> Result<()> {
+fn stale_and_foreign_sources_are_refused_and_a_reprovenanced_one_is_not() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
     let source = Package::from_vec(source_bytes.clone())?;
     let plan = plan_copy(&source, &Package::from_vec(destination_bytes.clone())?)?;
@@ -527,55 +533,28 @@ fn stale_foreign_and_reprovenanced_sources_are_refused() -> Result<()> {
     assert_eq!(refused.to_bytes()?, destination_bytes);
 
     // A source whose photo payload was replaced with equal bytes after
-    // planning proves the same revisions but no longer lends its member, so
-    // the fresh candidate differs from the planned one and is refused.
-    let mut reprovenanced = Package::from_vec(source_bytes.clone())?;
+    // planning proves the same revisions and publishes the same bytes, so it
+    // lends the same members: the plan applies, retained or released, and so
+    // does a plan made against it.
+    let mut reprovenanced = Package::from_vec(source_bytes)?;
     let photo_uri = PackURI::new(PHOTO).map_err(Error::Invalid)?;
     let same = reprovenanced.opc.get_part(&photo_uri)?.blob().to_vec();
     reprovenanced.opc.get_part_mut(&photo_uri)?.set_blob(same);
-    let error = refused
-        .apply_cross_slide_copy_plan(&reprovenanced, &plan)
-        .expect_err("a re-provenanced source cannot lend its member");
-    assert_unsafe_edit(&error);
-    assert!(error.to_string().contains("freshly proven candidate"));
-    assert_eq!(refused.to_bytes()?, destination_bytes);
-    // Retention moves no verdict: the released plan is refused identically,
-    // because a retained archive is reused only for the transfer set it was
-    // built with.
     let mut released = plan.clone();
     released.release_retained_candidate();
-    let released_error = refused
-        .apply_cross_slide_copy_plan(&reprovenanced, &released)
-        .expect_err("the released plan is refused too");
-    assert_eq!(released_error.to_string(), error.to_string());
-    assert_eq!(refused.to_bytes()?, destination_bytes);
-
-    // The reverse flip: a plan made while the photo was re-provenanced does
-    // not transfer it, and a source that could lend it again is refused by
-    // both routes.
-    let partial = plan_copy(
+    for candidate in [&plan, &released] {
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        destination.apply_cross_slide_copy_plan(&reprovenanced, candidate)?;
+        assert_eq!(destination.to_bytes()?, expected);
+    }
+    let replanned = plan_copy(
         &reprovenanced,
         &Package::from_vec(destination_bytes.clone())?,
     )?;
-    assert!(
-        partial.transfers_source_compressed_media(),
-        "the flat image still transfers"
-    );
-    assert_ne!(
-        partial.target_physical_revision(),
-        plan.target_physical_revision()
-    );
-    let mut released_partial = partial.clone();
-    released_partial.release_retained_candidate();
-    for candidate in [&partial, &released_partial] {
-        let error = refused
-            .apply_cross_slide_copy_plan(&source, candidate)
-            .expect_err("a source that lends the photo again is a different candidate");
-        assert_unsafe_edit(&error);
-        assert_eq!(refused.to_bytes()?, destination_bytes);
-    }
-    // And the source it was planned against still applies it.
-    refused.apply_cross_slide_copy_plan(&reprovenanced, &partial)?;
+    assert_eq!(replanned, plan);
+    let mut destination = Package::from_vec(destination_bytes)?;
+    destination.apply_cross_slide_copy_plan(&source, &replanned)?;
+    assert_eq!(destination.to_bytes()?, expected);
     Ok(())
 }
 
@@ -621,14 +600,27 @@ fn a_source_member_whose_local_header_disagrees_keeps_the_recompressing_route() 
         photo_bytes().as_slice()
     );
 
-    // The verdict does not depend on the destination: a modified destination
-    // records the recompressed encoding and copies the same slide.
+    // The verdict does not depend on the destination: a modified
+    // destination gives the same plan and the same bytes.
     let mut modified = Package::from_vec(destination_bytes)?;
     modified.opc.get_part_mut(&presentation_uri())?;
     let replanned = plan_copy(&source, &modified)?;
-    assert!(!replanned.transfers_source_compressed_media());
+    assert_eq!(replanned, plan);
     modified.apply_cross_slide_copy_plan(&source, &replanned)?;
+    assert_eq!(
+        modified.to_bytes()?,
+        Package::from_vec(output_bytes_of(&source, &plan)?)?.to_bytes()?
+    );
     Ok(())
+}
+
+/// The bytes an unmodified destination of the media fixture publishes for
+/// `plan`.
+fn output_bytes_of(source: &Package, plan: &CrossSlideCopyPlan) -> Result<Vec<u8>> {
+    let (_source_bytes, destination_bytes) = media_fixture()?;
+    let mut destination = Package::from_vec(destination_bytes)?;
+    destination.apply_cross_slide_copy_plan(source, plan)?;
+    destination.to_bytes()
 }
 
 /// The format half of the eligibility rule, including the XML guard the
@@ -779,5 +771,442 @@ fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
         plan.target_physical_revision(),
         "the copied image's encoding changed the serialized target"
     );
+    Ok(())
+}
+
+/// Insert `padding` zero bytes after the compressed payload of one member of a
+/// ZIP32 archive written without data descriptors, fixing the member's local
+/// and central compressed sizes and every later offset. A Deflate decoder
+/// stops at the final block, so the ordinary reader still decodes the member.
+fn pad_member_payload(archive: &[u8], name: &str, padding: usize) -> Vec<u8> {
+    splice_member_payload(archive, name, false, &vec![0; padding])
+}
+
+/// Insert `inserted` at the start or the end of a sized member's compressed
+/// payload, growing its declared compressed size and moving every later
+/// offset.
+fn splice_member_payload(archive: &[u8], name: &str, at_start: bool, inserted: &[u8]) -> Vec<u8> {
+    let padding = inserted.len();
+    let zip = ZipArchive::from_slice(archive).expect("parse ZIP");
+    let directory = usize::try_from(zip.directory_offset()).expect("offset");
+    let eocd = usize::try_from(zip.eocd_offset()).expect("offset");
+    let mut target = None;
+    for entry in zip.entries() {
+        let entry = entry.expect("central record");
+        if entry.file_path().as_ref() == name.as_bytes() {
+            assert!(
+                !entry.has_data_descriptor(),
+                "the helper pads sized members"
+            );
+            let (start, end) = zip
+                .get_entry(entry.wayfinder())
+                .expect("local entry")
+                .compressed_data_range();
+            target = Some((
+                usize::try_from(entry.local_header_offset()).expect("offset"),
+                usize::try_from(entry.central_directory_offset()).expect("offset"),
+                usize::try_from(if at_start { start } else { end }).expect("offset"),
+            ));
+        }
+    }
+    // Every offset at or after the insertion point moves; the member's own
+    // local header precedes it.
+    let (local, central, payload_end) = target.expect("the member exists");
+    let grow = |bytes: &mut [u8], offset: usize| {
+        let value = u32_at(bytes, offset) + u32::try_from(padding).expect("padding");
+        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    };
+    let mut output = archive[..payload_end].to_vec();
+    output.extend_from_slice(inserted);
+    output.extend_from_slice(&archive[payload_end..]);
+    grow(&mut output, local + 18);
+    let shift = |offset: usize| {
+        if offset >= payload_end {
+            offset + padding
+        } else {
+            offset
+        }
+    };
+    let central = shift(central);
+    grow(&mut output, central + 20);
+    // Every central record whose local header follows the payload moves.
+    let mut record = shift(directory);
+    let end = shift(eocd);
+    while record < end {
+        let local_offset = usize::try_from(u32_at(&output, record + 42)).expect("offset");
+        if local_offset >= payload_end {
+            grow(&mut output, record + 42);
+        }
+        record += 46
+            + usize::from(u16_at(&output, record + 28))
+            + usize::from(u16_at(&output, record + 30))
+            + usize::from(u16_at(&output, record + 32));
+    }
+    grow(&mut output, end + 16);
+    output
+}
+
+/// The reviewer's counterexample: 16 bytes after the final Deflate block of a
+/// sized member. The ordinary reader decodes it; the capture's consumed-input
+/// check refuses it.
+#[test]
+fn a_member_with_bytes_after_its_final_block_keeps_the_recompressing_route() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let padded = pad_member_payload(&source_bytes, &FLAT[1..], 16);
+    let source = Package::from_vec(padded.clone())?;
+    let flat_uri = PackURI::new(FLAT).map_err(Error::Invalid)?;
+    assert_eq!(
+        source.opc.get_part(&flat_uri)?.blob(),
+        flat_bytes().as_slice()
+    );
+    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let plan = plan_copy(&source, &destination)?;
+    assert!(
+        plan.transfers_source_compressed_media(),
+        "the photo still transfers"
+    );
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let output = destination.to_bytes()?;
+    let flat = raw_member(&output, images_target(&plan, FLAT).membername());
+    assert_eq!(flat.method, 8);
+    assert_ne!(flat.flags & 0x08, 0, "the padded member is recompressed");
+    let photo = raw_member(&output, images_target(&plan, PHOTO).membername());
+    assert_eq!(
+        photo.compressed,
+        raw_member(&padded, &PHOTO[1..]).compressed
+    );
+    // The durable patch reproduces the same decision.
+    let mut patched = Package::from_vec(destination_bytes)?;
+    patched.apply_cross_slide_copy_patch(
+        &source,
+        &CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?,
+    )?;
+    assert_eq!(patched.to_bytes()?, output);
+    Ok(())
+}
+
+/// The reviewer's other counterexample: undo then redo of a transferring copy.
+#[test]
+fn redo_after_undo_publishes_the_first_copy_again() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes)?;
+    let plan = plan_copy(&source, &Package::from_vec(destination_bytes.clone())?)?;
+    assert!(plan.transfers_source_compressed_media());
+    let forward = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let inverse = CrossSlideCopyPatch::from_bytes(&forward.inverse().to_bytes()?)?;
+
+    let mut first = Package::from_vec(destination_bytes.clone())?;
+    first.apply_cross_slide_copy_patch(&source, &forward)?;
+    let first = first.to_bytes()?;
+    let undone = || -> Result<Package> {
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        destination.apply_cross_slide_copy_patch(&source, &forward)?;
+        destination.apply_cross_slide_copy_patch(&source, &inverse)?;
+        assert_eq!(destination.to_bytes()?, destination_bytes, "undo is exact");
+        Ok(destination)
+    };
+
+    let mut by_patch = undone()?;
+    by_patch.apply_cross_slide_copy_patch(&source, &forward)?;
+    assert_eq!(by_patch.to_bytes()?, first, "redo by the durable patch");
+    let mut by_plan = undone()?;
+    by_plan.apply_cross_slide_copy_plan(&source, &plan)?;
+    assert_eq!(by_plan.to_bytes()?, first, "redo by the plan");
+    Ok(())
+}
+
+/// Offset of the copied-media encoding byte in an `LPCP0004` header.
+fn encoding_offset(plan: &CrossSlideCopyPlan) -> usize {
+    8 + 6 * 32
+        + (4 + plan.source().part_name().as_str().len())
+        + (4 + plan.destination().part_name().as_str().len())
+        + (4 + plan.destination_layout().as_str().len())
+        + 8
+        + 4
+        + (4 + plan.presentation_relationship_id().len())
+}
+
+/// An unknown encoding byte is a typed `Invalid`; flipping a transferring
+/// patch to the recompressed encoding parses, but no candidate reproduces its
+/// physical revisions, so application refuses and publishes nothing.
+#[test]
+fn a_tampered_encoding_byte_is_refused() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes)?;
+    let plan = plan_copy(&source, &Package::from_vec(destination_bytes.clone())?)?;
+    let encoded = plan.patch().to_bytes()?;
+    let offset = encoding_offset(&plan);
+    assert_eq!(
+        encoded[offset], 1,
+        "a transferring patch records encoding 1"
+    );
+
+    let mut unknown = encoded.clone();
+    unknown[offset] = 2;
+    assert!(matches!(
+        CrossSlideCopyPatch::from_bytes(&unknown),
+        Err(Error::Invalid(message)) if message.contains("copied-media encoding")
+    ));
+
+    let mut flipped = encoded;
+    flipped[offset] = 0;
+    let flipped = CrossSlideCopyPatch::from_bytes(&flipped)?;
+    assert!(!flipped.transfers_source_compressed_media());
+    for patch in [flipped.clone(), flipped.inverse()] {
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        assert_unsafe_edit(
+            &destination
+                .apply_cross_slide_copy_patch(&source, &patch)
+                .expect_err("a flipped encoding is not a proven candidate"),
+        );
+        assert_eq!(destination.to_bytes()?, destination_bytes);
+    }
+    Ok(())
+}
+
+/// The captures a transferring copy holds are charged, before any capture is
+/// taken, against the destination's `max_patch_bytes`: one byte below the
+/// charge is refused by name although the copy fits without them.
+#[test]
+fn captures_are_charged_against_the_patch_byte_limit() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes)?;
+    let destination = Package::from_vec(destination_bytes)?;
+    let plan = plan_copy(&source, &destination)?;
+    let mut capture_bytes = 0usize;
+    for part in image_parts(&plan) {
+        let size = source
+            .opc
+            .compressed_transfer_size(part.source())?
+            .expect("the fixture's images are eligible");
+        capture_bytes += usize::try_from(size).expect("size");
+    }
+    let snapshot = destination.opened_presentation()?;
+    let without = super::candidate_estimate(&snapshot, plan.parts(), plan.planned_bytes(), 0)?;
+    let with =
+        super::candidate_estimate(&snapshot, plan.parts(), plan.planned_bytes(), capture_bytes)?;
+    assert_eq!(with, without + capture_bytes);
+    let limits = |max_patch_bytes| {
+        let default = super::Limits::default();
+        super::Limits::new(
+            default.max_parts(),
+            max_patch_bytes,
+            default.max_text_bytes(),
+            default.max_history_entries(),
+            default.max_history_bytes(),
+            default.max_retained_candidate_bytes(),
+        )
+        .expect("finite limits")
+    };
+    let plan_under = |max_patch_bytes| {
+        let limits = limits(max_patch_bytes);
+        destination
+            .opened_presentation_with_limits(limits)?
+            .plan_cross_slide_copy(
+                &source.opened_presentation_with_limits(limits)?,
+                SOURCE_SLIDE,
+                DESTINATION_SLIDE,
+                POSITION,
+            )
+    };
+    assert!(matches!(
+        plan_under(with - 1),
+        Err(Error::Limit {
+            resource: "cross-slide candidate patch bytes",
+            limit,
+        }) if limit == with - 1
+    ));
+    assert!(plan_under(with)?.transfers_source_compressed_media());
+    Ok(())
+}
+
+/// A candidate published by a transferring copy is an owned package whose
+/// parts were materialized eagerly; it lends the same members onward, so a
+/// second copy frames the original source's compressed bytes again, and its
+/// durable patch round-trips.
+#[test]
+fn a_published_candidate_lends_its_media_to_a_further_copy() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes.clone())?;
+    let mut middle = Package::from_vec(destination_bytes)?;
+    let first = plan_copy(&source, &middle)?;
+    middle.apply_cross_slide_copy_plan(&source, &first)?;
+    assert!(middle.opc.is_unmodified_owned_source());
+
+    let third_bytes = authored("third", 2)?;
+    let mut third = Package::from_vec(third_bytes.clone())?;
+    let second = third.opened_presentation()?.plan_cross_slide_copy(
+        &middle.opened_presentation()?,
+        POSITION,
+        0_usize,
+        1,
+    )?;
+    assert!(second.transfers_source_compressed_media());
+    third.apply_cross_slide_copy_plan(&middle, &second)?;
+    let output = third.to_bytes()?;
+    for name in [PHOTO, FLAT] {
+        let in_middle = images_target(&first, name);
+        let in_third = second
+            .parts()
+            .iter()
+            .find(|part| part.source() == in_middle)
+            .map(|part| part.target())
+            .expect("the image is copied again");
+        let published = raw_member(&output, in_third.membername());
+        assert_eq!(
+            published.compressed,
+            raw_member(&source_bytes, &name[1..]).compressed,
+            "{name}: the original source member's bytes"
+        );
+        assert_fresh_sized_framing(&published);
+    }
+    let durable = CrossSlideCopyPatch::from_bytes(&second.patch().to_bytes()?)?;
+    let mut patched = Package::from_vec(third_bytes.clone())?;
+    patched.apply_cross_slide_copy_patch(&middle, &durable)?;
+    assert_eq!(patched.to_bytes()?, output);
+    patched.apply_cross_slide_copy_patch(
+        &middle,
+        &CrossSlideCopyPatch::from_bytes(&durable.inverse().to_bytes()?)?,
+    )?;
+    assert_eq!(patched.to_bytes()?, third_bytes);
+    Ok(())
+}
+
+/// A caller-defined part whose relationship-counting behaviour differs from
+/// a built-in part's.
+#[derive(Clone)]
+struct Sentinel(litchi_opc::BlobPart);
+
+impl litchi_opc::Part for Sentinel {
+    fn blob(&self) -> &[u8] {
+        self.0.blob()
+    }
+    fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+        self.0.blob_arc()
+    }
+    fn content_type(&self) -> &str {
+        self.0.content_type()
+    }
+    fn partname(&self) -> &PackURI {
+        self.0.partname()
+    }
+    fn rel_ref_count(&self, _r_id: &str) -> usize {
+        0x51_7e
+    }
+    fn rels(&self) -> &litchi_opc::Relationships {
+        self.0.rels()
+    }
+    fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
+        self.0.rels_mut()
+    }
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.0.set_blob(blob);
+    }
+}
+
+/// A transferring copy into a destination that holds a caller-defined part
+/// and save preferences publishes the reopened candidate: the part keeps its
+/// bytes but becomes a built-in part, and the save preferences are carried.
+/// The output is the output of the same copy into the destination's bytes.
+#[test]
+fn a_transferring_copy_keeps_save_options_but_not_caller_part_types() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes)?;
+    let sentinel = PackURI::new("/custom/sentinel.bin").map_err(Error::Invalid)?;
+    let custom = || -> Result<Package> {
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        destination
+            .opc
+            .try_add_part(Box::new(Sentinel(litchi_opc::BlobPart::new(
+                sentinel.clone(),
+                "application/octet-stream".to_owned(),
+                b"sentinel".to_vec(),
+            ))))?;
+        destination.opc.set_save_options(litchi_opc::SaveOptions {
+            fonts: litchi_opc::FontEmbedding::Full,
+        });
+        Ok(destination)
+    };
+    let mut destination = custom()?;
+    assert_eq!(
+        destination.opc.get_part(&sentinel)?.rel_ref_count("rId1"),
+        0x51_7e
+    );
+    let plan = plan_copy(&source, &destination)?;
+    assert!(plan.transfers_source_compressed_media());
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    assert_eq!(
+        destination.opc.save_options().fonts,
+        litchi_opc::FontEmbedding::Full
+    );
+    let part = destination.opc.get_part(&sentinel)?;
+    assert_eq!(part.blob(), b"sentinel");
+    assert_eq!(part.rel_ref_count("rId1"), 0, "a built-in part now");
+    let published = litchi_opc::PackageWriter::to_bytes(&destination.opc)?;
+
+    let clean_bytes = litchi_opc::PackageWriter::to_bytes(&custom()?.opc)?;
+    let mut clean = Package::from_vec(clean_bytes)?;
+    let clean_plan = plan_copy(&source, &clean)?;
+    assert_eq!(clean_plan, plan);
+    clean.apply_cross_slide_copy_plan(&source, &clean_plan)?;
+    assert_eq!(litchi_opc::PackageWriter::to_bytes(&clean.opc)?, published);
+    Ok(())
+}
+
+/// A producer that Stores a compressible image gets it transferred Stored:
+/// the source's choice is kept, as the source-backed route keeps it, at the
+/// cost of a larger member than recompression would give.
+#[test]
+fn a_stored_compressible_image_is_transferred_stored() -> Result<()> {
+    let flat = flat_bytes();
+    let source_bytes = repack(
+        &with_pictures(
+            &authored("source", 3)?,
+            SOURCE_SLIDE,
+            &[(FLAT, "image/png", &flat)],
+        )?,
+        |name| name.starts_with("ppt/media/"),
+    );
+    let source = Package::from_vec(source_bytes)?;
+    let mut destination = Package::from_vec(authored("destination", 2)?)?;
+    let plan = plan_copy(&source, &destination)?;
+    assert!(plan.transfers_source_compressed_media());
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let output = destination.to_bytes()?;
+    let published = raw_member(&output, images_target(&plan, FLAT).membername());
+    assert_eq!(published.method, 0);
+    assert_eq!(published.compressed, flat);
+    Ok(())
+}
+
+/// The reviewer's padding case: 200,000 empty stored blocks in front of the
+/// flat image's Deflate stream. The member decodes to the same image, but its
+/// declared compressed size fails the header-only guard, so it is recompressed
+/// instead of being published padded; the photo still transfers.
+#[test]
+fn a_member_padded_with_empty_stored_blocks_is_recompressed() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let empty_blocks = [0x00, 0x00, 0x00, 0xff, 0xff].repeat(200_000);
+    let padded = splice_member_payload(&source_bytes, &FLAT[1..], true, &empty_blocks);
+    let source = Package::from_vec(padded.clone())?;
+    let flat_uri = PackURI::new(FLAT).map_err(Error::Invalid)?;
+    assert_eq!(
+        source.opc.get_part(&flat_uri)?.blob(),
+        flat_bytes().as_slice()
+    );
+    assert_eq!(source.opc.compressed_transfer_size(&flat_uri)?, None);
+    let mut destination = Package::from_vec(destination_bytes)?;
+    let plan = plan_copy(&source, &destination)?;
+    assert!(
+        plan.transfers_source_compressed_media(),
+        "the photo transfers"
+    );
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let output = destination.to_bytes()?;
+    let flat = raw_member(&output, images_target(&plan, FLAT).membername());
+    assert_eq!(flat.method, 8);
+    assert_ne!(flat.flags & 0x08, 0, "the padded member is recompressed");
+    assert!(flat.compressed.len() < 1024);
+    assert!(output.len() < padded.len() / 2);
     Ok(())
 }
