@@ -14,9 +14,10 @@ copied; its digest is still recomputed at application, as 0646's G5 requires.
 
 On the media-rich pair, with both legs built by the same command:
 
-- lifecycle median p50: 180.8 → 102.3 ms (paired 0.564);
-- commit: 88.7 → 25.7 ms;
-- planning: 63.9 → 48.4 ms.
+- commit: 88.9 → 25.8 ms;
+- planning: 67.0 → 55.3 ms;
+- lifecycle median p50: 184.2 → 109.8 ms (paired 0.61), and 0.565 at equal
+  page faults.
 
 What remains in commit is that one digest (59.5%) and the shared reopen
 (25.5%). Planning keeps the first hash of each archive and the candidate
@@ -31,6 +32,7 @@ additive:
 
 - `OpcPackage::exact_source_sha256`, a digest memo created with the retained
   owned archive by one constructor, filled once and shared by clones;
+- `OpcPackage::exact_source_len`;
 - shared-archive ingress, `from_shared_vec_reusing_payloads` and
   `from_shared_vec_with_limits`.
 
@@ -43,22 +45,27 @@ In `litchi-pptx`:
   digest;
 - a plan's retained archive is shared with the package it publishes;
 - `Package::opened_presentation` keeps its capture's memo when the facade holds
-  none and every part is built in;
-- `apply_slide_removal_plan` now adopts its snapshot's memo.
+  none;
+- every facade adoption keeps the snapshot's memo re-projected onto the
+  facade's own allocations. The review found that adopting it as it was could
+  keep a caller-defined part's cloned payload alive, also on the base's
+  cross-copy publications.
 
 Every `LPCP0004` byte, recorded revision, published byte and refusal equals
-the base's, pinned by a 98-line golden transcript printed on the base.
+the base's. A 196-line golden transcript printed on the base pins them,
+including caller-defined destinations and size-limit refusals.
 
 Median process p50:
 
-- media-rich lifecycle: 180.8 → 102.3 ms;
-- media-rich: 161.9 → 86.4 ms;
-- plain: −2.3% and −3.0%;
+- media-rich lifecycle: 184.2 → 109.8 ms;
+- media-rich: 159.6 → 80.6 ms;
+- plain: −3.3% and −4.1%;
 - source-backed control: unchanged.
 
-Allocated bytes fall 12.3% and peak live bytes 5.4%. The tiny semantic control
-moves +0.65% at p50, with per-iteration instructions unchanged (0.9999) and
-front-end stalls up. `performance_claim: none`.
+Allocated bytes fall 12.3% and peak live bytes 5.4%. The tiny and medium
+semantic controls move +1.1% and +0.8% at p50: the re-projection adds 0.17%
+instructions per iteration there, and code layout adds cycles.
+`performance_claim: none`.
 
 ## For `GOAL_AUDIT.md`
 
@@ -73,14 +80,16 @@ front-end stalls up. `performance_claim: none`.
     G5;
   - each archive's first hash at planning stays;
   - packages no memo describes are hashed.
+
+  It also accepts a small cost on the semantic controls to meet the ADR 0005
+  memo amendment's re-projection clause literally at every facade adoption.
 - **Bound memos.** Every skipped hash is answered by a memo bound to its bytes
   by allocation identity, or by a single-constructor digest cell on an
   immutable archive, and every read is re-derived in debug builds. Every
   freshness, revision, physical-provenance, budget and refusal check still
   runs.
-- **ADR 0005.** The facade's memo is now also filled by a capture. The record
-  proves each condition of the 2026-09-16 memo amendment for that route. It
-  reads the amendment's publication sentence as a requirement rather than a
-  closed list, and leaves any wording change to the coordinator.
+- **ADR 0005.** Filling an empty facade slot from a capture follows the
+  coordinator's ruling in 0751's review. The ADR text is unchanged, and the
+  reading is listed for the owner's confirmation.
 
 The non-iWork goal stays open.

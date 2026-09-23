@@ -1,35 +1,41 @@
 # Change 0751 gates
 
-Run from the worktree root on commit f84522f8af (both production commits; the
-record and this packet uncommitted), by `scripts/gates.sh`, with
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0751,
-CARGO_BUILD_JOBS=6, Rust 1.95.0 from rust-toolchain.toml. The target
-directory already held this branch's earlier debug and release builds.
+## After the review, on 098f6ffd4e
 
-In-scope dependents are the workspace packages that declare litchi-opc or
-litchi-pptx: litchi-ooxml-common, litchi-docx, litchi-xlsx, litchi-xlsb,
-litchi-spreadsheet-drawing, litchi-ppt and the litchi facade. The perf-baseline
-harness is unchanged, so its own test suite was not run; every measured
-process ran the harness's untimed cross-copy gates first.
+Run from the worktree root on commit 098f6ffd4e (the review's three commits;
+the record and this packet's updates uncommitted), with a fresh
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0751,
+TMPDIR=/home/zhuhe/code/litchi-worktrees/scratch/0751/tmp, CARGO_BUILD_JOBS=6,
+Rust 1.95.0 from rust-toolchain.toml, every command in the foreground. These
+are the gates the coordinator's review message listed, then the facade tests
+and the three gate scripts, which ran again after the re-measurement.
 
 fmt	exit=0	cargo fmt --all --check
-check	exit=0	cargo check -p litchi-opc -p litchi-pptx -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx -p litchi-xlsb -p litchi-spreadsheet-drawing -p litchi-ppt -p litchi --all-targets --locked --offline
 clippy-lib	exit=0	cargo clippy -p litchi-opc -p litchi-pptx --lib --no-deps --locked --offline -- -D warnings
 clippy-opc-all-targets	exit=0	cargo clippy -p litchi-opc --all-targets --no-deps --locked --offline -- -D warnings
 clippy-pptx-all-targets	exit=101	cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline --keep-going -- -D warnings
-    pre-existing clippy::err_expect only, unchanged from base 6d989cad63 (0742 recorded the same three on its base): crates/litchi-pptx/src/opened/tests.rs:464:14, crates/litchi-pptx/src/opened/tests.rs:538:10, crates/litchi-pptx/src/opened/tests.rs:557:10
+    pre-existing clippy::err_expect only, unchanged from base 6d989cad63: crates/litchi-pptx/src/opened/tests.rs:464:14, crates/litchi-pptx/src/opened/tests.rs:538:10, crates/litchi-pptx/src/opened/tests.rs:557:10
 test-core	exit=0	cargo test -p litchi-opc -p litchi-pptx --locked --offline
     passed=1741 failed=0 ignored=4
 test-pptx-release-cross-copy	exit=0	cargo test -p litchi-pptx --release --locked --offline --lib -- cross_copy_plan facade_memo
     passed=57 failed=0 ignored=1
-test-dependents	exit=0	cargo test -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx -p litchi-xlsb -p litchi-spreadsheet-drawing -p litchi-ppt --locked --offline
-    passed=5241 failed=0 ignored=55
+doc	exit=0	env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-opc -p litchi-pptx --no-deps --locked --offline
 test-facade	exit=0	cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
     passed=382 failed=0 ignored=7
-doc	exit=0	env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-opc -p litchi-pptx --no-deps --locked --offline
 crate-boundaries	exit=0	python3 tools/check_crate_boundaries.py
     crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
 non-iwork	exit=0	python3 tools/non_iwork_gate.py verify
     verified_bulk_tree_roots=45; verified_facade_safe_trees=35; verified_facade_combined_tree=1
 perf-claims	exit=0	python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
     OK: 10 performance claims validated (structural)
+
+The golden transcript was also printed on the base: a detached worktree of
+6d989cad63 with only digest_reuse_tests.rs added, built into
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0751-before, ran
+`cargo test -p litchi-pptx --locked --offline --lib digest_reuse_tests::print -- --ignored --nocapture`
+(exit 0). Its 196 lines equal this branch's.
+
+The dependents' tests and `cargo check --all-targets` of the dependents ran
+before the review, on f84522f8af: see superseded-f84522f8af/gates.txt. The
+review's commits change no public item a dependent uses (litchi-opc gains the
+additive `exact_source_len`).

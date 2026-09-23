@@ -1,39 +1,38 @@
-pptx_cross_copy_media_rich_lifecycle p0 s0 before: {'cycles': 1189174355.5, 'instructions': 1519969938.5}
-pptx_cross_copy_media_rich_lifecycle p0 s1 after: {'cycles': 762860461.6, 'instructions': 951437630.0}
-pptx_cross_copy_media_rich_lifecycle p0 s2 after: {'cycles': 881308899.0, 'instructions': 1116732824.7}
-pptx_cross_copy_media_rich_lifecycle p0 s3 before: {'cycles': 1223419589.8, 'instructions': 1556555705.6}
-pptx_cross_copy_media_rich_lifecycle p1 s0 before: {'cycles': 1210305609.9, 'instructions': 1534339510.6}
-pptx_cross_copy_media_rich_lifecycle p1 s1 after: {'cycles': 901887437.2, 'instructions': 1141435903.8}
-pptx_cross_copy_media_rich_lifecycle p1 s2 after: {'cycles': 880414826.8, 'instructions': 1130942710.1}
-pptx_cross_copy_media_rich_lifecycle p1 s3 before: {'cycles': 1279816559.9, 'instructions': 1601262019.1}
-pptx_cross_copy_plain_lifecycle p0 s0 before: {'cycles': 45074787.8, 'instructions': 156759102.8}
-pptx_cross_copy_plain_lifecycle p0 s1 after: {'cycles': 44925386.4, 'instructions': 155498327.6}
-pptx_cross_copy_plain_lifecycle p0 s2 after: {'cycles': 44534849.2, 'instructions': 155609167.5}
-pptx_cross_copy_plain_lifecycle p0 s3 before: {'cycles': 48438071.9, 'instructions': 156801766.4}
-pptx_cross_copy_plain_lifecycle p1 s0 before: {'cycles': 46819363.8, 'instructions': 156768362.5}
-pptx_cross_copy_plain_lifecycle p1 s1 after: {'cycles': 51433056.7, 'instructions': 155631330.5}
-pptx_cross_copy_plain_lifecycle p1 s2 after: {'cycles': 43980305.7, 'instructions': 155171433.6}
-pptx_cross_copy_plain_lifecycle p1 s3 before: {'cycles': 46544452.5, 'instructions': 156759962.4}
-pptx_semantic_one_edit_save p0 s0 before: {'cycles': 902652925.5, 'instructions': 3761293662.8}
-pptx_semantic_one_edit_save p0 s1 after: {'cycles': 911326709.9, 'instructions': 3758459600.8}
-pptx_semantic_one_edit_save p0 s2 after: {'cycles': 913483971.0, 'instructions': 3757883720.6}
-pptx_semantic_one_edit_save p0 s3 before: {'cycles': 896273428.2, 'instructions': 3759521762.7}
-pptx_semantic_one_edit_save p1 s0 before: {'cycles': 890600023.8, 'instructions': 3760193765.2}
-pptx_semantic_one_edit_save p1 s1 after: {'cycles': 902810020.4, 'instructions': 3758125714.0}
-pptx_semantic_one_edit_save p1 s2 after: {'cycles': 904032183.0, 'instructions': 3754484597.0}
-pptx_semantic_one_edit_save p1 s3 before: {'cycles': 905684616.0, 'instructions': 3760106077.2}
+pptx_cross_copy_media_rich_lifecycle p0 s0 before: {'cycles': 1263679183.5, 'instructions': 1594499084.6}
+pptx_cross_copy_media_rich_lifecycle p0 s1 after: {'cycles': 816442171.3, 'instructions': 1047064125.3}
+pptx_cross_copy_media_rich_lifecycle p0 s2 after: {'cycles': 798402164.7, 'instructions': 1013862681.6}
+pptx_cross_copy_media_rich_lifecycle p0 s3 before: {'cycles': 1065808975.0, 'instructions': 1331046550.7}
+pptx_cross_copy_media_rich_lifecycle p1 s0 before: {'cycles': 1293563774.5, 'instructions': 1620114407.2}
+pptx_cross_copy_media_rich_lifecycle p1 s1 after: {'cycles': 738393150.7, 'instructions': 918986050.6}
+pptx_cross_copy_media_rich_lifecycle p1 s2 after: {'cycles': 822123623.4, 'instructions': 1030960203.0}
+pptx_cross_copy_media_rich_lifecycle p1 s3 before: {'cycles': 1220795644.8, 'instructions': 1555181051.5}
+pptx_cross_copy_plain_lifecycle p0 s0 before: {'cycles': 51793593.6, 'instructions': 156896966.8}
+pptx_cross_copy_plain_lifecycle p0 s1 after: {'cycles': 47154588.1, 'instructions': 155576737.6}
+pptx_cross_copy_plain_lifecycle p0 s2 after: {'cycles': 43314408.7, 'instructions': 155948281.7}
+pptx_cross_copy_plain_lifecycle p0 s3 before: {'cycles': 49697238.6, 'instructions': 156923666.9}
+pptx_cross_copy_plain_lifecycle p1 s0 before: {'cycles': 44992353.8, 'instructions': 156861769.9}
+pptx_cross_copy_plain_lifecycle p1 s1 after: {'cycles': 44144546.3, 'instructions': 155619271.0}
+pptx_cross_copy_plain_lifecycle p1 s2 after: {'cycles': 45461290.6, 'instructions': 155697372.1}
+pptx_cross_copy_plain_lifecycle p1 s3 before: {'cycles': 43107092.6, 'instructions': 156797575.6}
+pptx_semantic_one_edit_save p0 s0 before: {'cycles': 903977818.6, 'instructions': 3758701457.6}
+pptx_semantic_one_edit_save p0 s1 after: {'cycles': 911708237.8, 'instructions': 3757922579.5}
+pptx_semantic_one_edit_save p0 s2 after: {'cycles': 911310525.9, 'instructions': 3758094772.3}
+pptx_semantic_one_edit_save p0 s3 before: {'cycles': 903557089.2, 'instructions': 3761333399.2}
+pptx_semantic_one_edit_save p1 s0 before: {'cycles': 923101558.6, 'instructions': 3759784963.9}
+pptx_semantic_one_edit_save p1 s1 after: {'cycles': 918626088.2, 'instructions': 3758463732.4}
+pptx_semantic_one_edit_save p1 s2 after: {'cycles': 914646193.5, 'instructions': 3757538643.3}
+pptx_semantic_one_edit_save p1 s3 before: {'cycles': 898034316.8, 'instructions': 3757524890.0}
 {
   "pptx_cross_copy_media_rich_lifecycle": {
-    "cycles_ratio_after_over_before": 0.7238794774435355,
-    "instructions_ratio_after_over_before": 0.7271924078886541
+    "cycles_ratio_after_over_before": 0.6499741183149583,
+    "instructions_ratio_after_over_before": 0.6492160461512586
   },
   "pptx_cross_copy_plain_lifecycle": {
-    "cycles_ratio_after_over_before": 0.9581895764901375,
-    "instructions_ratio_after_over_before": 0.9922787524834572
+    "cycles_ratio_after_over_before": 0.9463113593463942,
+    "instructions_ratio_after_over_before": 0.9922166514765929
   },
   "pptx_semantic_one_edit_save": {
-    "cycles_ratio_after_over_before": 1.0091346369828882,
-    "instructions_ratio_after_over_before": 0.9994294897956316
+    "cycles_ratio_after_over_before": 1.0104117068051015,
+    "instructions_ratio_after_over_before": 0.999671600165036
   }
 }
-isolation exit 0

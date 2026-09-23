@@ -1,0 +1,89 @@
+{
+  "frontend_whole_child_median": {
+    "after": {
+      "L1-icache-load-misses": 0.0,
+      "branch-misses": 70490136.5,
+      "cycles": 10347713385.5,
+      "de_no_dispatch_per_slot.no_ops_from_frontend": 30438292474.5,
+      "iTLB-load-misses": 0.0,
+      "instructions": 30385596823.5
+    },
+    "before": {
+      "L1-icache-load-misses": 0.0,
+      "branch-misses": 69980687.5,
+      "cycles": 10250132285.0,
+      "de_no_dispatch_per_slot.no_ops_from_frontend": 29534786236.0,
+      "iTLB-load-misses": 0.0,
+      "instructions": 30335246866.0
+    }
+  },
+  "median_paired_p50_ratio": 1.0082532428551296,
+  "median_per_iteration": {
+    "after": {
+      "cycles": 8039259.157,
+      "instructions": 25442419.975500003
+    },
+    "before": {
+      "cycles": 7924320.054500001,
+      "instructions": 25445488.884
+    }
+  },
+  "p50_us": {
+    "r0-s0-before": 902.594,
+    "r0-s1-after": 907.954,
+    "r0-s2-after": 910.984,
+    "r0-s3-before": 901.914,
+    "r1-s0-before": 909.289,
+    "r1-s1-after": 915.154,
+    "r1-s2-after": 914.129,
+    "r1-s3-before": 901.319
+  },
+  "paired_p50_ratios": [
+    1.0059384396528228,
+    1.006450094524403,
+    1.010056391185856,
+    1.0142125041189636
+  ],
+  "per_iteration": {
+    "after": [
+      {
+        "cycles": 8032581.509,
+        "instructions": 25421209.399
+      },
+      {
+        "cycles": 8040552.045,
+        "instructions": 25441995.16
+      },
+      {
+        "cycles": 8037966.269,
+        "instructions": 25442844.791
+      },
+      {
+        "cycles": 8064144.246,
+        "instructions": 25447913.682
+      }
+    ],
+    "before": [
+      {
+        "cycles": 7927925.155,
+        "instructions": 25423883.278
+      },
+      {
+        "cycles": 7920714.954,
+        "instructions": 25445601.992
+      },
+      {
+        "cycles": 7945784.385,
+        "instructions": 25451162.794
+      },
+      {
+        "cycles": 7907726.45,
+        "instructions": 25445375.776
+      }
+    ]
+  },
+  "per_iteration_ratios": {
+    "cycles": 1.0145046012414312,
+    "instructions": 0.9998793928262103
+  }
+}
