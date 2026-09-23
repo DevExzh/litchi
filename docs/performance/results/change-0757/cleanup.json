@@ -44,5 +44,18 @@
  ],
  "not_touched": [
   "the main checkout, the shared base checkout base-009d515bef and its target, other agents' worktrees, targets and scratch directories, perf's build-id cache (no 0757 entries: only perf stat and valgrind were run), and the untracked docs/performance/results/change-0741/ packet in the main checkout"
- ]
+ ],
+ "verified_after_removal": {
+  "date": "2026-09-23T13:40Z",
+  "method": "each removed path checked with os.path.exists (the scratch directory checked empty); git worktree list no longer lists 0757-before-src",
+  "results": {
+   "/home/zhuhe/code/litchi-worktrees/targets/0757": "absent",
+   "/home/zhuhe/code/litchi-worktrees/targets/0757-before": "absent",
+   "/home/zhuhe/code/litchi-worktrees/targets/0757-final": "absent",
+   "/home/zhuhe/code/litchi-worktrees/targets/0757-probe-A": "absent",
+   "/home/zhuhe/code/litchi-worktrees/targets/0757-probe-B": "absent",
+   "/home/zhuhe/code/litchi-worktrees/0757-before-src": "absent",
+   "/home/zhuhe/code/litchi-worktrees/scratch/0757/*": "empty"
+  }
+ }
 }
