@@ -119,8 +119,10 @@ impl<R: Read + Seek> Workbook<R> {
     /// refusal it does not propagate (the `Err(_)` arm of `parse_workbook`),
     /// so the worksheet is simply not published and its
     /// `parsed_worksheet_index` stays unset. The edit owners then refuse the
-    /// package with their coverage refusal, an [`crate::Error::UnsafeEdit`]
-    /// naming a tab the complete reader did not publish.
+    /// package with their coverage refusal, an [`crate::Error::UnsafeEdit`]:
+    /// the `cell_values` and sheet-visibility owners name the tab the complete
+    /// reader did not publish, and the comments owner reports a worksheet
+    /// substream that was not completely parsed.
     pub(crate) fn validation_only(reader: R, kept: KeptCells) -> Result<ValidationWorkbook<R>> {
         let mut workbook = Self::empty(OleFile::open(reader)?);
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
