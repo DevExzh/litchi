@@ -18,15 +18,20 @@
 //! checked error instead of inheriting quick-xml's overflow panic/wrap path.
 //!
 //! Resolution answers exactly what quick-xml's newest-first linear search
-//! answers. Change 0754 put a small cache in front of that search: the
-//! positions of the few prefixes resolved most recently, and of the innermost
-//! default-namespace declaration. Every change to the binding list clears the
-//! cache, and a cached position is used only after the binding there is
-//! checked to carry the requested prefix, so a hit returns the binding the
-//! search would have found. The cache is a fixed-size array compared byte for
-//! byte, with no hashing: a lookup costs at most those few comparisons more
-//! than the search it fronts, and a document cannot steer it into a worse
-//! case than the search's own.
+//! answers, without that search's cost (change 0754). The innermost
+//! default-namespace declaration is the top of a stack of their positions,
+//! kept as declarations are added and scopes close. A prefixed name first
+//! tries the positions of the few prefixes resolved most recently; a cached
+//! position is used only after the binding there is checked to carry the
+//! requested prefix, and every change to the binding list clears the cache,
+//! so a hit is the binding the search would have found. A miss searches the
+//! list while it is short; once it has grown past a small bound, an ordered
+//! map from each declared prefix to its positions answers instead. Nothing is
+//! hashed, so no input can steer a lookup into collisions: a lookup costs a
+//! few comparisons plus one ordered-map descent, logarithmic in the number of
+//! distinct prefixes in scope, where quick-xml's search is linear in every
+//! declaration in scope, which a document can make as large as the
+//! per-element declaration limit times the nesting depth.
 
 use quick_xml::events::BytesStart;
 use quick_xml::events::attributes::Attribute;
@@ -36,6 +41,7 @@ use quick_xml::name::{
 };
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::collections::BTreeMap;
 use std::fmt;
 
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
@@ -43,6 +49,9 @@ const XMLNS_NAMESPACE: &[u8] = b"http://www.w3.org/2000/xmlns/";
 const MAX_NS_DECLARATIONS_PER_ELEMENT: usize = 256;
 /// How many recently resolved prefixes the resolution cache remembers.
 const RECENT_PREFIXES: usize = 4;
+/// Past this many bindings in scope, prefixed lookups that miss the cache
+/// use the ordered prefix index instead of searching the list.
+const INDEXED_BINDINGS: usize = 32;
 
 /// Failure from the hidden namespace-tracker plumbing.
 ///
@@ -128,21 +137,13 @@ pub struct BindingTracker {
     recent: [Cell<Option<usize>>; RECENT_PREFIXES],
     /// The `recent` slot the next cache miss replaces.
     recent_next: Cell<usize>,
-    /// Where the innermost default-namespace declaration is, once looked up.
-    /// Cleared by every change to `bindings`.
-    default: Cell<DefaultLookup>,
-}
-
-/// The cached answer to "which binding is the innermost default-namespace
-/// declaration".
-#[derive(Clone, Copy, Debug)]
-enum DefaultLookup {
-    /// Not looked up since the binding list last changed.
-    Unresolved,
-    /// No binding declares the default namespace.
-    Absent,
-    /// The innermost default-namespace declaration is at this position.
-    At(usize),
+    /// Positions of the default-namespace declarations in `bindings`, oldest
+    /// first; the last is the innermost.
+    defaults: Vec<usize>,
+    /// Once `bindings` has grown past [`INDEXED_BINDINGS`]: the positions of
+    /// each declared prefix's declarations, oldest first, kept in step with
+    /// `bindings` from then on. `None` until then.
+    index: Option<BTreeMap<Box<[u8]>, Vec<usize>>>,
 }
 
 impl BindingTracker {
@@ -170,7 +171,8 @@ impl BindingTracker {
             level: 0,
             recent: std::array::from_fn(|_| Cell::new(None)),
             recent_next: Cell::new(0),
-            default: Cell::new(DefaultLookup::Unresolved),
+            defaults: Vec::new(),
+            index: None,
         }
     }
 
@@ -179,7 +181,63 @@ impl BindingTracker {
         for slot in &mut self.recent {
             *slot.get_mut() = None;
         }
-        *self.default.get_mut() = DefaultLookup::Unresolved;
+    }
+
+    /// Record the binding just pushed at `position` in the default stack or
+    /// the prefix index, building the index when the list first outgrows
+    /// [`INDEXED_BINDINGS`].
+    fn record_binding(&mut self, position: usize) {
+        let Some(binding) = self.bindings.get(position) else {
+            return;
+        };
+        if binding.prefix_len == 0 {
+            self.defaults.push(position);
+        } else if let Some(index) = self.index.as_mut() {
+            let prefix = &self.buffer[binding.start..binding.start + binding.prefix_len];
+            match index.get_mut(prefix) {
+                Some(positions) => positions.push(position),
+                None => {
+                    index.insert(prefix.into(), vec![position]);
+                },
+            }
+        } else if self.bindings.len() > INDEXED_BINDINGS {
+            let mut index: BTreeMap<Box<[u8]>, Vec<usize>> = BTreeMap::new();
+            for (at, binding) in self.bindings.iter().enumerate() {
+                if let Some(prefix) = binding.prefix(&self.buffer) {
+                    index.entry(prefix.into()).or_default().push(at);
+                }
+            }
+            self.index = Some(index);
+        }
+        self.invalidate_resolutions();
+    }
+
+    /// Drop every binding from position `keep` on, with its entry in the
+    /// default stack or the prefix index.
+    fn truncate_bindings(&mut self, keep: usize) {
+        for position in (keep..self.bindings.len()).rev() {
+            let Some(binding) = self.bindings.get(position) else {
+                continue;
+            };
+            if binding.prefix_len == 0 {
+                self.defaults.pop();
+            } else if let Some(index) = self.index.as_mut() {
+                let prefix = &self.buffer[binding.start..binding.start + binding.prefix_len];
+                if let Some(positions) = index.get_mut(prefix) {
+                    positions.pop();
+                    if positions.is_empty() {
+                        index.remove(prefix);
+                    }
+                }
+            }
+        }
+        let buffer_len = self
+            .bindings
+            .get(keep)
+            .map_or(self.buffer.len(), |binding| binding.start);
+        self.buffer.truncate(buffer_len);
+        self.bindings.truncate(keep);
+        self.invalidate_resolutions();
     }
 
     /// Apply the declarations on one `Start` or `Empty` event.
@@ -243,7 +301,7 @@ impl BindingTracker {
                     value_len: uri.len(),
                     level,
                 });
-                self.invalidate_resolutions();
+                self.record_binding(self.bindings.len() - 1);
             },
             PrefixDeclaration::Named(b"xml") => {
                 if uri != XML_NAMESPACE {
@@ -277,7 +335,7 @@ impl BindingTracker {
                     value_len: uri.len(),
                     level,
                 });
-                self.invalidate_resolutions();
+                self.record_binding(self.bindings.len() - 1);
             },
         }
         Ok(())
@@ -292,19 +350,12 @@ impl BindingTracker {
             .rposition(|binding| binding.level <= self.level)
         {
             None => {
+                self.truncate_bindings(0);
                 self.buffer.clear();
-                self.bindings.clear();
-                self.invalidate_resolutions();
             },
             Some(last_kept) => {
-                if let Some(len) = self
-                    .bindings
-                    .get(last_kept + 1)
-                    .map(|binding| binding.start)
-                {
-                    self.buffer.truncate(len);
-                    self.bindings.truncate(last_kept + 1);
-                    self.invalidate_resolutions();
+                if last_kept + 1 < self.bindings.len() {
+                    self.truncate_bindings(last_kept + 1);
                 }
             },
         }
@@ -403,22 +454,12 @@ impl BindingTracker {
     }
 
     /// The newest binding that declares the default namespace, which is the
-    /// first one quick-xml's newest-first search meets.
+    /// first one quick-xml's newest-first search meets: the top of the
+    /// default stack.
     fn innermost_default(&self) -> Option<&Binding> {
-        let position = match self.default.get() {
-            DefaultLookup::At(position) => Some(position),
-            DefaultLookup::Absent => None,
-            DefaultLookup::Unresolved => {
-                let found = self
-                    .bindings
-                    .iter()
-                    .rposition(|binding| binding.prefix_len == 0);
-                self.default
-                    .set(found.map_or(DefaultLookup::Absent, DefaultLookup::At));
-                found
-            },
-        };
-        position.and_then(|position| self.bindings.get(position))
+        self.defaults
+            .last()
+            .and_then(|position| self.bindings.get(*position))
     }
 
     /// The newest binding that declares `prefix`, which is the first one
@@ -427,9 +468,11 @@ impl BindingTracker {
     /// A cached position is trusted only after the binding there is checked
     /// to declare `prefix`; the binding list has not changed since it was
     /// cached (every change clears the cache), so no newer declaration of
-    /// `prefix` can exist, and the answer is the search's. A miss runs the
-    /// search and remembers a found position in the least recently filled
-    /// slot. An absent prefix is not cached: it has no binding to point at.
+    /// `prefix` can exist, and the answer is the search's. A miss asks the
+    /// prefix index when there is one — the last of the prefix's positions is
+    /// its newest declaration — and searches the short list otherwise, then
+    /// remembers a found position in the least recently filled slot. An
+    /// absent prefix is not cached: it has no binding to point at.
     fn innermost_prefixed(&self, prefix: &[u8]) -> Option<&Binding> {
         for slot in &self.recent {
             if let Some(position) = slot.get()
@@ -439,10 +482,15 @@ impl BindingTracker {
                 return Some(binding);
             }
         }
-        let position = self
-            .bindings
-            .iter()
-            .rposition(|binding| binding.declares(&self.buffer, prefix))?;
+        let position = match self.index.as_ref() {
+            Some(index) => index
+                .get(prefix)
+                .and_then(|positions| positions.last().copied())?,
+            None => self
+                .bindings
+                .iter()
+                .rposition(|binding| binding.declares(&self.buffer, prefix))?,
+        };
         let slot = self.recent_next.get() % RECENT_PREFIXES;
         if let Some(entry) = self.recent.get(slot) {
             entry.set(Some(position));
@@ -625,9 +673,9 @@ mod tests {
         }
     }
 
-    fn random_declarations(random: &mut Random, allow_errors: bool) -> String {
+    fn random_declarations(random: &mut Random, allow_errors: bool, most: usize) -> String {
         let mut attributes = String::new();
-        for _ in 0..random.below(4) {
+        for _ in 0..random.below(most + 1) {
             let namespace = NAMESPACES[random.below(NAMESPACES.len())];
             match random.below(if allow_errors { 12 } else { 10 }) {
                 0 | 1 => attributes.push_str(&format!(" xmlns=\"{namespace}\"")),
@@ -646,21 +694,38 @@ mod tests {
     }
 
     fn random_document(random: &mut Random, allow_errors: bool) -> String {
-        fn element(random: &mut Random, depth: usize, allow_errors: bool, out: &mut String) {
+        random_document_with(random, allow_errors, 3, 6)
+    }
+
+    /// A random document whose elements declare up to `most` namespaces each
+    /// and nest up to `deepest` levels.
+    fn random_document_with(
+        random: &mut Random,
+        allow_errors: bool,
+        most: usize,
+        deepest: usize,
+    ) -> String {
+        fn element(
+            random: &mut Random,
+            depth: usize,
+            shape: (bool, usize, usize),
+            out: &mut String,
+        ) {
+            let (allow_errors, most, deepest) = shape;
             let name = random_name(random);
-            let declarations = random_declarations(random, allow_errors);
-            if depth >= 6 || random.below(4) == 0 {
+            let declarations = random_declarations(random, allow_errors, most);
+            if depth >= deepest || random.below(4) == 0 {
                 out.push_str(&format!("<{name}{declarations}/>"));
                 return;
             }
             out.push_str(&format!("<{name}{declarations}>"));
             for _ in 0..random.below(4) {
-                element(random, depth + 1, allow_errors, out);
+                element(random, depth + 1, shape, out);
             }
             out.push_str(&format!("</{name}>"));
         }
         let mut out = String::new();
-        element(random, 0, allow_errors, &mut out);
+        element(random, 0, (allow_errors, most, deepest), &mut out);
         out
     }
 
@@ -784,6 +849,62 @@ mod tests {
         assert!(
             resolutions > 30_000 && errors > 50,
             "{resolutions} {errors}"
+        );
+    }
+
+    #[test]
+    fn indexed_resolution_matches_quick_xml_on_dense_documents() {
+        // Up to twelve declarations per element and nine levels put more than
+        // `INDEXED_BINDINGS` in scope on most paths, so lookups go through the
+        // prefix index, which then stays in step as scopes close.
+        let mut random = Random(0x0754_B1D5_7AC4_0002);
+        let mut indexed = 0usize;
+        for round in 0..1_500 {
+            let xml = random_document_with(&mut random, round % 7 == 0, 12, 8);
+            assert_eq!(
+                tracker_trace(&xml),
+                resolver_trace(&xml),
+                "resolution diverged on {xml}"
+            );
+            indexed += usize::from(xml.matches("xmlns").count() > INDEXED_BINDINGS);
+        }
+        assert!(indexed > 500, "{indexed}");
+    }
+
+    #[test]
+    fn the_prefix_index_is_built_past_its_bound_and_kept_in_step() {
+        let many = (0..INDEXED_BINDINGS + 8)
+            .map(|index| format!(" xmlns:p{index}=\"urn:outer:{index}\""))
+            .collect::<String>();
+        let xml = format!(
+            r#"<p0:root{many}><p1:a xmlns:p1="urn:inner" xmlns="urn:default"><p1:x/><x/><p1:b xmlns:p1=""><p1:y/></p1:b></p1:a><p1:z/><z/><p39:last/></p0:root>"#
+        );
+        assert_eq!(tracker_trace(&xml), resolver_trace(&xml));
+
+        let mut reader = Reader::from_str(&xml);
+        let mut tracker = BindingTracker::new();
+        let Ok(Event::Start(root)) = reader.read_event() else {
+            panic!("expected the root start tag");
+        };
+        tracker.push(&root).unwrap();
+        assert!(tracker.index.is_some());
+        let Ok(Event::Start(inner)) = reader.read_event() else {
+            panic!("expected the inner start tag");
+        };
+        tracker.push(&inner).unwrap();
+        assert_eq!(
+            tracker.resolve_prefix_bytes(Some(b"p1")),
+            ResolveResult::Bound(Namespace(b"urn:inner"))
+        );
+        tracker.pop();
+        assert_eq!(
+            tracker.resolve_prefix_bytes(Some(b"p1")),
+            ResolveResult::Bound(Namespace(b"urn:outer:1"))
+        );
+        assert_eq!(tracker.resolve_prefix_bytes(None), ResolveResult::Unbound);
+        assert_eq!(
+            tracker.resolve_prefix_bytes(Some(b"absent")),
+            ResolveResult::Unknown(b"absent".to_vec())
         );
     }
 
