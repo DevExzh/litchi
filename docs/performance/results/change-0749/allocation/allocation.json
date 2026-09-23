@@ -1,0 +1,537 @@
+{
+ "schema": "0749-allocation-v1",
+ "summary": {
+  "ppt-remove-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 9041924,
+     "allocation_calls": 5447,
+     "peak_live_bytes": 1992933,
+     "retained_bytes": 390144
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 8655018,
+     "allocation_calls": 5419,
+     "peak_live_bytes": 1992933,
+     "retained_bytes": 390144
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "change": {
+    "allocated_bytes": -386906,
+    "allocation_calls": -28,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "ppt-remove-41246": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 9717292,
+     "allocation_calls": 18454,
+     "peak_live_bytes": 1976271,
+     "retained_bytes": 285184
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 9434995,
+     "allocation_calls": 18428,
+     "peak_live_bytes": 1976271,
+     "retained_bytes": 285184
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "change": {
+    "allocated_bytes": -282297,
+    "allocation_calls": -26,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "doc-replace-floating": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 14115027,
+     "allocation_calls": 15141,
+     "peak_live_bytes": 3128190,
+     "retained_bytes": 342528
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 13771983,
+     "allocation_calls": 15073,
+     "peak_live_bytes": 3128190,
+     "retained_bytes": 342528
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "change": {
+    "allocated_bytes": -343044,
+    "allocation_calls": -68,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "doc-replace-nohf": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 936223,
+     "allocation_calls": 1658,
+     "peak_live_bytes": 209515,
+     "retained_bytes": 27648
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 911398,
+     "allocation_calls": 1631,
+     "peak_live_bytes": 209515,
+     "retained_bytes": 27648
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "change": {
+    "allocated_bytes": -24825,
+    "allocation_calls": -27,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-reuse-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 5702423,
+     "allocation_calls": 747,
+     "peak_live_bytes": 2175287,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 4928611,
+     "allocation_calls": 691,
+     "peak_live_bytes": 2175287,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "change": {
+    "allocated_bytes": -773812,
+    "allocation_calls": -56,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-rewrite-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 4998119,
+     "allocation_calls": 537,
+     "peak_live_bytes": 2237445,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 4998119,
+     "allocation_calls": 537,
+     "peak_live_bytes": 2237445,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-reuse-floating": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 4877613,
+     "allocation_calls": 1898,
+     "peak_live_bytes": 1780696,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 4191525,
+     "allocation_calls": 1762,
+     "peak_live_bytes": 1780696,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "change": {
+    "allocated_bytes": -686088,
+    "allocation_calls": -136,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-rewrite-floating": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 4331887,
+     "allocation_calls": 1597,
+     "peak_live_bytes": 1866328,
+     "retained_bytes": 673408
+    },
+    "owners_identical": true,
+    "output_sha256": "c706853f5a334dffa5c739efcb4e7c107409eaf48c3e67ba89494e5206f38975"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 4331887,
+     "allocation_calls": 1597,
+     "peak_live_bytes": 1866328,
+     "retained_bytes": 673408
+    },
+    "owners_identical": true,
+    "output_sha256": "c706853f5a334dffa5c739efcb4e7c107409eaf48c3e67ba89494e5206f38975"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-reuse-nohf": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 423836,
+     "allocation_calls": 758,
+     "peak_live_bytes": 124655,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 374186,
+     "allocation_calls": 704,
+     "peak_live_bytes": 124655,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "change": {
+    "allocated_bytes": -49650,
+    "allocation_calls": -54,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "container-rewrite-nohf": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 369712,
+     "allocation_calls": 576,
+     "peak_live_bytes": 138223,
+     "retained_bytes": 50432
+    },
+    "owners_identical": true,
+    "output_sha256": "88acab55255044e1a8a96718b488a40ed14c18a9fe6e70b1a68f0b92615f9129"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 369712,
+     "allocation_calls": 576,
+     "peak_live_bytes": 138223,
+     "retained_bytes": 50432
+    },
+    "owners_identical": true,
+    "output_sha256": "88acab55255044e1a8a96718b488a40ed14c18a9fe6e70b1a68f0b92615f9129"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-reuse-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 1635017,
+     "allocation_calls": 143,
+     "peak_live_bytes": 715524,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 1248111,
+     "allocation_calls": 115,
+     "peak_live_bytes": 715524,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "change": {
+    "allocated_bytes": -386906,
+    "allocation_calls": -28,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-rewrite-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 1283317,
+     "allocation_calls": 42,
+     "peak_live_bytes": 773545,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 1283317,
+     "allocation_calls": 42,
+     "peak_live_bytes": 773545,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-reuse-41246": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 894798,
+     "allocation_calls": 149,
+     "peak_live_bytes": 380632,
+     "retained_bytes": 368496
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 612501,
+     "allocation_calls": 123,
+     "peak_live_bytes": 380632,
+     "retained_bytes": 368496
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "change": {
+    "allocated_bytes": -282297,
+    "allocation_calls": -26,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-reuse-floating": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 1346403,
+     "allocation_calls": 308,
+     "peak_live_bytes": 607656,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 1003359,
+     "allocation_calls": 240,
+     "peak_live_bytes": 607656,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "change": {
+    "allocated_bytes": -343044,
+    "allocation_calls": -68,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-rewrite-floating": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 1074090,
+     "allocation_calls": 160,
+     "peak_live_bytes": 692657,
+     "retained_bytes": 673408
+    },
+    "owners_identical": true,
+    "output_sha256": "c706853f5a334dffa5c739efcb4e7c107409eaf48c3e67ba89494e5206f38975"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 1074090,
+     "allocation_calls": 160,
+     "peak_live_bytes": 692657,
+     "retained_bytes": 673408
+    },
+    "owners_identical": true,
+    "output_sha256": "c706853f5a334dffa5c739efcb4e7c107409eaf48c3e67ba89494e5206f38975"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-reuse-nohf": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 110654,
+     "allocation_calls": 132,
+     "peak_live_bytes": 40948,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 85829,
+     "allocation_calls": 105,
+     "peak_live_bytes": 40948,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "change": {
+    "allocated_bytes": -24825,
+    "allocation_calls": -27,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-write-rewrite-nohf": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 84048,
+     "allocation_calls": 43,
+     "peak_live_bytes": 55640,
+     "retained_bytes": 50432
+    },
+    "owners_identical": true,
+    "output_sha256": "88acab55255044e1a8a96718b488a40ed14c18a9fe6e70b1a68f0b92615f9129"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 84048,
+     "allocation_calls": 43,
+     "peak_live_bytes": 55640,
+     "retained_bytes": 50432
+    },
+    "owners_identical": true,
+    "output_sha256": "88acab55255044e1a8a96718b488a40ed14c18a9fe6e70b1a68f0b92615f9129"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "ppt-noop-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 1024125,
+     "allocation_calls": 1354,
+     "peak_live_bytes": 442477,
+     "retained_bytes": 385024
+    },
+    "owners_identical": true,
+    "output_sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 1024125,
+     "allocation_calls": 1354,
+     "peak_live_bytes": 442477,
+     "retained_bytes": 385024
+    },
+    "owners_identical": true,
+    "output_sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  },
+  "cfb-open-read-45543": {
+   "base": {
+    "per_owner": {
+     "allocated_bytes": 406521,
+     "allocation_calls": 94,
+     "peak_live_bytes": 322319,
+     "retained_bytes": 8
+    },
+    "owners_identical": true,
+    "output_sha256": "21b0c10e7f90085ce63f5087ee304619bfe266017d08c5164e01a630cb1e3344"
+   },
+   "cand": {
+    "per_owner": {
+     "allocated_bytes": 406521,
+     "allocation_calls": 94,
+     "peak_live_bytes": 322319,
+     "retained_bytes": 8
+    },
+    "owners_identical": true,
+    "output_sha256": "21b0c10e7f90085ce63f5087ee304619bfe266017d08c5164e01a630cb1e3344"
+   },
+   "change": {
+    "allocated_bytes": 0,
+    "allocation_calls": 0,
+    "peak_live_bytes": 0,
+    "retained_bytes": 0
+   }
+  }
+ }
+}

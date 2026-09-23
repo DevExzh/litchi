@@ -1,0 +1,8 @@
+# started on Tue Sep 22 22:52:06 2026
+
+2057665392,,instructions:u,350442527,80.00,,
+874882601,,cycles:u,353620772,82.00,,
+1466364,,branch-misses:u,363985458,84.00,,
+15446631,,ic_cache_fill_l2,367734220,84.00,,
+0,,ic_cache_fill_sys,369921555,85.00,,
+123922,,bp_redirects.resync,362119033,83.00,,

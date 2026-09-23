@@ -1,0 +1,8 @@
+# started on Tue Sep 22 22:52:05 2026
+
+2027411442,,instructions:u,355579303,83.00,,
+871616864,,cycles:u,346043625,80.00,,
+1497309,,branch-misses:u,349828493,82.00,,
+16496006,,ic_cache_fill_l2,360755951,84.00,,
+0,,ic_cache_fill_sys,363475918,85.00,,
+117850,,bp_redirects.resync,365609030,85.00,,

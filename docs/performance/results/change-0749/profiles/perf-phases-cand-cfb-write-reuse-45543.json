@@ -1,0 +1,238 @@
+{
+ "label": "cand 897d24fd0f, cfb-write-reuse 45543.ppt, frame pointers, 20,000 owners",
+ "samples_total": 11459,
+ "samples_in_timed_owner": 11258,
+ "phase_share_of_timed": {
+  "plan": 0.4551,
+  "write_to/other": 0.2,
+  "validate/reparse": 0.1626,
+  "validate/readback": 0.1286,
+  "emit": 0.0457,
+  "validate/other": 0.0068,
+  "outside write_to": 0.0012
+ },
+ "leaf_share_of_timed_by_phase": {
+  "plan": [
+   [
+    "{closure#60}",
+    0.1277
+   ],
+   [
+    "plan_reuse",
+    0.0303
+   ],
+   [
+    "eq",
+    0.0284
+   ],
+   [
+    "walk_chain",
+    0.0274
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0187
+   ],
+   [
+    "claim",
+    0.0175
+   ],
+   [
+    "_int_malloc",
+    0.017
+   ],
+   [
+    "non_null<alloc::alloc::Global, u32>",
+    0.0138
+   ]
+  ],
+  "write_to/other": [
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.1936
+   ],
+   [
+    "[unknown]",
+    0.002
+   ],
+   [
+    "_int_free_create_chunk",
+    0.0004
+   ],
+   [
+    "branch<litchi_cfb::writer::layout::Outcome, litchi_cfb::file::OleError>",
+    0.0004
+   ],
+   [
+    "do_reserve_and_handle<alloc::alloc::Global>",
+    0.0004
+   ],
+   [
+    "_int_free_merge_chunk",
+    0.0004
+   ],
+   [
+    "_int_free_maybe_trim",
+    0.0004
+   ],
+   [
+    "__memset_avx512_unaligned_erms",
+    0.0004
+   ]
+  ],
+  "validate/reparse": [
+   [
+    "{closure#0}",
+    0.028
+   ],
+   [
+    "push_mut<u32, alloc::alloc::Global>",
+    0.013
+   ],
+   [
+    "validate_physical_sector_layout<litchi_cfb::shared::ReadAtCursor>",
+    0.0092
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0068
+   ],
+   [
+    "eq",
+    0.006
+   ],
+   [
+    "load_directory<litchi_cfb::writer::layout::PlanCursor>",
+    0.0054
+   ],
+   [
+    "claim_sector<litchi_cfb::shared::ReadAtCursor>",
+    0.0053
+   ],
+   [
+    "map_err<litchi_cfb::directory_name::DirectoryNameData, litchi_cfb::directory_name::DirectoryNameErro",
+    0.0041
+   ]
+  ],
+  "validate/readback": [
+   [
+    "{closure#0}",
+    0.0349
+   ],
+   [
+    "continues",
+    0.0197
+   ],
+   [
+    "examine_at",
+    0.0134
+   ],
+   [
+    "visit_sector_runs<litchi_cfb::file::{impl#12}::fat_stream_equals::{closure_env#1}<litchi_cfb::writer",
+    0.0069
+   ],
+   [
+    "checked_add",
+    0.0053
+   ],
+   [
+    "copied<litchi_cfb::writer::layout::PlannedSector>",
+    0.0046
+   ],
+   [
+    "_int_malloc",
+    0.0042
+   ],
+   [
+    "get<litchi_cfb::writer::layout::PlannedSector>",
+    0.0035
+   ]
+  ],
+  "emit": [
+   [
+    "emit<std::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>",
+    0.0149
+   ],
+   [
+    "follows",
+    0.0148
+   ],
+   [
+    "image_run",
+    0.0043
+   ],
+   [
+    "index<litchi_cfb::writer::layout::PlannedSector>",
+    0.0016
+   ],
+   [
+    "unlikely",
+    0.0014
+   ],
+   [
+    "checked_add",
+    0.0013
+   ],
+   [
+    "[unknown]",
+    0.0012
+   ],
+   [
+    "_int_malloc",
+    0.0012
+   ]
+  ],
+  "validate/other": [
+   [
+    "runtime",
+    0.0008
+   ],
+   [
+    "_int_free_merge_chunk",
+    0.0006
+   ],
+   [
+    "__libc_free",
+    0.0006
+   ],
+   [
+    "__rustc::__rust_dealloc",
+    0.0004
+   ],
+   [
+    "validate",
+    0.0004
+   ],
+   [
+    "add<&str>",
+    0.0004
+   ],
+   [
+    "branch<bool, litchi_cfb::file::OleError>",
+    0.0003
+   ],
+   [
+    "drop_in_place<litchi_cfb::file::OleError>",
+    0.0003
+   ]
+  ],
+  "outside write_to": [
+   [
+    "timed_owner",
+    0.0008
+   ],
+   [
+    "__libc_free",
+    0.0002
+   ],
+   [
+    "stream_inputs",
+    0.0001
+   ],
+   [
+    "branch<(), litchi_cfb::file::OleError>",
+    0.0001
+   ]
+  ]
+ }
+}

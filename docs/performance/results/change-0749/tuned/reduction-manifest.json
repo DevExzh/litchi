@@ -1,0 +1,386 @@
+{
+ "doc-replace-floating/r00-base.json": {
+  "original_sha256": "e220df8660fa8b772084463923e4d63de2aed2e2b122111541a89f3e192acf73",
+  "original_bytes": 866,
+  "kept_sha256": "e220df8660fa8b772084463923e4d63de2aed2e2b122111541a89f3e192acf73",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r00-cand.json": {
+  "original_sha256": "bd46215a7343a782a74e2533be02659ea9b20c8571a87ddc0bc894f9e0117d79",
+  "original_bytes": 866,
+  "kept_sha256": "bd46215a7343a782a74e2533be02659ea9b20c8571a87ddc0bc894f9e0117d79",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r01-base.json": {
+  "original_sha256": "ef82084a6da7b1888fcab79fe3c712e760c2461a3552e5b48e72f87fe6db64a9",
+  "original_bytes": 866,
+  "kept_sha256": "ef82084a6da7b1888fcab79fe3c712e760c2461a3552e5b48e72f87fe6db64a9",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r01-cand.json": {
+  "original_sha256": "e0e2f99266889451b9c82112598851e1dce14c5742d7246492f742ddf54e2805",
+  "original_bytes": 866,
+  "kept_sha256": "e0e2f99266889451b9c82112598851e1dce14c5742d7246492f742ddf54e2805",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r02-base.json": {
+  "original_sha256": "508286d83d74d340ab7b28cdd8ea88c70a258d7fed31199d3683199e093085a6",
+  "original_bytes": 866,
+  "kept_sha256": "508286d83d74d340ab7b28cdd8ea88c70a258d7fed31199d3683199e093085a6",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r02-cand.json": {
+  "original_sha256": "3a21ef0fed0da8239c5740a6f5c5eb7cdefcb7011d6f2f3ffe60cf80eb43322d",
+  "original_bytes": 878,
+  "kept_sha256": "3a21ef0fed0da8239c5740a6f5c5eb7cdefcb7011d6f2f3ffe60cf80eb43322d",
+  "kept_bytes": 878
+ },
+ "doc-replace-floating/r03-base.json": {
+  "original_sha256": "ca903e50799aa13c153a51110f4c9917146eae9dbf7b966394747700e2005d54",
+  "original_bytes": 866,
+  "kept_sha256": "ca903e50799aa13c153a51110f4c9917146eae9dbf7b966394747700e2005d54",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r03-cand.json": {
+  "original_sha256": "33dca1369bd9b19c95385c14d5262e728e52813aee1fa1b0ea4838e845edc31c",
+  "original_bytes": 866,
+  "kept_sha256": "33dca1369bd9b19c95385c14d5262e728e52813aee1fa1b0ea4838e845edc31c",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r04-base.json": {
+  "original_sha256": "2c4cd696e117630f49f3f7feb9d5efedd231b056a8fd1123614b433216b3448f",
+  "original_bytes": 869,
+  "kept_sha256": "2c4cd696e117630f49f3f7feb9d5efedd231b056a8fd1123614b433216b3448f",
+  "kept_bytes": 869
+ },
+ "doc-replace-floating/r04-cand.json": {
+  "original_sha256": "cf2c1a3bfe0cbe0773be0ae4443b7117b03bc357c46951ae4fbbe5d93d221b5e",
+  "original_bytes": 866,
+  "kept_sha256": "cf2c1a3bfe0cbe0773be0ae4443b7117b03bc357c46951ae4fbbe5d93d221b5e",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r05-base.json": {
+  "original_sha256": "9103850acca39b00d97a1d78a4bcbff62b10c1db1a225a3a93fee7803a450328",
+  "original_bytes": 866,
+  "kept_sha256": "9103850acca39b00d97a1d78a4bcbff62b10c1db1a225a3a93fee7803a450328",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r05-cand.json": {
+  "original_sha256": "14ba207334b552938c3d16eb6b87675d57b74d934e34747d2232864fe5fbca3f",
+  "original_bytes": 866,
+  "kept_sha256": "14ba207334b552938c3d16eb6b87675d57b74d934e34747d2232864fe5fbca3f",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r06-base.json": {
+  "original_sha256": "1408c160c15656f2e89fd51b8edbee3affa91104f701c8b0eba3315d4868443c",
+  "original_bytes": 866,
+  "kept_sha256": "1408c160c15656f2e89fd51b8edbee3affa91104f701c8b0eba3315d4868443c",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r06-cand.json": {
+  "original_sha256": "0acd25fd874d9b21415d161a41a66bfcd44b2e3b9cb2deec062655a30263f103",
+  "original_bytes": 866,
+  "kept_sha256": "0acd25fd874d9b21415d161a41a66bfcd44b2e3b9cb2deec062655a30263f103",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r07-base.json": {
+  "original_sha256": "2d6f064e1073e1448107553e13fe613fdb00c976761e633e0476b2d7eb8c7a94",
+  "original_bytes": 866,
+  "kept_sha256": "2d6f064e1073e1448107553e13fe613fdb00c976761e633e0476b2d7eb8c7a94",
+  "kept_bytes": 866
+ },
+ "doc-replace-floating/r07-cand.json": {
+  "original_sha256": "766e87ebf8667bb717570355a42f644a15381c4d5927ab45cdb54c48f4f003bd",
+  "original_bytes": 866,
+  "kept_sha256": "766e87ebf8667bb717570355a42f644a15381c4d5927ab45cdb54c48f4f003bd",
+  "kept_bytes": 866
+ },
+ "harness-ole-edit-save/r00-base.json": {
+  "original_sha256": "c20aa304f10aef0994336e5e99076df92652426910298f7657fac4f46f4a8e2c",
+  "original_bytes": 37362,
+  "kept_sha256": "bef1bcb6e6e01f5dd2cff22ba23ca3aacb87327b59959bfe5957b64da9bd7abd",
+  "kept_bytes": 19219
+ },
+ "harness-ole-edit-save/r00-cand.json": {
+  "original_sha256": "42e6767a0a6a8e0a1f5880a816a6ef10f88401a629ea64909c4f5e13f9a4ae82",
+  "original_bytes": 37366,
+  "kept_sha256": "af76864b4021ec38f54f117504c53e3a61dff65f0da7d831d8fedf536181e411",
+  "kept_bytes": 19223
+ },
+ "harness-ole-edit-save/r01-base.json": {
+  "original_sha256": "133a94edaf0445ad22d7e08f649b15c9b5dbb5f4fa85370097ef6a7398a5fd9e",
+  "original_bytes": 37366,
+  "kept_sha256": "4eb018e54b0e9a6ff08325291182e3ecef6a6e15648d112643d4fc5546361dc9",
+  "kept_bytes": 19223
+ },
+ "harness-ole-edit-save/r01-cand.json": {
+  "original_sha256": "65befeff30aec3d2df3fc3678f6fec0c83f30baec296d6d114a256842cbc70aa",
+  "original_bytes": 37385,
+  "kept_sha256": "50c59b6c8a2698b254243ae1a17c2f823719f40b6b9604171e3f9ae7586b977e",
+  "kept_bytes": 19242
+ },
+ "harness-ole-edit-save/r02-base.json": {
+  "original_sha256": "405b1305f009e8bbad086808cf1616c2af85a3c83a9811bbc951f25f0f72a0b6",
+  "original_bytes": 37359,
+  "kept_sha256": "6ff71c61a28d7c01cee63aee065d58ed0734df6392bd479bc5bdcafa1a81dc7a",
+  "kept_bytes": 19216
+ },
+ "harness-ole-edit-save/r02-cand.json": {
+  "original_sha256": "9fcbab2b2300e743d6728d8d5a207aade2760b6af9c3896f684363f585d59f57",
+  "original_bytes": 37388,
+  "kept_sha256": "2ce768af3135944163f3f496355a6c6a490208d25078f194a1f40690163a05c7",
+  "kept_bytes": 19245
+ },
+ "harness-ole-edit-save/r03-base.json": {
+  "original_sha256": "9f80c170baaf338850f816b126bf82962a305172702001b5f8b17c884f6b74cc",
+  "original_bytes": 37385,
+  "kept_sha256": "439ba718c84d7291b0a34791de6033453ac5c35e20eb1221d26bdad50f1c42da",
+  "kept_bytes": 19242
+ },
+ "harness-ole-edit-save/r03-cand.json": {
+  "original_sha256": "32594dfabf29cd7daf412ef807713903db8fb8047678b38374dcd41d1d5a3216",
+  "original_bytes": 37365,
+  "kept_sha256": "0cc1a2ac98d65423c12593f9cfa432bd55343c9b3f6b30f890b5029ed02e9665",
+  "kept_bytes": 19222
+ },
+ "harness-ole-edit-save/r04-base.json": {
+  "original_sha256": "8db53781dce78d2f614a88d15d52bdb8338936ceef8312f188e7500a22972ef6",
+  "original_bytes": 37381,
+  "kept_sha256": "d9f8ad61bd77b20501851e8304baf7a70a1aad3f0e0fc161e4ee27bb6aff3901",
+  "kept_bytes": 19238
+ },
+ "harness-ole-edit-save/r04-cand.json": {
+  "original_sha256": "5319060397e42c593ac1c653acf4275910f414cb8e233a1174c59793c5b29fb5",
+  "original_bytes": 37343,
+  "kept_sha256": "0f48337f22c93e675470d83e1296dda029d950d076191edf39943956250b459e",
+  "kept_bytes": 19200
+ },
+ "harness-ole-edit-save/r05-base.json": {
+  "original_sha256": "fcb1d2ce646ebc8ccab269cb25097c58be663408bd5cb832d96ac60ee4ebac8b",
+  "original_bytes": 37363,
+  "kept_sha256": "095ba343e637efbab4d9574a62d22717f15a379a4646b653565c440ecaccfe28",
+  "kept_bytes": 19220
+ },
+ "harness-ole-edit-save/r05-cand.json": {
+  "original_sha256": "f57416bd4ecfd552e99c4e38fc14a9f3fbf75eeda8404d35f6d71f42a18d0e59",
+  "original_bytes": 37367,
+  "kept_sha256": "6672cd2e4ba01a192fa0e0d9c95f49fa7112fe37806469b958ead6a45038b3ef",
+  "kept_bytes": 19224
+ },
+ "harness-ole-edit-save/r06-base.json": {
+  "original_sha256": "02fe060a1de141fb5515e0f66bc1daf4a08506145b74e02342867511d451a47b",
+  "original_bytes": 37373,
+  "kept_sha256": "11db22bc93666c0cbc11417c6e8e05fe432ee8723393efaf992d585dddf8a0d5",
+  "kept_bytes": 19230
+ },
+ "harness-ole-edit-save/r06-cand.json": {
+  "original_sha256": "3093a8b6cfb5062dcbfd7b0fe2644d8447f0eaa4bf45065211d03dd43634f1df",
+  "original_bytes": 37356,
+  "kept_sha256": "d8260635e41fb2a3dec1200a4b625af2a202357334d409ab72a43ef1afa17002",
+  "kept_bytes": 19213
+ },
+ "harness-ole-edit-save/r07-base.json": {
+  "original_sha256": "9e4caad6ee86f6ede6b48e045bf3854402a4fec94e4618777431d8b679d2cdf2",
+  "original_bytes": 37373,
+  "kept_sha256": "8525b27c0d8afe8377d85dd7ecd60ac1e7b823280c4f5b7fa11b7b497255c0ba",
+  "kept_bytes": 19230
+ },
+ "harness-ole-edit-save/r07-cand.json": {
+  "original_sha256": "8fc14908a76fb38eb26a4198728b401d41d98baf407c723d0830380f84258e41",
+  "original_bytes": 37361,
+  "kept_sha256": "8def80b9ed566702d6f71969d5dc3af8b455a613f1a8202f8d442b24c8489057",
+  "kept_bytes": 19218
+ },
+ "ppt-remove-41246/r00-base.json": {
+  "original_sha256": "3e269ca2b1b45aa59322187073c5fb3e349ffe280eb0b77136f672420d3143cf",
+  "original_bytes": 872,
+  "kept_sha256": "3e269ca2b1b45aa59322187073c5fb3e349ffe280eb0b77136f672420d3143cf",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r00-cand.json": {
+  "original_sha256": "d8118fa2fabb569e0b5c38a79bcda8c3751217c12cb0d409ae03a1b64fd82a82",
+  "original_bytes": 873,
+  "kept_sha256": "d8118fa2fabb569e0b5c38a79bcda8c3751217c12cb0d409ae03a1b64fd82a82",
+  "kept_bytes": 873
+ },
+ "ppt-remove-41246/r01-base.json": {
+  "original_sha256": "70be86e7542e953a77a1b5dcfc3e2db17423e66988d6222e1b17a114aa77ae84",
+  "original_bytes": 872,
+  "kept_sha256": "70be86e7542e953a77a1b5dcfc3e2db17423e66988d6222e1b17a114aa77ae84",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r01-cand.json": {
+  "original_sha256": "0e28e867dac4cd97b8a0af103bddd7c52d67ff0c0438204c376ea04e631bc544",
+  "original_bytes": 873,
+  "kept_sha256": "0e28e867dac4cd97b8a0af103bddd7c52d67ff0c0438204c376ea04e631bc544",
+  "kept_bytes": 873
+ },
+ "ppt-remove-41246/r02-base.json": {
+  "original_sha256": "190800090c2bca3b0e378d41bcf5359910d57709c17029b02092a011a7a3fc4f",
+  "original_bytes": 878,
+  "kept_sha256": "190800090c2bca3b0e378d41bcf5359910d57709c17029b02092a011a7a3fc4f",
+  "kept_bytes": 878
+ },
+ "ppt-remove-41246/r02-cand.json": {
+  "original_sha256": "e1efcc10f1f467f59c2e16e1aa0661e2690eed09be11d2c64e7455be3bef2c4f",
+  "original_bytes": 880,
+  "kept_sha256": "e1efcc10f1f467f59c2e16e1aa0661e2690eed09be11d2c64e7455be3bef2c4f",
+  "kept_bytes": 880
+ },
+ "ppt-remove-41246/r03-base.json": {
+  "original_sha256": "d16c29b426dc269221e1bd06ca58d28cd4a2d78e032b79bea34da89584aeb47b",
+  "original_bytes": 873,
+  "kept_sha256": "d16c29b426dc269221e1bd06ca58d28cd4a2d78e032b79bea34da89584aeb47b",
+  "kept_bytes": 873
+ },
+ "ppt-remove-41246/r03-cand.json": {
+  "original_sha256": "8ad81e3dfe3538025cb366bda7ba35fbd05da4c6f27a00f1a0c6ea829bb9f781",
+  "original_bytes": 872,
+  "kept_sha256": "8ad81e3dfe3538025cb366bda7ba35fbd05da4c6f27a00f1a0c6ea829bb9f781",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r04-base.json": {
+  "original_sha256": "20c3d435555d298d51a626a1d4a79939e4b3de9ab25be8027be605a8a443e6f5",
+  "original_bytes": 876,
+  "kept_sha256": "20c3d435555d298d51a626a1d4a79939e4b3de9ab25be8027be605a8a443e6f5",
+  "kept_bytes": 876
+ },
+ "ppt-remove-41246/r04-cand.json": {
+  "original_sha256": "071cf8cca676ec5251f1d5f29bbbc1006742e3dba6c02ed3778a3019bf23d780",
+  "original_bytes": 875,
+  "kept_sha256": "071cf8cca676ec5251f1d5f29bbbc1006742e3dba6c02ed3778a3019bf23d780",
+  "kept_bytes": 875
+ },
+ "ppt-remove-41246/r05-base.json": {
+  "original_sha256": "46dd7e1bf32ed2ae7e1e14c1634293beefed69386f2a335ec837710328817e2f",
+  "original_bytes": 872,
+  "kept_sha256": "46dd7e1bf32ed2ae7e1e14c1634293beefed69386f2a335ec837710328817e2f",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r05-cand.json": {
+  "original_sha256": "c361f6e016990852122846f828ab4784f1d13b0bde72a8080e960e331b0716d5",
+  "original_bytes": 872,
+  "kept_sha256": "c361f6e016990852122846f828ab4784f1d13b0bde72a8080e960e331b0716d5",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r06-base.json": {
+  "original_sha256": "448e1f78422bdc635ea0b3b38f4d55b104e60ec00304f0f6d870b6dc5d382204",
+  "original_bytes": 872,
+  "kept_sha256": "448e1f78422bdc635ea0b3b38f4d55b104e60ec00304f0f6d870b6dc5d382204",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r06-cand.json": {
+  "original_sha256": "c0c546180ab9e45db52f5767ec5a625f39260fcd2e97930aa51a27c0adad3991",
+  "original_bytes": 872,
+  "kept_sha256": "c0c546180ab9e45db52f5767ec5a625f39260fcd2e97930aa51a27c0adad3991",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r07-base.json": {
+  "original_sha256": "ba5b8be393d7209034bd6249217fb8073fb2f7f2a92d41154eacb65c955a3d22",
+  "original_bytes": 872,
+  "kept_sha256": "ba5b8be393d7209034bd6249217fb8073fb2f7f2a92d41154eacb65c955a3d22",
+  "kept_bytes": 872
+ },
+ "ppt-remove-41246/r07-cand.json": {
+  "original_sha256": "38850ad161c9c6fb0896af8f39fb1ac4b402e6af5f14adf7786994daec837930",
+  "original_bytes": 872,
+  "kept_sha256": "38850ad161c9c6fb0896af8f39fb1ac4b402e6af5f14adf7786994daec837930",
+  "kept_bytes": 872
+ },
+ "ppt-remove-45543/r00-base.json": {
+  "original_sha256": "bf469ba0e6304c082403086210b4e61d50f862a753a18d2862385d89ce6fddac",
+  "original_bytes": 870,
+  "kept_sha256": "bf469ba0e6304c082403086210b4e61d50f862a753a18d2862385d89ce6fddac",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r00-cand.json": {
+  "original_sha256": "93cfd1902128bc017d0de92f9e89b899c0849f768797e1be6187b43542b262b5",
+  "original_bytes": 870,
+  "kept_sha256": "93cfd1902128bc017d0de92f9e89b899c0849f768797e1be6187b43542b262b5",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r01-base.json": {
+  "original_sha256": "b0774292e4fee308ee5fc4621ecb2d8b9a7a766a9727c8b0906c5b1aac645b2b",
+  "original_bytes": 877,
+  "kept_sha256": "b0774292e4fee308ee5fc4621ecb2d8b9a7a766a9727c8b0906c5b1aac645b2b",
+  "kept_bytes": 877
+ },
+ "ppt-remove-45543/r01-cand.json": {
+  "original_sha256": "c615358dad238c064058b104f24193c96da1083389b7f45f734c294286d27868",
+  "original_bytes": 870,
+  "kept_sha256": "c615358dad238c064058b104f24193c96da1083389b7f45f734c294286d27868",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r02-base.json": {
+  "original_sha256": "5edddfecad051799edab59363cc75fb3461e7c34a11b12d4016a5406d4d1a1ba",
+  "original_bytes": 870,
+  "kept_sha256": "5edddfecad051799edab59363cc75fb3461e7c34a11b12d4016a5406d4d1a1ba",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r02-cand.json": {
+  "original_sha256": "d9979f53b7eec8241caf710661700f583301e1daca39a3759e95219b80c184ed",
+  "original_bytes": 870,
+  "kept_sha256": "d9979f53b7eec8241caf710661700f583301e1daca39a3759e95219b80c184ed",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r03-base.json": {
+  "original_sha256": "7ef0faa9d55ae5a5ed697395e2b2f0f794c7c89809c1479630a249109721b979",
+  "original_bytes": 870,
+  "kept_sha256": "7ef0faa9d55ae5a5ed697395e2b2f0f794c7c89809c1479630a249109721b979",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r03-cand.json": {
+  "original_sha256": "289dd66f77873c93e97bbc72ef2514ad1eccb718d5232214a9ab81ae17d3821f",
+  "original_bytes": 870,
+  "kept_sha256": "289dd66f77873c93e97bbc72ef2514ad1eccb718d5232214a9ab81ae17d3821f",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r04-base.json": {
+  "original_sha256": "4c71a13391e80f58f877357a7def137d0167afb81b617f9f8c7d3b6e85ce42fb",
+  "original_bytes": 870,
+  "kept_sha256": "4c71a13391e80f58f877357a7def137d0167afb81b617f9f8c7d3b6e85ce42fb",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r04-cand.json": {
+  "original_sha256": "1383124b56fbc26ce3f3330c0180ff90368649bb844e5d4b3693119109f64a44",
+  "original_bytes": 870,
+  "kept_sha256": "1383124b56fbc26ce3f3330c0180ff90368649bb844e5d4b3693119109f64a44",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r05-base.json": {
+  "original_sha256": "8578eb717fdee3aab12cd9b829f8111bba0fb2f3f20221be9fd8ac66f4f87fcf",
+  "original_bytes": 870,
+  "kept_sha256": "8578eb717fdee3aab12cd9b829f8111bba0fb2f3f20221be9fd8ac66f4f87fcf",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r05-cand.json": {
+  "original_sha256": "24c562a99cfe515e780ccd9f34ca4797ed9b8b95356add6e6c4003d41d658df3",
+  "original_bytes": 870,
+  "kept_sha256": "24c562a99cfe515e780ccd9f34ca4797ed9b8b95356add6e6c4003d41d658df3",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r06-base.json": {
+  "original_sha256": "7e8de3a08800fc91b70c7dce415eb9f934f3a17375386595bb1a81bb59623de5",
+  "original_bytes": 870,
+  "kept_sha256": "7e8de3a08800fc91b70c7dce415eb9f934f3a17375386595bb1a81bb59623de5",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r06-cand.json": {
+  "original_sha256": "daf8c05340e278ab30914c757941f9c00e1b2ad2f2959a4197a784490696b565",
+  "original_bytes": 870,
+  "kept_sha256": "daf8c05340e278ab30914c757941f9c00e1b2ad2f2959a4197a784490696b565",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r07-base.json": {
+  "original_sha256": "58e1762e9f3bb94f703c2f79bcdb66c71938324a14153adf3065a44afb16d157",
+  "original_bytes": 870,
+  "kept_sha256": "58e1762e9f3bb94f703c2f79bcdb66c71938324a14153adf3065a44afb16d157",
+  "kept_bytes": 870
+ },
+ "ppt-remove-45543/r07-cand.json": {
+  "original_sha256": "736ea6778c6c12c04a849312fb792df8a50d9c10e072f05050a47f98688c1914",
+  "original_bytes": 870,
+  "kept_sha256": "736ea6778c6c12c04a849312fb792df8a50d9c10e072f05050a47f98688c1914",
+  "kept_bytes": 870
+ }
+}

@@ -1,0 +1,50 @@
+{
+ "arms": {
+  "base": {
+   "source": "ab29ac6291 (detached checkout /home/zhuhe/code/litchi-worktrees/0749-before-src)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "773f050f508bf1cbeb9c03b7a51c62a7b8cfc9e51f5d0eb48110935d6c939978",
+     "bytes": 62949632
+    },
+    "probe": {
+     "sha256": "d1f026b935099bce43e3be4b2ea82c0994e359b34b60730c7d4bddbb39066745",
+     "bytes": 74448184
+    },
+    "probe_alloc": {
+     "sha256": "392bfa8b8e605208fcae54b47e25948cba101cab7913842d4fa5c4d5b93a5e45",
+     "bytes": 74451800
+    }
+   }
+  },
+  "cand": {
+   "source": "897d24fd0f (worktree /home/zhuhe/code/litchi-worktrees/0749-cfb-reuse-plan-validation; the later test-only commit 776ad05175 changes no binary)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "77b88937fa9ae0f4ba63cd0c55e20dd855f16c8a7be64aafb384c9feda75794f",
+     "bytes": 62961952
+    },
+    "probe": {
+     "sha256": "0646fdbf2a0fa99e0fbfdeb2b50b73492408258113db448c74ce563d33480f24",
+     "bytes": 74475392
+    },
+    "probe_alloc": {
+     "sha256": "75b4323da1d5323e9b564e82e6fdd9b81e7ef772df1d40e6433d0f710aa50075",
+     "bytes": 74479008
+    }
+   }
+  }
+ },
+ "lockfiles": {
+  "probe manifests/before/Cargo.lock": "4004d7363af559021ac2a35429c79bc8c765b146ac698c2a3d98873dcdec2593",
+  "probe manifests/after/Cargo.lock": "4004d7363af559021ac2a35429c79bc8c765b146ac698c2a3d98873dcdec2593",
+  "identical": true,
+  "repository Cargo.lock (both checkouts, copied from the main checkout)": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+ },
+ "builds": {
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14) for every binary: the repository pin, selected with RUSTUP_TOOLCHAIN=1.95.0 for the probe (built outside the repository tree) and by rust-toolchain.toml for the harness.",
+  "probe": "cd probe/manifests/{before|after} (dependency paths point at the arm source tree) && RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=<arm target>/probe CARGO_BUILD_JOBS=6 RUSTFLAGS=\"--remap-path-prefix=<arm source tree>=/litchi --remap-path-prefix=<probe dir>=/probe\" cargo build --release --locked --offline --bins (profile release, debug=1). Only the before arm's very first build ran without --locked, to derive the probe lockfile from the repository lock; every measured binary of both arms was built --locked against that one lockfile, from the same probe source.",
+  "harness": "cd <arm source tree> && RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=<arm target>/harness CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline (no RUSTFLAGS, no features; identical for both arms; a repeated build compiled nothing in either arm)",
+  "profiling_only": "probe with RUSTFLAGS additionally carrying -C force-frame-pointers=yes, for perf record --call-graph fp; never used for timing"
+ }
+}

@@ -1,0 +1,664 @@
+{
+ "events": "instructions,cycles,instructions:u,cycles:u,page-faults",
+ "layouts_argv0_extra_bytes": [
+  0,
+  16,
+  40
+ ],
+ "rows": [
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 4001893.405,
+    "cycles": 623669.45,
+    "instructions:u": 3884965.99,
+    "cycles:u": 588628.12,
+    "page-faults": 0.025
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3991629.115,
+    "cycles": 647324.28,
+    "instructions:u": 3885005.125,
+    "cycles:u": 619121.015,
+    "page-faults": -0.055
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3790101.04,
+    "cycles": 610026.485,
+    "instructions:u": 3681625.73,
+    "cycles:u": 594744.865,
+    "page-faults": 1.775
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3790978.915,
+    "cycles": 804844.45,
+    "instructions:u": 3681636.82,
+    "cycles:u": 711575.975,
+    "page-faults": 1.735
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2526743.175,
+    "cycles": 1520431.72,
+    "instructions:u": 2463249.03,
+    "cycles:u": 1527167.565,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2552908.47,
+    "cycles": 1602171.655,
+    "instructions:u": 2463229.85,
+    "cycles:u": 1582740.91,
+    "page-faults": 0.075
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 62347.245,
+    "cycles": -92380.075,
+    "instructions:u": 20565.975,
+    "cycles:u": -112201.145,
+    "page-faults": -0.01
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 91581.19,
+    "cycles": 21101.045,
+    "instructions:u": 20562.25,
+    "cycles:u": -5781.28,
+    "page-faults": 0.025
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3984510.62,
+    "cycles": 821912.675,
+    "instructions:u": 3885006.91,
+    "cycles:u": 842556.255,
+    "page-faults": 0.035
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3985747.86,
+    "cycles": 683825.015,
+    "instructions:u": 3885001.92,
+    "cycles:u": 690756.23,
+    "page-faults": -0.065
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3793208.34,
+    "cycles": 949123.6,
+    "instructions:u": 3683725.61,
+    "cycles:u": 904723.23,
+    "page-faults": 1.74
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3771826.06,
+    "cycles": 443484.295,
+    "instructions:u": 3683714.085,
+    "cycles:u": 417786.655,
+    "page-faults": 1.79
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2514540.595,
+    "cycles": 1462530.015,
+    "instructions:u": 2463109.87,
+    "cycles:u": 1477833.285,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2529720.64,
+    "cycles": 1691165.0,
+    "instructions:u": 2463130.34,
+    "cycles:u": 1672816.57,
+    "page-faults": -0.015
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 91076.315,
+    "cycles": 160079.33,
+    "instructions:u": 20534.5,
+    "cycles:u": 112296.53,
+    "page-faults": -0.01
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 89034.315,
+    "cycles": -16562.22,
+    "instructions:u": 20563.32,
+    "cycles:u": -94658.71,
+    "page-faults": 0.01
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3988169.02,
+    "cycles": 593978.0,
+    "instructions:u": 3884941.61,
+    "cycles:u": 580381.175,
+    "page-faults": -0.005
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3992511.89,
+    "cycles": 1081642.01,
+    "instructions:u": 3884988.98,
+    "cycles:u": 1045246.715,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3788117.12,
+    "cycles": 594022.515,
+    "instructions:u": 3681099.87,
+    "cycles:u": 592821.38,
+    "page-faults": 1.73
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 3791382.165,
+    "cycles": 730701.49,
+    "instructions:u": 3681107.11,
+    "cycles:u": 703947.73,
+    "page-faults": 1.775
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2510257.76,
+    "cycles": 1499838.57,
+    "instructions:u": 2463090.09,
+    "cycles:u": 1509064.785,
+    "page-faults": -0.055
+   }
+  },
+  {
+   "case": "cfb_read_one/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 2534699.45,
+    "cycles": 1582090.465,
+    "instructions:u": 2463119.315,
+    "cycles:u": 1506035.695,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 90012.285,
+    "cycles": 100632.33,
+    "instructions:u": 20385.855,
+    "cycles:u": 122095.175,
+    "page-faults": -0.08
+   }
+  },
+  {
+   "case": "cfb_read_one/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    40,
+    240
+   ],
+   "per_owner": {
+    "instructions": 107766.7,
+    "cycles": 183129.41,
+    "instructions:u": 20394.665,
+    "cycles:u": 102673.95,
+    "page-faults": 0.125
+   }
+  }
+ ],
+ "summary": {
+  "cfb_open/few-large": {
+   "instructions": {
+    "base": [
+     4001893.4,
+     3984510.6,
+     3988169.0
+    ],
+    "cand": [
+     3991629.1,
+     3985747.9,
+     3992511.9
+    ],
+    "median_change_pct": 0.087
+   },
+   "cycles": {
+    "base": [
+     623669.4,
+     821912.7,
+     593978.0
+    ],
+    "cand": [
+     647324.3,
+     683825.0,
+     1081642.0
+    ],
+    "median_change_pct": 9.645
+   },
+   "instructions:u": {
+    "base": [
+     3884966.0,
+     3885006.9,
+     3884941.6
+    ],
+    "cand": [
+     3885005.1,
+     3885001.9,
+     3884989.0
+    ],
+    "median_change_pct": 0.001
+   },
+   "cycles:u": {
+    "base": [
+     588628.1,
+     842556.3,
+     580381.2
+    ],
+    "cand": [
+     619121.0,
+     690756.2,
+     1045246.7
+    ],
+    "median_change_pct": 17.35
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     -0.0
+    ],
+    "cand": [
+     -0.1,
+     -0.1,
+     -0.1
+    ],
+    "median_change_pct": null
+   }
+  },
+  "cfb_open/many-small": {
+   "instructions": {
+    "base": [
+     3790101.0,
+     3793208.3,
+     3788117.1
+    ],
+    "cand": [
+     3790978.9,
+     3771826.1,
+     3791382.2
+    ],
+    "median_change_pct": 0.023
+   },
+   "cycles": {
+    "base": [
+     610026.5,
+     949123.6,
+     594022.5
+    ],
+    "cand": [
+     804844.4,
+     443484.3,
+     730701.5
+    ],
+    "median_change_pct": 19.782
+   },
+   "instructions:u": {
+    "base": [
+     3681625.7,
+     3683725.6,
+     3681099.9
+    ],
+    "cand": [
+     3681636.8,
+     3683714.1,
+     3681107.1
+    ],
+    "median_change_pct": 0.0
+   },
+   "cycles:u": {
+    "base": [
+     594744.9,
+     904723.2,
+     592821.4
+    ],
+    "cand": [
+     711576.0,
+     417786.7,
+     703947.7
+    ],
+    "median_change_pct": 18.361
+   },
+   "page-faults": {
+    "base": [
+     1.8,
+     1.7,
+     1.7
+    ],
+    "cand": [
+     1.7,
+     1.8,
+     1.8
+    ],
+    "median_change_pct": 5.882
+   }
+  },
+  "cfb_read_one/few-large": {
+   "instructions": {
+    "base": [
+     2526743.2,
+     2514540.6,
+     2510257.8
+    ],
+    "cand": [
+     2552908.5,
+     2529720.6,
+     2534699.5
+    ],
+    "median_change_pct": 0.802
+   },
+   "cycles": {
+    "base": [
+     1520431.7,
+     1462530.0,
+     1499838.6
+    ],
+    "cand": [
+     1602171.7,
+     1691165.0,
+     1582090.5
+    ],
+    "median_change_pct": 6.823
+   },
+   "instructions:u": {
+    "base": [
+     2463249.0,
+     2463109.9,
+     2463090.1
+    ],
+    "cand": [
+     2463229.9,
+     2463130.3,
+     2463119.3
+    ],
+    "median_change_pct": 0.001
+   },
+   "cycles:u": {
+    "base": [
+     1527167.6,
+     1477833.3,
+     1509064.8
+    ],
+    "cand": [
+     1582740.9,
+     1672816.6,
+     1506035.7
+    ],
+    "median_change_pct": 4.882
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     -0.1
+    ],
+    "cand": [
+     0.1,
+     -0.0,
+     0.0
+    ],
+    "median_change_pct": null
+   }
+  },
+  "cfb_read_one/many-small": {
+   "instructions": {
+    "base": [
+     62347.2,
+     91076.3,
+     90012.3
+    ],
+    "cand": [
+     91581.2,
+     89034.3,
+     107766.7
+    ],
+    "median_change_pct": 1.743
+   },
+   "cycles": {
+    "base": [
+     -92380.1,
+     160079.3,
+     100632.3
+    ],
+    "cand": [
+     21101.0,
+     -16562.2,
+     183129.4
+    ],
+    "median_change_pct": -79.032
+   },
+   "instructions:u": {
+    "base": [
+     20566.0,
+     20534.5,
+     20385.9
+    ],
+    "cand": [
+     20562.2,
+     20563.3,
+     20394.7
+    ],
+    "median_change_pct": 0.135
+   },
+   "cycles:u": {
+    "base": [
+     -112201.1,
+     112296.5,
+     122095.2
+    ],
+    "cand": [
+     -5781.3,
+     -94658.7,
+     102673.9
+    ],
+    "median_change_pct": -105.148
+   },
+   "page-faults": {
+    "base": [
+     -0.0,
+     -0.0,
+     -0.1
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.1
+    ],
+    "median_change_pct": null
+   }
+  }
+ }
+}
