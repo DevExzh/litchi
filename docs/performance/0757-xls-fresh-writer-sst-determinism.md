@@ -17,6 +17,7 @@ branch `perf/0757-xls-fresh-writer-sst-determinism`. Commits:
 | `7309029a6d` | `fix(doc,ppt,xls)`: the 0753 review's follow-ups (section "0753 review follow-ups") |
 | `921787e2c0` | `perf(xls)`: the order's sort keyed by one packed integer (same order, same bytes) |
 | `a400341bdf` | `fix(xls)`: data-validation strings with Latin-1 characters written as Latin-1 bytes |
+| `8a2693a83e` | `test(xls)`: defined-name records and `NamePublish` names at N − 1, N and N + 1 |
 
 Every timing and counter below is of `921787e2c0` against an identically built
 base. `a400341bdf` only changes the data-validation string encoder, which no
@@ -451,8 +452,9 @@ is outside the fields this record owns; code inspection unless stated):
 
 ## Verification
 
-At the final head `a400341bdf`, with `CARGO_TARGET_DIR=…/targets/0757`
-(`gates.txt`):
+At `a400341bdf`, the last production commit, with
+`CARGO_TARGET_DIR=…/targets/0757` (`gates.txt`; after the test-only `8a2693a83e`,
+fmt, clippy and the litchi-xls tests were run again):
 
 - `cargo fmt --all --check` — 0
 - `cargo check -p litchi-xls -p litchi-doc -p litchi-ppt --all-targets --locked` — 0
@@ -462,7 +464,7 @@ At the final head `a400341bdf`, with `CARGO_TARGET_DIR=…/targets/0757`
   `litchi-xls` on `tests/xls_query_index_cache.rs:546` (`unusual_byte_groupings`),
   which fails identically on the base (checked in the before worktree, as 0746
   and 0753 also recorded); with that lint allowed — 0
-- `cargo test -p litchi-xls` — 1,535 passed (base 1,506); `-p litchi-doc` —
+- `cargo test -p litchi-xls` — 1,536 passed at `8a2693a83e` (base 1,506); `-p litchi-doc` —
   1,206 (base 1,200); `-p litchi-ppt` — 1,235 (base 1,231); `-p litchi-ppt
   --features encryption` — 1,246 (base 1,242); `-p litchi --features
   doc,docx,ppt,pptx,xls,xlsx,xlsb,odt` — 382
@@ -472,7 +474,7 @@ At the final head `a400341bdf`, with `CARGO_TARGET_DIR=…/targets/0757`
 - `tests/xls_writer_text_goldens.rs` in twelve separate processes — 12 × 5
   passed; copied onto the base — the pre-0753 goldens pass, the multi-string
   pin and the order test fail ("many_strings is not deterministic")
-- the release harness builds at the final head (instruction check above)
+- the release harness builds at `a400341bdf` (instruction check above)
 
 The harness did not change, so its tests and the coverage validator were not
 required.

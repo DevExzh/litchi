@@ -2,16 +2,17 @@
 
 Record: [0757-xls-fresh-writer-sst-determinism](../../0757-xls-fresh-writer-sst-determinism.md).
 Base `9ff78bbf1c` (head of `perf/0753-legacy-fresh-writer-text-paths`); measured
-code `921787e2c0`; final head `a400341bdf` (branch
-`perf/0757-xls-fresh-writer-sst-determinism`). `performance_claim: none`.
+code `921787e2c0`; last production commit `a400341bdf`, then the test-only
+`8a2693a83e` (branch `perf/0757-xls-fresh-writer-sst-determinism`).
+`performance_claim: none`.
 
 ## Contents
 
 | path | what it is |
 | --- | --- |
 | `environment.txt` | host, kernel, toolchains, pinning, measurement windows |
-| `binaries.sha256` | SHA-256 of the measured harness (`lpb`) and probe (`prb`) binaries per leg, and of the final-head harness used only for the instruction check |
-| `gates.txt` | every gate command at the final head with its exit code and test counts, the base-side clippy and golden runs, and the final-head instruction check |
+| `binaries.sha256` | SHA-256 of the measured harness (`lpb`) and probe (`prb`) binaries per leg, and of the `a400341bdf` harness used only for the instruction check |
+| `gates.txt` | every gate command at the last production commit `a400341bdf` with its exit code and test counts, the reruns after the test-only commit, the base-side clippy and golden runs, and the instruction check of `a400341bdf` against the measured build |
 | `latency/window-1/`, `latency/window-2/` | ABBA runs of the harness selectors (`scripts/abba_harness.py`): `summary-xls.json`, `summary-docppt.json` (per-process p50/p95/mean, paired ratios, bootstrap CI, output SHA-256 per leg) and every raw harness report in `raw/` |
 | `counters/` | differenced `perf stat` counters (`scripts/perf_counters.py`): `summary.json` and the raw `perf stat -x,` outputs and harness reports in `raw/` |
 | `probe/` | `write_to`-only probe runs, eight processes per case (`scripts/probe_runs.py`): `summary.json` (timings, callgrind instructions per write, allocation counts, output length and FNV-1a per process), raw JSON per process, callgrind logs |
@@ -20,7 +21,7 @@ code `921787e2c0`; final head `a400341bdf` (branch
 | `ppt-long/` | `ppt_fresh_write_to/payload-heavy` with 200 samples per process (steady state against the first 40) |
 | `behaviour/` | what each leg does with strings past each limit (`base-probe.txt`, `after-probe.txt`, from `probe-src/string_fields_probe.rs`); the golden test file run on the base before and after its new digest was pinned (`base-goldens-run.txt`, `base-goldens-final.txt`); the data-validation and empty-number-format findings (`findings-probe.txt`) |
 | `probe-src/` | the timing/allocation probe (`main.rs`, `Cargo.toml.template`) and the string-field behaviour probe (a test file copied into `crates/litchi-xls/tests/` of a leg, run, and removed) |
-| `build-logs/` | the harness build logs of both legs and of the final head |
+| `build-logs/` | the harness build logs of both legs and of `a400341bdf` |
 | `scripts/` | the build, measurement and table scripts used |
 | `tables.md` | the tables rendered from this packet by `scripts/tables.py` |
 | `log-sections.md` | ready-to-paste paragraphs for `HOTSPOTS.md`, `REPORT.md` and `GOAL_AUDIT.md` |
