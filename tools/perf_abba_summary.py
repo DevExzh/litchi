@@ -5291,6 +5291,13 @@ XLS_NUMERIC_OPERATION_COUNTER_SCOPE = (
     "validated overlay logical pass shape; no runtime, allocator, or syscall counters"
 )
 XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA = "xls_numeric.operation_evidence.v1"
+# Change 0748: sealed owned sources compute both digests once, at planning, so a
+# version-2 owned row has no composed-view preflight and hashes no emitted byte.
+# Version-1 rows keep the earlier owned contract; generic rows are identical.
+XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA_V2 = "xls_numeric.operation_evidence.v2"
+XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMAS = frozenset(
+    {XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA, XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA_V2}
+)
 XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE = "owned-source-ingress-only"
 XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE = (
     "owned-source-ingress-only; xls-overlay-operation-evidence-v1"
@@ -6310,7 +6317,7 @@ def _validate_xls_numeric_source_summary(
                 raise AbbaSummaryInputError(
                     f"{location} source-backed implementation requires operation_evidence_schema"
                 )
-            if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA:
+            if schema not in XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMAS:
                 raise AbbaSummaryInputError(f"{location}.operation_evidence_schema is invalid")
             if not operation_present:
                 raise AbbaSummaryInputError(
@@ -6348,6 +6355,7 @@ def _validate_xls_numeric_operation_evidence(
         source_bytes: int,
         fingerprint_chunks: int,
         emission: bool = False,
+        hashed_scans: int | None = None,
     ) -> None:
         _u64(evidence[f"{prefix}_scans"], f"{prefix}.scans")
         _u64(evidence[f"{prefix}_bytes"], f"{prefix}.bytes")
@@ -6356,11 +6364,14 @@ def _validate_xls_numeric_operation_evidence(
         expected_chunks = (source_bytes + (65_536 if emission else 1_048_576) - 1) // (
             65_536 if emission else 1_048_576
         )
+        # An emission pass traverses every chunk; whether it also hashes them
+        # is a separate, schema-dependent part of the contract.
+        hashed = scans if hashed_scans is None else hashed_scans
         if evidence[f"{prefix}_scans"] != scans:
             raise AbbaSummaryInputError(
                 f"{prefix} scan count does not match source-mode contract"
             )
-        if evidence[f"{prefix}_bytes"] != expected_bytes * scans:
+        if evidence[f"{prefix}_bytes"] != expected_bytes * hashed:
             raise AbbaSummaryInputError(
                 f"{prefix} logical bytes do not match source-mode contract"
             )
@@ -6384,10 +6395,11 @@ def _validate_xls_numeric_operation_evidence(
             # shape. The explicit absence of the new schema marker, together
             # with the top-level legacy discriminator, keeps it opaque here.
             continue
-        if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA:
+        if schema not in XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMAS:
             raise AbbaSummaryInputError(
                 f"{label}.{case}.source.xls_numeric.operation_evidence_schema is invalid"
             )
+        sealed_owned_contract = schema == XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA_V2
         operation = numeric_object.get("operation_evidence", _MISSING)
         if operation is _MISSING:
             continue
@@ -6535,6 +6547,10 @@ def _validate_xls_numeric_operation_evidence(
             publication_chunks = (source_bytes + 65_536 - 1) // 65_536
             planning_scans = 2 if mode == "generic_read_at" else 1
             fenced_scans = 1 if mode == "generic_read_at" else 0
+            # Version 1: every owned row still took a composed-view preflight
+            # and hashed its emission. Version 2: only a generic row does.
+            composed_scans = fenced_scans if sealed_owned_contract else 1
+            hashed_emission_scans = fenced_scans if sealed_owned_contract else 1
             if evidence["planning_fingerprint_scans"] != planning_scans:
                 raise AbbaSummaryInputError(
                     f"{item_location}.planning_fingerprint_scans violates source-mode policy"
@@ -6550,7 +6566,7 @@ def _validate_xls_numeric_operation_evidence(
             phase_shape(
                 evidence,
                 "composed_source_preflight",
-                1,
+                composed_scans,
                 source_bytes,
                 fingerprint_chunks,
             )
@@ -6581,6 +6597,7 @@ def _validate_xls_numeric_operation_evidence(
                     source_bytes,
                     fingerprint_chunks,
                     emission=True,
+                    hashed_scans=hashed_emission_scans,
                 )
             if evidence["candidate_reopen_logical_artifact_bytes"] != (
                 output_bytes if implementation == "source_backed" else source_bytes

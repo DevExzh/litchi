@@ -22,7 +22,10 @@ const MAX_WRITE: u64 = 64 * 1024;
 const XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE: &str = "owned-source-ingress-only";
 const XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE: &str =
     "owned-source-ingress-only; xls-overlay-operation-evidence-v1";
-const XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA: &str = "xls_numeric.operation_evidence.v1";
+/// Version 2 (change 0748): sealed owned sources take no composed-view
+/// preflight and hash nothing while emitting. Version 1 reports keep the
+/// earlier owned contract and remain valid for the revisions that wrote them.
+const XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA: &str = "xls_numeric.operation_evidence.v2";
 const REAL_PRODUCER: &[u8] =
     include_bytes!("../../../test-data/poi/test-data/spreadsheet/54016.xls");
 
@@ -2178,7 +2181,7 @@ mod tests {
                 );
                 assert_eq!(
                     evidence.operation_evidence_schema,
-                    Some("xls_numeric.operation_evidence.v1")
+                    Some("xls_numeric.operation_evidence.v2")
                 );
                 let operation = evidence
                     .operation_evidence
@@ -2190,8 +2193,24 @@ mod tests {
                     "generic_read_at" | "owned_immutable_arc"
                 ));
                 let fenced_scans = u64::from(operation.source_mode == "generic_read_at");
+                let fingerprint_bytes = 2 * operation.source_bytes;
                 assert_eq!(operation.planning_fingerprint_scans, 1 + fenced_scans);
-                assert_eq!(operation.composed_source_preflight_scans, 1);
+                assert_eq!(
+                    operation.planning_fingerprint_bytes,
+                    fingerprint_bytes * (1 + fenced_scans)
+                );
+                assert_eq!(operation.composed_source_preflight_scans, fenced_scans);
+                assert_eq!(
+                    operation.composed_source_preflight_bytes,
+                    fingerprint_bytes * fenced_scans
+                );
+                for hashed in [
+                    operation.target_materialization_emission_bytes,
+                    operation.direct_emission_bytes,
+                    operation.atomic_save_emission_bytes,
+                ] {
+                    assert_eq!(hashed, fingerprint_bytes * fenced_scans);
+                }
                 assert_eq!(
                     operation.target_materialization_write_pre_scans,
                     fenced_scans
