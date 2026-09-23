@@ -172,6 +172,36 @@ struct RowBits {
     formula: [u64; 4],
 }
 
+impl RowBits {
+    /// `None` when `column` (inside the grid) is vacant, otherwise whether its
+    /// latest record is a `Formula`.
+    #[inline]
+    fn get(&self, column: u16) -> Option<bool> {
+        let word = usize::from(column / 64);
+        let mask = 1_u64 << (column % 64);
+        let occupied = self.occupied.get(word).is_some_and(|word| word & mask != 0);
+        occupied.then(|| self.formula.get(word).is_some_and(|word| word & mask != 0))
+    }
+
+    /// Marks `column` (inside the grid) occupied, its latest record a
+    /// `Formula` exactly when `formula`.
+    #[inline]
+    fn set(&mut self, column: u16, formula: bool) {
+        let word = usize::from(column / 64);
+        let mask = 1_u64 << (column % 64);
+        if let Some(occupied) = self.occupied.get_mut(word) {
+            *occupied |= mask;
+        }
+        if let Some(formulas) = self.formula.get_mut(word) {
+            if formula {
+                *formulas |= mask;
+            } else {
+                *formulas &= !mask;
+            }
+        }
+    }
+}
+
 /// Occupied positions of one worksheet's cell records.
 ///
 /// Every occupied row owns one [`RowBits`] (64 bytes), allocated fallibly when
@@ -201,6 +231,52 @@ struct CellOccupancy {
 }
 
 impl CellOccupancy {
+    /// `None` when no record occupies `position`, otherwise whether the latest
+    /// record there is a `Formula`.
+    ///
+    /// The row most recently stored is answered inline; everything else takes
+    /// the out-of-line lookup, which keeps the code this adds to the per-record
+    /// worksheet walk small.
+    #[inline]
+    fn get(&self, (row, column): Position) -> Option<bool> {
+        if column < GRID_COLUMNS
+            && let Some((recent, entry)) = self.recent
+            && recent == row
+        {
+            return self.bits(entry, column);
+        }
+        self.get_elsewhere((row, column))
+    }
+
+    /// Counts one record at `position`, replacing the `Formula` flag of an
+    /// earlier record there: the latest record at a position is the one the
+    /// public reader keeps.
+    ///
+    /// A record on the row most recently stored is counted inline; a first
+    /// record on a row, and every position outside the grid, takes the
+    /// out-of-line path.
+    #[inline]
+    fn insert(&mut self, (row, column): Position, formula: bool) -> Result<()> {
+        if column < GRID_COLUMNS
+            && let Some((recent, entry)) = self.recent
+            && recent == row
+            && let Some(bits) = usize::try_from(entry)
+                .ok()
+                .and_then(|entry| self.rows.get_mut(entry))
+        {
+            bits.set(column, formula);
+            return Ok(());
+        }
+        self.insert_elsewhere((row, column), formula)
+    }
+
+    /// Whether `column` is occupied in the row at `entry`, and if so whether
+    /// its latest record is a `Formula`.
+    #[inline]
+    fn bits(&self, entry: u32, column: u16) -> Option<bool> {
+        self.rows.get(usize::try_from(entry).ok()?)?.get(column)
+    }
+
     /// The entry in `rows` of an occupied `row`.
     fn entry(&self, row: u16) -> Option<u32> {
         if let Some((recent, entry)) = self.recent
@@ -227,23 +303,16 @@ impl CellOccupancy {
         }
     }
 
-    /// `None` when no record occupies `position`, otherwise whether the latest
-    /// record there is a `Formula`.
-    fn get(&self, (row, column): Position) -> Option<bool> {
+    #[inline(never)]
+    fn get_elsewhere(&self, (row, column): Position) -> Option<bool> {
         if column >= GRID_COLUMNS {
             return self.outside_grid.get(&(row, column)).copied();
         }
-        let bits = self.rows.get(usize::try_from(self.entry(row)?).ok()?)?;
-        let word = usize::from(column / 64);
-        let mask = 1_u64 << (column % 64);
-        let occupied = bits.occupied.get(word).is_some_and(|word| word & mask != 0);
-        occupied.then(|| bits.formula.get(word).is_some_and(|word| word & mask != 0))
+        self.bits(self.entry(row)?, column)
     }
 
-    /// Counts one record at `position`, replacing the `Formula` flag of an
-    /// earlier record there: the latest record at a position is the one the
-    /// public reader keeps.
-    fn insert(&mut self, (row, column): Position, formula: bool) -> Result<()> {
+    #[inline(never)]
+    fn insert_elsewhere(&mut self, (row, column): Position, formula: bool) -> Result<()> {
         if column >= GRID_COLUMNS {
             self.outside_grid
                 .try_reserve(1)
@@ -281,22 +350,11 @@ impl CellOccupancy {
             },
         };
         self.recent = Some((row, entry));
-        let bits = usize::try_from(entry)
+        usize::try_from(entry)
             .ok()
             .and_then(|entry| self.rows.get_mut(entry))
-            .ok_or(Error::Allocation("tracking worksheet cell positions"))?;
-        let word = usize::from(column / 64);
-        let mask = 1_u64 << (column % 64);
-        if let Some(occupied) = bits.occupied.get_mut(word) {
-            *occupied |= mask;
-        }
-        if let Some(formulas) = bits.formula.get_mut(word) {
-            if formula {
-                *formulas |= mask;
-            } else {
-                *formulas &= !mask;
-            }
-        }
+            .ok_or(Error::Allocation("tracking worksheet cell positions"))?
+            .set(column, formula);
         Ok(())
     }
 
