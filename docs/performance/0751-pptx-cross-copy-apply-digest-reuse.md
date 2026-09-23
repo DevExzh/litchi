@@ -878,13 +878,14 @@ deleting anything.
 
 - **After the review**
   ([`cleanup.json`](results/change-0751/cleanup.json), written by
-  `scripts/cleanup.py`) removed:
+  `scripts/cleanup.py`) removed 79.7 GB:
   - the fresh target directories of the review's gates and of the
-    re-measurement, `targets/0751` and `targets/0751-before`;
-  - the scratch directory's contents: the staged binaries, raw reports and
-    `TMPDIR`;
-  - the recreated detached base worktree `0751-before-src`, removed with
-    `git worktree remove --force`.
+    re-measurement, `targets/0751` (66.3 GB) and `targets/0751-before`
+    (3.0 GB);
+  - the scratch directory's contents (261 MB: the staged binaries, raw
+    reports and `TMPDIR`);
+  - the recreated detached base worktree `0751-before-src` (10.2 GB),
+    removed with `git worktree remove --force`.
 - **Before the review**
   ([`superseded-f84522f8af/cleanup.json`](results/change-0751/superseded-f84522f8af/cleanup.json))
   removed 125.0 GB:

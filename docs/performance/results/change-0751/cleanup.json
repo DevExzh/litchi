@@ -1,0 +1,81 @@
+{
+  "binaries": [
+    {
+      "name": "after-alloc",
+      "sha256": "4bc7f216098516d82d921b974d6ce48e8cff4819265e4a9b9d342e67febd6ccd",
+      "bytes": 63491128
+    },
+    {
+      "name": "after-native",
+      "sha256": "2fe858b5de84d6b07b7ce5b59fd1b13cdbd96775a5a2e4644e3c48c8e495e960",
+      "bytes": 63604880
+    },
+    {
+      "name": "before-alloc",
+      "sha256": "014c4bdf26dd3bef8ae0d2ec5140f8d2f6f70c2638e4f066c03e72a07640313a",
+      "bytes": 63549904
+    },
+    {
+      "name": "before-native",
+      "sha256": "60e0b2587585855a0557627a6cc05aa4f1e36446a8e249e78708b7199429ec20",
+      "bytes": 63833824
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751",
+      "files": 37859,
+      "bytes": 66328993311
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751-before",
+      "files": 4453,
+      "bytes": 2961132551
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0751",
+      "files": 394,
+      "bytes": 261075846,
+      "entries": [
+        "analysis2-faults.json",
+        "analysis2-matrix.json",
+        "analysis2-matrix.md",
+        "analysis2-tiny.json",
+        "bin",
+        "build-after-alloc-v2.log",
+        "build-after-native-v2.log",
+        "build-before-alloc-v2.log",
+        "build-before-native-v2.log",
+        "gates2",
+        "golden-after-v2.log",
+        "golden-after-v2.txt",
+        "golden-base-v2.log",
+        "golden-base-v2.txt",
+        "isolation2",
+        "isolation2.log",
+        "matrix2",
+        "prelim2",
+        "tiny2",
+        "tmp",
+        "worktree-add.log"
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0751-before-src",
+      "files": 139937,
+      "bytes": 10194916235,
+      "note": "detached worktree of 6d989cad63 for the before leg, removed with git worktree remove --force"
+    }
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0751-pptx-cross-copy-apply-digest-reuse",
+    "branch perf/0751-pptx-cross-copy-apply-digest-reuse",
+    "/home/zhuhe/code/litchi-worktrees/scratch/0751 (empty directory)",
+    "the packet's raw reports (gzipped), counters, analyses, attribution summaries and golden transcripts"
+  ],
+  "not_retained": [
+    "perf.data and perf script text of both frame-pointer profiles (53 MB); attribution/*.json summarize them",
+    "the gate command outputs; gates.txt summarizes them"
+  ],
+  "dry_run": false
+}
