@@ -1,0 +1,126 @@
+[
+ {
+  "case": "ole_common_finish_render",
+  "kind": "harness",
+  "target": "ole_common_finish_render",
+  "phase": "elapsed_ns",
+  "warmup": 5,
+  "samples": 60,
+  "extra": [
+   "--shape",
+   "few-large",
+   "--payload",
+   "incompressible"
+  ],
+  "core": "16",
+  "identities": [
+   "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+  ],
+  "before_median_p50": 4499370.0,
+  "after_median_p50": 4473472.5,
+  "before_median_p95": 4705661.5,
+  "after_median_p95": 4575040.25,
+  "before_median_mean": 4516419.016666667,
+  "after_median_mean": 4483070.583333334,
+  "paired_p50_ratios": [
+   0.9864273397015397,
+   0.9822138901363723,
+   0.9884932941904623,
+   1.0167150359454544
+  ],
+  "paired_mean_ratios": [
+   0.9867174408721278,
+   0.9802447653149853,
+   0.985078531714927,
+   1.0150064584832936
+  ],
+  "median_paired_p50_ratio": 0.987460316946001,
+  "median_paired_mean_ratio": 0.9858979862935273,
+  "bootstrap_95ci_p50_ratio": [
+   0.9822138901363723,
+   1.0167150359454544
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ole_common_finish_render-0-A.json",
+    "p50": 4558060.0,
+    "p95": 4719274.0,
+    "mean": 4566474.433333334,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ole_common_finish_render-1-B.json",
+    "p50": 4496195.0,
+    "p95": 4598914.45,
+    "mean": 4505819.966666667,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ole_common_finish_render-2-B.json",
+    "p50": 4450750.0,
+    "p95": 4551166.05,
+    "mean": 4460321.2,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ole_common_finish_render-3-A.json",
+    "p50": 4531345.0,
+    "p95": 4747407.5,
+    "mean": 4550211.7,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ole_common_finish_render-4-A.json",
+    "p50": 4467395.0,
+    "p95": 4613371.45,
+    "mean": 4482626.333333333,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ole_common_finish_render-5-B.json",
+    "p50": 4415990.0,
+    "p95": 4504664.0,
+    "mean": 4415738.966666667,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ole_common_finish_render-6-B.json",
+    "p50": 4516115.0,
+    "p95": 4785332.0,
+    "mean": 4545355.316666666,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ole_common_finish_render-7-A.json",
+    "p50": 4441869.0,
+    "p95": 4692049.0,
+    "mean": 4478154.083333333,
+    "n": 60,
+    "identity": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+   }
+  ]
+ }
+]
