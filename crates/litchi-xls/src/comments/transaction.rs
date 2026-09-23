@@ -157,6 +157,13 @@ impl Snapshot {
     }
 
     fn from_package(package: PackageEditor) -> Result<Self> {
+        Self::open_package(package, None)
+    }
+
+    /// Opens a captured package. `rendered` is the artifact an edit's package
+    /// publication already rendered and validated for this exact editor
+    /// state; without it the editor is finished here.
+    fn open_package(package: PackageEditor, rendered: Option<Vec<u8>>) -> Result<Self> {
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -166,7 +173,10 @@ impl Snapshot {
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
-        let bytes = package.finish()?;
+        let bytes = match rendered {
+            Some(rendered) => rendered,
+            None => package.finish()?,
+        };
         // The complete reader's validation-only mode: every record is
         // validated as `Workbook::new` validates it; no cell is decoded, and
         // no cell is read here.
@@ -542,8 +552,18 @@ impl Edit {
             Targets::default(),
             Limits::default(),
         )?;
-        package.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
-        let snapshot = Snapshot::from_package(package)?;
+        // Publish the rendering the package publication already validated
+        // instead of rendering the same editor state a second time.
+        let rendered = package.put_stream_shared_with_rendered(
+            &self.source.inner.workbook_path,
+            Arc::from(workbook),
+        )?;
+        debug_assert_eq!(
+            package.clone().finish().ok().as_deref(),
+            Some(rendered.as_slice()),
+            "a fresh render of the committed editor reproduces its validated rendering"
+        );
+        let snapshot = Snapshot::open_package(package, Some(rendered))?;
         verify_readback(&snapshot, &self.source, &effective)?;
         let mut operations = Vec::new();
         operations

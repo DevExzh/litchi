@@ -275,3 +275,61 @@ fn reads_poi_comment_fixtures() {
     );
     assert_eq!(comments[0].text(), "comment top row1 (index0)\n");
 }
+
+/// The generic comment commit publishes the rendering its package
+/// publication already validated. It must be byte-identical to the second
+/// render the commit used to publish (stream put, then finish), in release
+/// builds too, where the commit's own debug re-derivation is compiled out.
+#[test]
+fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
+    use crate::cell_values::{Reference, Selector};
+    use litchi_ole_common::object::{Editor, Limits, Targets};
+    use std::io::Cursor;
+    use std::sync::Arc;
+
+    for comments in [1_u32, 3, 12] {
+        let mut writer = crate::Writer::new();
+        let sheet = writer.add_worksheet("Notes").unwrap();
+        for index in 0..comments {
+            writer
+                .add_comment(
+                    sheet,
+                    index,
+                    1,
+                    &format!("Author {index}"),
+                    &format!("text {index}"),
+                )
+                .unwrap();
+        }
+        let other = writer.add_worksheet("Untouched").unwrap();
+        writer.write_number(other, 20, 4, 42.0).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+
+        let source = super::Snapshot::from_bytes(output.into_inner()).unwrap();
+        let mut edit = source.edit();
+        edit.replace(
+            Selector::Position(0),
+            Reference::new(comments - 1, 1).unwrap(),
+            super::Value::new("Probe", "a replacement of another length").unwrap(),
+        )
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        let mut rerendered = Editor::open(
+            source.bytes().to_vec(),
+            Targets::default(),
+            Limits::default(),
+        )
+        .unwrap();
+        rerendered
+            .put_stream_shared(
+                &["Workbook".to_string()],
+                Arc::from(commit.snapshot().workbook_stream()),
+            )
+            .unwrap();
+        assert_eq!(
+            commit.snapshot().bytes(),
+            rerendered.finish().unwrap().as_slice()
+        );
+    }
+}

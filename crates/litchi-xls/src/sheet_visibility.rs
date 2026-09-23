@@ -83,13 +83,23 @@ impl Snapshot {
     }
 
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
+        Self::open_package(package, None)
+    }
+
+    /// Opens a captured package. `rendered` is the artifact an edit's package
+    /// publication already rendered and validated for this exact editor
+    /// state; without it the editor is finished here.
+    fn open_package(package: PackageEditor, rendered: Option<Vec<u8>>) -> Result<Self> {
         let workbook_path = select_workbook_path(&package)?;
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let sheets = parse_directory(&workbook_stream)?;
         require_visible_worksheet(&sheets)?;
-        let bytes = package.finish()?;
+        let bytes = match rendered {
+            Some(rendered) => rendered,
+            None => package.finish()?,
+        };
         // The complete reader's validation-only mode: every record is
         // validated as `Workbook::new` validates it; no cell is decoded, and
         // no cell is read here.
@@ -393,8 +403,18 @@ impl Transaction {
             Targets::default(),
             Limits::default(),
         )?;
-        package.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
-        let snapshot = Snapshot::from_package_editor(package)?;
+        // Publish the rendering the package publication already validated
+        // instead of rendering the same editor state a second time.
+        let rendered = package.put_stream_shared_with_rendered(
+            &self.source.inner.workbook_path,
+            Arc::from(workbook),
+        )?;
+        debug_assert_eq!(
+            package.clone().finish().ok().as_deref(),
+            Some(rendered.as_slice()),
+            "a fresh render of the committed editor reproduces its validated rendering"
+        );
+        let snapshot = Snapshot::open_package(package, Some(rendered))?;
         for change in &self.changes {
             if snapshot
                 .inner
@@ -1463,6 +1483,41 @@ mod tests {
             .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
             .unwrap();
         package.finish().unwrap()
+    }
+
+    /// The generic commit publishes the rendering its package publication
+    /// already validated. It must be byte-identical to the second render the
+    /// commit used to publish (stream put, then finish), in release builds
+    /// too, where the commit's own debug re-derivation is compiled out.
+    #[test]
+    fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
+        for (sheets, target, visibility) in [
+            (2, 1, SheetVisibility::Hidden),
+            (3, 2, SheetVisibility::VeryHidden),
+            (4, 1, SheetVisibility::Hidden),
+        ] {
+            let source = Snapshot::from_bytes(package(sheets)).unwrap();
+            let mut edit = source.edit();
+            edit.set_visibility(Selector::Position(target), visibility)
+                .unwrap();
+            let commit = edit.commit().unwrap();
+            let mut rerendered = PackageEditor::open(
+                source.bytes().to_vec(),
+                Targets::default(),
+                Limits::default(),
+            )
+            .unwrap();
+            rerendered
+                .put_stream_shared(
+                    &source.inner.workbook_path,
+                    Arc::from(commit.snapshot().workbook_stream()),
+                )
+                .unwrap();
+            assert_eq!(
+                commit.snapshot().bytes(),
+                rerendered.finish().unwrap().as_slice()
+            );
+        }
     }
 
     fn stream(bytes: &[u8], path: &[&str]) -> Vec<u8> {
