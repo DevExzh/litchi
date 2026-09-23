@@ -1,7 +1,7 @@
 use crate::writer::core::{
     codec,
     model::{
-        CharacterFormatting, NoteStoryData, ParagraphFormatting, WriteError, Writer,
+        CharacterFormatting, NoteStoryData, ParagraphFormatting, TextStream, WriteError, Writer,
         utf16_code_unit_len,
     },
 };
@@ -27,7 +27,7 @@ impl Writer {
         actual_ref_cps: &[u32],
         ccp_text: u32,
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         pieces: &mut Vec<Piece>,
@@ -64,7 +64,7 @@ impl Writer {
         let mut txt_cps: Vec<u32> = vec![0];
 
         for (entry, _) in &ordered {
-            let fc_para_start = text_fc_start + text_stream.len() as u32;
+            let fc_para_start = text_fc_start + text_stream.text_len() as u32;
 
             // 1) Auto-numbered reference mark U+0002 with fSpec=1 CHPX
             //    This is what Word displays as the footnote number in the note area.
@@ -83,10 +83,8 @@ impl Writer {
             // 2) Note body text
             let text = &entry.text;
             let text_chars = utf16_code_unit_len(text)?;
-            let fc_text_start = text_fc_start + text_stream.len() as u32;
-            for u in text.encode_utf16() {
-                text_stream.extend_from_slice(&u.to_le_bytes());
-            }
+            let fc_text_start = text_fc_start + text_stream.text_len() as u32;
+            text_stream.push_utf16le(text, text_chars);
             let fc_text_end = fc_text_start + text_chars * 2;
             let body_grpprl =
                 codec::build_chpx_grpprl(&CharacterFormatting::default(), font_builder);
@@ -97,7 +95,7 @@ impl Writer {
             if let Some(last) = chpx_entries.last_mut() {
                 last.1 += 2;
             }
-            let fc_para_end = text_fc_start + text_stream.len() as u32;
+            let fc_para_end = text_fc_start + text_stream.text_len() as u32;
 
             // PAPX for this note paragraph
             papx_entries.push((
@@ -125,7 +123,7 @@ impl Writer {
         // This is an EXTRA paragraph mark beyond the last footnote's own \r.
         // LibreOffice and POI both write this guard.
         {
-            let fc_guard = text_fc_start + text_stream.len() as u32;
+            let fc_guard = text_fc_start + text_stream.text_len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             let fc_guard_end = fc_guard + 2;
             chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));

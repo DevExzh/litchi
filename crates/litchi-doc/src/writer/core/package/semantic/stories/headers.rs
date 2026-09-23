@@ -3,7 +3,8 @@ use crate::writer::core::{
     codec,
     model::{
         FloatingAnchorKind, HeaderFieldState, HeaderFooterParagraph, HeaderStoryData,
-        ParagraphFormatting, WriteError, Writer, checked_text_fc, utf16_code_unit_len,
+        ParagraphFormatting, TextStream, WriteError, Writer, checked_text_fc,
+        contains_field_character, utf16_code_unit_len,
     },
 };
 use crate::writer::font_table::FontTableBuilder;
@@ -20,7 +21,7 @@ impl Writer {
     pub(in crate::writer::core::package) fn build_header_story(
         &self,
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         pieces: &mut Vec<Piece>,
@@ -38,7 +39,7 @@ impl Writer {
         {
             return Ok(None);
         }
-        let story_text_start = text_stream.len();
+        let story_text_start = text_stream.text_len();
 
         // Build index->paragraph mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
         //   Slots 0-5:  footnote/endnote separator/continuation stories
@@ -82,7 +83,7 @@ impl Writer {
             cp_starts[i] = header_cp;
             if let Some(paragraphs) = idx_paragraphs[i] {
                 let mut field_state = HeaderFieldState::default();
-                let fc_story_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                let fc_story_start = checked_text_fc(text_fc_start, text_stream.text_len())?;
                 let mut story_chars = 0u32;
 
                 for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
@@ -99,7 +100,7 @@ impl Writer {
                     if let Some(kind) = anchor_kind {
                         shape_anchor_cps.push((header_cp + story_chars, kind));
                     }
-                    let fc_para_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                    let fc_para_start = checked_text_fc(text_fc_start, text_stream.text_len())?;
                     let mut paragraph_chars = 0u32;
                     let mut last_chpx = None;
 
@@ -113,26 +114,36 @@ impl Writer {
                                     "DOC header/footer field CP range overflows".to_string(),
                                 )
                             })?;
-                        for character in text.chars() {
-                            if field_state.observe(character, formatting)? {
-                                field_char_cps.push((marker_cp, character as u16));
+                        if contains_field_character(text) {
+                            for character in text.chars() {
+                                if field_state.observe(character, formatting)? {
+                                    field_char_cps.push((marker_cp, character as u16));
+                                }
+                                marker_cp = marker_cp
+                                    .checked_add(character.len_utf16() as u32)
+                                    .ok_or_else(|| {
+                                        WriteError::InvalidData(
+                                            "DOC header/footer field CP range overflows"
+                                                .to_string(),
+                                        )
+                                    })?;
                             }
-                            marker_cp = marker_cp
-                                .checked_add(character.len_utf16() as u32)
-                                .ok_or_else(|| {
-                                    WriteError::InvalidData(
-                                        "DOC header/footer field CP range overflows".to_string(),
-                                    )
-                                })?;
+                        } else {
+                            // `observe` accepts every other character without
+                            // effect, so the walk's only other outcome is
+                            // refusing a run that ends past the 32-bit CP range.
+                            marker_cp.checked_add(run_chars).ok_or_else(|| {
+                                WriteError::InvalidData(
+                                    "DOC header/footer field CP range overflows".to_string(),
+                                )
+                            })?;
                         }
                         if run_chars == 0 {
                             continue;
                         }
-                        let run_fc_start = checked_text_fc(text_fc_start, text_stream.len())?;
-                        for unit in text.encode_utf16() {
-                            text_stream.extend_from_slice(&unit.to_le_bytes());
-                        }
-                        let run_fc_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                        let run_fc_start = checked_text_fc(text_fc_start, text_stream.text_len())?;
+                        text_stream.push_utf16le(text, run_chars);
+                        let run_fc_end = checked_text_fc(text_fc_start, text_stream.text_len())?;
                         // Header picture anchors also carry sprmCPicLocation
                         // pointing at the picture's Data-stream block.
                         let mut grpprl = codec::build_chpx_grpprl(formatting, font_builder);
@@ -157,7 +168,7 @@ impl Writer {
                     }
 
                     text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                    let fc_para_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                    let fc_para_end = checked_text_fc(text_fc_start, text_stream.text_len())?;
                     if let Some(index) = last_chpx {
                         chpx_entries[index].1 = fc_para_end;
                     } else {
@@ -179,9 +190,9 @@ impl Writer {
                 }
 
                 // Guard paragraph mark required between stories.
-                let fc_guard_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                let fc_guard_start = checked_text_fc(text_fc_start, text_stream.text_len())?;
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                let fc_guard_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                let fc_guard_end = checked_text_fc(text_fc_start, text_stream.text_len())?;
                 chpx_entries.push((fc_guard_start, fc_guard_end, Vec::new()));
                 papx_entries.push((
                     fc_guard_start,
@@ -218,7 +229,7 @@ impl Writer {
         // The header subdocument ends with an extra paragraph mark. The second-to-last PlcfHdd
         // CP terminates the final story at ccpHdd - 1; the last CP is ignored.
         let stories_end = header_cp;
-        let fc_trailing = text_fc_start + text_stream.len() as u32;
+        let fc_trailing = text_fc_start + text_stream.text_len() as u32;
         text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
         let fc_trailing_end = fc_trailing + 2;
         chpx_entries.push((fc_trailing, fc_trailing_end, Vec::new()));
@@ -249,7 +260,7 @@ impl Writer {
             crate::writer::fields::build_plcffld(
                 &field_char_cps,
                 header_cp,
-                &text_stream[story_text_start..],
+                &text_stream.text()[story_text_start..],
             )?
         };
         Ok(Some(HeaderStoryData {

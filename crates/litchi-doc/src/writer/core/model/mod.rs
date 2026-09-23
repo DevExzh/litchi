@@ -43,7 +43,7 @@ pub use state::Writer;
 pub use story::{HeaderFooterParagraph, HeaderKind};
 
 pub(crate) use codec::pack_dttm;
-pub(super) use codec::utf16_code_unit_len;
+pub(super) use codec::{TextStream, contains_field_character, utf16_code_unit_len, utf16_units};
 pub(super) use state::WriterEncryption;
 pub(super) use story::{
     BookmarkTableData, CommentStoryData, FloatingAnchorKind, HeaderAnchor, HeaderStoryData,

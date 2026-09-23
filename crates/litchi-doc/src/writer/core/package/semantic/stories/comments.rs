@@ -2,8 +2,8 @@ use crate::writer::comments::CommentEntry;
 use crate::writer::core::{
     codec,
     model::{
-        CharacterFormatting, CommentStoryData, ParagraphFormatting, WriteError, Writer, pack_dttm,
-        utf16_code_unit_len,
+        CharacterFormatting, CommentStoryData, ParagraphFormatting, TextStream, WriteError, Writer,
+        pack_dttm, utf16_code_unit_len,
     },
 };
 use crate::writer::fib::FibBuilder;
@@ -21,7 +21,7 @@ impl Writer {
         actual_ref_cps: &[u32],
         ccp_text: u32,
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         pieces: &mut Vec<Piece>,
@@ -212,7 +212,7 @@ impl Writer {
         let mut comment_cp = 0u32;
         let mut text_cps = vec![0u32];
         for (entry, _) in &ordered {
-            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            let fc_story_start = text_fc_start + text_stream.text_len() as u32;
             text_stream.extend_from_slice(&0x0005u16.to_le_bytes());
             let fc_marker_end = fc_story_start + 2;
             let marker_grpprl = codec::build_chpx_grpprl(
@@ -225,10 +225,10 @@ impl Writer {
             chpx_entries.push((fc_story_start, fc_marker_end, marker_grpprl));
 
             let body_chars = utf16_code_unit_len(&entry.text)?;
-            let fc_body_start = text_fc_start + text_stream.len() as u32;
-            text_stream.extend(entry.text.encode_utf16().flat_map(u16::to_le_bytes));
+            let fc_body_start = text_fc_start + text_stream.text_len() as u32;
+            text_stream.push_utf16le(&entry.text, body_chars);
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            let fc_story_end = text_fc_start + text_stream.text_len() as u32;
             chpx_entries.push((
                 fc_body_start,
                 fc_story_end,
@@ -259,7 +259,7 @@ impl Writer {
             text_cps.push(comment_cp);
         }
 
-        let fc_guard = text_fc_start + text_stream.len() as u32;
+        let fc_guard = text_fc_start + text_stream.text_len() as u32;
         text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
         let fc_guard_end = fc_guard + 2;
         chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));

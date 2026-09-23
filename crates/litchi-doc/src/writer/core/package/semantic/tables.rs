@@ -1,6 +1,9 @@
 use crate::writer::core::{
     codec,
-    model::{RevisionWriterData, WritableParagraph, WriteError, Writer, utf16_code_unit_len},
+    model::{
+        RevisionWriterData, TextStream, WritableParagraph, WriteError, Writer,
+        contains_field_character, utf16_code_unit_len,
+    },
 };
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
@@ -8,7 +11,7 @@ impl Writer {
     pub(in crate::writer::core::package) fn append_tables_to_main_story(
         &self,
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         current_cp: &mut u32,
         pieces: &mut Vec<Piece>,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
@@ -89,7 +92,7 @@ impl Writer {
                 }
 
                 let fc_start = text_fc_start
-                    .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                    .checked_add(u32::try_from(text_stream.text_len()).map_err(|_| {
                         WriteError::InvalidData(
                             "DOC text stream exceeds 32-bit FC space".to_string(),
                         )
@@ -136,7 +139,7 @@ impl Writer {
         paragraph: &WritableParagraph,
         terminator: u16,
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         current_cp: &mut u32,
         pieces: &mut Vec<Piece>,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
@@ -146,7 +149,7 @@ impl Writer {
         revision_data: Option<&RevisionWriterData>,
     ) -> Result<(), WriteError> {
         let fc_start = text_fc_start
-            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+            .checked_add(u32::try_from(text_stream.text_len()).map_err(|_| {
                 WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
@@ -156,31 +159,44 @@ impl Writer {
         let mut last_chpx = None;
         for run in &paragraph.runs {
             let run_fc_start = text_fc_start
-                .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                .checked_add(u32::try_from(text_stream.text_len()).map_err(|_| {
                     WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
                 })?)
                 .ok_or_else(|| WriteError::InvalidData("DOC table run FC overflows".to_string()))?;
             let run_cps = utf16_code_unit_len(&run.text)?;
-            let mut offset = 0u32;
-            for ch in run.text.chars() {
-                let cp = current_cp
+            if contains_field_character(&run.text) {
+                let mut offset = 0u32;
+                for ch in run.text.chars() {
+                    let cp = current_cp
+                        .checked_add(paragraph_cps)
+                        .and_then(|value| value.checked_add(offset))
+                        .ok_or_else(|| {
+                            WriteError::InvalidData(
+                                "DOC table field character CP overflows".to_string(),
+                            )
+                        })?;
+                    if matches!(ch as u32, 0x0013..=0x0015) {
+                        field_char_cps.push((cp, ch as u16));
+                    }
+                    offset = offset.checked_add(ch.len_utf16() as u32).ok_or_else(|| {
+                        WriteError::InvalidData("DOC table run CP range overflows".to_string())
+                    })?;
+                }
+            } else if let Some(last) = run.text.chars().next_back() {
+                // Without a field character the walk above records nothing;
+                // its only other outcome is refusing a run whose CPs pass the
+                // 32-bit range, which the last character's CP decides.
+                let last_offset = run_cps - last.len_utf16() as u32;
+                current_cp
                     .checked_add(paragraph_cps)
-                    .and_then(|value| value.checked_add(offset))
+                    .and_then(|value| value.checked_add(last_offset))
                     .ok_or_else(|| {
                         WriteError::InvalidData(
                             "DOC table field character CP overflows".to_string(),
                         )
                     })?;
-                if matches!(ch as u32, 0x0013..=0x0015) {
-                    field_char_cps.push((cp, ch as u16));
-                }
-                offset = offset.checked_add(ch.len_utf16() as u32).ok_or_else(|| {
-                    WriteError::InvalidData("DOC table run CP range overflows".to_string())
-                })?;
             }
-            for unit in run.text.encode_utf16() {
-                text_stream.extend_from_slice(&unit.to_le_bytes());
-            }
+            text_stream.push_utf16le(&run.text, run_cps);
             let run_fc_end = run_fc_start
                 .checked_add(run_cps.checked_mul(2).ok_or_else(|| {
                     WriteError::InvalidData("DOC table run FC overflows".to_string())
@@ -198,7 +214,7 @@ impl Writer {
         }
         text_stream.extend_from_slice(&terminator.to_le_bytes());
         let fc_end = text_fc_start
-            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+            .checked_add(u32::try_from(text_stream.text_len()).map_err(|_| {
                 WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
@@ -225,14 +241,14 @@ impl Writer {
 
     pub(in crate::writer::core::package) fn append_empty_main_paragraph(
         text_fc_start: u32,
-        text_stream: &mut Vec<u8>,
+        text_stream: &mut TextStream,
         current_cp: &mut u32,
         pieces: &mut Vec<Piece>,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
     ) -> Result<(), WriteError> {
         let fc_start = text_fc_start
-            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+            .checked_add(u32::try_from(text_stream.text_len()).map_err(|_| {
                 WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
