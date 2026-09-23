@@ -190,6 +190,19 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
         Ok(self.workbook.xls_worksheet(worksheet_index)?.protection())
     }
 
+    /// Comments of the parsed worksheet at `worksheet_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Workbook::xls_worksheet`] error for an index that names
+    /// no parsed worksheet.
+    pub(crate) fn worksheet_comments(
+        &self,
+        worksheet_index: usize,
+    ) -> Result<&[crate::comments::Comment]> {
+        Ok(self.workbook.xls_worksheet(worksheet_index)?.comments())
+    }
+
     /// Inert VBA project metadata, as [`Workbook::vba_metadata`] reports it.
     pub(crate) fn vba_metadata(&self) -> crate::vba::VbaMetadata {
         self.workbook.vba_metadata()
