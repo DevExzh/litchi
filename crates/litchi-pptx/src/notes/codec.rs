@@ -365,9 +365,11 @@ fn scan_processed_xml(
     if processed.len() > max {
         return Err(limit("processed notes XML bytes", max));
     }
+    // A slice reader's events borrow `processed` directly, so no event is
+    // copied into a scratch buffer; the parser and its errors are the ones
+    // the buffered read uses on the same bytes.
     let mut reader = NsReader::from_reader(processed);
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut attributes = 0usize;
@@ -375,7 +377,7 @@ fn scan_processed_xml(
     let mut root_seen = false;
     let mut scan = XmlScan::default();
     loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 nodes += 1;
                 depth += 1;
@@ -430,7 +432,6 @@ fn scan_processed_xml(
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     if !root_seen || depth != 0 {
         return Err(invalid("missing or unterminated XML root"));
@@ -452,10 +453,10 @@ fn inspect_element(
     attribute_bytes: &mut usize,
     scan: &mut XmlScan,
 ) -> Result<()> {
+    // Every name and value below is validated exactly as before but borrowed
+    // from the event or the resolver; only a value the scan reports is owned.
     let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
-    let local = std::str::from_utf8(element.local_name().as_ref())
-        .map_err(xml_error)?
-        .to_owned();
+    let local = std::str::from_utf8(element.local_name().into_inner()).map_err(xml_error)?;
     if is_root
         && (namespace
             != if expected_root == "theme" {
@@ -481,11 +482,9 @@ fn inspect_element(
         }
         let (namespace, attr_local) = reader.resolver().resolve_attribute(item.key);
         let namespace = resolved(namespace)?;
-        let attr_local = std::str::from_utf8(attr_local.as_ref()).map_err(xml_error)?;
+        let attr_local = std::str::from_utf8(attr_local.into_inner()).map_err(xml_error)?;
         let raw_value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;
-        let value = quick_xml::escape::unescape(raw_value)
-            .map_err(xml_error)?
-            .into_owned();
+        let value = quick_xml::escape::unescape(raw_value).map_err(xml_error)?;
         *attribute_bytes = attribute_bytes
             .checked_add(namespace.len() + attr_local.len() + value.len())
             .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
@@ -493,12 +492,12 @@ fn inspect_element(
             return Err(limit("notes XML attribute bytes", MAX_ATTRIBUTE_BYTES));
         }
         if namespace == conformance.r() {
-            scan.relationship_attributes.push(value.clone());
+            scan.relationship_attributes.push(value.as_ref().to_owned());
             if attr_local == "id" {
                 if local == "notesMasterId" {
-                    scan.notes_master_ids.push(value.clone());
+                    scan.notes_master_ids.push(value.as_ref().to_owned());
                 } else if local == "sldId" {
-                    scan.slide_ids.push(value.clone());
+                    scan.slide_ids.push(value.as_ref().to_owned());
                 }
             }
         }
@@ -583,5 +582,431 @@ mod tests {
                 limit: 1,
             }
         ));
+    }
+
+    /// The scanner as it stood before change 0743, verbatim: buffered reads
+    /// into a scratch vector and owned names and values. The borrowed scanner
+    /// must return exactly its values and exactly its refusals.
+    fn buffered_scan_oracle(
+        processed: &[u8],
+        raw_len: usize,
+        max: usize,
+        conformance: Conformance,
+        expected_root: &str,
+    ) -> Result<XmlScan> {
+        if raw_len > max {
+            return Err(limit("notes XML bytes", max));
+        }
+        if processed.len() > max {
+            return Err(limit("processed notes XML bytes", max));
+        }
+        let mut reader = NsReader::from_reader(processed);
+        reader.config_mut().trim_text(false);
+        let mut buffer = Vec::new();
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
+        let mut attributes = 0usize;
+        let mut attribute_bytes = 0usize;
+        let mut root_seen = false;
+        let mut scan = XmlScan::default();
+        loop {
+            match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+                Event::Start(element) => {
+                    nodes += 1;
+                    depth += 1;
+                    if depth > MAX_DEPTH {
+                        return Err(limit("notes XML depth", MAX_DEPTH));
+                    }
+                    if nodes > MAX_NODES {
+                        return Err(limit("notes XML nodes", MAX_NODES));
+                    }
+                    inspect_element_oracle(
+                        &reader,
+                        &element,
+                        conformance,
+                        expected_root,
+                        !root_seen,
+                        &mut attributes,
+                        &mut attribute_bytes,
+                        &mut scan,
+                    )?;
+                    root_seen = true;
+                },
+                Event::Empty(element) => {
+                    nodes += 1;
+                    if nodes > MAX_NODES {
+                        return Err(limit("notes XML nodes", MAX_NODES));
+                    }
+                    if depth >= MAX_DEPTH {
+                        return Err(limit("notes XML depth", MAX_DEPTH));
+                    }
+                    inspect_element_oracle(
+                        &reader,
+                        &element,
+                        conformance,
+                        expected_root,
+                        !root_seen,
+                        &mut attributes,
+                        &mut attribute_bytes,
+                        &mut scan,
+                    )?;
+                    root_seen = true;
+                },
+                Event::End(_) => {
+                    if depth == 0 {
+                        return Err(invalid("unexpected XML closing element"));
+                    }
+                    depth -= 1;
+                },
+                Event::DocType(_) | Event::PI(_) => {
+                    return Err(invalid("DTDs and processing instructions are rejected"));
+                },
+                Event::CData(_) => return Err(invalid("CDATA is rejected")),
+                Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+        }
+        if !root_seen || depth != 0 {
+            return Err(invalid("missing or unterminated XML root"));
+        }
+        Ok(scan)
+    }
+
+    fn resolved_owned_oracle(value: quick_xml::name::ResolveResult<'_>) -> Result<String> {
+        match value {
+            quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(value)) => {
+                Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+            },
+            quick_xml::name::ResolveResult::Unbound => Ok(String::new()),
+            quick_xml::name::ResolveResult::Unknown(prefix) => Err(invalid(format!(
+                "unbound XML prefix '{}'",
+                String::from_utf8_lossy(prefix.as_ref())
+            ))),
+        }
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "verbatim oracle of the pre-change element inspector"
+    )]
+    fn inspect_element_oracle(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        conformance: Conformance,
+        expected_root: &str,
+        is_root: bool,
+        attributes: &mut usize,
+        attribute_bytes: &mut usize,
+        scan: &mut XmlScan,
+    ) -> Result<()> {
+        let namespace = resolved_owned_oracle(reader.resolver().resolve_element(element.name()).0)?;
+        let local = std::str::from_utf8(element.local_name().as_ref())
+            .map_err(xml_error)?
+            .to_owned();
+        if is_root
+            && (namespace
+                != if expected_root == "theme" {
+                    conformance.a()
+                } else {
+                    conformance.p()
+                }
+                || local != expected_root)
+        {
+            return Err(invalid(format!(
+                "invalid {expected_root} root or namespace"
+            )));
+        }
+        for item in element.attributes().with_checks(true) {
+            let item = item.map_err(xml_error)?;
+            let raw = item.key.as_ref();
+            if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
+                continue;
+            }
+            *attributes += 1;
+            if *attributes > MAX_ATTRIBUTES {
+                return Err(limit("notes XML attributes", MAX_ATTRIBUTES));
+            }
+            let (namespace, attr_local) = reader.resolver().resolve_attribute(item.key);
+            let namespace = resolved_owned_oracle(namespace)?;
+            let attr_local = std::str::from_utf8(attr_local.as_ref()).map_err(xml_error)?;
+            let raw_value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;
+            let value = quick_xml::escape::unescape(raw_value)
+                .map_err(xml_error)?
+                .into_owned();
+            *attribute_bytes = attribute_bytes
+                .checked_add(namespace.len() + attr_local.len() + value.len())
+                .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
+            if *attribute_bytes > MAX_ATTRIBUTE_BYTES {
+                return Err(limit("notes XML attribute bytes", MAX_ATTRIBUTE_BYTES));
+            }
+            if namespace == conformance.r() {
+                scan.relationship_attributes.push(value.clone());
+                if attr_local == "id" {
+                    if local == "notesMasterId" {
+                        scan.notes_master_ids.push(value.clone());
+                    } else if local == "sldId" {
+                        scan.slide_ids.push(value.clone());
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    type ScanOutcome = std::result::Result<(Vec<String>, Vec<String>, Vec<String>), String>;
+
+    fn outcome(result: Result<XmlScan>) -> ScanOutcome {
+        result
+            .map(|scan| {
+                (
+                    scan.relationship_attributes,
+                    scan.notes_master_ids,
+                    scan.slide_ids,
+                )
+            })
+            .map_err(|error| format!("{error:?}"))
+    }
+
+    /// Compare the borrowed scanner with the buffered oracle for one input
+    /// under every root, conformance and a spread of byte ceilings. Returns
+    /// the number of comparisons and of those the oracle refused.
+    fn assert_scanners_agree(label: &str, xml: &[u8]) -> (usize, usize) {
+        let mut compared = 0;
+        let mut refused = 0;
+        let ceilings = [
+            crate::notes::MAX_SLIDE_XML,
+            xml.len(),
+            xml.len().saturating_sub(1),
+            xml.len() / 2,
+            0,
+        ];
+        let actual_root = document_root_local_name(xml);
+        let mut roots = vec!["sld", "presentation", "notes", "notesMaster", "theme"];
+        if let Some(actual) = actual_root.as_deref()
+            && !roots.contains(&actual)
+        {
+            roots.push(actual);
+        }
+        for root in roots {
+            for conformance in [Conformance::Transitional, Conformance::Strict] {
+                for (index, max) in ceilings.into_iter().enumerate() {
+                    // The raw and processed lengths are checked separately;
+                    // vary them independently on the first two ceilings.
+                    for raw_len in [xml.len(), max.saturating_add(usize::from(index == 1))] {
+                        let expected =
+                            outcome(buffered_scan_oracle(xml, raw_len, max, conformance, root));
+                        let actual =
+                            outcome(scan_processed_xml(xml, raw_len, max, conformance, root));
+                        assert_eq!(
+                            actual, expected,
+                            "{label}: root {root}, {conformance:?}, max {max}, raw {raw_len}"
+                        );
+                        compared += 1;
+                        refused += usize::from(expected.is_err());
+                    }
+                }
+            }
+        }
+        (compared, refused)
+    }
+
+    /// Local name of the first element, so every well-formed input is also
+    /// scanned under the root it actually has.
+    fn document_root_local_name(xml: &[u8]) -> Option<String> {
+        let mut reader = Reader::from_reader(xml);
+        loop {
+            match reader.read_event().ok()? {
+                Event::Start(element) | Event::Empty(element) => {
+                    return String::from_utf8(element.local_name().as_ref().to_vec()).ok();
+                },
+                Event::Eof => return None,
+                _ => {},
+            }
+        }
+    }
+
+    const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    fn handcrafted_seeds() -> Vec<Vec<u8>> {
+        let deep = format!(
+            r#"<p:sld xmlns:p="{P_NS}">{}{}</p:sld>"#,
+            "<p:x>".repeat(MAX_DEPTH + 1),
+            "</p:x>".repeat(MAX_DEPTH + 1)
+        );
+        let deep_empty = format!(
+            r#"<p:sld xmlns:p="{P_NS}">{}<p:y/>{}</p:sld>"#,
+            "<p:x>".repeat(MAX_DEPTH - 1),
+            "</p:x>".repeat(MAX_DEPTH - 1)
+        );
+        let mut seeds: Vec<Vec<u8>> = [
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:p="{P_NS}" xmlns:r="{R_NS}"><p:notesMasterIdLst><p:notesMasterId r:id="rId9"/></p:notesMasterIdLst><p:sldIdLst><p:sldId id="256" r:id="rId2"/><p:sldId id="257" r:id="r&amp;Id&#x33;"/></p:sldIdLst></p:presentation>"#
+            ),
+            format!(r#"<p:sld xmlns:p="{P_NS}" xmlns:r="{R_NS}"><p:cSld name="a &lt; b"><p:spTree/></p:cSld><p:pic r:embed="rId5" r:link="&#65;"/></p:sld>"#),
+            format!(r#"<sld xmlns="{P_NS}"><cSld/></sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:cSld xmlns:p=""><p:x/></p:cSld></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><q:x/></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x q:y="1"/></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1" a="2"/></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="&bad;"/></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="&#0;"/></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><![CDATA[x]]></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><?pi x?></p:sld>"#),
+            format!(r#"<!DOCTYPE x><p:sld xmlns:p="{P_NS}"/>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><!-- note --> text &amp; more</p:sld> "#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"/><p:sld xmlns:p="{P_NS}"/>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:a></p:b></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"></p:sld></p:sld>"#),
+            format!(r#"<p:sld xmlns:p="{P_NS}"><p:a>"#),
+            format!("\u{feff}<p:sld xmlns:p=\"{P_NS}\"/>"),
+            deep,
+            deep_empty,
+            String::new(),
+            "   ".to_owned(),
+        ]
+        .into_iter()
+        .map(String::into_bytes)
+        .collect();
+        let mut invalid_utf8 = format!(r#"<p:sld xmlns:p="{P_NS}"><p:x v="#).into_bytes();
+        invalid_utf8.extend_from_slice(b"\"\xff\xfe\"/></p:sld>");
+        seeds.push(invalid_utf8);
+        let mut invalid_name = format!(r#"<p:sld xmlns:p="{P_NS}"><p:"#).into_bytes();
+        invalid_name.extend_from_slice(b"\xc3\x28/></p:sld>");
+        seeds.push(invalid_name);
+        seeds
+    }
+
+    /// Deterministic structural mutations: truncations, byte substitutions
+    /// with markup-significant or invalid bytes, and snippet insertions.
+    fn mutations(seed: &[u8], budget: usize) -> Vec<Vec<u8>> {
+        const BYTES: &[u8] = b"<>&\"'/!?=:\x00\xff\xc3 x";
+        const SNIPPETS: &[&[u8]] = &[
+            b"<![CDATA[c]]>",
+            b"<?pi x?>",
+            b"<!DOCTYPE d>",
+            b"<!-- c -->",
+            b"<q:x/>",
+            b"<p:y r:id=\"rId7\"/>",
+            b"&amp;",
+            b"&bad;",
+            b"</p:z>",
+            b" a=\"1\"",
+        ];
+        let mut output = Vec::new();
+        if seed.is_empty() {
+            return output;
+        }
+        let step = (seed.len() / budget.max(1)).max(1);
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ seed.len() as u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            usize::try_from(state >> 33).unwrap_or(0)
+        };
+        for position in (0..seed.len()).step_by(step) {
+            output.push(seed[..position].to_vec());
+            let mut replaced = seed.to_vec();
+            replaced[position] = BYTES[next() % BYTES.len()];
+            output.push(replaced);
+            let mut inserted = seed[..position].to_vec();
+            inserted.extend_from_slice(SNIPPETS[next() % SNIPPETS.len()]);
+            inserted.extend_from_slice(&seed[position..]);
+            output.push(inserted);
+        }
+        output
+    }
+
+    fn corpus_xml_parts(limit_parts: usize) -> Vec<Vec<u8>> {
+        fn collect(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(directory) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect(&path, found);
+                } else if path
+                    .extension()
+                    .is_some_and(|extension| extension == "pptx")
+                {
+                    found.push(path);
+                }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut fixtures = Vec::new();
+        collect(&root, &mut fixtures);
+        fixtures.sort();
+        let mut parts = Vec::new();
+        for fixture in fixtures {
+            let Ok(bytes) = std::fs::read(&fixture) else {
+                continue;
+            };
+            let Ok(package) = litchi_opc::OpcPackage::from_vec(bytes) else {
+                continue;
+            };
+            // Package parts iterate in hash order; take them by name so the
+            // oracle compares the same parts on every run.
+            let mut named: Vec<_> = package.try_iter_parts().flatten().collect();
+            named.sort_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
+            for part in named {
+                if part.content_type().ends_with("+xml") && parts.len() < limit_parts {
+                    parts.push(part.blob().to_vec());
+                }
+            }
+        }
+        parts
+    }
+
+    #[test]
+    fn the_borrowed_scanner_matches_the_buffered_oracle_on_handcrafted_and_mutated_xml() {
+        let mut compared = 0;
+        let mut refused = 0;
+        for (index, seed) in handcrafted_seeds().iter().enumerate() {
+            let (count, errors) = assert_scanners_agree(&format!("seed {index}"), seed);
+            compared += count;
+            refused += errors;
+            for (variant, mutated) in mutations(seed, 40).iter().enumerate() {
+                let (count, errors) =
+                    assert_scanners_agree(&format!("seed {index} variant {variant}"), mutated);
+                compared += count;
+                refused += errors;
+            }
+        }
+        println!(
+            "0743-notes-scan-oracle handcrafted compared={compared} accepted={}",
+            compared - refused
+        );
+        assert!(refused > 0 && refused < compared);
+    }
+
+    #[test]
+    fn the_borrowed_scanner_matches_the_buffered_oracle_on_the_pptx_corpus() {
+        let parts = corpus_xml_parts(600);
+        assert!(parts.len() >= 300, "expected the repository PPTX XML parts");
+        let mut compared = 0;
+        let mut refused = 0;
+        for (index, part) in parts.iter().enumerate() {
+            let (count, errors) = assert_scanners_agree(&format!("part {index}"), part);
+            compared += count;
+            refused += errors;
+            if index % 10 == 0 {
+                for (variant, mutated) in mutations(part, 12).iter().enumerate() {
+                    let (count, errors) =
+                        assert_scanners_agree(&format!("part {index} variant {variant}"), mutated);
+                    compared += count;
+                    refused += errors;
+                }
+            }
+        }
+        println!(
+            "0743-notes-scan-oracle corpus parts={} compared={compared} accepted={}",
+            parts.len(),
+            compared - refused
+        );
+        assert!(refused > 0 && refused < compared);
     }
 }

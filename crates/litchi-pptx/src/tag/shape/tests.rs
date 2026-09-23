@@ -405,3 +405,48 @@ fn shared_shape_anchor_forks_then_collects_each_orphan() {
     );
     assert!(package.get_part(&original_part).is_err());
 }
+
+/// Change 0743: an unmarked owner reuses the scene's read as the proof the
+/// separate raw offset pass would give, and must still return exactly the
+/// span, and exactly the refusal, of the full route. Debug builds also
+/// compare both routes inside `selected_raw_span_for_shape` itself.
+#[test]
+fn the_unmarked_raw_span_route_keeps_spans_and_refusals() {
+    let tree = |body: &str| {
+        format!(
+            r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{body}</p:spTree></p:cSld></p:sld>"#
+        )
+    };
+    // Unmarked, well-formed: the span is the selected element exactly.
+    let xml = tree(&format!(
+        "{}{}",
+        shape_xml("first", 2),
+        shape_xml("second", 3)
+    ));
+    let span = selected_raw_span(xml.as_bytes(), crate::shape::Key::Index(1)).expect("span");
+    assert!(xml[span].starts_with("<p:sp><p:nvSpPr><p:cNvPr id=\"3\""));
+
+    // A shape nested in a non-shape wrapper is a raw candidate but not a
+    // scene shape: the index maps disagree and the refusal must remain.
+    let wrapped = tree(&format!(
+        "{}<p:extLst>{}</p:extLst>",
+        shape_xml("first", 2),
+        shape_xml("hidden", 3)
+    ));
+    let error = selected_raw_span(wrapped.as_bytes(), crate::shape::Key::Index(0))
+        .expect_err("disagreeing raw and scene indexes must refuse");
+    assert!(
+        error
+            .to_string()
+            .contains("raw and MCE-processed shape indexes do not have the same length"),
+        "{error}"
+    );
+
+    // A marked owner still takes the full offset route.
+    let marked = format!(
+        r#"<p:sld xmlns:p="{PML}" xmlns:mc="{MC}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{}</p:spTree></p:cSld></p:sld>"#,
+        shape_xml("marked", 2)
+    );
+    let span = selected_raw_span(marked.as_bytes(), crate::shape::Key::Index(0)).expect("span");
+    assert!(marked[span].starts_with("<p:sp>"));
+}
