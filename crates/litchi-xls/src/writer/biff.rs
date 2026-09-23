@@ -236,7 +236,14 @@ pub(crate) fn write_unicode_string_biff8<W: Write>(writer: &mut W, value: &str) 
             writer.write_all(&code_unit.to_le_bytes())?;
         }
     } else {
-        writer.write_all(value.as_bytes())?;
+        // Compressed: the low byte of each code unit, which is Latin-1. The
+        // UTF-8 bytes of a character in U+0080..=U+00FF would overrun the
+        // count and desynchronize the record.
+        let latin1: Vec<u8> = value
+            .encode_utf16()
+            .map(crate::utils::truncate_u16_to_u8)
+            .collect();
+        writer.write_all(&latin1)?;
     }
 
     Ok(())
@@ -1213,6 +1220,17 @@ mod tests {
         assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 4); // char count
         assert_eq!(buf[2], 0x00); // ASCII flag
         assert_eq!(&buf[3..7], b"Test");
+    }
+
+    #[test]
+    fn test_write_unicode_string_biff8_latin1_is_one_byte_per_character() {
+        let mut buf = Vec::new();
+        write_unicode_string_biff8(&mut buf, "Café ñ").unwrap();
+
+        assert_eq!(buf.len(), usize::from(unicode_string_size("Café ñ")));
+        assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 6);
+        assert_eq!(buf[2], 0x00);
+        assert_eq!(&buf[3..], &[b'C', b'a', b'f', 0xE9, b' ', 0xF1]);
     }
 
     #[test]
