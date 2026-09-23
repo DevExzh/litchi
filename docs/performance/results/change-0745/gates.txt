@@ -1,0 +1,92 @@
+# Change 0745 gates
+
+Worktree /home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests; CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0745; CARGO_BUILD_JOBS=6; rustc 1.95.0.
+Each command ran from the repository root; exit codes as recorded.
+
+## Commit f5f2922750 (deferred artifact digests), gates run before commit
+
+== fmt: cargo fmt --all --check
+exit=0
+== check-ppt: cargo check -p litchi-ppt --all-targets --locked --offline
+exit=0
+== check-ppt-diag: cargo check -p litchi-ppt --all-targets --features performance-diagnostics --locked --offline
+exit=0
+== clippy-ppt-lib: cargo clippy -p litchi-ppt --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-lib-diag: cargo clippy -p litchi-ppt --lib --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all: cargo clippy -p litchi-ppt --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all-diag: cargo clippy -p litchi-ppt --all-targets --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== doc-ppt: cargo doc -p litchi-ppt --no-deps --locked --offline
+exit=0
+== doc-ppt-diag: cargo doc -p litchi-ppt --no-deps --features performance-diagnostics --locked --offline
+exit=0
+== check-facade: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=0
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+== test-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-ppt-diag: cargo test -p litchi-ppt --features performance-diagnostics --locked --offline
+exit=0
+
+Test totals (sum of all test binaries and doctests):
+  test-ppt: passed=1227 failed=0 ignored=11
+  test-ppt-diag: passed=1233 failed=0 ignored=11
+  boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+  non-iwork: verified_facade_combined_tree=1
+  perf-claims: OK: 10 performance claims validated (structural)
+
+## Commit e94bd56f58 (single-read editor streams, shared commit editor), gates run before commit (facade test after commit, same tree)
+
+== fmt: cargo fmt --all --check
+exit=0
+== check-ppt: cargo check -p litchi-ppt --all-targets --locked --offline
+exit=0
+== check-ppt-diag: cargo check -p litchi-ppt --all-targets --features performance-diagnostics --locked --offline
+exit=0
+== clippy-ppt-lib: cargo clippy -p litchi-ppt --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-lib-diag: cargo clippy -p litchi-ppt --lib --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all: cargo clippy -p litchi-ppt --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all-diag: cargo clippy -p litchi-ppt --all-targets --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== doc-ppt: cargo doc -p litchi-ppt --no-deps --locked --offline
+exit=0
+== doc-ppt-diag: cargo doc -p litchi-ppt --no-deps --features performance-diagnostics --locked --offline
+exit=0
+== check-facade: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit=0
+== test-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-ppt-diag: cargo test -p litchi-ppt --features performance-diagnostics --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=0
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+== test-facade: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit=0
+
+Test totals:
+  s-test-ppt: passed=1229 failed=0 ignored=11
+  s-test-ppt-diag: passed=1235 failed=0 ignored=11
+  s-test-facade: passed=382 failed=0 ignored=7
+  boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+  non-iwork: verified_facade_combined_tree=1
+  perf-claims: OK: 10 performance claims validated (structural)
+
+## Not run
+
+- The harness (tools/perf-baseline) is unchanged, so its tests and the CRUD coverage validator were not required.
+- No change touches litchi-xls, litchi-doc, litchi-ole-common or OOXML crates.

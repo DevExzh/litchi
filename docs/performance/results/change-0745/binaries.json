@@ -1,0 +1,88 @@
+{
+ "arms": {
+  "A": {
+   "source": "base 009d515bef (read-only checkout /home/zhuhe/code/litchi-worktrees/base-009d515bef)",
+   "binaries": {
+    "probe": {
+     "sha256": "b836a76976bf3ceaf4dab688aadea36d6e789062b3b066910800f99d6e9268ce",
+     "bytes": 87155568
+    },
+    "probe_alloc": {
+     "sha256": "967c6ea11423384355517a5b752f24b5fe57bfe867f27b18976a964c82c3a70a",
+     "bytes": 87159568
+    },
+    "p0734": {
+     "sha256": "026bd7dfdc1ce4f47621981d83f398c309254b00618c04be9f062ab380a810da",
+     "bytes": 93166256
+    },
+    "litchi-perf-baseline": {
+     "sha256": "fb535ebb4abb4154c4ac445b90a60399edf189d52cae76fea2947852a406cb0b",
+     "bytes": 62962456
+    }
+   }
+  },
+  "B": {
+   "source": "f5f2922750 (detached checkout /home/zhuhe/code/litchi-worktrees/0745-B-src; p0734 and harness built from the clean worktree at the same commit)",
+   "binaries": {
+    "probe": {
+     "sha256": "1726a3f851cc280ee4b3d58dbf2a4e5874f9123d06c061d635c15e8fd86e15e7",
+     "bytes": 87149672
+    },
+    "probe_alloc": {
+     "sha256": "ebdb65226092604e7a3abe21df379fc5d56b546bd92afe28159ee53a616906e5",
+     "bytes": 87153728
+    },
+    "p0734": {
+     "sha256": "1adf9ac71ded157ae0674334c53287aac4208f866e2f39feb28ecf06b237d120",
+     "bytes": 93149344
+    },
+    "litchi-perf-baseline": {
+     "sha256": "15d98af88e0e9b4a0934d803adaa9cfd584ea61d7b66bbe9f422527d53f05ca3",
+     "bytes": 62957784
+    }
+   }
+  },
+  "C": {
+   "source": "e94bd56f58 (worktree /home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests)",
+   "binaries": {
+    "probe": {
+     "sha256": "30d42839adcf78d47a9f9b851c69cc3badc111b4591954474eec8f669cc82d78",
+     "bytes": 92072168
+    },
+    "probe_alloc": {
+     "sha256": "52b453829f93577be21a470d66b9eae403860a02f4fed00761f72f6fc8e0e393",
+     "bytes": 92076184
+    },
+    "p0734": {
+     "sha256": "241f608cb4ce83e5e3c3f796d101ed3264daf89b6f76b6e3163dc6deaf874423",
+     "bytes": 93153312
+    },
+    "litchi-perf-baseline": {
+     "sha256": "05ce67c46fd67ac5aa8a97a6211ffc240d5a9977d3ab5329c03d8d94cefbd426",
+     "bytes": 62959512
+    }
+   }
+  }
+ },
+ "profiling_only": {
+  "A-fp": {
+   "probe": {
+    "sha256": "bf04863c38b9c856ee6a41caa05f5699a53256e28f1a46eabb3362e3beb62643",
+    "bytes": 87104712
+   }
+  },
+  "B-fp": {
+   "probe": {
+    "sha256": "45d19db3eb20cdf9b15ca0644784efaee21a1793e884c26bd83ef59509250259",
+    "bytes": 92020336
+   }
+  }
+ },
+ "builds": {
+  "toolchain": "Probe and sealed-0734-probe binaries (all arms, including the frame-pointer profiling builds): rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1, the host's default stable toolchain, because they were built from scratch directories outside the repository's rust-toolchain.toml (channel 1.95.0). Harness binaries (all arms): rustc 1.95.0 (59807616e 2026-04-14); A's embedded .comment section confirms it, and B and C were built from the worktree root. All gates ran with rustc 1.95.0 from the worktree. Each binary family uses one compiler for all three arms.",
+  "probe": "cd probe/manifests/{before|after-B|after-C} (dependency paths point at the arm source tree) && CARGO_TARGET_DIR=<arm target> CARGO_BUILD_JOBS=6 RUSTFLAGS=\"--remap-path-prefix=<arm source tree>=/litchi --remap-path-prefix=<probe dir>=/probe\" cargo build --release --locked --offline --bins  (profile: release, debug=1)",
+  "p0734": "copy of docs/performance/results/change-0734/probe with its five ../../../../../crates dependency paths replaced by the arm source tree; CARGO_TARGET_DIR=<arm target> CARGO_BUILD_JOBS=6 RUSTFLAGS=\"--remap-path-prefix=<arm source tree>=/litchi --remap-path-prefix=<probe copy>=/probe\" cargo build --release --locked --offline --bin ole_format_save_probe  (sealed 0734 Cargo.lock)",
+  "harness": "A: prebuilt /home/zhuhe/code/litchi-worktrees/targets/base-009d515bef/release/litchi-perf-baseline (copied); B, C: CARGO_TARGET_DIR=<arm target> CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline (no RUSTFLAGS, as the base binary)",
+  "profiling_only": "probe with RUSTFLAGS=\"-C force-frame-pointers=yes\" plus the same remaps, for perf record --call-graph fp; never used for timing"
+ }
+}

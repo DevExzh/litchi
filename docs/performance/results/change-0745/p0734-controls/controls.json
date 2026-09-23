@@ -1,0 +1,278 @@
+{
+ "docfloat-A": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "storage_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_doc_target_text",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ },
+ "docfloat-B": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "storage_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_doc_target_text",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ },
+ "docfloat-C": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "storage_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_doc_target_text",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ },
+ "ppt45543-A": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_ppt_slide_identity",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "ppt_survivor_payload_mutation",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ },
+ "ppt45543-B": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_ppt_slide_identity",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "ppt_survivor_payload_mutation",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ },
+ "ppt45543-C": {
+  "expected_oracle_ok": true,
+  "expected_output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859",
+  "controls": [
+   {
+    "name": "missing_stream",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "untouched_same_length_stream_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "root_clsid_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_state_bits_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "stream_timestamp_mutation",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "same_length_source_swap",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "wrong_ppt_slide_identity",
+    "status": "rejected",
+    "rejected": true
+   },
+   {
+    "name": "ppt_survivor_payload_mutation",
+    "status": "rejected",
+    "rejected": true
+   }
+  ]
+ }
+}
