@@ -158,6 +158,11 @@ impl Probe {
         }
     }
 
+    /// Give up the proof, so [`Self::finish`] delegates to the full reader.
+    pub(crate) fn decline(&mut self) {
+        self.eligible = false;
+    }
+
     fn proven(&self, output_len: usize) -> bool {
         self.eligible
             && self.saw_root
