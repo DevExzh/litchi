@@ -571,12 +571,16 @@ impl Snapshot {
     }
 
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
-        Self::open_package(package, None)
+        Self::open_package(package, None, None)
     }
 
     /// Opens a captured package, optionally verifying a source-backed numeric
     /// commit's materialized target on the complete `Workbook` this open
     /// already parses.
+    ///
+    /// `rendered` is the artifact an edit's package publication already
+    /// rendered and validated for this exact editor state; without it the
+    /// editor is finished here.
     ///
     /// The optional verification is the exact sequence the source-backed
     /// numeric commit used to run on a *second* complete parse of the same
@@ -586,6 +590,7 @@ impl Snapshot {
     /// second one could only ever have reproduced this one.
     fn open_package(
         package: PackageEditor,
+        rendered: Option<Vec<u8>>,
         verification: Option<NumericTargetVerification<'_>>,
     ) -> Result<Self> {
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
@@ -597,7 +602,10 @@ impl Snapshot {
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
-        let source = package.finish()?;
+        let source = match rendered {
+            Some(rendered) => rendered,
+            None => package.finish()?,
+        };
         let source_version = fresh_snapshot_source_version();
 
         let (mut sheets, sst_total_offset, xf_records) = parse_workbook_stream(&workbook_stream)?;
@@ -646,8 +654,11 @@ impl Snapshot {
         })
     }
 
+    /// Builds a fixed-numeric commit's target snapshot from the artifact its
+    /// package publication `rendered` and validated for `package`'s state.
     fn from_fixed_numeric_package_editor(
         package: PackageEditor,
+        rendered: Vec<u8>,
         source_snapshot: &Self,
         changes: &[Change],
     ) -> Result<Self> {
@@ -655,7 +666,7 @@ impl Snapshot {
             .stream_shared(&source_snapshot.inner.workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let sheets = carry_fixed_numeric_inventory(source_snapshot, &workbook_stream, changes)?;
-        let source = package.finish()?;
+        let source = rendered;
 
         // Keep the complete public reader as an independent validation owner.
         // Only the private offset inventory is carried forward after proving
@@ -2723,18 +2734,32 @@ impl Transaction {
             Targets::default(),
             Limits::default(),
         )?;
-        package.put_stream_shared(&self.source.inner.workbook_path, workbook)?;
         // The committed package editor has already rendered, reopened, and
-        // recaptured the candidate CFB. Reuse it so snapshot construction
-        // performs the owner parse and complete Workbook validation once.
+        // recaptured the candidate CFB, and it hands back the exact artifact
+        // it validated. Publish that artifact instead of rendering the same
+        // editor state a second time; snapshot construction then performs the
+        // owner parse and complete Workbook validation once, over the bytes
+        // the CFB reopen already accepted.
+        let rendered =
+            package.put_stream_shared_with_rendered(&self.source.inner.workbook_path, workbook)?;
+        debug_assert_eq!(
+            package.clone().finish().ok().as_deref(),
+            Some(rendered.as_slice()),
+            "a fresh render of the committed editor reproduces its validated rendering"
+        );
         let snapshot = if fixed_cells != 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
             && changes_are_fixed_numeric(&self.source, &self.changes)
         {
-            Snapshot::from_fixed_numeric_package_editor(package, &self.source, &self.changes)?
+            Snapshot::from_fixed_numeric_package_editor(
+                package,
+                rendered,
+                &self.source,
+                &self.changes,
+            )?
         } else {
-            Snapshot::from_package_editor(package)?
+            Snapshot::open_package(package, Some(rendered), None)?
         };
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
@@ -5401,6 +5426,7 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
         // that first parse, in the same order and at the same point.
         let target = Snapshot::open_package(
             package,
+            None,
             Some(NumericTargetVerification {
                 expected_bytes: &target_bytes,
                 source: &source,
