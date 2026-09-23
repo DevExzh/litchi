@@ -854,6 +854,17 @@ pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// attributes with the same namespace name and local name. Each defect is an
 /// [`Error::Malformed`] at its offset.
 ///
+/// These checks keep the audit's time linear in the input's length, in
+/// expectation over hash keys drawn at random for each audit:
+///
+/// * one pass finds illegal characters and the first `]]>`, and later searches
+///   for `]]>` never cover a byte twice;
+/// * every other check reads only the token it checks;
+/// * a namespace name is read only where it is declared, never by the tags in
+///   its scope;
+/// * checking one start tag's attributes for distinct expanded names takes time
+///   linear in their number and length.
+///
 /// Indentation and line endings between
 /// elements, a line ending after the XML declaration, attribute separators of
 /// any length or kind, and whitespace before a tag close are accepted as the
