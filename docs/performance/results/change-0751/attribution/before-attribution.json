@@ -1,0 +1,141 @@
+{
+  "lifecycle_period": 16823989068,
+  "phases": {
+    "commit": {
+      "share_of_lifecycle": 0.3343,
+      "leaf_shares": {
+        "sha256": 0.7975,
+        "kernel-or-unknown": 0.0775,
+        "memcpy": 0.0336,
+        "memcmp": 0.0292,
+        "other": 0.0282,
+        "crc32": 0.0221,
+        "memset": 0.0072,
+        "allocator": 0.0034,
+        "inflate": 0.0013
+      },
+      "path_shares": {
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal": 0.1635,
+        "validate_application_candidate > validate_candidate > capture_internal": 0.1625,
+        "package_fingerprint_with_memo > feed": 0.1601,
+        "prepare_cross_slide_copy_for_slides > build_candidate": 0.1599,
+        "physical_package_fingerprint > write_to_stream > write": 0.1599,
+        "prepare_cross_slide_copy_for_slides": 0.0886,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads": 0.071,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0135,
+        "prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part": 0.0053,
+        "capture_with_revision > capture_internal > load_snapshot_with_slide_root_proofs": 0.0044,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect > dialect_namespace_flags": 0.0025,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > slide_layouts": 0.0019,
+        "(root)": 0.0013,
+        "prepare_cross_slide_copy_for_slides > validate_master_layout_graph > parse_layout_id_list": 0.0008,
+        "package_fingerprint_with_memo": 0.0006,
+        "capture_with_revision > capture_internal > finish_from_processed": 0.0004,
+        "prepare_cross_slide_copy_for_slides > build_candidate > insert_slide": 0.0004,
+        "prepare_cross_slide_copy_for_slides > capture > get_part": 0.0004,
+        "capture_with_revision > capture_internal > catalog": 0.0002,
+        "package_fingerprint_with_memo > feed_relationships": 0.0002,
+        "validate_application_candidate > validate_candidate > from_part": 0.0002,
+        "prepare_cross_slide_copy_for_slides > validate_master_layout_graph > target_partname": 0.0002,
+        "capture_with_revision > capture_internal > clone": 0.0002,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > from_part": 0.0002,
+        "validate_application_candidate > partname": 0.0002
+      },
+      "sha256_site_shares_of_phase": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.3189,
+        "physical_package_fingerprint > write_to_stream > write": 0.1599,
+        "package_fingerprint_with_memo > feed": 0.1597,
+        "prepare_cross_slide_copy_for_slides > build_candidate": 0.1588,
+        "build_candidate > capture_internal > package_fingerprint_with_memo": 0.0002
+      }
+    },
+    "other": {
+      "share_of_lifecycle": 0.2926,
+      "leaf_shares": {
+        "kernel-or-unknown": 0.3901,
+        "sha256": 0.2219,
+        "memcpy": 0.1795,
+        "crc32": 0.1053,
+        "memset": 0.0321,
+        "other": 0.0317,
+        "memcmp": 0.0194,
+        "inflate": 0.0121,
+        "allocator": 0.008
+      },
+      "path_shares": {},
+      "sha256_site_shares_of_phase": {}
+    },
+    "plan": {
+      "share_of_lifecycle": 0.245,
+      "leaf_shares": {
+        "sha256": 0.6484,
+        "kernel-or-unknown": 0.1068,
+        "memcpy": 0.1049,
+        "memcmp": 0.0474,
+        "crc32": 0.0407,
+        "other": 0.032,
+        "memset": 0.0103,
+        "inflate": 0.0057,
+        "allocator": 0.0036,
+        "deflate": 0.0003
+      },
+      "path_shares": {
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate": 0.7005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > snapshot_physical_revision": 0.2167,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > capture": 0.0466,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0225,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance": 0.0093,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_registered_layout": 0.0018,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.001,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_master_layout_graph": 0.0005,
+        "plan_cross_slide_copy_for_slides": 0.0003,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_cycles": 0.0003,
+        "plan_cross_slide_copy_for_slides > has_signature_infrastructure": 0.0003,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > available_copy_name_avoiding": 0.0003
+      },
+      "sha256_site_shares_of_phase": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.2182,
+        "physical_package_fingerprint > write_to_stream > write": 0.2154,
+        "write_to > write_all_counted > write": 0.1085,
+        "write_prepared_local > write_all_counted > write": 0.1064
+      }
+    },
+    "capture": {
+      "share_of_lifecycle": 0.1281,
+      "leaf_shares": {
+        "sha256": 0.8273,
+        "memcpy": 0.0622,
+        "crc32": 0.0523,
+        "other": 0.0236,
+        "memset": 0.0158,
+        "kernel-or-unknown": 0.0084,
+        "inflate": 0.0074,
+        "allocator": 0.0015,
+        "memcmp": 0.0015
+      },
+      "path_shares": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.8327,
+        "capture_internal > package_fingerprint_with_memo > get_part": 0.1377,
+        "capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs": 0.0133,
+        "capture_internal > load_snapshot_with_slide_root_proofs > snapshot_from_index": 0.003,
+        "capture_internal > finish_from_processed > scan_processed_xml": 0.0029,
+        "capture_internal > package_fingerprint_with_memo": 0.002,
+        "capture_internal > from_part": 0.0015,
+        "capture_internal > validate_slide_relationship > get_part": 0.0015,
+        "capture_internal > slide_references": 0.001,
+        "capture_internal > catalog > slide_references": 0.001,
+        "capture_internal > processed_xml_with_capture": 0.001,
+        "capture_internal > package_fingerprint_with_memo > feed_relationships": 0.0005,
+        "capture_internal": 0.0005,
+        "capture_internal > load_snapshot_with_slide_root_proofs": 0.0005,
+        "capture_internal > clone > clone": 0.0005,
+        "capture_internal > main_document_part > target_partname": 0.0005
+      },
+      "sha256_site_shares_of_phase": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.8263,
+        "package_fingerprint_with_memo > feed_relationships > feed": 0.0005,
+        "capture_internal > package_fingerprint_with_memo": 0.0005
+      }
+    }
+  }
+}
