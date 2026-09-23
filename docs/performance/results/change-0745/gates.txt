@@ -90,3 +90,39 @@ Test totals:
 
 - The harness (tools/perf-baseline) is unchanged, so its tests and the CRUD coverage validator were not required.
 - No change touches litchi-xls, litchi-doc, litchi-ole-common or OOXML crates.
+
+## Review-fix commit (the commit after 0eb9de0006), gates run before commit in a fresh CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0745, deleted afterwards
+
+== fmt: cargo fmt --all --check
+exit=0
+== test-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-ppt-diag: cargo test -p litchi-ppt --features performance-diagnostics --locked --offline
+exit=0
+== clippy-ppt-lib: cargo clippy -p litchi-ppt --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-lib-diag: cargo clippy -p litchi-ppt --lib --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all: cargo clippy -p litchi-ppt --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-ppt-all-diag: cargo clippy -p litchi-ppt --all-targets --no-deps --features performance-diagnostics --locked --offline -- -D warnings
+exit=0
+== doc-ppt: cargo doc -p litchi-ppt --no-deps --locked --offline
+exit=0
+== doc-ppt-diag: cargo doc -p litchi-ppt --no-deps --features performance-diagnostics --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=0
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+
+Test totals:
+  test-ppt: passed=1229 failed=0 ignored=11
+  test-ppt-diag: passed=1235 failed=0 ignored=11
+  boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+  non-iwork: verified_facade_combined_tree=1
+  perf-claims: OK: 10 performance claims validated (structural)
+
+Mutation check (not a gate): with the structural artifact precondition in apply_durable_structural disabled, mixed_formatting_and_structural_patch_binds_the_unretained_intermediate fails with "a durable structural patch applied to a sibling artifact"; the source was restored before the gates above.

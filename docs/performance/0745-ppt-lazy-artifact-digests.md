@@ -48,14 +48,23 @@ no-op and formatting-only branch hashed the same bytes twice.
 
 The commit now makes these changes:
 
-- **`Snapshot` gains a private `ArtifactDigest(Arc<OnceLock<String>>)`.**
-  Every clone of a snapshot shares its byte allocation and this memo. The memo
-  is filled on first use, from exactly those bytes, and only by a durable or
-  transfer consumer. Its `PartialEq` always holds and its `Debug` prints a
-  placeholder, because it is a pure function of the bytes the snapshot already
-  compares. A unit test checks that every construction path gets a fresh memo
-  equal to `BlobId::of(bytes)`: open, single and batch text adoption, and
-  reopen after an anchor edit.
+- **Each `Snapshot` now carries a small, bounded digest memo.** The bytes and
+  their memo form one private `Artifact` value: an `Arc<[u8]>` plus an
+  `Arc<OnceLock<String>>`. The memo is a 48-byte allocation per artifact, plus
+  a 64-byte hex string once hashed.
+  - Every clone of a snapshot shares the byte allocation and the memo.
+  - The memo is filled on first use, from exactly those bytes, and only by a
+    durable or transfer consumer.
+  - `Artifact`'s fields are private to a nested module, and `Artifact::new` is
+    its only constructor, so new bytes always get a fresh memo. Struct-update
+    syntax on a snapshot cannot attach one artifact's digest to other bytes.
+    This construction was added by the review fix.
+  - Equality compares the bytes only, and `Debug` omits the memo.
+  - A unit test checks that every construction path gets a fresh memo equal to
+    `BlobId::of(bytes)`: open, single and batch text adoption, and reopen after
+    an anchor edit.
+  - A compile-time assertion keeps `Snapshot`, `Patch`, `Commit` and
+    `TransferPlan` `Send + Sync`.
 - **`Patch` records which retained artifact each side of its structural
   operations is bound to** (`StructuralArtifact::{Before, After}`) and resolves
   the digest in `to_durable`. `inverse` maps Before↔After. The no-op branch
@@ -65,8 +74,9 @@ The commit now makes these changes:
 - **Only a transaction that stages formatting and then structural changes
   still hashes at commit.** In that case the structural operations start from
   an intermediate artifact that the patch does not retain
-  (`StructuralArtifact::Intermediate(digest)`). The patch retains no new
-  artifact, as the brief preferred.
+  (`StructuralArtifact::Intermediate(digest)`). The patch retains no
+  additional artifact, as the brief preferred. The only new memory is the
+  per-snapshot memo described above.
 - **Duplicate hashing of identical bytes is removed:**
   - `apply_durable` hashes `current` once per structural run. Its inner commit
     computes nothing, and `insert_transfer` reuses the memo through the
@@ -114,16 +124,20 @@ avoiding it would need a retained editor or a weaker check at `edit()` time.
   wire form. The durable envelope, its operation vocabulary, its preconditions
   and its bytes are unchanged. In-memory `apply` and `inverse` still authorize
   by exact artifacts.
-- **ADR 0005:** memory and evidence. The per-snapshot memo is a
-  48-byte `Arc`, plus 64 hex bytes once filled. It replaces two 64-byte
-  `String`s per patch. No artifact is newly retained.
+- **ADR 0005:** memory and evidence. Each snapshot now carries a small,
+  bounded digest memo: a 48-byte allocation, plus a 64-byte hex string once
+  hashed. It replaces two 64-byte `String`s per patch. No artifact is newly
+  retained.
 - **ADR 0006:** preservation and validation. Every output byte is unchanged,
-  every validation still runs, and typed refusals, including
-  `TransferTargetMismatch` and durable precondition conflicts, are unchanged.
+  every validation still runs, and typed refusals are unchanged. That includes
+  `TransferTargetMismatch` and the durable structural artifact conflict, which
+  `mixed_formatting_and_structural_patch_binds_the_unretained_intermediate`
+  now asserts exactly, forward and inverse.
 - **Change 0652's standing trade-offs:**
   - Breaking changes are acceptable. The feature-gated diagnostics enum
     changed.
-  - Correctness comes first. The wire bytes are proven unchanged.
+  - Correctness comes first. The wire bytes are tested unchanged (8 unit
+    scenarios, 32 golden entries).
   - Optimize the benign common path. Structural-only and formatting-only
     commits no longer hash, while the rare mixed commit still hashes once.
 - **The 0732 disposition still holds.** 0732 said the required before/after
@@ -157,9 +171,21 @@ avoiding it would need a retained editor or a weaker check at `edit()` time.
   - no-op and formatting-only patches never fill it.
 - **The mixed case** binds the digest of the exact intermediate, which equals
   the formatting-only publication's bytes. It round-trips through durable
-  apply and restore on an authored deck, and a wrong artifact still conflicts.
+  apply and restore on an authored deck.
+- **A wrong artifact still conflicts**, as shown by
+  `mixed_formatting_and_structural_patch_binds_the_unretained_intermediate`,
+  corrected in review:
+  - Siblings whose formatting preconditions match but whose bytes differ
+    (slide 0 hidden then unhidden, or an anchor moved and restored, each in
+    two commits) are refused with the exact error "PPT durable structural
+    patch source artifact does not match".
+  - This holds in both directions: the forward patch on a sibling of the
+    source, and the inverse on a sibling of the committed artifact.
+  - The first version of that test was satisfied by formatting preconditions
+    and never reached the artifact check. With the artifact check disabled,
+    the corrected test fails.
 - **Equality ignores memo state.** Equal snapshots stay equal whether or not a
-  digest was computed, and `Debug` output is unchanged.
+  digest was computed, and their `Debug` output is identical.
 
 ## Motivating evidence and profile
 
@@ -181,15 +207,18 @@ The first two-arm pilot, with fixed command lines, measured `chain-durable` at
 separated the cause:
 
 - Environment padding of 0–4,032 bytes had no effect.
-- The length of argv[0] flipped the result. Rust copies argv[0] into a heap
-  allocation at startup.
+- The length of argv[0] flipped the result. The probe's own
+  `std::env::args()` call (`probe/src/lib.rs:116`) copies argv[0] into a heap
+  allocation. Rust's startup does not.
 - User instructions per owner were constant per arm.
 - Page faults per owner varied from 273 to 964 with layout.
 
-On this host, some PPT lifecycle timings therefore depend on the startup heap
-layout through glibc's mmap and trim behaviour, by up to about ±15%, and not
-on code. This is consistent with the command-line sensitivity that 0736–0738
-reported, but it does not prove the cause of their observations.
+On this host, some PPT lifecycle timings therefore depend on the early heap
+layout by up to about ±15%, and not on code. The varying page-fault counts
+point to allocator state. glibc's mmap-threshold and trim behaviour is the
+suspected mechanism, but that is inferred, not tested: no run fixed the
+`MALLOC_*` settings. This is consistent with the command-line sensitivity that
+0736–0738 reported, but it does not prove the cause of their observations.
 
 The final matrix therefore runs each round through argv[0] symlinks 8 bytes
 longer than the previous round. All three arms use the same length in a round.
@@ -374,6 +403,26 @@ because removing them needs a new "insert with known id" API.
 - Crate boundaries: 64 packages, 241 declarations, 11 existing debt items.
 - `non_iwork_gate verify`.
 - Structural perf-claims check: 10 claims.
+
+**Review fix.** The fix commit changes these:
+
+- the corrected artifact-conflict test;
+- `Artifact` binding bytes to their memo;
+- the `Send + Sync` assertion;
+- this wording.
+
+Its gates were rerun in a fresh target directory, deleted afterwards:
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --all --check` | pass |
+| `cargo test -p litchi-ppt` | 1,229 passed |
+| `cargo test -p litchi-ppt` with `performance-diagnostics` | 1,235 passed |
+| Clippy `-D warnings`, lib and all targets, with and without the feature | pass |
+| rustdoc `-D warnings`, with and without the feature | pass |
+| Boundaries, non-iWork and structural claims checks | pass |
+
+No test failed. `gates.txt` has the commands and exit codes.
 
 ## Cleanup
 

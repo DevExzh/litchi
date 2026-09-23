@@ -6,9 +6,10 @@ C = e94bd56f58 (B plus single-read editor streams and a shared commit editor).
 
 Every process is pinned with `taskset -c CORE`. Each round runs every case
 once per arm. Round r launches each binary through a symlink whose name adds
-8*r bytes to argv[0]; Rust's runtime copies argv into heap allocations, and
-change 0745 found that this startup heap layout alone moves some PPT
-lifecycle timings by up to +/-15% (glibc page-fault behaviour). Using the same
+8*r bytes to argv[0]; each binary's own `std::env::args()` call copies argv
+into heap allocations, and change 0745 found that this early heap layout alone
+moves some PPT lifecycle timings by up to +/-15% (varying page faults; the
+glibc mechanism is inferred, not tested). Using the same
 argv[0] length for every arm within a round keeps the comparison paired while
 the rounds sample many heap layouts. Arm order cycles through all six
 permutations; case order rotates each round. Command lines are otherwise

@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Cursor;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 pub use litchi_core::Position;
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
@@ -462,45 +462,115 @@ impl fmt::Debug for Lineage {
     }
 }
 
-/// Lazily memoized SHA-256 content address of one snapshot's exact artifact.
-///
-/// A snapshot never mutates its bytes, and every clone shares both the byte
-/// allocation and this memo, so the digest is computed at most once per
-/// artifact, from exactly those bytes, and only when a durable-patch or
-/// transfer consumer asks for it. Commit and in-memory patch application
-/// never need it: they authorize by exact byte equality.
-///
-/// Equality and `Debug` ignore the memo. The digest is a pure function of the
-/// bytes that the owning snapshot already compares, and whether it has been
-/// filled depends only on call history.
-#[derive(Clone, Default)]
-struct ArtifactDigest(Arc<OnceLock<String>>);
+mod artifact {
+    //! Exact artifact bytes bound to the lazily memoized SHA-256 of exactly
+    //! those bytes.
+    //!
+    //! The fields are private to this module and [`Artifact::new`] is the only
+    //! constructor, so new bytes always start with a fresh memo while a clone
+    //! keeps its bytes and memo together. No code outside this module can pair
+    //! a memo with different bytes, including through struct-update syntax on
+    //! an owning snapshot.
 
-impl ArtifactDigest {
-    fn hex(&self, bytes: &[u8]) -> &str {
-        self.0.get_or_init(|| artifact_hash(bytes))
+    use std::fmt;
+    use std::sync::{Arc, OnceLock};
+
+    /// One immutable artifact and its content address.
+    ///
+    /// The digest is computed at most once per artifact, from exactly its
+    /// bytes, and only when a durable-patch or transfer consumer asks for it.
+    /// Commit and in-memory patch application never need it: they authorize
+    /// by exact byte equality. Every clone shares both the byte allocation and
+    /// the memo, a 48-byte allocation that also holds the 64-byte hex digest
+    /// once it is computed.
+    ///
+    /// Equality compares the bytes only, because the digest is a pure function
+    /// of them. `Debug` omits the memo, whose fill state depends only on call
+    /// history.
+    #[derive(Clone)]
+    pub(super) struct Artifact {
+        bytes: Arc<[u8]>,
+        sha256: Arc<OnceLock<String>>,
+    }
+
+    impl Artifact {
+        /// Binds new exact bytes to a fresh, empty digest memo.
+        pub(super) fn new(bytes: Arc<[u8]>) -> Self {
+            Self {
+                bytes,
+                sha256: Arc::default(),
+            }
+        }
+
+        /// The exact artifact bytes.
+        pub(super) fn bytes(&self) -> &[u8] {
+            &self.bytes
+        }
+
+        /// The shared immutable byte allocation.
+        pub(super) const fn shared(&self) -> &Arc<[u8]> {
+            &self.bytes
+        }
+
+        /// Whether both values share one byte allocation.
+        pub(super) fn same_allocation(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.bytes, &other.bytes)
+        }
+
+        /// Lowercase hexadecimal SHA-256 of the bytes, computed on first use.
+        pub(super) fn sha256(&self) -> &str {
+            self.sha256
+                .get_or_init(|| super::artifact_hash(&self.bytes))
+        }
+
+        /// The digest if some consumer has already computed it.
+        #[cfg(test)]
+        pub(super) fn memoized_sha256(&self) -> Option<&str> {
+            self.sha256.get().map(String::as_str)
+        }
+
+        /// Whether both values share one digest memo.
+        #[cfg(test)]
+        pub(super) fn shares_memo_with(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.sha256, &other.sha256)
+        }
+    }
+
+    impl PartialEq for Artifact {
+        fn eq(&self, other: &Self) -> bool {
+            self.bytes == other.bytes
+        }
+    }
+
+    impl Eq for Artifact {}
+
+    impl fmt::Debug for Artifact {
+        fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter
+                .debug_struct("Artifact")
+                .field("bytes", &self.bytes)
+                .finish_non_exhaustive()
+        }
     }
 }
 
-impl PartialEq for ArtifactDigest {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
+use artifact::Artifact;
 
-impl Eq for ArtifactDigest {}
-
-impl fmt::Debug for ArtifactDigest {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ArtifactDigest(..)")
-    }
-}
+// Snapshots memoize their artifact digest through interior mutability
+// (`OnceLock`). Keep every shareable slide-order value `Send + Sync`; this
+// fails to compile if a future field breaks that.
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Snapshot>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<TransferPlan>();
+};
 
 /// Immutable exact whole-package snapshot used by slide-order edits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
-    bytes: Arc<[u8]>,
-    digest: ArtifactDigest,
+    artifact: Artifact,
     document: document_structure::Snapshot,
     document_persist_id: u32,
     limits: RecordLimits,
@@ -579,8 +649,7 @@ impl Snapshot {
         drop(presentation);
         drop(package);
         Ok(Self {
-            bytes: Arc::from(bytes.into_boxed_slice()),
-            digest: ArtifactDigest::default(),
+            artifact: Artifact::new(Arc::from(bytes.into_boxed_slice())),
             document,
             document_persist_id,
             limits,
@@ -628,8 +697,7 @@ impl Snapshot {
             .into());
         }
         Ok(Self {
-            bytes,
-            digest: ArtifactDigest::default(),
+            artifact: Artifact::new(bytes),
             document: self.document.clone(),
             document_persist_id: self.document_persist_id,
             limits: self.limits,
@@ -679,8 +747,7 @@ impl Snapshot {
         }
         Ok((
             Self {
-                bytes,
-                digest: ArtifactDigest::default(),
+                artifact: Artifact::new(bytes),
                 document: self.document.clone(),
                 document_persist_id: self.document_persist_id,
                 limits: self.limits,
@@ -693,7 +760,7 @@ impl Snapshot {
     /// Exact bytes of the complete source or committed artifact.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+        self.artifact.bytes()
     }
 
     /// Number of presentation slides in semantic order.
@@ -988,7 +1055,7 @@ impl Snapshot {
         crate::font::require_stream_only_cfb(self.bytes())
             .and_then(|()| {
                 crate::embedded::object::Editor::open_records_arc_with_limit(
-                    self.bytes.clone(),
+                    self.shared_bytes(),
                     self.limits.max_package_bytes,
                 )
                 .map(|_editor| ())
@@ -1004,13 +1071,18 @@ impl Snapshot {
     }
 
     fn lineage(&self) -> Lineage {
-        Lineage(self.bytes.clone())
+        Lineage(self.shared_bytes())
     }
 
     /// Lowercase hexadecimal SHA-256 of the exact artifact, computed on first
     /// use and shared by every clone of this snapshot.
     fn artifact_digest(&self) -> &str {
-        self.digest.hex(&self.bytes)
+        self.artifact.sha256()
+    }
+
+    /// Shared handle to the exact artifact bytes.
+    fn shared_bytes(&self) -> Arc<[u8]> {
+        Arc::clone(self.artifact.shared())
     }
 }
 
@@ -1695,7 +1767,7 @@ impl Transaction {
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
         let text_snapshot =
-            crate::text_edit::Snapshot::from_shared_bytes(self.working.bytes.clone())?;
+            crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
         let mut text_edit = text_snapshot.edit_text(source_target)?;
         let before = text_edit.text().to_string();
         let after = value.into();
@@ -1781,7 +1853,7 @@ impl Transaction {
         }
 
         let Some(publication) = crate::text_edit::replace_shape_texts_batch(
-            self.working.bytes.clone(),
+            self.working.shared_bytes(),
             &mapped,
             self.source.limits.max_package_bytes,
         )?
@@ -2085,7 +2157,7 @@ impl Transaction {
         }
 
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-            working.bytes.clone(),
+            working.shared_bytes(),
             source.limits.max_package_bytes,
         )?;
         // Nothing is staged yet, so the publishing editor reads exactly the
@@ -2127,7 +2199,7 @@ impl Transaction {
             )
             .into());
         }
-        let after_slides = persisted_slides(&snapshot.bytes, &snapshot.document)?;
+        let after_slides = persisted_slides(snapshot.artifact.shared(), &snapshot.document)?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
             &before_slides,
@@ -2220,7 +2292,7 @@ impl Transaction {
         let mut editor = observe_phase(&mut observer, DiagnosticPhase::EmbeddedOpen, || {
             Ok(
                 crate::embedded::object::Editor::open_records_arc_with_limit(
-                    working.bytes.clone(),
+                    working.shared_bytes(),
                     source.limits.max_package_bytes,
                 )?,
             )
@@ -2281,7 +2353,7 @@ impl Transaction {
         }
         let after_slides =
             observe_phase(&mut observer, DiagnosticPhase::AfterPayloadCapture, || {
-                persisted_slides(&snapshot.bytes, &snapshot.document)
+                persisted_slides(snapshot.artifact.shared(), &snapshot.document)
             })?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
@@ -2414,7 +2486,7 @@ impl StructuralArtifact {
     /// that structural publication started from. Without staged formatting the
     /// working snapshot shares the source allocation.
     fn retains_structural_source(source: &Snapshot, working: &Snapshot) -> bool {
-        Arc::ptr_eq(&source.bytes, &working.bytes) || source.bytes() == working.bytes()
+        source.artifact.same_allocation(&working.artifact) || source.bytes() == working.bytes()
     }
 
     /// Binds the artifact that structural publication started from.
@@ -3872,7 +3944,7 @@ fn media_path_of(object: &crate::external_media::Object) -> Result<Option<String
 
 fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapshot> {
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        snapshot.bytes.clone(),
+        snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?;
     let live = editor.persisted_record(snapshot.document_persist_id)?;
@@ -3932,7 +4004,7 @@ fn editor_persisted_slides(
 
 fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
     crate::embedded::object::Editor::open_records_arc_with_limit(
-        snapshot.bytes.clone(),
+        snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?
     .persisted_record(persist_id)
@@ -4053,7 +4125,7 @@ fn replace_slide_hidden(
         .into());
     }
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        snapshot.bytes.clone(),
+        snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
@@ -4184,7 +4256,7 @@ fn replace_slide_advance(
         .into());
     }
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        snapshot.bytes.clone(),
+        snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
@@ -4332,7 +4404,7 @@ fn replace_slide_transition_visual(
         .into());
     }
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        snapshot.bytes.clone(),
+        snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
@@ -4421,7 +4493,7 @@ fn require_master_closure(target: &Snapshot, donor: &Snapshot, master_id: u32) -
 
 fn next_persist_id(source: &Snapshot, inserted: &BTreeMap<u32, Vec<u8>>) -> Result<u32> {
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        source.bytes.clone(),
+        source.shared_bytes(),
         source.limits.max_package_bytes,
     )?;
     editor
@@ -5289,7 +5361,7 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
         .map(|slide| slide.persist_id())
         .collect::<BTreeSet<_>>();
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        target.bytes.clone(),
+        target.shared_bytes(),
         target.limits.max_package_bytes,
     )?;
     let mut live_shape_ids = BTreeSet::new();
@@ -6753,7 +6825,7 @@ mod tests {
         replacement: &str,
     ) -> crate::text_edit::RootPublication {
         let text_source =
-            crate::text_edit::Snapshot::from_shared_bytes(source.bytes.clone()).unwrap();
+            crate::text_edit::Snapshot::from_shared_bytes(source.shared_bytes()).unwrap();
         let mut edit = text_source.edit_text(target).unwrap();
         edit.set_text(replacement).unwrap();
         let commit = edit.commit().unwrap();
@@ -6948,7 +7020,7 @@ mod tests {
         let valid = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let missing = crate::text_edit::Target::new(Position::new(1), Position::new(99));
         let mut edit = source.edit().unwrap();
-        let source_ptr = edit.working.bytes.as_ptr();
+        let source_ptr = edit.working.bytes().as_ptr();
 
         let error = edit
             .set_shape_texts(&[
@@ -6960,7 +7032,7 @@ mod tests {
             error,
             Error::Refused(Refusal::DuplicateShapeTextTarget { target }) if target == valid
         ));
-        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), source_ptr);
         assert!(edit.shape_text_changes().is_empty());
 
         let error = edit
@@ -6974,7 +7046,7 @@ mod tests {
             Error::Text(error)
                 if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::ShapeNotFound))
         ));
-        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), source_ptr);
         assert!(edit.shape_text_changes().is_empty());
 
         let error = edit
@@ -6991,7 +7063,7 @@ mod tests {
             Error::Text(error)
                 if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::IncompatibleEncoding))
         ));
-        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), source_ptr);
         assert!(edit.shape_text_changes().is_empty());
         assert_eq!(edit.commit().unwrap().snapshot(), &source);
     }
@@ -7024,13 +7096,13 @@ mod tests {
             Err(Error::Refused(Refusal::DuplicateShapeTextTarget { .. }))
         ));
 
-        let before_ptr = edit.working.bytes.as_ptr();
+        let before_ptr = edit.working.bytes().as_ptr();
         assert_eq!(
             edit.set_shape_texts(&[ShapeTextReplacement::new(target, "first shape")])
                 .unwrap(),
             0
         );
-        assert_eq!(edit.working.bytes.as_ptr(), before_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), before_ptr);
         assert!(edit.shape_text_changes().is_empty());
 
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
@@ -7057,9 +7129,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let mut exact_edit = exact_source.edit().unwrap();
-        let source_ptr = exact_edit.working.bytes.as_ptr();
+        let source_ptr = exact_edit.working.bytes().as_ptr();
         assert_eq!(exact_edit.set_shape_texts(&exact_limit).unwrap(), 0);
-        assert_eq!(exact_edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(exact_edit.working.bytes().as_ptr(), source_ptr);
         assert_eq!(exact_edit.commit().unwrap().snapshot(), &exact_source);
     }
 
@@ -7076,7 +7148,7 @@ mod tests {
         assert!(!crate::text_edit::shape_text_can_resize(source.bytes(), dependency).unwrap());
         let dependency_before = shape_text(source.bytes(), dependency);
         let mut edit = source.edit().unwrap();
-        let source_ptr = edit.working.bytes.as_ptr();
+        let source_ptr = edit.working.bytes().as_ptr();
         let error = edit
             .set_shape_texts(&[
                 ShapeTextReplacement::new(safe, "valid but unpublished"),
@@ -7088,7 +7160,7 @@ mod tests {
             Error::Text(error)
                 if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::DependencyClosure))
         ));
-        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), source_ptr);
         assert!(edit.shape_text_changes().is_empty());
         assert_eq!(edit.commit().unwrap().snapshot(), &source);
     }
@@ -7105,7 +7177,7 @@ mod tests {
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
         let oversized = "x".repeat(limits.max_package_bytes);
         let mut edit = source.edit().unwrap();
-        let source_ptr = edit.working.bytes.as_ptr();
+        let source_ptr = edit.working.bytes().as_ptr();
         let error = edit
             .set_shape_texts(&[
                 ShapeTextReplacement::new(first, "valid but unpublished"),
@@ -7121,7 +7193,7 @@ mod tests {
                         if message.contains("shape-text batch retained bytes")
                 )
         ));
-        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(edit.working.bytes().as_ptr(), source_ptr);
         assert!(edit.shape_text_changes().is_empty());
         assert_eq!(edit.commit().unwrap().snapshot(), &source);
     }
@@ -8063,7 +8135,7 @@ mod tests {
     }
 
     fn memoized_digest(snapshot: &Snapshot) -> Option<&str> {
-        snapshot.digest.0.get().map(String::as_str)
+        snapshot.artifact.memoized_sha256()
     }
 
     fn exact_digest(bytes: &[u8]) -> String {
@@ -8076,6 +8148,20 @@ mod tests {
             .filter_map(|operation| operation.preconditions.get("artifact_sha256"))
             .map(|value| value.as_str().unwrap())
             .collect()
+    }
+
+    /// Asserts that durable application stopped at the structural
+    /// `artifact_sha256` precondition rather than at a formatting, order or
+    /// payload precondition.
+    fn assert_structural_artifact_conflict(result: Result<Snapshot>) {
+        match result {
+            Err(Error::Package(PackageError::InvalidFormat(message))) => assert_eq!(
+                message,
+                "PPT durable structural patch source artifact does not match"
+            ),
+            Err(error) => panic!("expected the structural artifact conflict, got: {error}"),
+            Ok(_) => panic!("a durable structural patch applied to a sibling artifact"),
+        }
     }
 
     #[test]
@@ -8485,13 +8571,38 @@ mod tests {
         let applied = source.apply_durable(&durable).unwrap();
         assert_eq!(applied.bytes(), commit.snapshot().bytes());
         assert_eq!(applied.slide_hidden(Position::new(0)).unwrap(), !hidden);
-        // A structural precondition over the wrong artifact still conflicts.
-        assert!(intermediate.apply_durable(&durable).is_err());
+
+        // Siblings whose formatting state matches but whose bytes differ:
+        // slide 0 is toggled and restored in two commits. The durable
+        // formatting operations therefore apply, and only the structural
+        // artifact precondition can refuse them.
+        let visibility_sibling = |base: &Snapshot, state: bool| {
+            let mut away = base.edit().unwrap();
+            away.set_slide_hidden(Position::new(0), !state).unwrap();
+            let away = away.commit().unwrap().snapshot().clone();
+            let mut back = away.edit().unwrap();
+            back.set_slide_hidden(Position::new(0), state).unwrap();
+            let sibling = back.commit().unwrap().snapshot().clone();
+            assert_eq!(sibling.slide_hidden(Position::new(0)).unwrap(), state);
+            assert_eq!(sibling.slide_count(), base.slide_count());
+            assert_ne!(sibling.bytes(), base.bytes());
+            sibling
+        };
+        // Forward: the hide applies to the sibling, whose intermediate differs
+        // from the one the structural removal is bound to.
+        let source_sibling = visibility_sibling(&source, hidden);
+        assert_structural_artifact_conflict(source_sibling.apply_durable(&durable));
+        // Inverse: structural reinsertion runs first against the committed
+        // artifact's sibling.
+        let target_sibling = visibility_sibling(commit.snapshot(), !hidden);
+        assert_structural_artifact_conflict(target_sibling.apply_durable(&durable.inverse()));
+        assert_structural_artifact_conflict(target_sibling.apply_durable(&inverse_durable));
 
         // Complete durable round trip through an unretained intermediate on a
         // deck whose re-inserted slide needs no second picture store.
         let source = Snapshot::from_bytes(authored_fixture()).unwrap();
         let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let original_anchor = source.shape_anchor(target).unwrap();
         let anchor = crate::Anchor::small(25, 35, 325, 235).unwrap();
         let mut edit = source.edit().unwrap();
         edit.set_shape_anchor(target, anchor).unwrap();
@@ -8507,23 +8618,31 @@ mod tests {
         let restored = applied.apply_durable(&durable.inverse()).unwrap();
         assert_eq!(restored.slide_count(), source.slide_count());
         assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
-        assert_eq!(
-            restored.shape_anchor(target).unwrap(),
-            source.shape_anchor(target).unwrap()
-        );
-        assert!(
-            commit
-                .snapshot()
-                .apply_durable(&durable)
-                .is_err_and(|error| error.to_string().contains("does not match"))
-        );
+        assert_eq!(restored.shape_anchor(target).unwrap(), original_anchor);
+
+        // The same proof through an anchor that is moved and restored.
+        let anchor_sibling = |base: &Snapshot, kept: crate::Anchor, away: crate::Anchor| {
+            let mut first = base.edit().unwrap();
+            first.set_shape_anchor(target, away).unwrap();
+            let moved = first.commit().unwrap().snapshot().clone();
+            let mut second = moved.edit().unwrap();
+            second.set_shape_anchor(target, kept).unwrap();
+            let sibling = second.commit().unwrap().snapshot().clone();
+            assert_eq!(sibling.shape_anchor(target).unwrap(), kept);
+            assert_ne!(sibling.bytes(), base.bytes());
+            sibling
+        };
+        let source_sibling = anchor_sibling(&source, original_anchor, anchor);
+        assert_structural_artifact_conflict(source_sibling.apply_durable(&durable));
+        let target_sibling = anchor_sibling(commit.snapshot(), anchor, original_anchor);
+        assert_structural_artifact_conflict(target_sibling.apply_durable(&durable.inverse()));
     }
 
     #[test]
     fn artifact_digest_memo_follows_every_snapshot_construction() {
         let source = Snapshot::from_bytes(authored_batch_fixture()).unwrap();
         let clone = source.clone();
-        assert!(Arc::ptr_eq(&source.digest.0, &clone.digest.0));
+        assert!(source.artifact.shares_memo_with(&clone.artifact));
         assert_eq!(clone.artifact_digest(), exact_digest(source.bytes()));
         assert_eq!(
             memoized_digest(&source),
@@ -8547,7 +8666,7 @@ mod tests {
             ("anchor", &anchor),
         ] {
             assert!(
-                !Arc::ptr_eq(&source.digest.0, &snapshot.digest.0),
+                !source.artifact.shares_memo_with(&snapshot.artifact),
                 "{label} publication must not inherit the source memo"
             );
             assert_eq!(memoized_digest(snapshot), None, "{label}");
@@ -8604,7 +8723,7 @@ mod tests {
             Some(plan.target_artifact.as_str())
         );
         let mut edit = receiver.edit().unwrap();
-        assert!(Arc::ptr_eq(&edit.source.digest.0, &receiver.digest.0));
+        assert!(edit.source.artifact.shares_memo_with(&receiver.artifact));
         edit.insert_transfer(Position::new(1), &plan).unwrap();
         assert_eq!(edit.commit().unwrap().snapshot().slide_count(), 2);
 

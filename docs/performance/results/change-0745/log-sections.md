@@ -19,9 +19,10 @@ Remaining PPT lifecycle cost is editor opens, finish and reopen. The editor
 that `edit()` discards is a validation and is kept. Next candidates found:
 `litchi-ole-common` `render_copy_through` opens in-memory sources generically,
 so the CFB overlay hashes source and target on several passes. PPT timings on
-this host swing up to about ±15% with the startup heap layout through
-page-fault behaviour, so randomize that layout (argv[0] length) in paired
-measurements. The non-iWork goal remains active.
+this host swing up to about ±15% with the early heap layout, which the
+length of argv[0] shifts through each binary's own `std::env::args()` copy.
+Page faults vary with it, and the glibc mechanism is inferred, not tested.
+Randomize that layout in paired measurements. The non-iWork goal remains active.
 
 ## For REPORT.md
 
@@ -66,11 +67,13 @@ Gates:
 ## 0745 — deferred PPT artifact digests and single-read editor streams
 
 [0745](0745-ppt-lazy-artifact-digests.md) keeps the ADR 0003 durable patch
-contract byte for byte. It pins eight forward and inverse wire digests to the
-eager base. The probe goldens (32 entries, including refusals) match across
-three builds. The change retains no new artifact: the digest memo is one
-48-byte `Arc` per snapshot, and in-memory apply still authorizes by exact
-bytes.
+contract byte for byte: tested unchanged in eight unit scenarios pinned to
+the eager base, and in 32 golden entries, including refusals, across three
+builds. A review fix makes the durable artifact-conflict test reach that check
+in both directions. The change retains no additional artifact. Each snapshot
+carries a small, bounded digest memo: 48 bytes, plus a 64-byte hex string once
+hashed. The bytes and memo are bound by construction, and in-memory apply
+still authorizes by exact bytes.
 
 The feature-gated `DiagnosticPhase` loses its two artifact-hash phases and
 gains `IntermediateArtifactHash`. That is a breaking change under 0652
