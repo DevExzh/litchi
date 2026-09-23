@@ -1,0 +1,6 @@
+label                  A p50 ms   B p50 ms    ratio             95% CI     A p95     B p95 digest
+control_xls               0.081      0.081   0.9976 [0.9933, 0.9984]     0.090     0.088 same
+docx_sb_one               1.757      1.800   1.0267 [1.0215, 1.0390]     1.782     1.841 same
+sb_one_dense             26.142     26.624   1.0191 [1.0136, 1.0206]    26.467    26.855 same
+    A {'commit_ns': 5.197, 'open_ns': 0.091, 'plan_ns': 9.895, 'publication_ns': 10.952}
+    B {'commit_ns': 5.168, 'open_ns': 0.086, 'plan_ns': 10.199, 'publication_ns': 11.162}

@@ -27,3 +27,20 @@ SHA-256 in binary_identity.binary_sha256; their environment.rustc_version is the
 rustc of the directory the harness ran from (1.95.0 for the timing runs, which
 ran in the worktree; 1.98.1 for the callgrind runs, which ran in scratch), not
 the compiler that built it.
+
+Review follow-up (the expanded-name fix, commit 0bbcc9bf94; 900eb6de11 changes only comments):
+
+Harness, built again for both legs with the identical command above, the base
+in a detached worktree at 3174242282 (CARGO_TARGET_DIR targets/0750/harness-before)
+and the fix in the branch worktree (CARGO_TARGET_DIR targets/0750), rustc 1.95.0:
+37c9d54e52fcdad6a4a63cf7c23e02f6dfd93a5b12173e3822a23f3dc36d2fa2  litchi-perf-baseline.before
+e78216fd5dbb7e5bd6e19b250add81c85169d834575e143a68710bdc29a2648f  litchi-perf-baseline.after
+
+Adversarial-input probe (probe/dos), release, rustc 1.98.1, against three checkouts:
+a66efc6b601302eed3395e57e95c329593deac2153946764480b636d0b91d1a5  litchi-dos-probe-0750 (base 3174242282)
+82ecbc2722595ef80172cec2e75cd0515e1ca1c512eff2ddec7777ce5a97bd08  litchi-dos-probe-0750 (first candidate de69fb407d)
+e41455d9a42a7646fb700df7b37b51b11273a4218a4e6b8b8b918bb514bc1db8  litchi-dos-probe-0750 (fix)
+
+Audit probe (probe/audit), rebuilt for the follow-up instruction counts, rustc 1.98.1:
+9783a86af1d3ba0d567fac2eea92efb287edd4a0a6a3c3acd753b2ec4b43fefc  litchi-audit-probe-0750 (base; identical to the first build above)
+587bb93131a5cbd0f23bdab1ccc4f28bc41ff50f7de3230932e3d16dbdff7750  litchi-audit-probe-0750 (fix)

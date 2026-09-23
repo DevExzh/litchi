@@ -24,8 +24,12 @@ def inclusive(path):
 
 
 def main(directory):
+    import glob, os
+    present = {os.path.basename(path).split("-", 2)[2].rsplit("-s", 1)[0]
+               for path in glob.glob(f"{directory}/cg-before-*-s1.out")}
+    cases = [case for case in CASES if case in present]
     print(f"{'case':<15}{'entry point':<48}{'before/sample':>16}{'after/sample':>16}{'delta':>13}{'change':>9}")
-    for case in CASES:
+    for case in cases:
         runs = {(leg, s): inclusive(f"{directory}/cg-{leg}-{case}-s{s}.out")
                 for leg in ("before", "after") for s in (1, 3)}
         names = sorted(set().union(*runs.values()))

@@ -33,11 +33,27 @@ Binary SHA-256s and compilers are in [`binaries.txt`](binaries.txt).
 | [`callgrind/tiny-document.txt`](callgrind/tiny-document.txt) | where the source audit's fixed cost goes, by function (`scripts/cg_tiny.py`) |
 | [`probe/parts.txt`](probe/parts.txt) | the audit probe's inputs: source member, size and SHA-256 |
 | [`probe/pair-verdicts.txt`](probe/pair-verdicts.txt) | what the probe's two pair cases return (one window proof, one refusal) |
-| `probe/audit/`, `probe/census/` | probe sources |
+| `probe/audit/`, `probe/census/`, `probe/dos/` | probe sources |
 | [`gates.txt`](gates.txt) | every gate's command, exit status and tail, and the test-suite totals |
 | `scripts/` | every script used (census, part extraction, timing, analysis, flags, campaign, callgrind, gates, pipeline) |
 | [`log-sections.md`](log-sections.md) | ready-to-paste sections for `HOTSPOTS.md`, `REPORT.md` and `GOAL_AUDIT.md` |
 | [`cleanup.json`](cleanup.json) | what was removed and what was kept |
+
+## Review follow-up
+
+The expanded-name fix (`0bbcc9bf94`) and the citation fix (`900eb6de11`) were
+measured and gated with a fresh `CARGO_TARGET_DIR` under `targets/0750` and
+`TMPDIR` on `/home`.
+
+| path | what it is |
+| --- | --- |
+| [`review-followup/dos/summary.md`](review-followup/dos/summary.md), `results.jsonl`, `status.txt` | `verify_source` on the reviewer's inputs and further adversarial namespace families: base, first candidate and fix (`probe/dos`, `scripts/run_dos.sh`, `scripts/summarize_dos.py`) |
+| [`review-followup/mutation-check.txt`](review-followup/mutation-check.txt) | the new operation-bound tests fail on the first candidate |
+| [`review-followup/probe-instructions.txt`](review-followup/probe-instructions.txt) | audit-probe instructions per audit: base, first candidate and fix (`scripts/probe_callgrind_followup.sh`, `scripts/probe_followup_summary.py`) |
+| `review-followup/timing/` | harness ABBA, 6 rounds, DOCX one-edit, XLSX dense-sparse one-edit and the XLS control (`scripts/run_abba_followup.sh`, `analyze.py`, `flags.py`) |
+| [`review-followup/callgrind/summary.txt`](review-followup/callgrind/summary.txt), `runs/` | harness isolation pairs for those two cases and the auditor's share (`scripts/callgrind_pairs_followup.sh`, `cg_attribute.py`) |
+| [`review-followup/campaign/totals.txt`](review-followup/campaign/totals.txt) | the release differential campaign repeated on the fix |
+| [`review-followup/gates.txt`](review-followup/gates.txt) | tests and gates on the fix (`scripts/verify_fix.sh`, `scripts/followup_build_and_campaign.sh`) |
 
 Not kept: binaries (hashes kept), the probe's inputs (rebuilt byte-identically by
 `scripts/extract_parts.py`), raw callgrind profiles (summaries kept), build and

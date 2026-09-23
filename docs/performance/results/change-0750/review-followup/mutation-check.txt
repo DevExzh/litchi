@@ -1,0 +1,8 @@
+Change 0750 follow-up: mutation check of the operation-bound tests
+
+The fixed namespaces.rs test module was appended to the pre-fix namespaces.rs (commit de69fb407d),
+with the pre-fix name() accessor instrumented exactly as the fixed one is. Then:
+  cargo test -p xml-minifier --lib --locked --offline many_tags   (debug build)
+failed in 3.93 s with 'alias false: 390000000000' name bytes read (50,000 tags x 2 x 3.9 MB),
+against the bound of 2 x 11,700,000 declared bytes. The fixed file was restored afterwards
+(sha256 62a30aab725e8626... verified), and then formatted by cargo fmt, which changed no code.

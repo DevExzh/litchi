@@ -1,0 +1,20 @@
+Change 0750 review follow-up: harness callgrind isolation pairs, base against the fix
+(scripts/callgrind_pairs_followup.sh; the method of callgrind/pairs-summary.txt).
+
+case                 before/sample      after/sample  delta/sample    change
+sb_one_dense       1,717,163,098.0   1,722,004,642.0  +4,841,544.0   +0.282%
+docx_sb_one        1,515,352,480.0   1,518,339,370.0  +2,986,890.0   +0.197%
+
+output digest sb_one_dense: identical 6bcafbdb87472762
+output digest docx_sb_one: identical 9af99bf7f63aac1f
+
+Auditor entry points per sample (scripts/cg_attribute.py):
+
+case           entry point                                        before/sample    after/sample        delta   change
+sb_one_dense   verify_source_replacement                             48,067,712      53,379,358   +5,311,645   +11.1%
+docx_sb_one    verify_source                                          1,241,075       1,524,006     +282,931   +22.8%
+docx_sb_one    verify_source_replacement                              1,315,854       1,616,536     +300,683   +22.9%
+docx_sb_one    verify_with_policy                                     1,241,067       1,523,999     +282,932   +22.8%
+
+First candidate (callgrind/pairs-summary.txt), for comparison: sb_one_dense pair +5,112,647 (+10.6%);
+docx_sb_one gate +276,138 (+22.3%) and pair +288,677 (+21.9%).

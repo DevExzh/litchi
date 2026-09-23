@@ -1,0 +1,73 @@
+Change 0750 review follow-up gates, 2026-09-23T06:37Z
+Run on the fix (commit 0bbcc9bf94 content; 900eb6de11 changes only comments) with a fresh CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0750,
+TMPDIR=/home/zhuhe/code/litchi-worktrees/scratch/0750/tmp (on /home), CARGO_BUILD_JOBS=6, by scripts/verify_fix.sh.
+
+### cargo test -p xml-minifier --locked --offline --no-fail-fast
+8 test binaries: 107 passed, 0 failed, 1 ignored
+xml-minifier exit 0
+
+### cargo test -p litchi-opc -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx -p litchi-pptx -p litchi-xlsb --locked --offline --no-fail-fast
+247 test binaries: 5628 passed, 0 failed, 45 ignored
+ooxml exit 0
+
+### cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline --no-fail-fast
+29 test binaries: 382 passed, 0 failed, 7 ignored
+facade exit 0
+
+### cargo check -p litchi-odf-common -p litchi-odt -p litchi-ods -p litchi-odp -p litchi-xls -p litchi-ppt -p litchi-imgconv --all-targets --locked --offline (compile-only)
+    Checking litchi-imgconv v0.0.1 (/home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/litchi-imgconv)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.58s
+check-odf-ole exit 0
+
+### cargo clippy -p xml-minifier -p litchi-opc -p litchi-docx -p litchi-xlsx --lib --no-deps --locked --offline -- -D warnings
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.76s
+clippy-lib exit 0
+
+### cargo clippy -p xml-minifier -p litchi-opc -p litchi-docx -p litchi-xlsx --all-targets --no-deps --locked --offline -- -D warnings
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.03s
+clippy-all exit 0
+
+### RUSTDOCFLAGS="-D warnings" cargo doc -p xml-minifier -p litchi-opc -p litchi-docx -p litchi-xlsx --no-deps --locked --offline
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.10s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0750/doc/litchi_docx/index.html and 3 other files
+doc exit 0
+
+### cargo fmt --all --check
+fmt exit 0
+
+### the xml-minifier suites
+unittests: 19 passed, 0 failed, 0 ignored
+tests/attribute_cardinality.rs: 8 passed, 0 failed, 0 ignored
+tests/audit.rs: 19 passed, 0 failed, 0 ignored
+tests/ooxml_assets.rs: 5 passed, 0 failed, 1 ignored
+tests/source_replacement.rs: 15 passed, 0 failed, 0 ignored
+tests/stream_audit.rs: 20 passed, 0 failed, 0 ignored
+tests/well_formedness.rs: 21 passed, 0 failed, 0 ignored
+doc-tests: 0 passed, 0 failed, 0 ignored
+
+### release differential campaign (scripts/differential_campaign.sh, 8 seeds x 3,000,000 cases)
+seed 1 exit 0
+seed 2 exit 0
+seed 3 exit 0
+seed 4 exit 0
+seed 5 exit 0
+seed 6 exit 0
+seed 7 exit 0
+seed 8 exit 0
+seeds passed 8 {'cases': 24000000, 'original': 9454154, 'replacement': 7239727, 'identical': 565278, 'window': 3765562, 'complete': 2975279, 'two_sites': 3798976, 'two_site_windows': 145828}
+### python3 tools/check_crate_boundaries.py
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+exit 0
+
+### python3 tools/non_iwork_gate.py verify
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit 0
+
+### python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+OK: 10 performance claims validated (structural)
+exit 0
+
