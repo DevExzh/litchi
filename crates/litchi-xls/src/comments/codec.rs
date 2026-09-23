@@ -293,9 +293,14 @@ impl CommentCollector {
                 "worksheet ended with an incomplete comment object sequence".to_string(),
             );
         }
-        // Several unmatched objects are refused by naming the lowest id, so
-        // the refusal is the same on every open of the same bytes; the map's
-        // hash iteration order differs between two maps and would not be.
+        // Several unmatched objects are refused by naming the lowest object
+        // id, so the refusal is the same on every open of the same bytes; the
+        // map's hash iteration order differs between two maps and would not
+        // be. This is the lowest id, not the first unmatched OBJ in record
+        // order: the map keeps ids, not arrival order, and the minimum is
+        // found in one pass with no ordering state added to the collector.
+        // Any unmatched object refuses the sheet with the same error kind, so
+        // which one is named changes only the message, never the outcome.
         if let Some(object_id) = self
             .objects
             .keys()

@@ -110,10 +110,17 @@ impl<R: Read + Seek> Workbook<R> {
     /// # Errors
     ///
     /// Returns exactly the error [`Self::new`] returns for the same reader,
-    /// and accepts every package [`Self::new`] accepts. The one addition is
-    /// resource exhaustion: this mode reserves its occupancy map fallibly and
-    /// returns a typed allocation error where the complete reader's
-    /// infallible cell map would abort the process.
+    /// and accepts every package [`Self::new`] accepts. The one difference is
+    /// resource exhaustion inside a worksheet. This mode reserves its
+    /// occupancy map fallibly, so a failed reservation fails that worksheet's
+    /// parse with [`crate::Error::Allocation`], where the complete reader's
+    /// infallible cell map would abort the process. That error does not reach
+    /// the caller: the package walk treats it like every other per-worksheet
+    /// refusal it does not propagate (the `Err(_)` arm of `parse_workbook`),
+    /// so the worksheet is simply not published and its
+    /// `parsed_worksheet_index` stays unset. The edit owners then refuse the
+    /// package with their coverage refusal, an [`crate::Error::UnsafeEdit`]
+    /// naming a tab the complete reader did not publish.
     pub(crate) fn validation_only(reader: R, kept: KeptCells) -> Result<ValidationWorkbook<R>> {
         let mut workbook = Self::empty(OleFile::open(reader)?);
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
