@@ -10,7 +10,7 @@ use litchi_cfb::{
     OleError, OleFile, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay,
     SectorLayoutPolicy, SharedOleFile,
 };
-use litchi_core::OwnedSource;
+use litchi_core::SourceVersion;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -509,6 +509,11 @@ impl Package {
     /// before the returned bytes are materialized.  This keeps the 0617
     /// pre-emission invariant: a sink never observes an unvalidated candidate,
     /// and untouched streams are checked against their captured source bytes.
+    ///
+    /// `source` is the editor's immutable original allocation, so the CFB
+    /// reader is opened with sealed ownership: the plan computes its source
+    /// and target digests once, and neither the composed view nor the
+    /// emission re-hashes an artifact that cannot have changed.
     pub(crate) fn render_copy_through(
         &self,
         baseline: &Self,
@@ -533,8 +538,11 @@ impl Package {
             Err(_) => return Ok(None),
         }
 
-        let source_adapter = OwnedSource::from_arc(Arc::clone(source));
-        let shared = match SharedOleFile::open(Arc::new(source_adapter)) {
+        // The version only has to stay stable while this call's views are
+        // alive; the allocation identity serves, as it does for the XLS
+        // comments and visibility owners.
+        let version = SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
+        let shared = match SharedOleFile::open_owned_vec(Arc::clone(source), version) {
             Ok(shared) => shared,
             Err(error) => return overlay_fallback(error.into()),
         };

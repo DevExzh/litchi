@@ -503,9 +503,16 @@ impl Transaction {
             ));
         }
 
-        let source: Arc<dyn ReadAt> =
-            Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
-        let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
+        // Preserve the snapshot's immutable Arc ownership through CFB, exactly
+        // as the comments owner does. The version is the same `(address,
+        // length)` identity the previous private adapter reported, so the
+        // composed target's version is unchanged; the sealed provenance lets
+        // the plan compute its digests once instead of re-proving them.
+        let source = Arc::clone(&self.source.inner.bytes);
+        let source_version =
+            SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
+        let publisher = SourceBackedOverlayPublisher::open_owned(source, source_version)
+            .map_err(overlay_to_error)?;
         let (plan, owner_validated) = publisher
             .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
                 verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
@@ -1234,45 +1241,6 @@ fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
         }
     }
     Ok(())
-}
-
-#[derive(Clone)]
-struct SnapshotSource {
-    bytes: Arc<[u8]>,
-    version: SourceVersion,
-}
-
-impl SnapshotSource {
-    fn new(bytes: Arc<[u8]>) -> Self {
-        let identity = bytes.as_ptr() as usize as u64;
-        let length = bytes.len() as u64;
-        Self {
-            bytes,
-            version: SourceVersion::new(identity, length),
-        }
-    }
-}
-
-impl ReadAt for SnapshotSource {
-    fn len(&self) -> std::io::Result<u64> {
-        u64::try_from(self.bytes.len())
-            .map_err(|_error| std::io::Error::other("source length exceeds u64"))
-    }
-
-    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
-        if output.is_empty() || offset >= self.bytes.len() as u64 {
-            return Ok(0);
-        }
-        let start = usize::try_from(offset)
-            .map_err(|_error| std::io::Error::other("source offset exceeds usize"))?;
-        let count = output.len().min(self.bytes.len() - start);
-        output[..count].copy_from_slice(&self.bytes[start..start + count]);
-        Ok(count)
-    }
-
-    fn version(&self) -> std::io::Result<SourceVersion> {
-        Ok(self.version)
-    }
 }
 
 struct PositionalReader {
