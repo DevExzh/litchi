@@ -67,19 +67,18 @@ pub(crate) fn append_client_textbox_with_interactions(
     output.extend_from_slice(&text_type.to_le_bytes());
 
     let text_units = if ascii {
-        let atom = InPlaceRecord::begin(output, 0, 0, ppt_rt::TEXT_BYTES_ATOM);
-        output.extend_from_slice(text.as_bytes());
-        atom.finish(output)?;
-        text.len()
+        InPlaceRecord::write(output, 0, 0, ppt_rt::TEXT_BYTES_ATOM, |output| {
+            output.extend_from_slice(text.as_bytes());
+            Ok::<_, Error>(text.len())
+        })?
     } else {
-        let atom = InPlaceRecord::begin(output, 0, 0, ppt_rt::TEXT_CHARS_ATOM);
-        let body_start = output.len();
-        for unit in text.encode_utf16() {
-            output.extend_from_slice(&unit.to_le_bytes());
-        }
-        let units = (output.len() - body_start) / 2;
-        atom.finish(output)?;
-        units
+        InPlaceRecord::write(output, 0, 0, ppt_rt::TEXT_CHARS_ATOM, |output| {
+            let body_start = output.len();
+            for unit in text.encode_utf16() {
+                output.extend_from_slice(&unit.to_le_bytes());
+            }
+            Ok::<_, Error>((output.len() - body_start) / 2)
+        })?
     };
     let text_units = u32::try_from(text_units).map_err(|_err| too_large())?;
     let char_count = text_units.checked_add(1).ok_or_else(too_large)?;

@@ -389,6 +389,24 @@ for large text, which removed every peak increase above.
 - The SST writer silently truncates a string at 0xFFFF UTF-16 code units (it can
   split a surrogate pair there), and `write_string` accepts longer strings.
   Unchanged here; a typed refusal would be a behaviour change.
+
+> **Amended 2026-09-23** by
+> [0757](0757-xls-fresh-writer-sst-determinism.md), after this record's
+> review. The truncation is more severe than the bullet above says. When the
+> 0xFFFF-unit cut falls inside a surrogate pair (for example a cell holding
+> 65,534 × `a` followed by one emoji), the SST entry ends with a lone high
+> surrogate, and litchi's own reader then refuses the *whole* workbook
+> ("lone surrogate found"); every other over-long string silently loses its
+> tail. Change 0757 fixes both findings above: the SST lists each string at its
+> first occurrence in worksheet, row and column order, and the writer refuses
+> a string longer than an SST entry with the typed `Error::StringTooLong`
+> before producing any output. Its regression test reproduces the lone
+> surrogate case. The review's other follow-ups, which change no output byte,
+> are recorded there too: the DOC and PPT stream reservations are made after
+> the document-wide checks and fallibly, `InPlaceRecord` is written only
+> through a closure that always patches its header, and `utf16_units`,
+> `contains_field_character` and `InPlaceRecord` have direct unit tests.
+
 - The CFB writer's `write_to` zero-fills its destination as it emits sectors:
   about 37% of the remaining DOC payload-heavy time is that `memset`, mostly in
   kernel page faults (owned by litchi-cfb, which records 0748 and 0749 are

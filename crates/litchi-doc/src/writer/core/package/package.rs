@@ -238,10 +238,6 @@ impl Writer {
         const FIB_PLACEHOLDER_BYTES: usize = 1248;
         let text_start = FIB_PLACEHOLDER_BYTES + (512 - (FIB_PLACEHOLDER_BYTES % 512)) % 512;
 
-        // Build the WordDocument stream (the zeroed placeholder, then the text
-        // every story appends) and the piece table.
-        let mut text_stream =
-            TextStream::new(text_start, self.word_document_capacity_hint(text_start));
         let mut data_stream = data_prefix;
         let mut floating_anchors: Vec<(u32, FloatingAnchorKind)> = Vec::new();
         let mut current_cp = 0u32;
@@ -250,6 +246,13 @@ impl Writer {
         let mut papx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut font_builder = FontTableBuilder::new();
         let revision_data = self.build_revision_writer_data()?;
+
+        // Build the WordDocument stream (the zeroed placeholder, then the text
+        // every story appends) and the piece table. It is reserved once the
+        // document-wide checks above have passed, and fallibly; the checks of
+        // each story run as its text is appended.
+        let mut text_stream =
+            TextStream::try_new(text_start, self.word_document_capacity_hint(text_start))?;
 
         let text_fc_start = text_start as u32;
         let fc_min: u32 = text_fc_start;

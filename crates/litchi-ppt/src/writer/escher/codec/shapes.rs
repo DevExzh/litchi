@@ -88,13 +88,22 @@ fn append_shape_container(
     anchor_kind: ShapeAnchor,
 ) -> Result<(), Error> {
     validate_user_shape(shape)?;
-    let container = InPlaceRecord::begin(
+    InPlaceRecord::write(
         output,
         header_version::CONTAINER,
         0,
         record_type::SP_CONTAINER,
-    );
+        |output| append_shape_container_children(output, shape_id, shape, anchor_kind),
+    )
+}
 
+/// Appends the children of the `SpContainer` [`append_shape_container`] writes.
+fn append_shape_container_children(
+    output: &mut Vec<u8>,
+    shape_id: u32,
+    shape: &UserShapeData,
+    anchor_kind: ShapeAnchor,
+) -> Result<(), Error> {
     let mut flags = Flags::HAVE_ANCHOR | Flags::HAVE_SPT;
     if matches!(anchor_kind, ShapeAnchor::Child(_)) {
         flags |= Flags::CHILD;
@@ -285,6 +294,5 @@ fn append_shape_container(
             "shape has text interactions but no corresponding text",
         ));
     }
-
-    container.finish(output)
+    Ok(())
 }
