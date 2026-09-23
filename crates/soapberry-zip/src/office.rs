@@ -1131,8 +1131,8 @@ where
             StrictLayoutCacheState::Building {
                 owner: building_owner,
             } if *building_owner == owner => {
-                return Err(Error::from(ErrorKind::InvalidInput {
-                    msg: "strict layout proof build re-entered on its owning thread".to_string(),
+                return Err(Error::from(ErrorKind::Reentered {
+                    operation: "strict layout proof build",
                 }));
             },
             StrictLayoutCacheState::Building { .. } => {

@@ -53,7 +53,12 @@ impl Error {
     /// content fault exactly, so a caller may treat it as a deterministic
     /// verdict about the archive. Every other error — allocation, a declared
     /// size above a caller's limit, I/O, cancellation, worker or spool
-    /// failures, and any kind added later — is not a content fault.
+    /// failures, a reader's re-entry, and any kind added later — is not a
+    /// content fault.
+    ///
+    /// A declared size that does not fit the platform's `usize` is an
+    /// `InvalidInput` content fault: it is a property of the bytes, although
+    /// only on platforms whose `usize` is narrower than the size.
     #[must_use]
     pub fn is_content_fault(&self) -> bool {
         matches!(
@@ -181,6 +186,14 @@ pub enum ErrorKind {
 
     /// The caller-provided central-directory spool exceeded its byte budget.
     CentralDirectorySpoolLimitExceeded { actual: u64, maximum: u64 },
+
+    /// A reader re-entered an operation on the thread that was already
+    /// running it, which reports this instead of deadlocking. It is a property
+    /// of the reader, never of the archive's bytes.
+    Reentered {
+        /// The operation that was re-entered.
+        operation: &'static str,
+    },
 }
 
 impl std::error::Error for Error {
@@ -311,6 +324,9 @@ impl std::fmt::Display for ErrorKind {
                     "central-directory spool limit exceeded: {actual} bytes, maximum {maximum}"
                 )
             },
+            ErrorKind::Reentered { operation } => {
+                write!(f, "{operation} re-entered on its owning thread")
+            },
         }
     }
 }
@@ -435,6 +451,9 @@ mod tests {
             ErrorKind::IO(std::io::Error::other("transport")),
             ErrorKind::Cancelled,
             ErrorKind::BufferTooSmall,
+            ErrorKind::Reentered {
+                operation: "strict layout proof build",
+            },
         ];
         for kind in others {
             assert!(!Error::from(kind).is_content_fault());
