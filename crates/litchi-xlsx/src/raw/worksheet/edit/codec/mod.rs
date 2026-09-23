@@ -13,6 +13,8 @@ mod validation;
 mod wire;
 
 #[cfg(test)]
+mod lane_scan_tests;
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]

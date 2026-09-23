@@ -1,5 +1,6 @@
 //! Streaming `SpreadsheetML` event codec.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
@@ -13,6 +14,7 @@ use quick_xml::reader::NsReader;
 use super::super::formula::Range as FormulaRange;
 use super::super::namespace::is_spreadsheetml_name;
 use super::super::strings::decode_spreadsheet_text;
+use super::lane;
 use super::model::{
     Context, MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_COLUMN_STYLE, MAX_ENCODED_CELL_BYTES,
     MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, MAX_XML_EVENTS, Parser, PendingCell,
@@ -181,6 +183,20 @@ struct CellAttributeView<'a> {
     cell_type: Option<Attribute<'a>>,
 }
 
+/// The cell attributes decoded after the coordinate, in their check order.
+#[derive(Debug, Clone, Copy)]
+enum CellField {
+    Style,
+    CellMetadata,
+    ValueMetadata,
+    Type,
+}
+
+/// Borrow an admitted lane slice of a UTF-8 document as text.
+fn lane_text(value: &[u8]) -> Result<&str> {
+    std::str::from_utf8(value).map_err(|_source| invalid("worksheet lane split a UTF-8 sequence"))
+}
+
 fn scan_cell_attributes<'a>(
     element: &'a BytesStart<'_>,
     decoder: Decoder,
@@ -222,14 +238,9 @@ fn decode_cell_attribute(
         .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
 
-fn parse_cell_u32(
-    attribute: Option<Attribute<'_>>,
-    decoder: Decoder,
-    description: &str,
-) -> Result<Option<u32>> {
-    attribute
-        .map(|attribute| {
-            let value = decode_cell_attribute(attribute, decoder)?;
+fn parse_cell_u32(value: Option<Cow<'_, str>>, description: &str) -> Result<Option<u32>> {
+    value
+        .map(|value| {
             value
                 .parse::<u32>()
                 .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
@@ -237,7 +248,18 @@ fn parse_cell_u32(
         .transpose()
 }
 
-impl Parser {
+/// Decode one retained cell attribute when its check is reached.
+fn decode_cell_field(
+    attribute: Option<Attribute<'_>>,
+    decoder: Decoder,
+) -> Result<Option<Cow<'static, str>>> {
+    attribute
+        .map(|attribute| decode_cell_attribute(attribute, decoder).map(Cow::Owned))
+        .transpose()
+        .map_err(Into::into)
+}
+
+impl<'c> Parser<'c> {
     fn new(extensions: x14ac::Values) -> Self {
         Self {
             cells: Vec::new(),
@@ -263,39 +285,223 @@ impl Parser {
     }
 
     pub(super) fn parse<'a, F>(
-        content: &str,
+        content: &'c str,
         strings: F,
         extensions: x14ac::Values,
     ) -> Result<Store>
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
-        let mut reader = NsReader::from_reader(content.as_bytes());
+        let bytes = content.as_bytes();
+        let mut reader = NsReader::from_reader(bytes);
         reader.config_mut().check_end_names = true;
         let mut parser = Self::new(extensions);
         let mut stack = Vec::new();
         let mut closed_root = false;
 
-        loop {
-            let event = reader
-                .read_event()
-                .map_err(|error| invalid(error.to_string()))?;
-            let (namespace, event) = reader.resolver().resolve_event(event);
-            let decoder = reader.decoder();
-            let resolver = reader.resolver();
-            if parser.transition(
-                &mut stack,
-                &mut closed_root,
-                &namespace,
-                event,
-                decoder,
-                resolver,
-            )? {
-                break;
+        #[cfg(not(test))]
+        let lane_enabled = true;
+        #[cfg(test)]
+        let lane_enabled = lane::route::enabled();
+        if let Some((entry, decoder)) = parser.drive(
+            &mut reader,
+            &mut stack,
+            &mut closed_root,
+            lane_enabled.then_some(bytes),
+        )? {
+            match parser.lane_body(content, entry, decoder)? {
+                Some(resume) => {
+                    let spliced = lane::splice_without_body(bytes, entry.position, resume)?;
+                    let mut tail = NsReader::from_reader(spliced.as_slice());
+                    tail.config_mut().check_end_names = true;
+                    lane::skip_to(&mut tail, entry.position)?;
+                    if parser
+                        .drive(&mut tail, &mut stack, &mut closed_root, None)?
+                        .is_some()
+                    {
+                        return Err(invalid("worksheet lane resumed at a second entry"));
+                    }
+                },
+                None => {
+                    if parser
+                        .drive(&mut reader, &mut stack, &mut closed_root, None)?
+                        .is_some()
+                    {
+                        return Err(invalid("worksheet lane resumed at a second entry"));
+                    }
+                },
             }
         }
 
         parser.finish_parse(strings)
+    }
+
+    /// Feed reader events to [`Self::transition`] until end of file.
+    ///
+    /// With `lane` set to the reader's own input, stop right after the
+    /// `<sheetData>` start tag when its unprefixed children resolve to
+    /// `SpreadsheetML`, and report where.
+    fn drive(
+        &mut self,
+        reader: &mut NsReader<&[u8]>,
+        stack: &mut Vec<Context>,
+        closed_root: &mut bool,
+        lane: Option<&[u8]>,
+    ) -> Result<Option<(lane::Entry, Decoder)>> {
+        loop {
+            let event_start = reader.buffer_position();
+            let event = reader
+                .read_event()
+                .map_err(|error| invalid(error.to_string()))?;
+            let sheet_data_name = match (&lane, &event) {
+                (Some(_), Event::Start(element))
+                    if element.local_name().as_ref() == b"sheetData" =>
+                {
+                    Some(element.name().as_ref().len())
+                },
+                _ => None,
+            };
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            let decoder = reader.decoder();
+            let resolver = reader.resolver();
+            if self.transition(stack, closed_root, &namespace, event, decoder, resolver)? {
+                return Ok(None);
+            }
+            // `SheetData` is pushed only for the root's `<sheetData>` child.
+            if let (Some(content), Some(name_len)) = (lane, sheet_data_name)
+                && stack.last() == Some(&Context::SheetData)
+                && lane::children_are_spreadsheetml(reader.resolver())
+                && let Some(entry) =
+                    lane::Entry::locate(content, event_start, name_len, reader.buffer_position())
+            {
+                return Ok(Some((entry, decoder)));
+            }
+        }
+    }
+
+    /// Parse an admitted `<sheetData>` body without the reader.
+    ///
+    /// Returns the offset of `</sheetData>` when the whole body lies in the
+    /// lane's subset. The lane replays exactly the events the reader would
+    /// have delivered, into the same parser methods and in the same order,
+    /// so values and refusals are unchanged. `None` leaves the parser
+    /// untouched for the ordinary reader.
+    fn lane_body(
+        &mut self,
+        content: &'c str,
+        entry: lane::Entry,
+        decoder: Decoder,
+    ) -> Result<Option<usize>> {
+        let bytes = content.as_bytes();
+        let name = entry.name(bytes)?;
+        let Some(summary) = lane::recognize(bytes, entry.position, name) else {
+            return Ok(None);
+        };
+        #[cfg(test)]
+        lane::route::note_admitted(lane::route::Pass::Parse);
+        // The admitted body fixes the record counts, so reserve them once.
+        self.cells
+            .try_reserve(summary.cells)
+            .map_err(|source| allocation("sparse worksheet cells", source))?;
+        self.rows
+            .try_reserve(summary.rows)
+            .map_err(|source| allocation("sparse worksheet rows", source))?;
+        self.seen_rows
+            .try_reserve(summary.rows)
+            .map_err(|source| allocation("worksheet parser row index set", source))?;
+        let walked = lane::walk(bytes, entry.position, name, &mut |event| {
+            self.lane_event(content, event, decoder)
+        })?;
+        match walked {
+            Some(walked) if walked == summary => Ok(Some(summary.end)),
+            _ => Err(invalid("worksheet lane changed its admitted body")),
+        }
+    }
+
+    /// Apply one lane event exactly as [`Self::transition`] applies the
+    /// corresponding reader event inside `<sheetData>`.
+    fn lane_event(
+        &mut self,
+        content: &'c str,
+        event: lane::Event<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        match event {
+            lane::Event::Start(lane::Name::Row, tag) => self.start_lane_row(tag, decoder),
+            lane::Event::Empty(lane::Name::Row, tag) => {
+                self.start_lane_row(tag, decoder)?;
+                self.finish(Context::Row)
+            },
+            lane::Event::Start(lane::Name::Cell, tag) => self.start_lane_cell(tag),
+            lane::Event::Empty(lane::Name::Cell, tag) => {
+                self.start_lane_cell(tag)?;
+                self.finish(Context::Cell)
+            },
+            lane::Event::Start(lane::Name::Value, _) => self.start_value(),
+            lane::Event::Empty(lane::Name::Value, _) => {
+                self.start_value()?;
+                self.finish(Context::Value)
+            },
+            lane::Event::End(lane::Name::Row, ..) => self.finish(Context::Row),
+            lane::Event::End(lane::Name::Cell, ..) => self.finish(Context::Cell),
+            lane::Event::End(lane::Name::Value, ..) => self.finish(Context::Value),
+            lane::Event::Text {
+                start,
+                end,
+                value: true,
+            } => {
+                let text = content
+                    .get(start..end)
+                    .ok_or_else(|| invalid("worksheet lane split a UTF-8 sequence"))?;
+                self.push_lane_value(text)
+            },
+            // Whitespace between elements has no text target.
+            lane::Event::Text { value: false, .. } => Ok(()),
+        }
+    }
+
+    fn start_lane_row(&mut self, tag: lane::Tag<'_>, decoder: Decoder) -> Result<()> {
+        // Rows are few; reuse the reader's own attribute handling verbatim.
+        let element = BytesStart::from_content(lane_text(tag.content)?, b"row".len());
+        self.start_row(&element, decoder)
+    }
+
+    fn start_lane_cell(&mut self, tag: lane::Tag<'_>) -> Result<()> {
+        if self.cell.is_some() {
+            return Err(invalid("nested worksheet cell"));
+        }
+        let row = self
+            .row
+            .as_ref()
+            .ok_or_else(|| invalid("worksheet cell outside a row"))?
+            .number;
+        // Admitted names are unique and admitted values decode to themselves,
+        // so this matches `scan_cell_attributes` without the reader.
+        let mut reference = None;
+        let mut style = None;
+        let mut cell_metadata = None;
+        let mut value_metadata = None;
+        let mut cell_type = None;
+        for (name, value) in tag.attributes() {
+            let slot = match name {
+                b"r" => &mut reference,
+                b"s" => &mut style,
+                b"cm" => &mut cell_metadata,
+                b"vm" => &mut value_metadata,
+                b"t" => &mut cell_type,
+                _ => continue,
+            };
+            *slot = Some(lane_text(value)?);
+        }
+        self.start_cell_fields(row, reference, |field| {
+            Ok(match field {
+                CellField::Style => style,
+                CellField::CellMetadata => cell_metadata,
+                CellField::ValueMetadata => value_metadata,
+                CellField::Type => cell_type,
+            }
+            .map(Cow::Borrowed))
+        })
     }
 
     fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
@@ -781,14 +987,34 @@ impl Parser {
             .number;
         let CellAttributeView {
             reference,
-            style,
-            cell_metadata,
-            value_metadata,
-            cell_type,
+            mut style,
+            mut cell_metadata,
+            mut value_metadata,
+            mut cell_type,
         } = scan_cell_attributes(element, decoder)?;
+        self.start_cell_fields(row, reference.as_deref(), |field| {
+            let attribute = match field {
+                CellField::Style => style.take(),
+                CellField::CellMetadata => cell_metadata.take(),
+                CellField::ValueMetadata => value_metadata.take(),
+                CellField::Type => cell_type.take(),
+            };
+            decode_cell_field(attribute, decoder)
+        })
+    }
+
+    /// Validate and open one cell from its decoded coordinate and a source of
+    /// the remaining fields, which are decoded in their historical check
+    /// order so every refusal keeps its precedence.
+    fn start_cell_fields<'v>(
+        &mut self,
+        row: u32,
+        reference: Option<&str>,
+        mut field: impl FnMut(CellField) -> Result<Option<Cow<'v, str>>>,
+    ) -> Result<()> {
         let column = match reference {
             Some(reference) => {
-                let (reference_row, column) = parse_a1(&reference)?;
+                let (reference_row, column) = parse_a1(reference)?;
                 if reference_row != row {
                     return Err(invalid(format!(
                         "cell reference '{reference}' does not belong to row {row}"
@@ -808,17 +1034,18 @@ impl Parser {
             .as_mut()
             .ok_or_else(|| invalid("worksheet cell outside a row"))?;
         pending_row.last_column = column;
-        let style = parse_cell_u32(style, decoder, "worksheet cell style")?;
+        let style = parse_cell_u32(field(CellField::Style)?, "worksheet cell style")?;
         if style.is_some_and(|style| style > MAX_CELL_STYLE) {
             return Err(invalid(format!(
                 "worksheet cell style exceeds {MAX_CELL_STYLE}"
             )));
         }
-        let cell_metadata = parse_cell_u32(cell_metadata, decoder, "cell metadata index")?;
+        let cell_metadata = parse_cell_u32(field(CellField::CellMetadata)?, "cell metadata index")?;
         if cell_metadata.is_some_and(|index| !(1..=MAX_METADATA_INDEX).contains(&index)) {
             return Err(invalid("cell metadata index is outside Office limits"));
         }
-        let value_metadata = parse_cell_u32(value_metadata, decoder, "value metadata index")?;
+        let value_metadata =
+            parse_cell_u32(field(CellField::ValueMetadata)?, "value metadata index")?;
         if value_metadata.is_some_and(|index| !(1..=MAX_METADATA_INDEX).contains(&index)) {
             return Err(invalid("value metadata index is outside Office limits"));
         }
@@ -828,10 +1055,8 @@ impl Parser {
             style,
             cell_metadata,
             value_metadata,
-            cell_type: cell_type
-                .map(|attribute| decode_cell_attribute(attribute, decoder))
-                .transpose()?,
-            value: String::new(),
+            cell_type: field(CellField::Type)?.map(Cow::into_owned),
+            value: Cow::Borrowed(""),
             value_bytes: 0,
             saw_value: false,
             formula: String::new(),
@@ -961,10 +1186,11 @@ impl Parser {
                     .checked_add(value.len())
                     .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
                     .ok_or_else(|| invalid("worksheet value text is too large"))?;
-                cell.value
+                let owned = cell.value.to_mut();
+                owned
                     .try_reserve(value.len())
                     .map_err(|source| allocation("worksheet value", source))?;
-                cell.value.push_str(value);
+                owned.push_str(value);
             },
             TextTarget::Inline => {
                 cell.inline_bytes = cell
@@ -978,6 +1204,27 @@ impl Parser {
                 cell.inline.push_str(value);
             },
         }
+        Ok(())
+    }
+
+    /// Record the one character-data run of an admitted `<v>` element.
+    ///
+    /// This is [`Self::push_text`] for a value that is still empty, as every
+    /// lane value is, with the document slice borrowed instead of copied.
+    fn push_lane_value(&mut self, value: &'c str) -> Result<()> {
+        let cell = self
+            .cell
+            .as_mut()
+            .ok_or_else(|| invalid("worksheet cell text outside a cell"))?;
+        if !cell.value.is_empty() {
+            return self.push_text(TextTarget::Value, value);
+        }
+        cell.value_bytes = cell
+            .value_bytes
+            .checked_add(value.len())
+            .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
+            .ok_or_else(|| invalid("worksheet value text is too large"))?;
+        cell.value = Cow::Borrowed(value);
         Ok(())
     }
 

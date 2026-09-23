@@ -12,15 +12,15 @@ use quick_xml::reader::NsReader;
 use super::super::X14;
 use super::super::wire::{cell_tag, column_range, is_mce_name, position, tag};
 use super::model::{
-    CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout, MergeCellsSlot,
-    MergeSlot, RootSlot, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
+    Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
+    MergeCellsSlot, MergeSlot, RootSlot, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
 };
 use crate::error::{Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::worksheet::edit::model::SelectionRange;
 use crate::raw::worksheet::model::{MAX_XML_DEPTH, MAX_XML_EVENTS};
 use crate::raw::worksheet::{
-    merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, x14ac,
+    lane, merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, x14ac,
 };
 use crate::{error::allocation, merge};
 
@@ -118,6 +118,45 @@ struct PendingMerge {
     start: usize,
 }
 
+/// One open cell of an admitted `<sheetData>` body.
+#[derive(Debug)]
+struct LaneCell {
+    address: Address,
+    start: usize,
+    tag_end: usize,
+    tag: Option<Tag>,
+    value_start: Option<usize>,
+    primary: Option<Span>,
+}
+
+/// The boxed payload spans the reader-driven cell would have collected.
+fn primary_spans(primary: Option<Span>) -> Box<[Span]> {
+    match primary {
+        Some(span) => Box::new([span]),
+        None => Box::new([]),
+    }
+}
+
+/// Rebuild the reader's `BytesStart` for an admitted tag.
+fn lane_element<'a>(tag: lane::Tag<'a>, name: &[u8]) -> Result<BytesStart<'a>> {
+    Ok(BytesStart::from_content(
+        lane_text(tag.content)?,
+        name.len(),
+    ))
+}
+
+/// Borrow an admitted slice of a UTF-8 body as text.
+fn lane_text(value: &[u8]) -> Result<&str> {
+    std::str::from_utf8(value).map_err(|_source| invalid("worksheet lane split a UTF-8 sequence"))
+}
+
+/// Map a spliced reader position to its real document offset.
+fn shifted(position: usize, shift: usize) -> Result<usize> {
+    position
+        .checked_add(shift)
+        .ok_or_else(|| invalid("worksheet XML position does not fit usize"))
+}
+
 fn merge_range(element: &BytesStart<'_>, decoder: Decoder) -> Result<Rect> {
     let value = unqualified_attribute_value(element, b"ref", decoder)?
         .ok_or_else(|| invalid("mergeCell is missing ref during edit"))?;
@@ -204,110 +243,52 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
     let mut stack = Vec::<Frame>::new();
     let mut events = 0usize;
 
-    loop {
-        events = events
-            .checked_add(1)
-            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
-        if events > max_events {
-            return Err(invalid("worksheet XML exceeds event limit"));
-        }
-        let event_start = position(&reader)?;
-        let event = reader
-            .read_event()
-            .map_err(|error| invalid(error.to_string()))?;
-        let (namespace, event) = reader.resolver().resolve_event(event);
-        let event_end = position(&reader)?;
+    #[cfg(not(test))]
+    let lane_enabled = true;
+    #[cfg(test)]
+    let lane_enabled = lane::route::enabled();
+    if let Some(entry) = scanner.drive(
+        &mut reader,
+        &mut stack,
+        &mut events,
+        max_events,
+        0,
+        lane_enabled.then_some(content),
+    )? {
         let decoder = reader.decoder();
-        let resolver = reader.resolver();
-        match event {
-            Event::Start(element) => {
-                if stack.len() >= MAX_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "worksheet XML exceeds {MAX_XML_DEPTH} levels"
-                    )));
-                }
-                let parent = stack.last().map(|frame| frame.kind);
-                let kind = scanner.start(
-                    parent,
-                    &namespace,
-                    &element,
-                    decoder,
-                    resolver,
-                    Span {
-                        start: event_start,
-                        end: event_end,
-                    },
-                )?;
-                stack.push(Frame {
-                    kind,
-                    start: event_start,
-                });
-            },
-            Event::Empty(element) => {
-                let parent = stack.last().map(|frame| frame.kind);
-                scanner.empty(
-                    parent,
-                    &namespace,
-                    &element,
-                    decoder,
-                    resolver,
-                    Span {
-                        start: event_start,
-                        end: event_end,
-                    },
-                )?;
-            },
-            Event::End(_) => {
-                let frame = stack
-                    .pop()
-                    .ok_or_else(|| invalid("worksheet edit scan has an unmatched closing tag"))?;
-                scanner.finish(frame, event_start, event_end)?;
-            },
-            Event::Text(value) => {
-                if stack
-                    .last()
-                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
+        match scanner.lane_body(
+            content,
+            entry,
+            reader.resolver(),
+            decoder,
+            &mut events,
+            max_events,
+        )? {
+            Some(resume) => {
+                let spliced = lane::splice_without_body(content, entry.position, resume)?;
+                let mut tail = NsReader::from_reader(spliced.as_slice());
+                tail.config_mut().check_end_names = true;
+                lane::skip_to(&mut tail, entry.position)?;
+                // Positions past the entry lie `resume - position` bytes
+                // later in the real document than in the spliced one.
+                let shift = resume
+                    .checked_sub(entry.position)
+                    .ok_or_else(|| invalid("worksheet lane resumed before its entry"))?;
+                if scanner
+                    .drive(&mut tail, &mut stack, &mut events, max_events, shift, None)?
+                    .is_some()
                 {
-                    let text = value.decode().map_err(|error| invalid(error.to_string()))?;
-                    scanner.mark_formula_text(&text);
-                } else if stack.last().is_some_and(|frame| {
-                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
-                }) && !value
-                    .decode()
-                    .map_err(|error| invalid(error.to_string()))?
-                    .trim()
-                    .is_empty()
-                {
-                    scanner.mark_merge_payload();
+                    return Err(invalid("worksheet lane resumed at a second entry"));
                 }
             },
-            Event::CData(value) => {
-                if stack
-                    .last()
-                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
+            None => {
+                if scanner
+                    .drive(&mut reader, &mut stack, &mut events, max_events, 0, None)?
+                    .is_some()
                 {
-                    let text = value.decode().map_err(|error| invalid(error.to_string()))?;
-                    scanner.mark_formula_text(&text);
-                } else if stack.last().is_some_and(|frame| {
-                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
-                }) {
-                    scanner.mark_merge_payload();
+                    return Err(invalid("worksheet lane resumed at a second entry"));
                 }
             },
-            Event::GeneralRef(_) => {
-                if stack
-                    .last()
-                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
-                {
-                    scanner.mark_formula_reference();
-                } else if stack.last().is_some_and(|frame| {
-                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
-                }) {
-                    scanner.mark_merge_payload();
-                }
-            },
-            Event::Eof => break,
-            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -317,6 +298,407 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
 }
 
 impl Scanner {
+    /// Feed reader events to the scanner until end of file.
+    ///
+    /// `shift` is added to every reader position, so a reader over a spliced
+    /// document reports real document offsets. With `lane` set to the
+    /// reader's own input, stop right after the `<sheetData>` start tag
+    /// when its unprefixed children resolve to `SpreadsheetML`.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "the historical event loop is kept intact so its refusal order is unchanged"
+    )]
+    fn drive(
+        &mut self,
+        reader: &mut NsReader<&[u8]>,
+        stack: &mut Vec<Frame>,
+        events: &mut usize,
+        max_events: usize,
+        shift: usize,
+        lane: Option<&[u8]>,
+    ) -> Result<Option<lane::Entry>> {
+        let scanner = self;
+        loop {
+            *events = events
+                .checked_add(1)
+                .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+            if *events > max_events {
+                return Err(invalid("worksheet XML exceeds event limit"));
+            }
+            let reader_start = reader.buffer_position();
+            let event_start = shifted(position(reader)?, shift)?;
+            let event = reader
+                .read_event()
+                .map_err(|error| invalid(error.to_string()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            let event_end = shifted(position(reader)?, shift)?;
+            let decoder = reader.decoder();
+            let resolver = reader.resolver();
+            match event {
+                Event::Start(element) => {
+                    if stack.len() >= MAX_XML_DEPTH {
+                        return Err(invalid(format!(
+                            "worksheet XML exceeds {MAX_XML_DEPTH} levels"
+                        )));
+                    }
+                    let parent = stack.last().map(|frame| frame.kind);
+                    let name_len = element.name().as_ref().len();
+                    let kind = scanner.start(
+                        parent,
+                        &namespace,
+                        &element,
+                        decoder,
+                        resolver,
+                        Span {
+                            start: event_start,
+                            end: event_end,
+                        },
+                    )?;
+                    stack.push(Frame {
+                        kind,
+                        start: event_start,
+                    });
+                    if kind == FrameKind::SheetData
+                        && let Some(content) = lane
+                        && lane::children_are_spreadsheetml(resolver)
+                        && let Some(entry) = lane::Entry::locate(
+                            content,
+                            reader_start,
+                            name_len,
+                            reader.buffer_position(),
+                        )
+                    {
+                        return Ok(Some(entry));
+                    }
+                },
+                Event::Empty(element) => {
+                    let parent = stack.last().map(|frame| frame.kind);
+                    scanner.empty(
+                        parent,
+                        &namespace,
+                        &element,
+                        decoder,
+                        resolver,
+                        Span {
+                            start: event_start,
+                            end: event_end,
+                        },
+                    )?;
+                },
+                Event::End(_) => {
+                    let frame = stack.pop().ok_or_else(|| {
+                        invalid("worksheet edit scan has an unmatched closing tag")
+                    })?;
+                    scanner.finish(frame, event_start, event_end)?;
+                },
+                Event::Text(value) => {
+                    if stack
+                        .last()
+                        .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                    {
+                        let text = value.decode().map_err(|error| invalid(error.to_string()))?;
+                        scanner.mark_formula_text(&text);
+                    } else if stack.last().is_some_and(|frame| {
+                        matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                    }) && !value
+                        .decode()
+                        .map_err(|error| invalid(error.to_string()))?
+                        .trim()
+                        .is_empty()
+                    {
+                        scanner.mark_merge_payload();
+                    }
+                },
+                Event::CData(value) => {
+                    if stack
+                        .last()
+                        .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                    {
+                        let text = value.decode().map_err(|error| invalid(error.to_string()))?;
+                        scanner.mark_formula_text(&text);
+                    } else if stack.last().is_some_and(|frame| {
+                        matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                    }) {
+                        scanner.mark_merge_payload();
+                    }
+                },
+                Event::GeneralRef(_) => {
+                    if stack
+                        .last()
+                        .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                    {
+                        scanner.mark_formula_reference();
+                    } else if stack.last().is_some_and(|frame| {
+                        matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                    }) {
+                        scanner.mark_merge_payload();
+                    }
+                },
+                Event::Eof => return Ok(None),
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+            }
+        }
+    }
+
+    /// Scan an admitted `<sheetData>` body without the reader.
+    ///
+    /// Returns the offset of the body's close tag when the whole body lies in
+    /// the lane's subset, is UTF-8, and fits the remaining event budget.
+    /// Rows go through [`Self::start`], [`Self::empty`] and [`Self::finish`]
+    /// unchanged; cells take [`Self::lane_cell`], which reproduces the
+    /// reader-driven `start_cell`, `empty` and `finish` records for the only
+    /// cell shape the lane admits. `None` leaves the scanner untouched.
+    fn lane_body(
+        &mut self,
+        content: &[u8],
+        entry: lane::Entry,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        events: &mut usize,
+        max_events: usize,
+    ) -> Result<Option<usize>> {
+        let name = entry.name(content)?;
+        let Some(summary) = lane::recognize(content, entry.position, name) else {
+            return Ok(None);
+        };
+        // Every decode the reader would make succeeds on a UTF-8 body, and a
+        // body that would cross the event limit keeps the reader's refusal.
+        let Some(body) = content.get(entry.position..summary.end) else {
+            return Ok(None);
+        };
+        if std::str::from_utf8(body).is_err() {
+            return Ok(None);
+        }
+        let Some(counted) = events.checked_add(summary.events) else {
+            return Ok(None);
+        };
+        if counted > max_events {
+            return Ok(None);
+        }
+        #[cfg(test)]
+        lane::route::note_admitted(lane::route::Pass::Scan);
+        let mut cell = None::<LaneCell>;
+        let mut row_start = entry.position;
+        let walked = lane::walk(content, entry.position, name, &mut |event| {
+            self.lane_event(event, resolver, decoder, &mut cell, &mut row_start)
+        })?;
+        match walked {
+            Some(walked) if walked == summary => {
+                *events = counted;
+                Ok(Some(summary.end))
+            },
+            _ => Err(invalid("worksheet lane changed its admitted body")),
+        }
+    }
+
+    /// Apply one lane event exactly as the reader-driven loop applies the
+    /// corresponding event inside `<sheetData>`.
+    fn lane_event(
+        &mut self,
+        event: lane::Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        cell: &mut Option<LaneCell>,
+        row_start: &mut usize,
+    ) -> Result<()> {
+        match event {
+            lane::Event::Start(lane::Name::Row, tag) => {
+                let element = lane_element(tag, b"row")?;
+                let (namespace, _) = resolver.resolve_element(element.name());
+                *row_start = tag.start;
+                let kind = self.start(
+                    Some(FrameKind::SheetData),
+                    &namespace,
+                    &element,
+                    decoder,
+                    resolver,
+                    Span {
+                        start: tag.start,
+                        end: tag.end,
+                    },
+                )?;
+                if kind == FrameKind::Row {
+                    Ok(())
+                } else {
+                    Err(invalid("worksheet lane row was not scanned as a row"))
+                }
+            },
+            lane::Event::Empty(lane::Name::Row, tag) => {
+                let element = lane_element(tag, b"row")?;
+                let (namespace, _) = resolver.resolve_element(element.name());
+                self.empty(
+                    Some(FrameKind::SheetData),
+                    &namespace,
+                    &element,
+                    decoder,
+                    resolver,
+                    Span {
+                        start: tag.start,
+                        end: tag.end,
+                    },
+                )
+            },
+            lane::Event::End(lane::Name::Row, close_start, end) => self.finish(
+                Frame {
+                    kind: FrameKind::Row,
+                    start: *row_start,
+                },
+                close_start,
+                end,
+            ),
+            lane::Event::Start(lane::Name::Cell, tag) => {
+                *cell = Some(self.lane_cell(tag)?);
+                Ok(())
+            },
+            lane::Event::Empty(lane::Name::Cell, tag) => {
+                let LaneCell {
+                    address,
+                    tag: owned,
+                    ..
+                } = self.lane_cell(tag)?;
+                self.row
+                    .as_mut()
+                    .ok_or_else(|| invalid("empty cell outside row"))?
+                    .cells
+                    .push(CellSlot {
+                        address,
+                        span: Span {
+                            start: tag.start,
+                            end: tag.end,
+                        },
+                        tag_end: tag.end,
+                        close_start: tag.end,
+                        tag: owned,
+                        primary: Box::new([]),
+                        mce_payload: false,
+                        empty: true,
+                    });
+                Ok(())
+            },
+            lane::Event::Start(lane::Name::Value, tag) => {
+                cell.as_mut()
+                    .ok_or_else(|| invalid("cell payload outside cell"))?
+                    .value_start = Some(tag.start);
+                Ok(())
+            },
+            lane::Event::Empty(lane::Name::Value, tag) => {
+                cell.as_mut()
+                    .ok_or_else(|| invalid("empty cell payload outside cell"))?
+                    .primary = Some(Span {
+                    start: tag.start,
+                    end: tag.end,
+                });
+                Ok(())
+            },
+            lane::Event::End(lane::Name::Value, _close_start, end) => {
+                let open = cell
+                    .as_mut()
+                    .ok_or_else(|| invalid("cell payload closed outside a cell"))?;
+                let start = open
+                    .value_start
+                    .take()
+                    .ok_or_else(|| invalid("cell payload closed before it opened"))?;
+                open.primary = Some(Span { start, end });
+                Ok(())
+            },
+            lane::Event::End(lane::Name::Cell, close_start, end) => {
+                let closed = cell
+                    .take()
+                    .ok_or_else(|| invalid("cell close without edit state"))?;
+                self.row
+                    .as_mut()
+                    .ok_or_else(|| invalid("cell closed outside a row"))?
+                    .cells
+                    .push(CellSlot {
+                        address: closed.address,
+                        span: Span {
+                            start: closed.start,
+                            end,
+                        },
+                        tag_end: closed.tag_end,
+                        close_start,
+                        tag: closed.tag,
+                        primary: primary_spans(closed.primary),
+                        mce_payload: false,
+                        empty: false,
+                    });
+                Ok(())
+            },
+            // Value text is not a formula, and whitespace has no owner here;
+            // the body is UTF-8, so the reader's decode would succeed.
+            lane::Event::Text { .. } => Ok(()),
+        }
+    }
+
+    /// Open one admitted cell as `start_cell` would: the coordinate from an
+    /// unprefixed `r`, and the owned tag unless the tag carries at most that
+    /// one attribute.
+    fn lane_cell(&mut self, tag: lane::Tag<'_>) -> Result<LaneCell> {
+        let row = self
+            .row
+            .as_ref()
+            .ok_or_else(|| invalid("cell outside edit row"))?
+            .number;
+        let mut reference = None;
+        let mut first_is_reference = false;
+        let mut count = 0usize;
+        for (index, (name, value)) in tag.attributes().enumerate() {
+            if name == b"r" {
+                reference = Some(lane_text(value)?);
+                first_is_reference = index == 0;
+            }
+            count += 1;
+        }
+        let column = match reference {
+            Some(reference) => {
+                let (reference_row, column) = parse_a1(reference)?;
+                if reference_row != row {
+                    return Err(invalid(format!(
+                        "cell reference '{reference}' does not belong to row {row}"
+                    )));
+                }
+                column
+            },
+            None => self
+                .row
+                .as_ref()
+                .and_then(|row| row.last_column.checked_add(1))
+                .filter(|column| *column <= COLUMNS)
+                .ok_or_else(|| invalid("inferred edit column exceeds the grid"))?,
+        };
+        let pending = self
+            .row
+            .as_mut()
+            .ok_or_else(|| invalid("cell outside edit row"))?;
+        pending.last_column = column;
+        let address = Address::at(row - 1, column - 1)?;
+        let owned = if count == 0 || (count == 1 && first_is_reference) {
+            None
+        } else {
+            let mut attributes = Vec::new();
+            attributes
+                .try_reserve_exact(count)
+                .map_err(|source| allocation("worksheet cell attributes", source))?;
+            for (name, value) in tag.attributes() {
+                attributes.push(Attribute {
+                    name: lane_text(name)?.into(),
+                    value: lane_text(value)?.into(),
+                });
+            }
+            Some(Tag {
+                name: "c".into(),
+                attributes: attributes.into_boxed_slice(),
+            })
+        };
+        Ok(LaneCell {
+            address,
+            start: tag.start,
+            tag_end: tag.end,
+            tag: owned,
+            value_start: None,
+            primary: None,
+        })
+    }
     fn start(
         &mut self,
         parent: Option<FrameKind>,

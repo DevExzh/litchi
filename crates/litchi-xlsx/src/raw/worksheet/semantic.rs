@@ -14,7 +14,7 @@ use crate::error::{Result, allocation, invalid};
 use crate::formula::{Cache, Formula, Kind};
 use litchi_sheet::{Cell as Address, Rect};
 
-pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stored> {
+pub(super) fn materialize(raw: RawCell<'_>, strings: Option<&[Text]>) -> Result<Stored> {
     let formula_range = if let Some(range) = raw.formula_range {
         Some(formula_range_rect(range)?)
     } else {
@@ -44,7 +44,11 @@ pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stor
         .filter(|kind| !matches!(*kind, "b" | "d" | "e" | "inlineStr" | "n" | "s" | "str"));
     let cell = if let Some(kind) = unknown_cell_type {
         let formula = raw.formula.map(|formula| formula.text);
-        Cell::Unknown(Unknown::new(kind, raw.value, formula))
+        Cell::Unknown(Unknown::new(
+            kind,
+            raw.value.map(std::borrow::Cow::into_owned),
+            formula,
+        ))
     } else if let Some(inline) = raw.inline {
         if raw.formula.is_some() {
             return Err(invalid("formula cell cannot contain an inline string"));
@@ -166,7 +170,7 @@ fn parse_shared_string_index(value: &str) -> Result<usize> {
         .map_err(|_source| invalid(format!("invalid shared-string index '{value}'")))
 }
 
-pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {
+pub(super) fn resolve_shared_formulas(cells: &mut [RawCell<'_>]) -> Result<()> {
     let mut members = Vec::new();
     for (cell_index, cell) in cells.iter().enumerate() {
         let Some(RawFormula {

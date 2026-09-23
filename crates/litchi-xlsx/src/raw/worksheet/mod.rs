@@ -6,12 +6,15 @@
 
 mod codec;
 pub(crate) mod edit;
+pub(crate) mod lane;
 mod model;
 pub(crate) mod selected;
 mod semantic;
 mod validation;
 mod x14ac;
 
+#[cfg(test)]
+mod lane_parse_tests;
 #[cfg(test)]
 mod tests;
 

@@ -1,5 +1,6 @@
 //! Lossless parser state and raw worksheet records.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use litchi_sheet::{Cell as Address, Rect};
@@ -83,15 +84,17 @@ pub(super) struct PendingRow {
     pub(super) properties: row::Properties,
 }
 
+/// One open cell. `'c` is the lifetime of the parsed document: a value the
+/// `<sheetData>` lane admits is borrowed from it rather than copied.
 #[derive(Debug)]
-pub(super) struct PendingCell {
+pub(super) struct PendingCell<'c> {
     pub(super) row: u32,
     pub(super) column: u32,
     pub(super) style: Option<u32>,
     pub(super) cell_metadata: Option<u32>,
     pub(super) value_metadata: Option<u32>,
     pub(super) cell_type: Option<String>,
-    pub(super) value: String,
+    pub(super) value: Cow<'c, str>,
     pub(super) value_bytes: usize,
     pub(super) saw_value: bool,
     pub(super) formula: String,
@@ -115,13 +118,13 @@ pub(super) enum RawFormulaKind {
 }
 
 #[derive(Debug)]
-pub(super) struct RawCell {
+pub(super) struct RawCell<'c> {
     pub(super) address: Address,
     pub(super) style: Option<u32>,
     pub(super) cell_metadata: Option<u32>,
     pub(super) value_metadata: Option<u32>,
     pub(super) cell_type: Option<String>,
-    pub(super) value: Option<String>,
+    pub(super) value: Option<Cow<'c, str>>,
     pub(super) inline: Option<String>,
     pub(super) inline_rich: bool,
     // Shared formulas are expanded into ordinary formula text before
@@ -159,15 +162,15 @@ pub(super) struct SharedMaster {
 }
 
 #[derive(Debug)]
-pub(super) struct Parser {
-    pub(super) cells: Vec<RawCell>,
+pub(super) struct Parser<'c> {
+    pub(super) cells: Vec<RawCell<'c>>,
     pub(super) rows: Vec<row::Stored>,
     pub(super) columns: Option<Assignments<column::Properties>>,
     pub(super) defaults: Option<Defaults>,
     pub(super) extensions: x14ac::Values,
     pub(super) declared_extent: Option<Rect>,
     pub(super) row: Option<PendingRow>,
-    pub(super) cell: Option<PendingCell>,
+    pub(super) cell: Option<PendingCell<'c>>,
     pub(super) seen_rows: HashSet<u32>,
     pub(super) previous_row: u32,
     pub(super) seen_dimension: bool,

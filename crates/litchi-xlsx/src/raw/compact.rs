@@ -4,6 +4,7 @@ use quick_xml::Writer;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::reader::NsReader;
 
+use super::worksheet::lane;
 use crate::error::{Error, Result, allocation};
 
 /// Re-emit changed XML without declaration/root or inter-element formatting.
@@ -12,7 +13,77 @@ use crate::error::{Error, Result, allocation};
 /// retained. Callers must compare with the exact source before invoking this
 /// function so unchanged producer XML keeps its OPC source provenance.
 pub(crate) fn changed(input: &[u8], resource: &'static str) -> Result<Vec<u8>> {
-    changed_observed(input, resource, |_, _| {})
+    changed_observed(input, resource, &mut Unobserved)
+}
+
+/// A consumer of the events compaction emits.
+trait Observer {
+    /// Observe one event after it was emitted.
+    fn event(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>);
+
+    /// Account for an admitted `<sheetData>` body that was emitted without
+    /// per-event observation.
+    fn admitted(&mut self, body: &AdmittedBody<'_>);
+}
+
+/// The observer of parts that need no proof.
+struct Unobserved;
+
+impl Observer for Unobserved {
+    fn event(&mut self, _reader: &NsReader<&[u8]>, _event: &Event<'_>) {}
+
+    fn admitted(&mut self, _body: &AdmittedBody<'_>) {}
+}
+
+impl Observer for super::web::check::Probe {
+    fn event(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>) {
+        self.observe(reader, event);
+    }
+
+    fn admitted(&mut self, body: &AdmittedBody<'_>) {
+        // Rows, cells and values are never web names, stay far below the
+        // proof's depth bound and keep the root open, so the per-event proof
+        // could only have been lost to an apostrophe in an attribute or to
+        // value text that is not UTF-8.
+        if body.summary.apostrophe || !body.value_text_is_utf8() {
+            self.decline();
+        }
+    }
+}
+
+/// An admitted `<sheetData>` body and what the lane learned about it.
+struct AdmittedBody<'a> {
+    content: &'a [u8],
+    start: usize,
+    name: &'a [u8],
+    summary: lane::Summary,
+}
+
+impl AdmittedBody<'_> {
+    fn value_text_is_utf8(&self) -> bool {
+        let Some(body) = self.content.get(self.start..self.summary.end) else {
+            return false;
+        };
+        if body.is_ascii() {
+            return true;
+        }
+        let mut valid = true;
+        let walked = lane::walk(self.content, self.start, self.name, &mut |event| {
+            if let lane::Event::Text {
+                start,
+                end,
+                value: true,
+            } = event
+            {
+                valid &= self
+                    .content
+                    .get(start..end)
+                    .is_some_and(|text| std::str::from_utf8(text).is_ok());
+            }
+            Ok::<(), ()>(())
+        });
+        valid && matches!(walked, Ok(Some(summary)) if summary == self.summary)
+    }
 }
 
 /// Keep the proof bound to the exact compacted bytes until web validation runs.
@@ -34,14 +105,14 @@ impl WorksheetOutput {
 
 pub(crate) fn changed_worksheet(input: &[u8], resource: &'static str) -> Result<WorksheetOutput> {
     let mut web = super::web::check::Probe::default();
-    let bytes = changed_observed(input, resource, |reader, event| web.observe(reader, event))?;
+    let bytes = changed_observed(input, resource, &mut web)?;
     Ok(WorksheetOutput { bytes, web })
 }
 
 fn changed_observed(
     input: &[u8],
     resource: &'static str,
-    mut observe: impl FnMut(&NsReader<&[u8]>, &Event<'_>),
+    observer: &mut impl Observer,
 ) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(input);
     reader.config_mut().trim_text(false);
@@ -52,9 +123,58 @@ fn changed_observed(
         .map_err(|source| allocation(resource, source))?;
     let mut writer = Writer::new(bytes);
     let mut preserve = Vec::new();
+    #[cfg(not(test))]
+    let lane_enabled = true;
+    #[cfg(test)]
+    let lane_enabled = lane::route::enabled();
+    if let Some(entry) = compact_events(
+        &mut reader,
+        &mut writer,
+        &mut preserve,
+        observer,
+        lane_enabled.then_some(input),
+    )? {
+        let preserved = preserve.last().copied().unwrap_or(false);
+        match compact_body(input, entry, preserved, writer.get_mut(), observer)? {
+            Some(resume) => {
+                let spliced = lane::splice_without_body(input, entry.position, resume)?;
+                let mut tail = NsReader::from_reader(spliced.as_slice());
+                tail.config_mut().trim_text(false);
+                tail.config_mut().check_end_names = true;
+                lane::skip_to(&mut tail, entry.position)?;
+                if compact_events(&mut tail, &mut writer, &mut preserve, observer, None)?.is_some()
+                {
+                    return Err(invalid("compact lane resumed at a second entry"));
+                }
+            },
+            None => {
+                if compact_events(&mut reader, &mut writer, &mut preserve, observer, None)?
+                    .is_some()
+                {
+                    return Err(invalid("compact lane resumed at a second entry"));
+                }
+            },
+        }
+    }
+    Ok(writer.into_inner())
+}
+
+/// Compact reader events until end of file.
+///
+/// With `lane` set to the reader's own input, stop right after a
+/// `<sheetData>` start tag that is a direct child of the root.
+fn compact_events(
+    reader: &mut NsReader<&[u8]>,
+    writer: &mut Writer<Vec<u8>>,
+    preserve: &mut Vec<bool>,
+    observer: &mut impl Observer,
+    lane: Option<&[u8]>,
+) -> Result<Option<lane::Entry>> {
     // Slice-backed events borrow the immutable input and are consumed before the next read.
     loop {
+        let event_start = reader.buffer_position();
         let event = reader.read_event().map_err(xml_error)?;
+        let mut sheet_data_name = None;
         match &event {
             Event::Start(element) => {
                 let local = element.local_name();
@@ -67,10 +187,13 @@ fn changed_observed(
                 }
                 let inherited = preserve.last().copied().unwrap_or(false);
                 preserve.push(explicit.unwrap_or(inherited) || text_bearing(local.as_ref()));
-                write_start(&mut writer, element, false)?;
+                write_start(writer, element, false)?;
+                if lane.is_some() && preserve.len() == 2 && local.as_ref() == b"sheetData" {
+                    sheet_data_name = Some(element.name().as_ref().len());
+                }
             },
             Event::Empty(element) => {
-                write_start(&mut writer, element, true)?;
+                write_start(writer, element, true)?;
             },
             Event::End(element) => {
                 let _ = preserve.pop();
@@ -86,7 +209,7 @@ fn changed_observed(
             {
                 continue;
             },
-            Event::Eof => break,
+            Event::Eof => return Ok(None),
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
@@ -96,9 +219,73 @@ fn changed_observed(
             | Event::GeneralRef(_) => writer.write_event(event.borrow()).map_err(xml_error)?,
         }
         // Discarded formatting is absent from the bytes that web validation sees.
-        observe(&reader, &event);
+        observer.event(reader, &event);
+        if let (Some(content), Some(name_len)) = (lane, sheet_data_name)
+            && let Some(entry) =
+                lane::Entry::locate(content, event_start, name_len, reader.buffer_position())
+        {
+            return Ok(Some(entry));
+        }
     }
-    Ok(writer.into_inner())
+}
+
+/// Emit an admitted `<sheetData>` body without the reader.
+///
+/// Every admitted start, empty and close tag is already in the exact form
+/// [`write_start`] and the writer produce, and value text is written
+/// verbatim, so the compact body is the source body with its formatting
+/// whitespace removed unless an ancestor preserves it. Returns the offset of
+/// the body's close tag, or `None` to keep the reader.
+fn compact_body(
+    content: &[u8],
+    entry: lane::Entry,
+    preserved: bool,
+    output: &mut Vec<u8>,
+    observer: &mut impl Observer,
+) -> Result<Option<usize>> {
+    let name = entry.name(content)?;
+    let Some(summary) = lane::recognize(content, entry.position, name) else {
+        return Ok(None);
+    };
+    #[cfg(test)]
+    lane::route::note_admitted(lane::route::Pass::Compact);
+    let body = content
+        .get(entry.position..summary.end)
+        .ok_or_else(|| invalid("compact lane body lies outside its document"))?;
+    if preserved || summary.whitespace == 0 {
+        output.extend_from_slice(body);
+    } else {
+        let mut copied = entry.position;
+        let walked = lane::walk(content, entry.position, name, &mut |event| {
+            if let lane::Event::Text {
+                start,
+                end,
+                value: false,
+            } = event
+            {
+                output.extend_from_slice(&content[copied..start]);
+                copied = end;
+            }
+            Ok::<(), Error>(())
+        })?;
+        if walked != Some(summary) {
+            return Err(invalid("compact lane changed its admitted body"));
+        }
+        output.extend_from_slice(&content[copied..summary.end]);
+    }
+    observer.admitted(&AdmittedBody {
+        content,
+        start: entry.position,
+        name,
+        summary,
+    });
+    Ok(Some(summary.end))
+}
+
+fn invalid(message: &'static str) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "changed SpreadsheetML XML is malformed: {message}"
+    )))
 }
 
 fn write_start(writer: &mut Writer<Vec<u8>>, element: &BytesStart<'_>, empty: bool) -> Result<()> {
@@ -615,5 +802,166 @@ mod tests {
         assert!(bindings.is_empty());
         let compacted = changed_worksheet(&input, "test XML").expect("compact worksheet");
         assert!(compacted.web.is_proven());
+    }
+
+    /// Compact through both routes and require identical bytes, identical
+    /// web-proof eligibility and identical final bindings or refusals.
+    fn assert_lane_parity(input: &[u8]) -> bool {
+        use crate::raw::worksheet::lane::route::{self, Pass};
+        route::reset();
+        let fast = changed_worksheet(input, "test worksheet XML");
+        let admitted = route::admitted(Pass::Compact) > 0;
+        let slow = route::without_lane(|| changed_worksheet(input, "test worksheet XML"));
+        let text = String::from_utf8_lossy(input);
+        match (fast, slow) {
+            (Ok(fast), Ok(slow)) => {
+                assert_eq!(fast.bytes(), slow.bytes(), "{text}");
+                assert_eq!(fast.web.is_proven(), slow.web.is_proven(), "{text}");
+                let fast = fast.into_bytes_and_web();
+                let slow = slow.into_bytes_and_web();
+                assert_eq!(format!("{fast:?}"), format!("{slow:?}"), "{text}");
+            },
+            (Err(fast), Err(slow)) => {
+                assert_eq!(format!("{fast:?}"), format!("{slow:?}"), "{text}");
+                assert_eq!(fast.to_string(), slow.to_string(), "{text}");
+            },
+            (fast, slow) => panic!(
+                "routes disagree for {text}: {:?} vs {:?}",
+                fast.map(|output| output.bytes().len()),
+                slow.map(|output| output.bytes().len())
+            ),
+        }
+        let unobserved_fast = changed(input, "test XML");
+        let unobserved_slow = route::without_lane(|| changed(input, "test XML"));
+        assert_eq!(
+            format!("{unobserved_fast:?}"),
+            format!("{unobserved_slow:?}"),
+            "{text}"
+        );
+        admitted
+    }
+
+    #[test]
+    fn lane_compaction_matches_the_reader_on_generated_worksheets() {
+        use crate::raw::worksheet::lane::corpus::{Lcg, generated_body, worksheet};
+        let mut random = Lcg(0xC0DE);
+        let mut benign = 0usize;
+        let mut hostile = 0usize;
+        for index in 0..900 {
+            let is_hostile = index % 3 == 0;
+            let document = worksheet(&generated_body(&mut random, is_hostile));
+            let admitted = usize::from(assert_lane_parity(document.as_bytes()));
+            if is_hostile {
+                hostile += admitted;
+            } else {
+                benign += admitted;
+            }
+        }
+        assert_eq!(benign, 600, "every benign body is admitted");
+        // Hostile bodies with duplicate attributes stay on the reader.
+        assert!(
+            hostile > 200 && hostile < 300,
+            "hostile admissions {hostile}"
+        );
+    }
+
+    #[test]
+    fn lane_compaction_keeps_preserved_formatting_and_proof_inputs() {
+        let cases = [
+            // Formatting is dropped between rows and cells but kept in values.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\">\n <sheetData>\n  <row r=\"1\">\n   <c r=\"A1\"> <v> 1 </v> </c>\n  </row>\n </sheetData>\n</worksheet>"
+                ),
+                true,
+            ),
+            // An inherited `xml:space` keeps the formatting.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\" xml:space=\"preserve\"><sheetData>\n <row r=\"1\">\n </row>\n</sheetData></worksheet>"
+                ),
+                true,
+            ),
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData xml:space=\"preserve\"> <row r=\"1\"/> </sheetData></worksheet>"
+                ),
+                true,
+            ),
+            // An apostrophe in an attribute value gives up the web proof on
+            // both routes.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"><c r=\"A1\" x=\"it's\"/></row></sheetData></worksheet>"
+                ),
+                true,
+            ),
+            // Prefixed documents and foreign namespaces compact identically.
+            (
+                format!(
+                    "<x:worksheet xmlns:x=\"{MAIN_NAMESPACE}\"><x:sheetData><row r=\"1\"/></x:sheetData></x:worksheet>"
+                ),
+                true,
+            ),
+            (
+                "<worksheet xmlns=\"urn:other\"><sheetData><row/></sheetData></worksheet>"
+                    .to_owned(),
+                true,
+            ),
+            // A web extension after the body still reaches the full reader.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"/></sheetData><extLst><ext uri=\"x\"/></extLst></worksheet>"
+                ),
+                true,
+            ),
+            // Malformed markup after the body keeps its refusal.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"/></sheetData><bad></worksheet>"
+                ),
+                true,
+            ),
+            // A nested sheetData is not the root's child.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><a><sheetData><row/></sheetData></a></worksheet>"
+                ),
+                false,
+            ),
+            // Declined bodies stay on the reader.
+            (
+                format!(
+                    "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"><c r=\"A1\"><f>1</f></c></row></sheetData></worksheet>"
+                ),
+                false,
+            ),
+        ];
+        for (document, expected) in cases {
+            assert_eq!(
+                assert_lane_parity(document.as_bytes()),
+                expected,
+                "{document}"
+            );
+        }
+    }
+
+    #[test]
+    fn lane_compaction_matches_invalid_utf8_value_text() {
+        let mut document = format!(
+            "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"><c r=\"A1\" t=\"str\"><v>xx</v></c></row></sheetData></worksheet>"
+        )
+        .into_bytes();
+        let at = document
+            .windows(2)
+            .position(|window| window == b"xx")
+            .expect("marker");
+        document[at] = 0xFF;
+        assert!(assert_lane_parity(&document));
+        // Non-ASCII UTF-8 text keeps the proof on both routes.
+        let document = format!(
+            "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"><c r=\"A1\" t=\"str\"><v>\u{e9}</v></c></row></sheetData></worksheet>"
+        );
+        assert!(assert_lane_parity(document.as_bytes()));
     }
 }
