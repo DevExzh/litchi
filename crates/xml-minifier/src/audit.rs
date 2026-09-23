@@ -659,6 +659,16 @@ impl Policy {
         require_compact: true,
     };
     /// Producer bytes: structure and budgets only, no compactness contract.
+    ///
+    /// [`verify_source_replacement`] proves a replacement from a scan of one
+    /// window, and that proof relies on every check under this policy being
+    /// local to a token, as the invariant at [`scan`] states: a check may
+    /// read the token's own bytes, the element depth, the aggregate counters
+    /// and the listed uses of `spaces` and `roots`, and nothing else. A new
+    /// check that reads more (a token's offset or ordinal, whether another
+    /// token was seen, the `xml:space` scope) must be replayed into
+    /// [`State::within`] and `Window::prove`, or must make
+    /// `verify_source_replacement` fall back to the complete scan.
     const SOURCE: Self = Self {
         reject_ambiguous_space: false,
         require_compact: false,
@@ -692,15 +702,33 @@ impl State {
         }
     }
 
-    /// The state inside `depth` open elements of a document whose element
-    /// has been seen, with none of the open elements' spaces on the stack:
-    /// an end tag that would close one of them is refused as unexpected.
+    /// The state in which a window is scanned under the source policy: inside
+    /// `depth` open elements of a document whose element has been seen.
+    ///
+    /// Every field is set explicitly, so that a new field forces a decision
+    /// about how a window replays it; the invariant at [`scan`] says which
+    /// state a source-policy check may read.
     fn within(depth: usize) -> Self {
         Self {
+            // Replayed exactly: the window starts at this depth.
             depth,
+            // Reported, never checked.
             max_depth: depth,
+            // Read only at depth zero, which a window never reaches.
             roots: 1,
-            ..Self::new()
+            // The window's own charges, which `Window::prove` re-totals with
+            // the original's.
+            attributes: 0,
+            events: 0,
+            text_bytes: 0,
+            // Empty on purpose: an end tag that would close an enclosing
+            // element finds no entry and is refused, so a window must be
+            // balanced. The inherited `xml:space` scope the entries would
+            // carry serves only compactness checks.
+            spaces: Vec::new(),
+            // Whitespace-run state, read only by compactness checks.
+            ambiguous_space_offset: None,
+            text_run_has_explicit_content: false,
         }
     }
 
@@ -859,7 +887,14 @@ impl std::error::Error for ReplacementError {
 /// difference is not covered by such an element, the window is larger than
 /// half the replacement, or any window check fails, the replacement is scanned
 /// completely, so every error is the one [`verify_source`] reports, with its
-/// offset. [`ReplacementProof`] says which path was taken.
+/// offset. [`ReplacementProof`] says which path was taken. Debug builds also
+/// confirm every window proof with a complete audit of the replacement.
+///
+/// The fallback has a price: when a window is found but a check made only on
+/// the window path then fails, the replacement is scanned about one and a half
+/// times, and the pair costs up to about 30% more than two [`verify_source`]
+/// calls. That happens only for an invalid replacement or an unusual one, such
+/// as a window whose last token is character data ending in `>`.
 ///
 /// # Errors
 ///
@@ -889,11 +924,28 @@ pub fn verify_source_replacement(
         .found
         .and_then(|window| window.prove(report, replacement, limits))
     {
+        #[cfg(debug_assertions)]
+        debug_check_window_proof(replacement, limits, &proof);
         return Ok(proof);
     }
     verify_source(replacement, limits)
         .map(|_report| ReplacementProof::Complete)
         .map_err(ReplacementError::Replacement)
+}
+
+/// Re-derive a window proof from a complete audit of the replacement.
+///
+/// Debug builds run this for every window proof, so each debug test that
+/// reaches one re-checks the invariant stated at [`scan`]. Release builds do
+/// not compile it.
+#[cfg(debug_assertions)]
+fn debug_check_window_proof(replacement: &[u8], limits: Limits, proof: &ReplacementProof) {
+    let complete = verify_source(replacement, limits);
+    assert!(
+        complete.is_ok(),
+        "window proof {proof:?} contradicts the complete source audit of the replacement: \
+         {complete:?}"
+    );
 }
 
 /// Verifies one XML document from a caller-owned buffered source.
@@ -1519,6 +1571,43 @@ fn verify_observed<O: Observer>(
 /// `input` is the same text as `xml` plus a leading byte-order mark of
 /// `bom_bytes` bytes, which quick-xml consumes without counting it; raw spans
 /// and diagnostics address `input`.
+///
+/// # The invariant window proofs rely on
+///
+/// [`verify_source_replacement`] also runs this loop over a *window*: the
+/// replacement bytes that took one element's place, starting from
+/// [`State::within`] instead of the state a complete scan of the replacement
+/// would have reached there. The two scans agree on every token of the window
+/// only because, under [`Policy::SOURCE`], the checks of a token read nothing
+/// but:
+///
+/// * the token's own bytes: its lexical layout, attributes, `xml:space` value
+///   and length;
+/// * `state.depth`, for character data, CDATA and references outside the
+///   document element, the depth budget and an end tag at depth zero; the
+///   window starts at the depth the original had there;
+/// * the aggregate counters `events`, `attributes` and `text_bytes`, compared
+///   with their limits; they only grow, so `Window::prove` re-totals them for
+///   the whole replacement;
+/// * `state.spaces` only as the end-tag balance guard; a window starts with it
+///   empty, so no enclosing element can be closed from inside the window;
+/// * `state.roots` only at depth zero, which a window never reaches.
+///
+/// The quick-xml reader over a window likewise starts with no open names, so
+/// it refuses an end tag for an enclosing element. Offsets inside a window
+/// scan are relative to the window and appear only in diagnostics, which the
+/// window path never reports; the `xml:space` scope and the whitespace-run
+/// state serve only compactness checks, which the source policy does not make.
+///
+/// **Obligation.** A new check under the source policy that reads anything
+/// else, such as a token's offset or ordinal ("a declaration must come
+/// first"), whether some other token has been seen, the inherited `xml:space`
+/// scope, the root count away from depth zero, or other state of the
+/// enclosing elements, breaks window proofs. It must be replayed into
+/// [`State::within`] and checked by `Window::prove`, or it must make
+/// [`verify_source_replacement`] fall back to the complete scan. Debug builds
+/// re-derive every window proof from a complete audit of the replacement, so a
+/// violation fails any debug test that reaches one.
 fn scan<O: Observer>(
     input: &[u8],
     xml: &str,

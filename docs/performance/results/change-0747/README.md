@@ -1,7 +1,9 @@
 # Change 0747 evidence packet
 
 Record: [0747](../../0747-xlsx-publication-audit-reuse.md). Base `009d515bef`;
-candidate commits `1ccfe6b354` (pair audit) and `6b49ce999a` (observer gate).
+candidate commits `1ccfe6b354` (pair audit) and `6b49ce999a` (observer gate), and the
+review follow-up commit (invariant documentation, explicit `State::within`,
+debug cross-check, extended generator).
 `performance_claim: none`.
 
 Everything here was produced on the recorded host with every measured process
@@ -17,7 +19,9 @@ bytes and corpora are not kept; their identities are.
 | `probe/first/`, `probe/final/` | unit probe CSVs (A = base-code probe, B = candidate probe), 4 rounds × 2 shapes × A B B A; `abba.summary.txt` / `abba2.summary.txt` are the per-measure medians |
 | `callgrind/` | per-measured-iteration inclusive instructions and call counts from isolation pairs (`--samples 1` vs `3`): `report-oneedit.json` (self-built base vs final candidate, both shapes), `report-eager.json` (eager dense-sparse control), `report-prebuilt-base.json` (coordinator's base, for the planning-variation note) |
 | `capture/` | the gdb capture of every `verify_with_policy` call in one run per shape: backtraces (`*-cap.log.gz`) and SHA-256 plus length of each audited payload (`*-payloads.txt`); hits 44–47 are the measured publication |
-| `differential/` | the release-mode differential campaigns: `campaign/` 8 × 5,000,000 cases on the first candidate, `campaign2/` 8 × 3,000,000 on the final one; per-seed accepted / window / refused counts, all exits 0 |
+| `differential/` | the release-mode differential campaigns: `campaign/` 8 × 5,000,000 cases on the first candidate, `campaign2/` 8 × 3,000,000 on the final one (per-seed accepted / window / refused counts), and `campaign3/` 8 × 3,000,000 with the review follow-up's extended generator (per-seed refusals by side, identical / window / complete, two-separated-edit cases and their windows; `summary.txt` totals); all exits 0 |
+| `review/` | the review follow-up's evidence: `run1-4.csv` and `summary.txt` from the worst-case probe (fallback cost on constructed ~64 KiB documents, and `verify_source`'s verdict on the pre-existing gap inputs), and `mutation-check.txt` (the reviewer's hypothetical declaration-position rule, applied temporarily, caught by the debug cross-check) |
+| `gates-review.txt` | the review follow-up's gates with a fresh target directory: fmt, clippy (lib and all targets), tests, rustdoc |
 | `scripts/` | every script used: timing runner and analysis, flag scan, probe source and runners, callgrind runners and parser, gdb capture scripts, differential campaign runner, leg build script, gates script |
 | `gates.txt` | the gate commands, test totals and exit codes on the committed candidate |
 | `cleanup.json` | what was deleted after the evidence was copied here, with sizes |

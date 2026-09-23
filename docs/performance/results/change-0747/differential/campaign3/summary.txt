@@ -1,0 +1,1 @@
+extended-generator campaign (8 seeds): {'cases': 24000000, 'original_refused': 8489897, 'replacement_refused': 6266432, 'identical': 619092, 'window': 4510930, 'complete': 4113649, 'two_sites': 3746101, 'two_site_windows': 214761}

@@ -33,5 +33,24 @@
     "/home/zhuhe/code/litchi-worktrees/0747-xlsx-publication-audit-reuse (worktree) and branch perf/0747-xlsx-publication-audit-reuse",
     "the coordinator's shared read-only base checkout and prebuilt base binary, untouched"
   ],
-  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout"
+  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout",
+  "review_follow_up": {
+    "performed": "2026-09-22, after the review follow-up gates, the extended differential campaign and the worst-case probe, with their evidence copied into this packet",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0747",
+        "bytes": 17442882848,
+        "what": "fresh target directory for the review follow-up: debug gate builds of xml-minifier, litchi-opc and litchi-xlsx, the release differential test and the release worst-case probe"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0747/*",
+        "bytes": 252522,
+        "what": "scratch: gate logs (summary kept as gates-review.txt), campaign logs (kept under differential/campaign3), probe source and CSVs (kept under scripts/ and review/), mutation-check output (kept)"
+      }
+    ],
+    "verified_after_removal": {
+      "targets/0747": "absent",
+      "scratch/0747": "0 entries"
+    }
+  }
 }

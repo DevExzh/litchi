@@ -1,0 +1,13 @@
+case,bytes,pair_result,two_verify_source_ns,verify_source_replacement_ns,ratio
+one-element edit (window proof),64983,Ok(Window { original: 64943..64960, replacement: 64943..64968 }),546425,302046,0.5528
+valid replacement, window fails its last-token check,64977,Ok(Complete),544559,714156,1.3114
+invalid replacement, defect at the end of a half-size window,64978,Err("replacement XML: malformed XML at byte 64943: xml:space must be 'default' or 'preserve'"),545350,709230,1.3005
+
+gap_input,verify_source,pair_with_edited_neighbour_agrees
+"<r/>& ;",accepted,true
+"<r>&;</r>",accepted,true
+"<r>&a b;</r>",accepted,true
+"<r>&#xZZ;&#0;</r>",accepted,true
+"<r><?xml version=\"1.0\"?></r>",accepted,true
+"<r>]]></r>",accepted,true
+"<p:r/>",accepted,true

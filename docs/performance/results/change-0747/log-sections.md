@@ -28,8 +28,13 @@ share of one-percent publication is unchanged.
 `performance_claim: none`. Base `009d515bef`; commits `1ccfe6b354` and
 `6b49ce999a`. All seven paired source-policy audit sites in `litchi-opc` call
 one `verify_source_replacement`, whose verdict, failing side and error value
-equal the two `verify_source` calls. 64,040,000 generated differential cases
-showed no difference. With both legs built by the same command (a first
+equal the two `verify_source` calls. Generated differential campaigns covering
+17,753,101 window proofs, 214,761 of them over two separated edits, showed no
+difference. So did an independent review of about 595 million cases reported by
+the coordinator. The invariant the window relies on (no source-policy check
+reads a token's position or other non-local state) is documented at the
+auditor's token loop, and debug builds re-derive every window proof from a
+complete audit. With both legs built by the same command (a first
 campaign against the prebuilt base showed layout-induced control shifts and is
 retained), `xlsx_source_backed_cell_values_one_edit_save` moves 4.448 → 4.165 ms
 (−6.63%, CI [−7.39%, −5.55%]) on medium and 28.783 → 27.005 ms (−6.32%, CI

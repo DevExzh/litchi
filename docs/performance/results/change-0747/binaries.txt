@@ -10,3 +10,4 @@ fb535ebb4abb4154c4ac445b90a60399edf189d52cae76fea2947852a406cb0b  harness, coord
 a0a9fe5e6ce5d71956c9015c926e863fe08155308630dfcb58a2c2d58d66dba7  probe against base xml-minifier 009d515bef (probe A, both runs)
 5751be277b27ee4c0c3335eaf3450e3dc5a10ae96c34868227a68a1a1fa6648a  probe against first candidate 1ccfe6b354 (probe/first B)
 a130a03349a34749ad7ed1afc2cfee2f66860435deadb63dd0973edb867b8f92  probe against final candidate 6b49ce999a (probe/final B)
+34c43e680a062aa5aec13ec53c5171cab91d98220c14430de75bd52f321ba0e1  worst-case and gap probe (scripts/worst_case_probe_0747.rs) against the review follow-up tree; its release library code equals 6b49ce999a (the follow-up changes docs, a debug-only check and tests)

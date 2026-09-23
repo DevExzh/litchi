@@ -337,6 +337,39 @@ fn a_marked_original_keeps_physical_offsets() {
     assert_eq!(proof, window(value.clone(), value));
 }
 
+/// Constructs whose verdict could depend on where a token sits, placed
+/// inside the edited element. Today's source policy judges them by their own
+/// bytes, so the window and the complete scan agree. A future check that
+/// reads position must keep them agreeing (see the invariant documented at
+/// the auditor's token loop); the oracle comparison here, and the debug
+/// cross-check inside `verify_source_replacement`, fail if it does not.
+#[test]
+fn position_sensitive_tokens_inside_a_window_are_judged_as_the_complete_audit_judges_them() {
+    let pad = "<pad>padding padding padding padding padding padding</pad>";
+    let original = format!("<r><a/>{pad}</r>");
+    for inserted in [
+        "<?xml version=\"1.0\"?>",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<?xml-stylesheet href=\"s\"?>",
+        "<!--c-->",
+        "\u{feff}",
+        "<![CDATA[ ]]>",
+        "<!DOCTYPE r>",
+        "</r><r>",
+    ] {
+        for replacement in [
+            format!("<r>{inserted}{pad}</r>"),
+            format!("<r><a>{inserted}</a>{pad}</r>"),
+        ] {
+            let _verdict = checked(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default(),
+            );
+        }
+    }
+}
+
 fn narrow(resource: Resource, maximum: usize) -> Limits {
     Limits::default().narrow(resource, maximum)
 }
@@ -628,11 +661,12 @@ fn fragment(rng: &mut Rng) -> String {
     fragment
 }
 
-/// A local edit of `original`: most often a whole element replaced,
-/// inserted, deleted or retouched, otherwise an arbitrary span replaced.
-fn edit(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> Vec<u8> {
+/// Where one local edit goes and what it inserts: most often a whole element
+/// replaced, inserted, deleted or retouched, otherwise an arbitrary span
+/// replaced.
+fn edit_site(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> (usize, usize, String) {
     let length = original.len();
-    let (start, end, insert) = match rng.below(10) {
+    match rng.below(10) {
         _ if spans.is_empty() => {
             let start = rng.below(length + 1);
             (start, (start + rng.below(6)).min(length), fragment(rng))
@@ -661,11 +695,79 @@ fn edit(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> Vec<u8> {
             let start = rng.below(length + 1);
             (start, (start + rng.below(6)).min(length), fragment(rng))
         },
+    }
+}
+
+/// A second edit site inside the smallest element that contains `first`, so
+/// that the two edits often share a small enclosing element: another element
+/// in it replaced, or an insertion before or after one, or at any byte.
+fn nearby_site(
+    rng: &mut Rng,
+    original: &[u8],
+    spans: &[(usize, usize)],
+    first: &(usize, usize, String),
+) -> (usize, usize, String) {
+    let container = spans
+        .iter()
+        .filter(|(start, end)| {
+            *start <= first.0 && first.1 <= *end && end - start > first.1 - first.0
+        })
+        .min_by_key(|(start, end)| end - start);
+    let Some(&(start, end)) = container else {
+        return edit_site(rng, original, spans);
     };
-    let mut replacement = original[..start].to_vec();
-    replacement.extend_from_slice(insert.as_bytes());
-    replacement.extend_from_slice(&original[end..]);
-    replacement
+    let inner: Vec<(usize, usize)> = spans
+        .iter()
+        .copied()
+        .filter(|(a, b)| start < *a && *b < end)
+        .collect();
+    if !inner.is_empty() && rng.chance(70) {
+        let (a, b) = inner[rng.below(inner.len())];
+        return match rng.below(3) {
+            0 => (a, b, fragment(rng)),
+            1 => (a, a, fragment(rng)),
+            _ => (b, b, fragment(rng)),
+        };
+    }
+    let at = start + 1 + rng.below(end - start - 1);
+    (at, at, fragment(rng))
+}
+
+/// An edit of `original` and the number of separated sites it changed: one
+/// local edit, or in a quarter of the cases two, with at least one original
+/// byte left between them so that a window must cover both. Half of the
+/// second sites are drawn inside the first site's enclosing element.
+fn edit(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> (Vec<u8>, usize) {
+    let first = edit_site(rng, original, spans);
+    let mut sites = vec![first];
+    if rng.chance(25) {
+        let second = if rng.chance(50) {
+            nearby_site(rng, original, spans, &sites[0])
+        } else {
+            edit_site(rng, original, spans)
+        };
+        let first = sites.remove(0);
+        let (earlier, later) = if first.0 <= second.0 {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        if earlier.1 < later.0 {
+            sites.push(earlier);
+            sites.push(later);
+        } else {
+            sites.push(earlier);
+        }
+    }
+    let mut replacement = Vec::new();
+    let mut cursor = 0;
+    for (start, end, insert) in &sites {
+        replacement.extend_from_slice(&original[cursor..*start]);
+        replacement.extend_from_slice(insert.as_bytes());
+        cursor = *end;
+    }
+    replacement.extend_from_slice(&original[cursor..]);
+    (replacement, sites.len())
 }
 
 /// Default limits half the time; otherwise every budget within two of what
@@ -724,23 +826,50 @@ fn the_pair_verdict_equals_two_complete_audits_on_generated_edits() {
         0x0747_5eed_0747_5eed,
     ));
     let scale = |count: u64| count * cases / 40_000;
-    let (mut windows, mut accepted, mut refused) = (0u64, 0u64, 0u64);
+    let mut original_refused = 0u64;
+    let mut replacement_refused = 0u64;
+    let mut identical = 0u64;
+    let mut windows = 0u64;
+    let mut complete = 0u64;
+    let mut two_sites = 0u64;
+    let mut two_site_windows = 0u64;
     for _ in 0..cases {
         let (original, spans) = document(&mut rng);
-        let replacement = edit(&mut rng, &original, &spans);
+        let (replacement, sites) = edit(&mut rng, &original, &spans);
         let limits = limits(&mut rng, &original, &replacement);
+        if sites == 2 {
+            two_sites += 1;
+        }
         match checked(&original, &replacement, limits) {
+            Err(ReplacementError::Original(_)) => original_refused += 1,
+            Err(_) => replacement_refused += 1,
+            Ok(ReplacementProof::Identical) => identical += 1,
             Ok(ReplacementProof::Window { .. }) => {
                 windows += 1;
-                accepted += 1;
+                if sites == 2 {
+                    two_site_windows += 1;
+                }
             },
-            Ok(_) => accepted += 1,
-            Err(_) => refused += 1,
+            Ok(_) => complete += 1,
         }
     }
-    eprintln!("accepted {accepted} (windows {windows}), refused {refused}");
-    // The generator must exercise every path, and the window path often.
-    assert!(accepted > scale(8_000), "accepted {accepted}");
-    assert!(refused > scale(8_000), "refused {refused}");
+    eprintln!(
+        "cases {cases}: refused on the original {original_refused}, refused on the replacement \
+         {replacement_refused}, identical {identical}, window {windows}, complete {complete}; \
+         two separated edits {two_sites} (window {two_site_windows})"
+    );
+    // The generator must exercise every path, and the window path often,
+    // including windows that cover two separated edits.
+    assert!(identical + windows + complete > scale(8_000));
+    assert!(original_refused + replacement_refused > scale(8_000));
+    assert!(
+        replacement_refused > scale(2_000),
+        "replacement refusals {replacement_refused}"
+    );
     assert!(windows > scale(4_000), "windows {windows}");
+    assert!(complete > scale(2_000), "complete {complete}");
+    assert!(
+        two_site_windows > scale(200),
+        "two-edit windows {two_site_windows}"
+    );
 }
