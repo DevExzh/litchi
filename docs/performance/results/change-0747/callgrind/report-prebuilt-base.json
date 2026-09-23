@@ -1,0 +1,56 @@
+{
+  "before/dense-sparse": {
+    "audit_slice_before": {
+      "calls": 4.0,
+      "inclusive_ir": 92098416.5
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 94887875.0
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 187655374.0
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 65861272.0
+    },
+    "program_total": 1762404416.5,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 158834395.5
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 158366888.5
+    }
+  },
+  "before/medium": {
+    "audit_slice_before": {
+      "calls": 4.0,
+      "inclusive_ir": 13060639.5
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 13931161.5
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 27996978.5
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 17732695.5
+    },
+    "program_total": 1170879666.0,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 31238085.0
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 31169247.5
+    }
+  }
+}

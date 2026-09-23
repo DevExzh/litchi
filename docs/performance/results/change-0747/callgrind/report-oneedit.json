@@ -1,0 +1,118 @@
+{
+  "after2/dense-sparse": {
+    "audit_pair_after": {
+      "calls": 2.0,
+      "inclusive_ir": 48068487.5
+    },
+    "audit_slice_before": {
+      "calls": 1.0,
+      "inclusive_ir": 21557.5
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 94867207.5
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 187607756.0
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 65699362.5
+    },
+    "program_total": 1721062568.5,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 114644023.0
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 114175708.0
+    }
+  },
+  "after2/medium": {
+    "audit_pair_after": {
+      "calls": 2.0,
+      "inclusive_ir": 6837321.5
+    },
+    "audit_slice_before": {
+      "calls": 1.0,
+      "inclusive_ir": 21500.0
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 13945284.5
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 28024422.5
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 17729487.5
+    },
+    "program_total": 1164802797.0,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 25043733.0
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 24975475.0
+    }
+  },
+  "beforeself/dense-sparse": {
+    "audit_slice_before": {
+      "calls": 4.0,
+      "inclusive_ir": 92098713.0
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 94864278.5
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 187912108.0
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 65881399.5
+    },
+    "program_total": 1764117885.0,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 158856373.5
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 158387892.5
+    }
+  },
+  "beforeself/medium": {
+    "audit_slice_before": {
+      "calls": 4.0,
+      "inclusive_ir": 13060524.5
+    },
+    "commit": {
+      "calls": 1.0,
+      "inclusive_ir": 13938691.0
+    },
+    "planning": {
+      "calls": 1.0,
+      "inclusive_ir": 27384719.0
+    },
+    "preservation_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 17699770.5
+    },
+    "program_total": 1169341463.0,
+    "publication": {
+      "calls": 1.0,
+      "inclusive_ir": 31235589.0
+    },
+    "topology_writer": {
+      "calls": 1.0,
+      "inclusive_ir": 31166663.0
+    }
+  }
+}

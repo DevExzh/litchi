@@ -1,0 +1,12 @@
+# Binaries used by change 0747 (deleted after the record; identities retained).
+# All built with rustc 1.95.0 (59807616e 2026-04-14), CARGO_BUILD_JOBS=6, --locked --offline.
+# Harness: cargo build --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline
+# Probe: crates/xml-minifier/examples/audit_probe_0747.rs (scripts/audit_probe_0747.rs), built with
+#   CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_PANIC=unwind cargo build --release --example audit_probe_0747 -p xml-minifier
+fb535ebb4abb4154c4ac445b90a60399edf189d52cae76fea2947852a406cb0b  harness, coordinator-prebuilt base 009d515bef (preliminary campaign A; callgrind report-prebuilt-base)
+52528d5b2ed38f33b45a8d6c7bfeda280835d0f887a976ebcff67c071b04d57d  harness, first candidate 1ccfe6b354 (preliminary campaign B)
+0578e443a6744e66ad0510032819ce12c9da69301a27a03ed0f2bca647aa0157  harness, base 009d515bef built from the detached 0747-before-src worktree into targets/0747-before (final and follow-up campaign A; callgrind beforeself)
+5c63a831ac9f6989b9f2d1667aa1c9b67cc1a02d35d3077860c04ceb5817f9ab  harness, final candidate 6b49ce999a built into targets/0747 (final and follow-up campaign B; callgrind after2)
+a0a9fe5e6ce5d71956c9015c926e863fe08155308630dfcb58a2c2d58d66dba7  probe against base xml-minifier 009d515bef (probe A, both runs)
+5751be277b27ee4c0c3335eaf3450e3dc5a10ae96c34868227a68a1a1fa6648a  probe against first candidate 1ccfe6b354 (probe/first B)
+a130a03349a34749ad7ed1afc2cfee2f66860435deadb63dd0973edb867b8f92  probe against final candidate 6b49ce999a (probe/final B)

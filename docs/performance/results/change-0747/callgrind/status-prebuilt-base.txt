@@ -1,0 +1,4 @@
+medium s1 exit 0
+medium s3 exit 0
+dense-sparse s1 exit 0
+dense-sparse s3 exit 0
