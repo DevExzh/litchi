@@ -310,9 +310,8 @@ impl OpcPackage {
     /// A deferred part is reached through its provenance payload, which is
     /// the very cell the part holds, and uses the index that payload's decode
     /// builds, after proving that index covers this package's retained
-    /// archive. A part the package materialized eagerly uses one index of the
-    /// retained archive per package open, built on first use under the limits
-    /// the archive was admitted under and shared by clones.
+    /// archive. A part the package materialized eagerly, or a deferred part
+    /// whose own index was refused, uses the package's transfer index.
     fn transfer_member<'package>(
         &'package self,
         part: &'package dyn Part,
@@ -321,54 +320,67 @@ impl OpcPackage {
         let Some(source_archive) = self.source_archive.as_ref() else {
             return Ok(None);
         };
-        let (index, member, limits) = match source_part.blob.as_deferred() {
-            Some(deferred) => {
-                if !Arc::ptr_eq(deferred.source().bytes(), source_archive) {
-                    return Ok(None);
-                }
-                match deferred.source().index() {
-                    Ok(index) => (index, deferred.member(), deferred.source().limits()),
-                    // The index of the part's own decode is cached with its
-                    // refusal (ADR 0030); a byte-caused refusal is a verdict.
-                    Err(OpcError::ZipError(_)) => return Ok(None),
-                    Err(error) => return Err(error),
-                }
-            },
-            None => {
-                let Some(cell) = self.transfer_index.as_ref() else {
-                    return Ok(None);
-                };
-                let limits = self.source_limits;
-                let index = match cell.get() {
-                    Some(state) => state.as_deref(),
-                    None => {
-                        match IndexedArchive::from_reader_with_limits(
-                            Arc::clone(source_archive),
-                            source_archive.len() as u64,
-                            limits.zip_limits(),
-                        ) {
-                            Ok(index) => {
-                                let _raced = cell.set(Some(Box::new(index)));
-                            },
-                            Err(error) if error.is_content_fault() => {
-                                let _raced = cell.set(None);
-                            },
-                            Err(error) => return Err(OpcError::from(error)),
-                        }
-                        cell.get().and_then(Option::as_deref)
-                    },
-                };
-                let Some(index) = index else {
-                    return Ok(None);
-                };
-                (index, part.partname().membername(), limits)
-            },
+        let deferred = source_part.blob.as_deferred();
+        if let Some(deferred) = deferred {
+            if !Arc::ptr_eq(deferred.source().bytes(), source_archive) {
+                return Ok(None);
+            }
+            // The decode's index caches its refusal (ADR 0030) as an
+            // `OpcError` that no longer says whether the bytes caused it, so a
+            // refusal is classified again through the transfer index below.
+            if let Ok(index) = deferred.source().index() {
+                return Ok(index
+                    .entry_id(deferred.member())
+                    .map(|entry_id| TransferMember {
+                        index,
+                        entry_id,
+                        limits: deferred.source().limits(),
+                    }));
+            }
+        }
+        let Some(index) = self.owned_transfer_index(source_archive)? else {
+            return Ok(None);
         };
+        let member = deferred.map_or_else(
+            || part.partname().membername(),
+            |deferred| deferred.member(),
+        );
         Ok(index.entry_id(member).map(|entry_id| TransferMember {
             index,
             entry_id,
-            limits,
+            limits: self.source_limits,
         }))
+    }
+
+    /// One index of the retained archive per package open, built on first
+    /// use under the limits the archive was admitted under and shared by
+    /// clones, or `None` when the archive's own bytes cannot be indexed
+    /// ([`soapberry_zip::Error::is_content_fault`]). Any other failure is
+    /// returned and not stored, so a later call, or a clone, tries again.
+    fn owned_transfer_index(
+        &self,
+        source_archive: &Arc<Vec<u8>>,
+    ) -> Result<Option<&IndexedArchive<Arc<Vec<u8>>>>> {
+        let Some(cell) = self.transfer_index.as_ref() else {
+            return Ok(None);
+        };
+        if let Some(state) = cell.get() {
+            return Ok(state.as_deref());
+        }
+        match IndexedArchive::from_reader_with_limits(
+            Arc::clone(source_archive),
+            source_archive.len() as u64,
+            self.source_limits.zip_limits(),
+        ) {
+            Ok(index) => {
+                let _raced = cell.set(Some(Box::new(index)));
+            },
+            Err(error) if error.is_content_fault() => {
+                let _raced = cell.set(None);
+            },
+            Err(error) => return Err(OpcError::from(error)),
+        }
+        Ok(cell.get().and_then(Option::as_deref))
     }
 }
 

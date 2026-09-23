@@ -1173,3 +1173,91 @@ fn an_incompressible_member_from_a_default_encoder_stays_eligible() {
         .expect("verified");
     assert_eq!(transfer.compressed_size(), compressed);
 }
+
+/// A deferred part's own decode index caches its refusal as an `OpcError`
+/// that no longer says whether the bytes caused it. Eligibility classifies
+/// the archive again through the package's transfer index, so a refusal the
+/// bytes did not cause is not taken for a verdict, while the part's own
+/// decode still reports it.
+#[test]
+fn a_refused_decode_index_is_not_taken_for_a_verdict_about_the_bytes() {
+    let archive = source_archive(Mode::DeflatedSized, false);
+    let compressed = raw_member(&archive, PHOTO).compressed.len();
+    let source = OpcPackage::from_vec(archive).expect("source opens");
+    let photo = part_uri(PHOTO);
+    let deferred = source
+        .preservation
+        .as_deref()
+        .and_then(|provenance| provenance.parts.get(&photo))
+        .and_then(|part| part.blob.as_deferred())
+        .expect("a deferred photo");
+    deferred
+        .source()
+        .refuse_index_for_test(OpcError::ZipError("Buffer size too small".to_owned()));
+    assert_eq!(
+        source
+            .compressed_transfer_size(&photo)
+            .expect("classified again"),
+        Some(u64::try_from(compressed).expect("size"))
+    );
+    assert!(matches!(
+        source.authorize_compressed_transfer(&photo),
+        Err(OpcError::ZipError(message)) if message == "Buffer size too small"
+    ));
+}
+
+/// A caller-defined part is not one of this crate's own part types; a
+/// package holding one says so, and the reopen of its serialization does not.
+#[test]
+fn a_caller_defined_part_is_not_built_in() {
+    #[derive(Clone)]
+    struct Custom(BlobPart);
+    impl Part for Custom {
+        fn blob(&self) -> &[u8] {
+            self.0.blob()
+        }
+        fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+            self.0.blob_arc()
+        }
+        fn content_type(&self) -> &str {
+            self.0.content_type()
+        }
+        fn partname(&self) -> &PackURI {
+            self.0.partname()
+        }
+        fn rels(&self) -> &crate::Relationships {
+            self.0.rels()
+        }
+        fn rels_mut(&mut self) -> &mut crate::Relationships {
+            self.0.rels_mut()
+        }
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.0.set_blob(blob);
+        }
+    }
+    let mut package =
+        OpcPackage::from_vec(source_archive(Mode::DeflatedSized, false)).expect("source opens");
+    assert!(package.holds_only_built_in_parts());
+    package
+        .get_part_mut(&part_uri(STORED))
+        .expect("part")
+        .set_blob(b"edited".to_vec());
+    assert!(
+        package.holds_only_built_in_parts(),
+        "an edit keeps the built-in part"
+    );
+    let custom = PackURI::new("/doc/custom.bin").expect("URI");
+    package
+        .try_add_part(Box::new(Custom(BlobPart::new(
+            custom.clone(),
+            "application/octet-stream".to_owned(),
+            b"custom".to_vec(),
+        ))))
+        .expect("added");
+    assert!(!package.holds_only_built_in_parts());
+    assert!(!package.clone().holds_only_built_in_parts());
+    let reopened = OpcPackage::from_vec(PackageWriter::to_bytes(&package).expect("serialized"))
+        .expect("reopened");
+    assert!(reopened.holds_only_built_in_parts());
+    assert_eq!(reopened.get_part(&custom).expect("part").blob(), b"custom");
+}

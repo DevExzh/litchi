@@ -250,6 +250,22 @@ impl OpcPackage {
         self.exact_source().is_some()
     }
 
+    /// Whether every part of this package is one of `litchi-opc`'s own part
+    /// types, [`BlobPart`](crate::BlobPart) or [`XmlPart`](crate::XmlPart).
+    ///
+    /// Such a package behaves like the reopen of its serialization. A
+    /// caller-defined [`Part`] implementation may not: it can refuse a
+    /// content-type change, observe writes or count relationship references
+    /// its own way, and reopening its bytes yields a built-in part in its
+    /// place. A package holding one answers `false`; an unmodified owned
+    /// source holds only built-in parts (change 0742).
+    #[must_use]
+    pub fn holds_only_built_in_parts(&self) -> bool {
+        self.parts
+            .values()
+            .all(|part| part.is_built_in(crate::part::Seal(())))
+    }
+
     /// The read limits this package's owned source archive was admitted
     /// under, or `None` when the package retains no owned source archive.
     ///

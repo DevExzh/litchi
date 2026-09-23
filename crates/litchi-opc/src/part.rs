@@ -43,6 +43,20 @@ impl Clone for Box<dyn Part + Send + Sync> {
     }
 }
 
+/// The seal of [`Part::is_built_in`].
+///
+/// [`built_in::Seal`] is public so that the trait can name it, but its module
+/// is private, so no implementation outside this crate can name it in a
+/// signature and override the method.
+mod built_in {
+    /// Proof that [`Part::is_built_in`](super::Part::is_built_in) is asked
+    /// from inside `litchi-opc`.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Seal(pub(crate) ());
+}
+
+pub(crate) use built_in::Seal;
+
 /// Trait representing a part in an OPC package.
 ///
 /// Parts are the fundamental units of content in an OPC package. Each part
@@ -132,6 +146,18 @@ pub trait Part: PartClone + Send + Sync {
     #[doc(hidden)]
     fn payload_handle(&self) -> PayloadHandle {
         PayloadHandle(PartPayload::ready(self.blob_arc()))
+    }
+
+    /// Whether this part is one of this crate's own part types, [`BlobPart`]
+    /// or [`XmlPart`], whose observable behavior is fixed by its bytes,
+    /// content type and relationships.
+    ///
+    /// Implementations outside `litchi-opc` cannot name the argument, so they
+    /// keep this default and answer `false`. See
+    /// [`OpcPackage::holds_only_built_in_parts`](crate::OpcPackage::holds_only_built_in_parts).
+    #[doc(hidden)]
+    fn is_built_in(&self, _seal: Seal) -> bool {
+        false
     }
 
     /// Get the relationships for this part.
@@ -281,6 +307,10 @@ impl BlobPart {
 impl Part for BlobPart {
     fn partname(&self) -> &PackURI {
         &self.partname
+    }
+
+    fn is_built_in(&self, _seal: Seal) -> bool {
+        true
     }
 
     fn content_type(&self) -> &str {
@@ -554,6 +584,10 @@ impl XmlPart {
 impl Part for XmlPart {
     fn partname(&self) -> &PackURI {
         &self.partname
+    }
+
+    fn is_built_in(&self, _seal: Seal) -> bool {
+        true
     }
 
     fn content_type(&self) -> &str {

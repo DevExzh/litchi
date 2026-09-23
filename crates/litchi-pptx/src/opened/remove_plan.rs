@@ -933,6 +933,9 @@ fn map_copy_refusal(value: Result<()>) -> Result<()> {
                 SlideCopyRefusal::DependencyCycle | SlideCopyRefusal::AmbiguousTopology => {
                     SlideRemovalRefusal::AmbiguousTopology
                 },
+                // Raised only when a cross-presentation copy is applied; the
+                // shared validators slide removal reuses never raise it.
+                SlideCopyRefusal::CallerDefinedPart => SlideRemovalRefusal::UnknownSemanticSurface,
             };
             refusal(kind, detail)
         },

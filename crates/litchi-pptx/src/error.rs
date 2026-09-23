@@ -52,6 +52,12 @@ pub enum SlideCopyRefusal {
     /// The physical package carries an unknown non-Part ZIP member that this
     /// topology-changing operation cannot preserve or authorize.
     UnknownPhysicalMember,
+    /// The destination holds a caller-defined `Part` implementation, and the
+    /// copy frames source-compressed media, so it could only publish a reopen
+    /// of the destination's bytes, in which that part would become a built-in
+    /// one. Planning the copy against this destination records the
+    /// recompressing route, which keeps the part.
+    CallerDefinedPart,
 }
 
 /// Durable `PresentationML` patch families, each naming the revision proof its
@@ -183,6 +189,7 @@ impl std::fmt::Display for SlideCopyRefusal {
             Self::AmbiguousTopology => "ambiguous package topology",
             Self::GlobalTableStyle => "presentation-global table style",
             Self::UnknownPhysicalMember => "unknown physical package member",
+            Self::CallerDefinedPart => "caller-defined destination part",
         })
     }
 }
