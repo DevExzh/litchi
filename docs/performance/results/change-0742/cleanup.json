@@ -1,0 +1,41 @@
+{
+  "binaries": [],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742",
+      "files": 65005,
+      "bytes": 105417325273
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0742",
+      "files": 17,
+      "bytes": 793676,
+      "entries": [
+        "gate-check.out",
+        "gate-clippy-lib-2.out",
+        "gate-clippy-lib.out",
+        "gate-clippy-opc-zip-all-targets.out",
+        "gate-clippy-pptx-all-targets.out",
+        "gate-crate-boundaries.out",
+        "gate-doc-2.out",
+        "gate-doc.out",
+        "gate-fmt.out",
+        "gate-non-iwork.out",
+        "gate-perf-claims.out",
+        "gate-test-core.out",
+        "gate-test-dependents.out",
+        "gate-test-facade.out",
+        "gates.log",
+        "gates.sh",
+        "gates.stdout"
+      ]
+    }
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0742-pptx-owned-cross-copy-media-transfer",
+    "branch perf/0742-pptx-owned-cross-copy-media-transfer",
+    "/home/zhuhe/code/litchi-worktrees/targets/base-009d515bef (shared base build, not owned by this change)",
+    "/home/zhuhe/code/litchi-worktrees/scratch/0742 (empty directory)"
+  ],
+  "dry_run": false
+}

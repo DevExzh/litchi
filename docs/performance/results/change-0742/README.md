@@ -3,8 +3,11 @@
 Record: [0742](../../0742-pptx-owned-cross-copy-media-transfer.md).
 
 Base `009d515bef`; production commits `317920af5c`, `52db88c24c` and
-`b2132486af` (first review), `172501ac89` and `d2b2aa3d75` (second review) on
-`perf/0742-pptx-owned-cross-copy-media-transfer`. Host: AMD EPYC 9R45, Linux
+`b2132486af` (first review), `172501ac89` and `d2b2aa3d75` (second review),
+`34255fea84` and `ddefc2cfe8` (third review) on
+`perf/0742-pptx-owned-cross-copy-media-transfer`. The reported matrix measured
+`d2b2aa3d75`; the third review's commits add only constant-time checks to the
+measured path and were not measured (see the record). Host: AMD EPYC 9R45, Linux
 7.0.0-1012-aws, 32 logical CPUs shared with other agents; every measured
 process pinned with `taskset -c 4`. Toolchain from `rust-toolchain.toml`
 (Rust 1.95.0); release profile, `--locked --offline`, `CARGO_BUILD_JOBS=6`.
@@ -90,11 +93,12 @@ reports were removed to keep the packet small ([`cleanup.json`](cleanup.json)):
   `b2132486af`: `attribute.py`, its summaries `cycles-depth3.json` and
   `cycles-depth5.json`, the page-fault site summary `faults-by-site.txt`, and
   the two harness reports of the profiled runs (no `perf.data`).
-- `gates.txt` — every gate command with its exit code and counts, on
-  `d2b2aa3d75` and, below it, on the first review's commits.
-- `cleanup.py` → `cleanup.json` (second review) and
-  `cleanup-b2132486af.json` (first review) — binary identities taken before
-  removal and every removed tree.
+- `gates.txt` — every gate command with its exit code and counts, on the
+  third review's commits and, below them, on `d2b2aa3d75` and on the first
+  review's commits.
+- `cleanup.py` → `cleanup.json` (third review), `cleanup-d2b2aa3d75.json`
+  (second review) and `cleanup-b2132486af.json` (first review) — binary
+  identities taken before removal and every removed tree.
 - `log-sections.md` — paragraphs for `HOTSPOTS.md`, `REPORT.md` and
   `GOAL_AUDIT.md`, for the coordinator to merge.
 
