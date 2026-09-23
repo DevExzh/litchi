@@ -13,7 +13,8 @@ use super::super::X14;
 use super::super::wire::{cell_tag, column_range, is_mce_name, position, tag};
 use super::model::{
     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
-    MergeCellsSlot, MergeSlot, RootSlot, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
+    MergeCellsSlot, MergeSlot, PrimarySpans, RootSlot, RowSlot, SharedFormulaGroup, SheetData,
+    Span, Tag,
 };
 use crate::error::{Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
@@ -51,7 +52,7 @@ struct PendingCell {
     start: usize,
     tag_end: usize,
     tag: Option<Tag>,
-    primary: Vec<Span>,
+    primary: PrimarySpans,
     mce_payload: bool,
     formula_index: Option<usize>,
 }
@@ -127,14 +128,6 @@ struct LaneCell {
     tag: Option<Tag>,
     value_start: Option<usize>,
     primary: Option<Span>,
-}
-
-/// The boxed payload spans the reader-driven cell would have collected.
-fn primary_spans(primary: Option<Span>) -> Box<[Span]> {
-    match primary {
-        Some(span) => Box::new([span]),
-        None => Box::new([]),
-    }
 }
 
 /// Rebuild the reader's `BytesStart` for an admitted tag.
@@ -569,7 +562,7 @@ impl Scanner {
                         tag_end: tag.end,
                         close_start: tag.end,
                         tag: owned,
-                        primary: Box::new([]),
+                        primary: PrimarySpans::default(),
                         mce_payload: false,
                         empty: true,
                     });
@@ -618,7 +611,7 @@ impl Scanner {
                         tag_end: closed.tag_end,
                         close_start,
                         tag: closed.tag,
-                        primary: primary_spans(closed.primary),
+                        primary: PrimarySpans::Inline(closed.primary),
                         mce_payload: false,
                         empty: false,
                     });
@@ -1046,7 +1039,7 @@ impl Scanner {
                     tag_end: span.end,
                     close_start: span.end,
                     tag,
-                    primary: Box::new([]),
+                    primary: PrimarySpans::default(),
                     mce_payload: false,
                     empty: true,
                 });
@@ -1233,7 +1226,7 @@ impl Scanner {
                         tag_end: cell.tag_end,
                         close_start,
                         tag: cell.tag,
-                        primary: cell.primary.into_boxed_slice(),
+                        primary: cell.primary,
                         mce_payload: cell.mce_payload,
                         empty: false,
                     });
@@ -1345,7 +1338,7 @@ impl Scanner {
             start,
             tag_end: end,
             tag,
-            primary: Vec::new(),
+            primary: PrimarySpans::default(),
             mce_payload: false,
             formula_index: None,
         });

@@ -698,7 +698,7 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
                 source,
                 cell.tag_end,
                 cell.close_start,
-                &cell.primary,
+                cell.primary.as_slice(),
             );
         } else {
             output.extend_from_slice(&source[cell.tag_end..cell.close_start]);
