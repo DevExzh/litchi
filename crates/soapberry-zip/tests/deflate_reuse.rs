@@ -49,6 +49,13 @@ const PLANS: &[FeedPlan] = &[
         chunk_sizes: &[16 * 1024],
         flush_every: None,
     },
+    // Streaming-writer shaped: many short writes staged for one CRC-32 pass,
+    // interleaved with writes on each side of the stage's 1,024-byte copy
+    // threshold and one that exceeds its 4,096-byte capacity.
+    FeedPlan {
+        chunk_sizes: &[5, 31, 56, 12, 6, 1024, 1025, 3, 4096, 4097, 700],
+        flush_every: None,
+    },
 ];
 
 fn patterned_payload(length: usize, seed: u64) -> Vec<u8> {

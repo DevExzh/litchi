@@ -521,6 +521,7 @@ impl ZipArchiveWriterBuilder {
             files: Vec::with_capacity(self.capacity),
             file_names: Vec::new(),
             reusable_deflate: None,
+            reusable_crc_stage: CrcStage::default(),
             directory_spool: None,
             pending_borrowed_entry: false,
             poisoned: false,
@@ -553,6 +554,7 @@ impl ZipArchiveWriterBuilder {
             files: Vec::new(),
             file_names: Vec::new(),
             reusable_deflate: None,
+            reusable_crc_stage: CrcStage::default(),
             directory_spool,
             pending_borrowed_entry: false,
             poisoned: false,
@@ -592,6 +594,9 @@ pub struct ZipArchiveWriter<W> {
     file_names: Vec<u8>,
     writer: CountWriter<W>,
     reusable_deflate: Option<Box<ReusableDeflateState>>,
+    /// CRC-32 staging buffer lent to each owned entry and returned when the
+    /// entry finishes, so a many-member archive allocates it once.
+    reusable_crc_stage: CrcStage,
     directory_spool: Option<Box<DirectorySpool>>,
     pending_borrowed_entry: bool,
     poisoned: bool,
@@ -946,6 +951,22 @@ impl<W> ZipArchiveWriter<W> {
     /// Returns a finished Deflate state to the archive for the next member.
     pub(crate) fn restore_reusable_deflate(&mut self, state: Box<ReusableDeflateState>) {
         self.reusable_deflate = Some(state);
+    }
+
+    /// Lends the archive's CRC-32 staging buffer to one owned entry.
+    ///
+    /// The buffer holds no bytes between entries. An owned entry carries the
+    /// archive itself, so an entry dropped unfinished drops both together.
+    fn take_reusable_crc_stage(&mut self) -> CrcStage {
+        let mut stage = std::mem::take(&mut self.reusable_crc_stage);
+        stage.enable();
+        stage
+    }
+
+    /// Returns a finished entry's (empty) CRC-32 staging buffer.
+    fn restore_reusable_crc_stage(&mut self, stage: CrcStage) {
+        debug_assert!(stage.is_empty(), "a returned CRC stage holds no bytes");
+        self.reusable_crc_stage = stage;
     }
 }
 
@@ -2011,6 +2032,7 @@ where
         } else {
             None
         };
+        let crc_stage = self.take_reusable_crc_stage();
 
         let state = OwnedEntryState {
             name: spool_name,
@@ -2057,9 +2079,10 @@ where
         };
 
         Ok(ZipOwnedEntryWriter {
-            inner: Some(ZipDataWriter::with_crc32(
+            inner: Some(ZipDataWriter::with_crc32_stage(
                 compressor,
                 Crc32Option::default(),
+                crc_stage,
             )),
         })
     }
@@ -2984,8 +3007,10 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
         let inner = self.inner.take().ok_or_else(|| ErrorKind::InvalidInput {
             msg: "owned ZIP entry writer was already finished".to_string(),
         })?;
-        let (compressor, descriptor) = inner.finish()?;
-        compressor.finish(descriptor)
+        let (compressor, descriptor, crc_stage) = inner.finish_with_crc_stage()?;
+        let mut archive = compressor.finish(descriptor)?;
+        archive.restore_reusable_crc_stage(crc_stage);
+        Ok(archive)
     }
 }
 
@@ -3005,6 +3030,93 @@ impl<W: Write> Write for ZipOwnedEntryWriter<W> {
     }
 }
 
+/// Largest accepted write the CRC-32 stage copies. Longer writes are
+/// checksummed in place, after any staged bytes.
+const CRC_STAGE_MAX_WRITE: usize = 1024;
+
+/// Bytes the CRC-32 stage accumulates before checksumming them in one pass.
+const CRC_STAGE_CAPACITY: usize = 4 * 1024;
+
+/// Accepted entry bytes whose CRC-32 has not been folded in yet.
+///
+/// A CRC-32 over a few bytes costs a table lookup per byte plus the hasher's
+/// setup on every call; over a few kilobytes it runs the carry-less-multiply
+/// path. Streaming Office writers hand an owned entry many short writes, so an
+/// enabled stage copies each short accepted write and checksums the copies in
+/// one pass when the stage fills, when a long write arrives, or when the entry
+/// finishes. CRC-32 depends only on the byte sequence, and the stage keeps that
+/// sequence in order, so the value is identical to checksumming every write as
+/// it is accepted. The stage never changes which bytes reach the compressor or
+/// the sink, or when.
+///
+/// A disabled stage checksums every write in place, exactly as before; the
+/// borrowed-entry writers, which copy whole members in large chunks, keep it
+/// disabled. The stage's allocation is fixed at [`CRC_STAGE_CAPACITY`] bytes
+/// and an allocation failure only disables staging.
+#[derive(Default)]
+struct CrcStage {
+    bytes: Vec<u8>,
+    enabled: bool,
+}
+
+impl CrcStage {
+    fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    fn is_empty(&self) -> bool {
+        self.bytes.is_empty()
+    }
+
+    /// Folds `accepted` into `crc`, possibly after later writes arrive.
+    fn update(&mut self, crc: &mut u32, accepted: &[u8]) {
+        if accepted.is_empty() {
+            return;
+        }
+        if self.enabled && accepted.len() <= CRC_STAGE_MAX_WRITE && self.reserve() {
+            if self.bytes.len() + accepted.len() > CRC_STAGE_CAPACITY {
+                self.fold_into(crc);
+            }
+            self.bytes.extend_from_slice(accepted);
+            return;
+        }
+        self.fold_into(crc);
+        *crc = crc::crc32_chunk(accepted, *crc);
+    }
+
+    /// Ensures the stage holds [`CRC_STAGE_CAPACITY`] bytes without growing.
+    fn reserve(&mut self) -> bool {
+        if self.bytes.capacity() >= CRC_STAGE_CAPACITY {
+            return true;
+        }
+        let additional = CRC_STAGE_CAPACITY.saturating_sub(self.bytes.len());
+        if self.bytes.try_reserve_exact(additional).is_ok() {
+            return true;
+        }
+        self.enabled = false;
+        false
+    }
+
+    /// Folds every staged byte into `crc`, in order, and empties the stage.
+    fn fold_into(&mut self, crc: &mut u32) {
+        if !self.bytes.is_empty() {
+            *crc = crc::crc32_chunk(&self.bytes, *crc);
+            self.bytes.clear();
+        }
+    }
+}
+
+impl std::fmt::Debug for CrcStage {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Staged bytes are entry payload; only their count is diagnostic.
+        formatter
+            .debug_struct("CrcStage")
+            .field("staged_bytes", &self.bytes.len())
+            .field("enabled", &self.enabled)
+            .finish()
+    }
+}
+
 /// A writer for the uncompressed data of a Zip file entry.
 ///
 /// This writer will keep track of the data necessary to write the data
@@ -3018,6 +3130,7 @@ pub struct ZipDataWriter<W> {
     uncompressed_bytes: u64,
     crc: u32,
     crc32_option: Crc32Option,
+    crc_stage: CrcStage,
 }
 
 impl<W> ZipDataWriter<W> {
@@ -3040,12 +3153,18 @@ impl<W> ZipDataWriter<W> {
 
     /// Creates a new `ZipDataWriter` with a specific CRC32 calculation option.
     fn with_crc32_option(inner: W, crc32_option: Crc32Option) -> Self {
+        Self::with_crc32_stage(inner, crc32_option, CrcStage::default())
+    }
+
+    /// Creates a writer whose CRC-32 is computed through `crc_stage`.
+    fn with_crc32_stage(inner: W, crc32_option: Crc32Option, crc_stage: CrcStage) -> Self {
         let crc = crc32_option.initial_value();
         ZipDataWriter {
             inner,
             uncompressed_bytes: 0,
             crc,
             crc32_option,
+            crc_stage,
         }
     }
 
@@ -3063,18 +3182,28 @@ impl<W> ZipDataWriter<W> {
     ///
     /// The `DataDescriptorOutput` contains the CRC32 checksum and uncompressed size,
     /// which is needed by `ZipEntryWriter::finish`.
-    pub fn finish(mut self) -> Result<(W, DataDescriptorOutput), Error>
+    pub fn finish(self) -> Result<(W, DataDescriptorOutput), Error>
+    where
+        W: Write,
+    {
+        self.finish_with_crc_stage()
+            .map(|(inner, output, _crc_stage)| (inner, output))
+    }
+
+    /// [`Self::finish`], also returning the emptied CRC-32 stage for reuse.
+    fn finish_with_crc_stage(mut self) -> Result<(W, DataDescriptorOutput, CrcStage), Error>
     where
         W: Write,
     {
         self.flush()?;
+        self.crc_stage.fold_into(&mut self.crc);
         let output = DataDescriptorOutput {
             crc: self.crc,
             compressed_size: 0,
             uncompressed_size: self.uncompressed_bytes,
         };
 
-        Ok((self.inner, output))
+        Ok((self.inner, output, self.crc_stage))
     }
 }
 
@@ -3120,7 +3249,7 @@ where
 
         // Only calculate CRC32 if the option is Calculate
         if matches!(self.crc32_option, Crc32Option::Calculate) {
-            self.crc = crc::crc32_chunk(&buf[..bytes_written], self.crc);
+            self.crc_stage.update(&mut self.crc, &buf[..bytes_written]);
         }
 
         Ok(bytes_written)
@@ -3846,6 +3975,7 @@ mod tests {
             uncompressed_bytes: u64::MAX,
             crc: 0,
             crc32_option: Crc32Option::Skip,
+            crc_stage: CrcStage::default(),
         };
         let error = data_writer
             .write(b"x")
@@ -4187,6 +4317,125 @@ mod tests {
         let reader = crate::office::ArchiveReader::new(output.get_ref()).unwrap();
         assert_eq!(reader.read("stored.txt").unwrap(), b"stored payload");
         assert_eq!(reader.read("deflated.txt").unwrap(), b"deflated payload");
+    }
+
+    /// Deterministic bytes that are not a repeated pattern.
+    fn crc_stage_payload(length: usize) -> Vec<u8> {
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        (0..length)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state.to_le_bytes()[3]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn crc_stage_matches_a_one_pass_checksum_at_every_boundary() {
+        // Sizes on each side of the copy threshold and of the capacity,
+        // with empty writes between them.
+        let sizes = [
+            0,
+            1,
+            5,
+            31,
+            CRC_STAGE_MAX_WRITE - 1,
+            CRC_STAGE_MAX_WRITE,
+            CRC_STAGE_MAX_WRITE + 1,
+            CRC_STAGE_CAPACITY - CRC_STAGE_MAX_WRITE,
+            CRC_STAGE_CAPACITY - 1,
+            CRC_STAGE_CAPACITY,
+            CRC_STAGE_CAPACITY + 1,
+            0,
+            2,
+            3 * CRC_STAGE_CAPACITY + 7,
+            1,
+        ];
+        let total: usize = sizes.iter().sum();
+        let payload = crc_stage_payload(total);
+        for enabled in [true, false] {
+            for rotation in 0..sizes.len() {
+                let mut stage = CrcStage::default();
+                if enabled {
+                    stage.enable();
+                }
+                let mut crc = 0_u32;
+                let mut offset = 0_usize;
+                for index in 0..sizes.len() {
+                    let size = sizes[(index + rotation) % sizes.len()];
+                    stage.update(&mut crc, &payload[offset..offset + size]);
+                    offset += size;
+                    // The stage never grows past its fixed allocation.
+                    assert!(stage.bytes.len() <= CRC_STAGE_CAPACITY);
+                    assert!(stage.bytes.capacity() <= CRC_STAGE_CAPACITY);
+                    assert_eq!(stage.bytes.is_empty(), !enabled || stage.is_empty());
+                }
+                stage.fold_into(&mut crc);
+                assert!(stage.is_empty());
+                assert_eq!(
+                    crc,
+                    crate::crc32(&payload),
+                    "enabled {enabled}, rotation {rotation}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn crc_stage_continues_from_a_custom_initial_value() {
+        let payload = crc_stage_payload(10_000);
+        let initial = crate::crc32(b"prefix");
+        let mut stage = CrcStage::default();
+        stage.enable();
+        let mut crc = initial;
+        for chunk in payload.chunks(7) {
+            stage.update(&mut crc, chunk);
+        }
+        stage.fold_into(&mut crc);
+        assert_eq!(crc, crc::crc32_chunk(&payload, initial));
+    }
+
+    #[test]
+    fn owned_entries_checksum_short_writes_exactly_and_reuse_one_stage() {
+        let payloads = [
+            crc_stage_payload(0),
+            crc_stage_payload(3),
+            crc_stage_payload(CRC_STAGE_CAPACITY * 5 + 11),
+            crc_stage_payload(700),
+        ];
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        for (index, payload) in payloads.iter().enumerate() {
+            let method = if index % 2 == 0 {
+                CompressionMethod::Deflate
+            } else {
+                CompressionMethod::Store
+            };
+            let mut entry = archive
+                .start_file_owned(&format!("member-{index}"), method)
+                .unwrap();
+            for (number, chunk) in payload.chunks(1 + index * 13).enumerate() {
+                entry.write_all(chunk).unwrap();
+                if number % 97 == 0 {
+                    entry.flush().unwrap();
+                }
+            }
+            archive = entry.finish().unwrap();
+            // The finished entry returned an empty stage for the next member.
+            assert!(archive.reusable_crc_stage.is_empty());
+        }
+        assert!(archive.reusable_crc_stage.bytes.capacity() <= CRC_STAGE_CAPACITY);
+        archive.finish().unwrap();
+
+        // The reader verifies every member's recorded CRC-32 and size.
+        let bytes = output.into_inner();
+        let reader = crate::office::ArchiveReader::new(&bytes).unwrap();
+        for (index, payload) in payloads.iter().enumerate() {
+            let name = format!("member-{index}");
+            assert_eq!(&reader.read(&name).unwrap(), payload, "{name}");
+        }
     }
 
     #[test]
