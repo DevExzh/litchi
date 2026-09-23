@@ -15,7 +15,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::{Budget, Reservation, Resource, ResourceLimit};
+use crate::{Budget, Reservation, Resource, ResourceLimit, ScopedReservation};
 
 /// CPU-affinity policy for workers created by a runtime adapter.
 ///
@@ -333,6 +333,28 @@ impl ExecutionContext {
         self.budget.reserve(resource, amount).map_err(Into::into)
     }
 
+    /// Reserves a resource after checking for cancellation, borrowing this
+    /// context's budget for the reservation's lifetime.
+    ///
+    /// Charges, refuses and releases exactly as [`Self::reserve`]; see
+    /// [`Budget::reserve_scoped`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExecutionError::Cancelled`] if cancellation was requested, or
+    /// [`ExecutionError::ResourceLimit`] if this context's budget or an
+    /// ancestor cannot accept the charge.
+    pub fn reserve_scoped(
+        &self,
+        resource: Resource,
+        amount: u64,
+    ) -> Result<ScopedReservation<'_>, ExecutionError> {
+        self.check()?;
+        self.budget
+            .reserve_scoped(resource, amount)
+            .map_err(Into::into)
+    }
+
     /// Consumes cumulative resource capacity after checking for cancellation.
     ///
     /// # Errors
@@ -515,6 +537,10 @@ mod tests {
         assert_eq!(context.check(), Err(ExecutionError::Cancelled));
         assert!(matches!(
             context.reserve(Resource::Memory, 1),
+            Err(ExecutionError::Cancelled)
+        ));
+        assert!(matches!(
+            context.reserve_scoped(Resource::Memory, 1),
             Err(ExecutionError::Cancelled)
         ));
         assert_eq!(
