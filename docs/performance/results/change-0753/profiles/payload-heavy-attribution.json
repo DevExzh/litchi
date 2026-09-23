@@ -1,0 +1,404 @@
+{
+ "doc_fresh_write_to/payload-heavy/A": {
+  "file": "doc-A.folded",
+  "timed_share_of_process_cycles": 0.7645,
+  "kernel_leaf_share_of_timed": 0.2608,
+  "top_leaves": [
+   [
+    "build_output_streams_with_data_prefix < branch<..>",
+    0.1744
+   ],
+   [
+    "next_code_point<..> < next",
+    0.1539
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < branch<..>",
+    0.1026
+   ],
+   [
+    "wrapping_sub < needs_to_grow<..>",
+    0.0923
+   ],
+   [
+    "[K] copy_nonoverlapping<..> < append_elements<..>",
+    0.0921
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.0821
+   ],
+   [
+    "[K] __memset_avx512_unaligned_erms < branch<..>",
+    0.0589
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.0478
+   ],
+   [
+    "eq<..> < next<..>",
+    0.043
+   ],
+   [
+    "append_elements<..> < spec_extend<..>",
+    0.0394
+   ],
+   [
+    "next<..> < next_code_point<..>",
+    0.0254
+   ],
+   [
+    "__memset_avx512_unaligned_erms < branch<..>",
+    0.0145
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.2396,
+   "text_widening_or_append": 0.3419,
+   "field_character_scan": 0.0,
+   "siphash": 0.0,
+   "memmove": 0.1546,
+   "memset": 0.0736,
+   "memcmp": 0.0,
+   "realloc_growth": 0.0167,
+   "cfb_write_to": 0.0002,
+   "harness_text_generation": 0.0222
+  }
+ },
+ "doc_fresh_write_to/payload-heavy/B": {
+  "file": "doc-B.folded",
+  "timed_share_of_process_cycles": 0.5029,
+  "kernel_leaf_share_of_timed": 0.6245,
+  "top_leaves": [
+   [
+    "[K] __memset_avx512_unaligned_erms < branch<..>",
+    0.3236
+   ],
+   [
+    "[K] write<..> < {closure#0}<..>",
+    0.2914
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.0752
+   ],
+   [
+    "__memset_avx512_unaligned_erms < branch<..>",
+    0.046
+   ],
+   [
+    "copied<..> < next<..>",
+    0.046
+   ],
+   [
+    "write<..> < {closure#0}<..>",
+    0.0285
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.0183
+   ],
+   [
+    "copy_nonoverlapping<..> < _mm_loadu_si128",
+    0.0154
+   ],
+   [
+    "fold<..> < {closure#0}",
+    0.0124
+   ],
+   [
+    "{closure#0} < fold<..>",
+    0.0124
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < __libc_realloc",
+    0.0102
+   ],
+   [
+    "_mm_or_si128 < is_ascii_sse2",
+    0.0102
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.0767,
+   "text_widening_or_append": 0.428,
+   "field_character_scan": 0.0277,
+   "siphash": 0.0022,
+   "memmove": 0.0906,
+   "memset": 0.3697,
+   "memcmp": 0.0007,
+   "realloc_growth": 0.0424,
+   "cfb_write_to": 0.008,
+   "harness_text_generation": 0.0621
+  }
+ },
+ "ppt_fresh_write_to/payload-heavy/A": {
+  "file": "ppt-A.folded",
+  "timed_share_of_process_cycles": 0.7124,
+  "kernel_leaf_share_of_timed": 0.306,
+  "top_leaves": [
+   [
+    "next_code_point<..> < next",
+    0.2357
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < branch<..>",
+    0.1474
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.1412
+   ],
+   [
+    "[K] __memset_avx512_unaligned_erms < branch<..>",
+    0.1171
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < create_dg_container_with_charts",
+    0.0427
+   ],
+   [
+    "next < fold<..>",
+    0.0318
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < __libc_realloc",
+    0.0277
+   ],
+   [
+    "__memset_avx512_unaligned_erms < branch<..>",
+    0.0229
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < write_fresh_ppt",
+    0.021
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < drop<..>",
+    0.0187
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < create_dg_container_with_charts",
+    0.0178
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.0168
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.2817,
+   "text_widening_or_append": 0.0816,
+   "field_character_scan": 0.0,
+   "siphash": 0.0,
+   "memmove": 0.4829,
+   "memset": 0.14,
+   "memcmp": 0.0,
+   "realloc_growth": 0.0659,
+   "cfb_write_to": 0.0025,
+   "harness_text_generation": 0.0381
+  }
+ },
+ "ppt_fresh_write_to/payload-heavy/B": {
+  "file": "ppt-B.folded",
+  "timed_share_of_process_cycles": 0.3186,
+  "kernel_leaf_share_of_timed": 0.036,
+  "top_leaves": [
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.2061
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < clone<..>",
+    0.1325
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.1182
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < write_fresh_ppt",
+    0.1075
+   ],
+   [
+    "__memset_avx512_unaligned_erms < branch<..>",
+    0.0645
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < __libc_realloc",
+    0.0448
+   ],
+   [
+    "copy_nonoverlapping<..> < _mm_loadu_si128",
+    0.0287
+   ],
+   [
+    "_int_malloc < _int_realloc",
+    0.0269
+   ],
+   [
+    "[K] __memset_avx512_unaligned_erms < branch<..>",
+    0.0162
+   ],
+   [
+    "writer_payload_text < write_fresh_ppt",
+    0.0161
+   ],
+   [
+    "_mm_or_si128 < is_ascii_sse2",
+    0.0126
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < branch<..>",
+    0.0108
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.0,
+   "text_widening_or_append": 0.2527,
+   "field_character_scan": 0.0,
+   "siphash": 0.0054,
+   "memmove": 0.5197,
+   "memset": 0.0807,
+   "memcmp": 0.0,
+   "realloc_growth": 0.1238,
+   "cfb_write_to": 0.009,
+   "harness_text_generation": 0.2653
+  }
+ },
+ "xls_fresh_write_to/payload-heavy/A": {
+  "file": "xls-A.folded",
+  "timed_share_of_process_cycles": 0.7573,
+  "kernel_leaf_share_of_timed": 0.3659,
+  "top_leaves": [
+   [
+    "rotate_left<..> < rotate_left",
+    0.2147
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < branch<..>",
+    0.1762
+   ],
+   [
+    "write<..> < write_u8<..>",
+    0.1194
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < build_shared_strings",
+    0.0736
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < push_mut<..>",
+    0.0676
+   ],
+   [
+    "c_rounds < write<..>",
+    0.0657
+   ],
+   [
+    "wrapping_add < c_rounds",
+    0.0494
+   ],
+   [
+    "__memcmp_evex_movbe < branch<..>",
+    0.0347
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.033
+   ],
+   [
+    "[K] _int_malloc < __libc_malloc2",
+    0.0195
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < litchi_xls::writer::core::codec::cells::<..>",
+    0.0124
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.01
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.0002,
+   "text_widening_or_append": 0.036,
+   "field_character_scan": 0.0,
+   "siphash": 0.4581,
+   "memmove": 0.4007,
+   "memset": 0.0008,
+   "memcmp": 0.0349,
+   "realloc_growth": 0.0245,
+   "cfb_write_to": 0.0017,
+   "harness_text_generation": 0.0306
+  }
+ },
+ "xls_fresh_write_to/payload-heavy/B": {
+  "file": "xls-B.folded",
+  "timed_share_of_process_cycles": 0.5915,
+  "kernel_leaf_share_of_timed": 0.4001,
+  "top_leaves": [
+   [
+    "[K] __memmove_avx512_unaligned_erms < branch<..>",
+    0.3733
+   ],
+   [
+    "rotate_left<..> < rotate_left",
+    0.1163
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < branch<..>",
+    0.0912
+   ],
+   [
+    "write<..> < write_u8<..>",
+    0.0654
+   ],
+   [
+    "__memcmp_evex_movbe < branch<..>",
+    0.052
+   ],
+   [
+    "c_rounds < write<..>",
+    0.0456
+   ],
+   [
+    "wrapping_add < c_rounds",
+    0.0289
+   ],
+   [
+    "copy_nonoverlapping<..> < append_elements<..>",
+    0.0241
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < __libc_realloc",
+    0.0177
+   ],
+   [
+    "copy_nonoverlapping<..> < _mm_loadu_si128",
+    0.0166
+   ],
+   [
+    "__memmove_avx512_unaligned_erms < litchi_xls::writer::core::codec::cells::<..>",
+    0.0155
+   ],
+   [
+    "[K] __memmove_avx512_unaligned_erms < litchi_xls::writer::core::codec::cells::<..>",
+    0.0102
+   ]
+  ],
+  "component_inclusive_share": {
+   "utf16_count_or_decode": 0.0,
+   "text_widening_or_append": 0.0756,
+   "field_character_scan": 0.0,
+   "siphash": 0.2744,
+   "memmove": 0.5111,
+   "memset": 0.0021,
+   "memcmp": 0.052,
+   "realloc_growth": 0.0445,
+   "cfb_write_to": 0.0021,
+   "harness_text_generation": 0.0772
+  }
+ }
+}

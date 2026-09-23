@@ -1,0 +1,11 @@
+[
+  {"case": "doc_fresh_write_to/tiny", "allocations": 126, "reallocations": 39, "allocated_bytes": 58188, "peak_live_bytes": 47613, "output_bytes": 15360},
+  {"case": "doc_fresh_write_to/large", "allocations": 3207, "reallocations": 100, "allocated_bytes": 982825, "peak_live_bytes": 801110, "output_bytes": 97792},
+  {"case": "doc_fresh_write_to/payload-heavy", "allocations": 961, "reallocations": 1103, "allocated_bytes": 21433355, "peak_live_bytes": 18182488, "output_bytes": 5179904},
+  {"case": "ppt_fresh_write_to/tiny", "allocations": 249, "reallocations": 152, "allocated_bytes": 51467, "peak_live_bytes": 35027, "output_bytes": 7680},
+  {"case": "ppt_fresh_write_to/large", "allocations": 2176, "reallocations": 757, "allocated_bytes": 489621, "peak_live_bytes": 272683, "output_bytes": 40960},
+  {"case": "ppt_fresh_write_to/payload-heavy", "allocations": 2212, "reallocations": 1901, "allocated_bytes": 32500177, "peak_live_bytes": 20777831, "output_bytes": 5191168},
+  {"case": "xls_fresh_write_to/tiny", "allocations": 77, "reallocations": 30, "allocated_bytes": 22478, "peak_live_bytes": 17461, "output_bytes": 4096},
+  {"case": "xls_fresh_write_to/large", "allocations": 1293, "reallocations": 2137, "allocated_bytes": 4031923, "peak_live_bytes": 1972688, "output_bytes": 163840},
+  {"case": "xls_fresh_write_to/payload-heavy", "allocations": 11188, "reallocations": 1453, "allocated_bytes": 23936229, "peak_live_bytes": 17309788, "output_bytes": 4256256}
+]

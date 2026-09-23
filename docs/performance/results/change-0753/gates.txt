@@ -1,0 +1,229 @@
+HEAD 630a24b17b593e25ea999a7658427700174acc9c
+rustc rustc 1.95.0 (59807616e 2026-04-14)
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0753 CARGO_BUILD_JOBS=6 TMPDIR=<scratch>/tmp
+
+$ cargo fmt --all --check
+exit 0
+
+$ cargo check -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --locked --offline
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.82s
+exit 0
+
+$ cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+        Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xlsx)
+        Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-pptx)
+        Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.82s
+exit 0
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --lib --no-deps --locked --offline -- -D warnings
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.82s
+exit 0
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
+        = help: to override `-D clippy::all` add `#[allow(clippy::unusual_byte_groupings)]`
+    
+    error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+exit 101
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.38s
+exit 0
+
+$ RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-doc -p litchi-ppt -p litchi-xls --no-deps --locked --offline
+     Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+     Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.08s
+       Generated /home/zhuhe/code/litchi-worktrees/targets/0753/doc/litchi_doc/index.html and 2 other files
+exit 0
+
+$ (base 6d989cad63 detached worktree) cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
+    error: digits of hex, binary or octal literal not in groups of equal size
+       --> crates/litchi-xls/tests/xls_query_index_cache.rs:546:32
+    error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 1 previous error
+exit 101
+    (pre-existing: the same unusual_byte_groupings error in tests/xls_query_index_cache.rs fails on the base; record 0746 recorded it too)
+
+$ cargo test -p litchi-doc --locked --offline
+    43 suites, 1199 passed, 0 failed, 13 ignored
+exit 0
+
+$ cargo test -p litchi-ppt --locked --offline
+    33 suites, 1230 passed, 0 failed, 11 ignored
+exit 0
+
+$ cargo test -p litchi-xls --locked --offline
+    74 suites, 1505 passed, 0 failed, 1 ignored
+exit 0
+
+$ cargo test -p litchi-ppt --features encryption --locked --offline
+    33 suites, 1241 passed, 0 failed, 11 ignored
+exit 0
+
+$ cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+    29 suites, 382 passed, 0 failed, 7 ignored
+exit 0
+
+$ python3 tools/check_crate_boundaries.py
+      [014] litchi-iwa -> litchi-keynote
+      [015] litchi-iwa -> litchi-numbers
+      [016] litchi-iwa -> litchi-numbers-wire
+      [017] litchi-iwa -> litchi-pages
+exit 0
+
+$ python3 tools/non_iwork_gate.py verify
+    facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+    verified_bulk_tree_roots=45
+    verified_facade_safe_trees=35
+    verified_facade_combined_tree=1
+exit 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+    OK: 10 performance claims validated (structural)
+exit 0
+
+$ (base 6d989cad63 detached worktree, golden file copied from HEAD) cargo test -p litchi-doc --locked --offline --test doc_writer_text_goldens
+    test fresh_doc_writer_text_paths_match_the_pre_0753_goldens ... ok
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+exit 0
+
+$ (base 6d989cad63 detached worktree, golden file copied from HEAD) cargo test -p litchi-ppt --locked --offline --test ppt_writer_text_goldens
+    test fresh_ppt_writer_text_paths_match_the_pre_0753_goldens ... ok
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+exit 0
+
+$ (base 6d989cad63 detached worktree, golden file copied from HEAD) cargo test -p litchi-xls --locked --offline --test xls_writer_text_goldens
+    test many_distinct_and_repeated_strings_read_back_cell_by_cell ... ok
+    test fresh_xls_writer_shared_strings_match_the_pre_0753_goldens ... ok
+    test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+exit 0
+
+$ (base 6d989cad63 detached worktree, final test file copied from the branch) cargo test -p litchi-doc --locked --offline --test doc_writer_text_goldens
+    test a_writer_written_twice_writes_the_same_bytes ... ok
+    test fresh_doc_writer_text_paths_match_the_pre_0753_goldens ... ok
+    test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+exit 0
+
+$ (base 6d989cad63 detached worktree, final test file copied from the branch) cargo test -p litchi-ppt --locked --offline --test ppt_writer_text_goldens
+    test a_writer_written_twice_writes_the_same_bytes_and_a_refusal_writes_nothing ... ok
+    test fresh_ppt_writer_text_paths_match_the_pre_0753_goldens ... ok
+    test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+exit 0
+
+$ (base 6d989cad63 detached worktree, final test file copied from the branch) cargo test -p litchi-xls --locked --offline --test xls_writer_text_goldens
+    test a_writer_written_twice_and_extended_restages_its_strings ... ok
+    test many_distinct_and_repeated_strings_read_back_cell_by_cell ... ok
+    test fresh_xls_writer_shared_strings_match_the_pre_0753_goldens ... ok
+    test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+exit 0
+
+--- final HEAD 42daeb4bc7c390cd9cd4be6dfe0445102da3be07 (adds the reuse/refusal tests; production code identical to 630a24b17b)
+$ cargo fmt --all --check
+exit 0
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.49s
+exit 0
+
+$ cargo test -p litchi-doc -p litchi-ppt -p litchi-xls --locked --offline --test doc_writer_text_goldens --test ppt_writer_text_goldens --test xls_writer_text_goldens
+    3 suites, 7 passed, 0 failed, 0 ignored
+exit 0
+
+
+=== Final gate run at HEAD 4c079ef4bf1d54a1ac6acb616b999aa04060e639 (production code 4c079ef4bf; the record and packet are uncommitted docs) ===
+
+$ cargo fmt --all --check
+exit 0
+
+$ cargo check -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --locked --offline
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.84s
+exit 0
+
+$ cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.74s
+exit 0
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --lib --no-deps --locked --offline -- -D warnings
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.53s
+exit 0
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
+        = help: to override `-D clippy::all` add `#[allow(clippy::unusual_byte_groupings)]`
+    
+    error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+exit 101
+
+$ cargo clippy -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
+        Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-xls)
+        Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.19s
+exit 0
+
+$ RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-doc -p litchi-ppt -p litchi-xls --no-deps --locked --offline
+     Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-doc)
+     Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths/crates/litchi-ppt)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.95s
+       Generated /home/zhuhe/code/litchi-worktrees/targets/0753/doc/litchi_doc/index.html and 2 other files
+exit 0
+
+$ cargo test -p litchi-doc --locked --offline
+    43 suites, 1200 passed, 0 failed, 13 ignored
+exit 0
+
+$ cargo test -p litchi-ppt --locked --offline
+    33 suites, 1231 passed, 0 failed, 11 ignored
+exit 0
+
+$ cargo test -p litchi-ppt --features encryption --locked --offline
+    33 suites, 1242 passed, 0 failed, 11 ignored
+exit 0
+
+$ cargo test -p litchi-xls --locked --offline
+    74 suites, 1506 passed, 0 failed, 1 ignored
+exit 0
+
+$ cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+    29 suites, 382 passed, 0 failed, 7 ignored
+exit 0
+
+$ python3 tools/check_crate_boundaries.py
+      [014] litchi-iwa -> litchi-keynote
+      [015] litchi-iwa -> litchi-numbers
+      [016] litchi-iwa -> litchi-numbers-wire
+      [017] litchi-iwa -> litchi-pages
+exit 0
+
+$ python3 tools/non_iwork_gate.py verify
+    facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+    verified_bulk_tree_roots=45
+    verified_facade_safe_trees=35
+    verified_facade_combined_tree=1
+exit 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+    OK: 10 performance claims validated (structural)
+exit 0
+

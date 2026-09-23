@@ -1,0 +1,314 @@
+[
+ {
+  "case": "xls_fresh_write_to",
+  "shape": "tiny",
+  "short_samples": 200,
+  "long_samples": 2200,
+  "A": {
+   "page-faults": 0.01225,
+   "instructions:u": 82240.7515,
+   "cycles:u": 20806.16925,
+   "instructions:k": 32986.139500000005,
+   "cycles:k": 8743.10975
+  },
+  "A_runs": [
+   {
+    "page-faults": 0.0135,
+    "instructions:u": 82246.89,
+    "cycles:u": 22468.513,
+    "instructions:k": 32740.3715,
+    "cycles:k": 8117.7555
+   },
+   {
+    "page-faults": 0.011,
+    "instructions:u": 82234.613,
+    "cycles:u": 19143.8255,
+    "instructions:k": 33231.9075,
+    "cycles:k": 9368.464
+   }
+  ],
+  "B": {
+   "page-faults": 0.00875,
+   "instructions:u": 82291.92175,
+   "cycles:u": 23264.08175,
+   "instructions:k": 33365.25125,
+   "cycles:k": 9825.23375
+  },
+  "B_runs": [
+   {
+    "page-faults": 0.012,
+    "instructions:u": 82289.3675,
+    "cycles:u": 21881.489,
+    "instructions:k": 33715.5255,
+    "cycles:k": 8370.1455
+   },
+   {
+    "page-faults": 0.0055,
+    "instructions:u": 82294.476,
+    "cycles:u": 24646.6745,
+    "instructions:k": 33014.977,
+    "cycles:k": 11280.322
+   }
+  ]
+ },
+ {
+  "case": "xls_fresh_write_to",
+  "shape": "large",
+  "short_samples": 20,
+  "long_samples": 220,
+  "A": {
+   "page-faults": 434.72749999999996,
+   "instructions:u": 17464979.1775,
+   "cycles:u": 4879826.5825,
+   "instructions:k": 2361892.6100000003,
+   "cycles:k": 761408.4299999999
+  },
+  "A_runs": [
+   {
+    "page-faults": 413.515,
+    "instructions:u": 17462061.83,
+    "cycles:u": 4845100.665,
+    "instructions:k": 2261733.62,
+    "cycles:k": 753485.895
+   },
+   {
+    "page-faults": 455.94,
+    "instructions:u": 17467896.525,
+    "cycles:u": 4914552.5,
+    "instructions:k": 2462051.6,
+    "cycles:k": 769330.965
+   }
+  ],
+  "B": {
+   "page-faults": 319.825,
+   "instructions:u": 17650975.1175,
+   "cycles:u": 4809463.6375,
+   "instructions:k": 1756421.6825,
+   "cycles:k": 565997.7775
+  },
+  "B_runs": [
+   {
+    "page-faults": 187.585,
+    "instructions:u": 17657794.755,
+    "cycles:u": 4793939.195,
+    "instructions:k": 1055251.905,
+    "cycles:k": 359018.67
+   },
+   {
+    "page-faults": 452.065,
+    "instructions:u": 17644155.48,
+    "cycles:u": 4824988.08,
+    "instructions:k": 2457591.46,
+    "cycles:k": 772976.885
+   }
+  ]
+ },
+ {
+  "case": "xls_fresh_write_to",
+  "shape": "payload-heavy",
+  "short_samples": 20,
+  "long_samples": 220,
+  "A": {
+   "page-faults": 4240.0425,
+   "instructions:u": 60565736.3,
+   "cycles:u": 20385876.979999997,
+   "instructions:k": 22522330.174999997,
+   "cycles:k": 8126220.35
+  },
+  "A_runs": [
+   {
+    "page-faults": 4239.9,
+    "instructions:u": 60565780.5,
+    "cycles:u": 20103794.865,
+    "instructions:k": 22523371.005,
+    "cycles:k": 7977450.615
+   },
+   {
+    "page-faults": 4240.185,
+    "instructions:u": 60565692.1,
+    "cycles:u": 20667959.095,
+    "instructions:k": 22521289.345,
+    "cycles:k": 8274990.085
+   }
+  ],
+  "B": {
+   "page-faults": 2103.385,
+   "instructions:u": 21374983.740000002,
+   "cycles:u": 7741097.0975,
+   "instructions:k": 11120299.68,
+   "cycles:k": 3603338.9775
+  },
+  "B_runs": [
+   {
+    "page-faults": 2103.365,
+    "instructions:u": 21374981.215,
+    "cycles:u": 7724037.655,
+    "instructions:k": 11120006.795,
+    "cycles:k": 3600007.935
+   },
+   {
+    "page-faults": 2103.405,
+    "instructions:u": 21374986.265,
+    "cycles:u": 7758156.54,
+    "instructions:k": 11120592.565,
+    "cycles:k": 3606670.02
+   }
+  ]
+ },
+ {
+  "case": "doc_semantic_one_edit_save",
+  "shape": "large",
+  "short_samples": 20,
+  "long_samples": 220,
+  "A": {
+   "page-faults": 810.6275,
+   "instructions:u": 41395150.144999996,
+   "cycles:u": 11239433.350000001,
+   "instructions:k": 4398561.077500001,
+   "cycles:k": 1543246.2375
+  },
+  "A_runs": [
+   {
+    "page-faults": 810.655,
+    "instructions:u": 41387705.98,
+    "cycles:u": 11187295.39,
+    "instructions:k": 4389836.955,
+    "cycles:k": 1544612.29
+   },
+   {
+    "page-faults": 810.6,
+    "instructions:u": 41402594.31,
+    "cycles:u": 11291571.31,
+    "instructions:k": 4407285.2,
+    "cycles:k": 1541880.185
+   }
+  ],
+  "B": {
+   "page-faults": 503.125,
+   "instructions:u": 41406782.6375,
+   "cycles:u": 11137211.8825,
+   "instructions:k": 2737334.59,
+   "cycles:k": 999665.2975
+  },
+  "B_runs": [
+   {
+    "page-faults": 503.135,
+    "instructions:u": 41406166.04,
+    "cycles:u": 10903956.06,
+    "instructions:k": 2721524.495,
+    "cycles:k": 1018898.345
+   },
+   {
+    "page-faults": 503.115,
+    "instructions:u": 41407399.235,
+    "cycles:u": 11370467.705,
+    "instructions:k": 2753144.685,
+    "cycles:k": 980432.25
+   }
+  ]
+ },
+ {
+  "case": "ppt_semantic_one_edit_save",
+  "shape": "large",
+  "short_samples": 20,
+  "long_samples": 220,
+  "A": {
+   "page-faults": 5.1125,
+   "instructions:u": 8420786.995000001,
+   "cycles:u": 2410474.7325,
+   "instructions:k": 109428.0925,
+   "cycles:k": 90709.2525
+  },
+  "A_runs": [
+   {
+    "page-faults": 5.085,
+    "instructions:u": 8420785.355,
+    "cycles:u": 2417952.145,
+    "instructions:k": 99936.995,
+    "cycles:k": 76956.385
+   },
+   {
+    "page-faults": 5.14,
+    "instructions:u": 8420788.635,
+    "cycles:u": 2402997.32,
+    "instructions:k": 118919.19,
+    "cycles:k": 104462.12
+   }
+  ],
+  "B": {
+   "page-faults": 0.3075,
+   "instructions:u": 8418762.024999999,
+   "cycles:u": 2321859.155,
+   "instructions:k": 39774.3525,
+   "cycles:k": 56150.82
+  },
+  "B_runs": [
+   {
+    "page-faults": 0.385,
+    "instructions:u": 8418793.395,
+    "cycles:u": 2467012.425,
+    "instructions:k": 42759.97,
+    "cycles:k": 86653.03
+   },
+   {
+    "page-faults": 0.23,
+    "instructions:u": 8418730.655,
+    "cycles:u": 2176705.885,
+    "instructions:k": 36788.735,
+    "cycles:k": 25648.61
+   }
+  ]
+ },
+ {
+  "case": "xls_semantic_one_edit_save",
+  "shape": "large",
+  "short_samples": 20,
+  "long_samples": 220,
+  "A": {
+   "page-faults": 421.8325,
+   "instructions:u": 162726385.14749998,
+   "cycles:u": 46600094.5025,
+   "instructions:k": 2372746.5825,
+   "cycles:k": 1180641.0350000001
+  },
+  "A_runs": [
+   {
+    "page-faults": 328.16,
+    "instructions:u": 162729683.595,
+    "cycles:u": 46469715.76,
+    "instructions:k": 1874606.415,
+    "cycles:k": 957670.96
+   },
+   {
+    "page-faults": 515.505,
+    "instructions:u": 162723086.7,
+    "cycles:u": 46730473.245,
+    "instructions:k": 2870886.75,
+    "cycles:k": 1403611.11
+   }
+  ],
+  "B": {
+   "page-faults": 448.65,
+   "instructions:u": 163811422.41500002,
+   "cycles:u": 46973642.58,
+   "instructions:k": 2511572.6325000003,
+   "cycles:k": 1238719.715
+  },
+  "B_runs": [
+   {
+    "page-faults": 403.615,
+    "instructions:u": 163810156.12,
+    "cycles:u": 47289977.165,
+    "instructions:k": 2263223.355,
+    "cycles:k": 1209470.985
+   },
+   {
+    "page-faults": 493.685,
+    "instructions:u": 163812688.71,
+    "cycles:u": 46657307.995,
+    "instructions:k": 2759921.91,
+    "cycles:k": 1267968.445
+   }
+  ]
+ }
+]
