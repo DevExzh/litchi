@@ -29,8 +29,9 @@ pub struct Package {
     ///
     /// The slot is also filled, when empty, by a capture of the current graph
     /// (change 0751), which is why it is a cell: a capture takes `&self`. It
-    /// is only ever set from a memo whose every entry names an allocation
-    /// `opc` holds, and every mutation that publishes no opened-presentation
+    /// is only ever set to a snapshot's memo re-projected onto `opc`'s own
+    /// allocations, so every entry names and retains an allocation `opc`
+    /// holds, and every mutation that publishes no opened-presentation
     /// snapshot still empties it.
     pub(crate) part_digests: std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>,
     #[cfg(feature = "encryption")]
@@ -1544,33 +1545,59 @@ impl Package {
         Ok(value)
     }
 
-    /// Adopt `snapshot`'s payload-digest memo as this package's.
+    /// Adopt, as this package's memo, `snapshot`'s payload-digest memo
+    /// re-projected onto the allocations `self.opc` itself holds.
     ///
-    /// Every entry of a snapshot's memo names an allocation that snapshot's own
-    /// package holds, and the snapshot was captured from the graph now in
-    /// `self.opc`, so adopting it retains nothing this package does not hold.
+    /// The snapshot was captured from the graph now in `self.opc`, but its
+    /// memo names the allocations of the snapshot's own package, a clone. A
+    /// clone of a built-in part shares its payload allocation; a caller-defined
+    /// part may copy its payload when cloned, and adopting the snapshot's memo
+    /// as it is would then keep that copy alive after the snapshot is dropped.
+    /// The projection keeps an entry only for an allocation `self.opc` holds,
+    /// and retains `self.opc`'s own `Arc` for it (change 0751's review), so the
+    /// facade retains no payload its own graph does not hold. A projection that
+    /// cannot allocate leaves the memo empty, which only costs a later hash.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
-        self.part_digests =
-            std::sync::OnceLock::from(std::sync::Arc::clone(&snapshot.part_digests));
+        self.part_digests = std::sync::OnceLock::new();
+        if let Some(memo) = Self::memo_for(&self.opc, snapshot) {
+            self.part_digests = std::sync::OnceLock::from(memo);
+        }
     }
 
-    /// Keep the memo of a capture of the current graph when this package holds
-    /// none (change 0751).
+    /// Keep the memo of a capture of the current graph, re-projected onto
+    /// `self.opc`'s own allocations, when this package holds none (change
+    /// 0751).
     ///
-    /// The snapshot's package is a clone of `self.opc`, and a clone of a
-    /// built-in part shares its payload allocation, so when every part is
-    /// built in, every entry of the capture's memo names an allocation
-    /// `self.opc` itself holds and keeping it retains nothing the package does
-    /// not hold. A package holding a caller-defined part keeps nothing, since
-    /// such a part may copy its payload when cloned. A filled slot is kept: it
-    /// describes this same graph, because every mutation that publishes no
-    /// snapshot empties it and every publication replaces it.
+    /// The ADR 0005 memo amendment's adoption clause says when the facade must
+    /// refresh its memo (every publication) and when it must release it (every
+    /// mutation that publishes nothing); filling an empty slot from a snapshot
+    /// of the current, unmutated graph is permitted under the coordinator's
+    /// ruling in 0751's review, with the amendment's re-projection clause met
+    /// in code: the memo kept is [`Self::memo_for`]'s projection, whatever the
+    /// parts are. A filled slot is kept: it describes this same graph, because
+    /// every mutation that publishes no snapshot empties it and every
+    /// publication replaces it.
     fn offer_part_digests(&self, snapshot: &crate::opened::Snapshot) {
-        if self.part_digests.get().is_none() && self.opc.holds_only_built_in_parts() {
-            let _kept = self
-                .part_digests
-                .set(std::sync::Arc::clone(&snapshot.part_digests));
+        if self.part_digests.get().is_none()
+            && let Some(memo) = Self::memo_for(&self.opc, snapshot)
+        {
+            let _kept = self.part_digests.set(memo);
         }
+    }
+
+    /// `snapshot`'s memo re-projected onto `opc`'s own payload allocations:
+    /// every entry kept names, and retains, an allocation `opc` holds, and an
+    /// entry naming any other allocation is dropped. `None` when the
+    /// projection cannot allocate.
+    fn memo_for(
+        opc: &OpcPackage,
+        snapshot: &crate::opened::Snapshot,
+    ) -> Option<std::sync::Arc<crate::opened::PartDigests>> {
+        snapshot
+            .part_digests
+            .project(opc)
+            .ok()
+            .map(std::sync::Arc::new)
     }
 
     /// The payload-digest memo this package retains for its current graph.

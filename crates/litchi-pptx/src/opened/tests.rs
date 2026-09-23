@@ -5513,6 +5513,55 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     package.apply_slide_removal_plan(&plan)?;
     assert_eq!(facade_memo_len(&package), package.opc.part_count());
     assert_facade_memo_names_only_its_own_package("after a removal plan", &package);
+
+    // A facade holding a caller-defined part that copies its payload when
+    // cloned (change 0751's review). Its captures and publications name that
+    // copy; the facade keeps neither the copy nor an entry naming it.
+    let mut removal = opened_plain_slides_package(3)?;
+    let custom = with_copying_part(&mut removal)?;
+    let plan = removal.opened_presentation()?.plan_slide_removal(0_usize)?;
+    assert_facade_memo_names_only_its_own_package("after a capture, caller-defined part", &removal);
+    assert_eq!(facade_memo_len(&removal), removal.opc.part_count() - 1);
+    assert_publication_keeps_no_copy("removal plan", &mut removal, &custom, |package| {
+        package.apply_slide_removal_plan(&plan)
+    })?;
+    drop(plan);
+
+    // The cross-copy route into such a destination records the recompressing
+    // route and publishes by clone-and-apply, by plan and by durable patch.
+    let mut authored = Package::new()?;
+    authored
+        .presentation_mut()?
+        .add_slide()?
+        .set_title("memo-cross-source");
+    let mut source = Package::from_bytes(&authored.to_bytes()?)?;
+    rename_slide(&mut source, 0, "memo-cross-source")?;
+    let source = Package::from_vec(source.to_bytes()?)?;
+    let mut destination = opened_plain_slides_package(2)?;
+    rename_slide(&mut destination, 0, "memo-destination-first")?;
+    rename_slide(&mut destination, 1, "memo-destination-second")?;
+    let destination_bytes = destination.to_bytes()?;
+    let mut by_plan = Package::from_vec(destination_bytes.clone())?;
+    let custom = with_copying_part(&mut by_plan)?;
+    let plan = by_plan.opened_presentation()?.plan_cross_slide_copy(
+        &source.opened_presentation()?,
+        0,
+        1,
+        1,
+    )?;
+    assert!(!plan.transfers_source_compressed_media());
+    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    assert_publication_keeps_no_copy("cross-copy plan", &mut by_plan, &custom, |package| {
+        package.apply_cross_slide_copy_plan(&source, &plan)
+    })?;
+    let mut by_patch = Package::from_vec(destination_bytes)?;
+    let custom = with_copying_part(&mut by_patch)?;
+    assert_publication_keeps_no_copy("cross-copy patch", &mut by_patch, &custom, |package| {
+        package.apply_cross_slide_copy_patch(&source, &durable)
+    })?;
+    assert_publication_keeps_no_copy("cross-copy inverse", &mut by_patch, &custom, |package| {
+        package.apply_cross_slide_copy_patch(&source, &durable.inverse())
+    })?;
     Ok(())
 }
 
@@ -5521,23 +5570,135 @@ fn facade_memo_len(package: &Package) -> usize {
 }
 
 fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package) {
-    let live: std::collections::HashSet<(usize, usize)> = package
-        .opc
+    if let Some(memo) = package.part_digest_memo() {
+        assert_memo_retains_only_allocations_of(stage, memo, &package.opc);
+    }
+}
+
+/// Every entry of `memo` names an allocation `opc` holds and retains `opc`'s
+/// own `Arc` for it, not an `Arc` of a copy with the same bytes (change 0751's
+/// review).
+pub(crate) fn assert_memo_retains_only_allocations_of(
+    stage: &str,
+    memo: &super::PartDigests,
+    opc: &litchi_opc::OpcPackage,
+) {
+    let live: HashMap<(usize, usize), std::sync::Arc<Vec<u8>>> = opc
         .try_iter_parts()
         .filter_map(|part| {
             let part = part.expect("validated memo package payload");
             let blob = part.blob_arc();
-            std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
+            std::ptr::eq(blob.as_slice(), part.blob())
+                .then(|| ((blob.as_ptr() as usize, blob.len()), blob))
         })
         .collect();
-    for key in package
-        .part_digest_memo()
-        .into_iter()
-        .flat_map(|memo| memo.keys())
-    {
+    for (key, retained) in memo.retained() {
+        let held = live.get(&key).unwrap_or_else(|| {
+            panic!("{stage}: the memo names an allocation the package does not hold")
+        });
         assert!(
-            live.contains(&key),
-            "{stage}: the facade's memo names an allocation its own graph does not hold"
+            std::sync::Arc::ptr_eq(held, retained),
+            "{stage}: the memo retains an `Arc` the package does not hold"
         );
     }
+}
+
+/// A caller-defined part that copies its payload whenever it is cloned
+/// (change 0751's review): a snapshot of a package holding one holds a copy
+/// of the payload, so the snapshot's memo names an allocation the package
+/// itself does not hold.
+pub(crate) struct CopyingPart {
+    inner: BlobPart,
+}
+
+impl CopyingPart {
+    pub(crate) fn new(name: PackURI, bytes: Vec<u8>) -> Self {
+        Self {
+            inner: BlobPart::new(name, "application/octet-stream".to_owned(), bytes),
+        }
+    }
+}
+
+impl Clone for CopyingPart {
+    fn clone(&self) -> Self {
+        Self::new(
+            litchi_opc::Part::partname(&self.inner).clone(),
+            litchi_opc::Part::blob(&self.inner).to_vec(),
+        )
+    }
+}
+
+impl litchi_opc::Part for CopyingPart {
+    fn blob(&self) -> &[u8] {
+        litchi_opc::Part::blob(&self.inner)
+    }
+    fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+        litchi_opc::Part::blob_arc(&self.inner)
+    }
+    fn content_type(&self) -> &str {
+        litchi_opc::Part::content_type(&self.inner)
+    }
+    fn partname(&self) -> &PackURI {
+        litchi_opc::Part::partname(&self.inner)
+    }
+    fn rels(&self) -> &litchi_opc::Relationships {
+        litchi_opc::Part::rels(&self.inner)
+    }
+    fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
+        litchi_opc::Part::rels_mut(&mut self.inner)
+    }
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        litchi_opc::Part::set_blob(&mut self.inner, blob);
+    }
+}
+
+/// Add a 64 KiB [`CopyingPart`] to `package`; returns its part name.
+fn with_copying_part(package: &mut Package) -> Result<PackURI> {
+    let name = PackURI::new("/custom/copying.bin").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(CopyingPart::new(
+        name.clone(),
+        vec![0x5a; 64 * 1024],
+    )))?;
+    assert!(!package.opc.holds_only_built_in_parts());
+    Ok(name)
+}
+
+/// After `publish` returns its snapshot and the snapshot is dropped, nothing
+/// keeps the snapshot's copy of the caller-defined payload alive: the facade
+/// kept the published memo only as re-projected onto its own allocations.
+fn assert_publication_keeps_no_copy(
+    stage: &str,
+    package: &mut Package,
+    part: &PackURI,
+    publish: impl FnOnce(&mut Package) -> Result<super::Snapshot>,
+) -> Result<()> {
+    let published = publish(package)?;
+    let held = package.opc.get_part(part)?.blob_arc();
+    let snapshot_copy = published.package.get_part(part)?.blob_arc();
+    assert!(
+        !std::sync::Arc::ptr_eq(&held, &snapshot_copy),
+        "{stage}: the part copies its payload when cloned"
+    );
+    assert!(
+        published
+            .part_digests
+            .get_for_test((snapshot_copy.as_ptr() as usize, snapshot_copy.len()))
+            .is_some(),
+        "{stage}: the snapshot's own memo names its copy"
+    );
+    let copy = std::sync::Arc::downgrade(&snapshot_copy);
+    drop(snapshot_copy);
+    drop(held);
+    drop(published);
+    assert!(
+        copy.upgrade().is_none(),
+        "{stage}: the facade's memo keeps the snapshot's copy of a caller-defined payload alive"
+    );
+    assert_facade_memo_names_only_its_own_package(stage, package);
+    assert_eq!(
+        facade_memo_len(package),
+        package.opc.part_count() - 1,
+        "{stage}: every entry but the caller-defined part's is kept"
+    );
+    Ok(())
 }

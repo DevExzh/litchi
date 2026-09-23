@@ -424,6 +424,15 @@ impl PartDigests {
         self.entries.keys().copied()
     }
 
+    /// Each entry's key with the payload allocation it retains, for the tests
+    /// that prove an entry retains the very `Arc` a package holds.
+    #[cfg(test)]
+    pub(crate) fn retained(&self) -> impl Iterator<Item = ((usize, usize), &Arc<Vec<u8>>)> + '_ {
+        self.entries
+            .iter()
+            .map(|(key, (blob, _digest))| (*key, blob))
+    }
+
     /// Strong references the memo itself holds on each memoized payload.
     #[cfg(test)]
     pub(crate) fn strong_counts(&self) -> impl Iterator<Item = usize> + '_ {
@@ -447,7 +456,11 @@ impl PartDigests {
     ///
     /// An entry survives only when `package` holds the very allocation it
     /// names, so the projection never pins a payload the package dropped.
-    fn project(&self, package: &OpcPackage) -> Result<Self> {
+    /// Each kept entry retains `package`'s own `Arc` for that allocation, never
+    /// the one `self` retained, so the result is re-projected onto `package`'s
+    /// allocations rather than inherited; the facade relies on this at every
+    /// point it keeps a snapshot's memo (change 0751).
+    pub(crate) fn project(&self, package: &OpcPackage) -> Result<Self> {
         if self.entries.is_empty() {
             return Ok(Self::default());
         }
