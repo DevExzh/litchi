@@ -1,118 +1,76 @@
 {
   "binaries": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742/release/litchi-perf-baseline",
-      "sha256": "6237d2950fb324821e0e51e5d496b71b882f8b6fbaa1f7ac619ee859e6cdacf1",
-      "bytes": 62982208
-    },
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742/release/litchi-perf-baseline-alloc",
-      "sha256": "191dfeeb042ced08aec52959ec8adf092bbaf5fbf76089693905b90d10f30bf1",
-      "bytes": 62906960
-    },
-    {
       "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-before/release/litchi-perf-baseline",
-      "sha256": "0f20b4d07456ebb6493c8f70a11876cf2b88c93f6068dee5f33272f6c6004bf3",
+      "sha256": "b375de3695473a3f0bf870ae25d9c2e7a8f9b8124aa43370698f6557a75f3385",
       "bytes": 62962456
     },
     {
       "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-before/release/litchi-perf-baseline-alloc",
-      "sha256": "3e304e2d0b1d364fe25b0857d65dd35f20a9ddc70e986c476200d6c5910c6b09",
+      "sha256": "75c5ee1707d0f45ee2366af3e77f26b9748cb34474e14550cea44e566eeddab2",
       "bytes": 62851544
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-fp/release/litchi-perf-baseline",
-      "sha256": "8b54a2428b65571ea668477cc157d829b9b0b58b90e4d01cd19ea69036ce4d06",
-      "bytes": 61619256
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-after/release/litchi-perf-baseline",
+      "sha256": "9d714e54b1f34a13d1778ab34a0f7ae41711ffab41760f7864e796db12521d2e",
+      "bytes": 62982040
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-probe/release/change0742-route-compare",
-      "sha256": "9346330830dfc96893c0bb8be85cfd89e211f9f74398e726c79d85176ae86945",
-      "bytes": 5615232
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-after/release/litchi-perf-baseline-alloc",
+      "sha256": "d8ff3f80738cf97aa27ba0fc27d6e7a51d7bc2a2f2b207df2ab90d4a34391434",
+      "bytes": 62902056
     }
   ],
   "removed": [
     {
       "path": "/home/zhuhe/code/litchi-worktrees/targets/0742",
-      "files": 157032,
-      "bytes": 178313226549
+      "files": 96427,
+      "bytes": 116211767872
     },
     {
       "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-before",
-      "files": 4529,
-      "bytes": 3228270638
+      "files": 1783,
+      "bytes": 1349018674
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-fp",
-      "files": 1768,
-      "bytes": 1122463105
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-after",
+      "files": 1783,
+      "bytes": 1350576137
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-probe",
-      "files": 1071,
-      "bytes": 362350032
-    },
-    {
-      "path": "superseded-317920af5c/raw",
+      "path": "superseded-b2132486af/raw",
       "files": 114,
-      "bytes": 3899183,
-      "note": "raw reports of a superseded matrix; summaries and receipts kept"
-    },
-    {
-      "path": "superseded-52db88c24c/raw",
-      "files": 114,
-      "bytes": 3897108,
+      "bytes": 3897366,
       "note": "raw reports of a superseded matrix; summaries and receipts kept"
     },
     {
       "path": "/home/zhuhe/code/litchi-worktrees/scratch/0742",
-      "files": 76,
-      "bytes": 35224590,
+      "files": 23,
+      "bytes": 803950,
       "entries": [
-        "abba-alloc.log",
-        "abba-native-1.log",
-        "abba-native-2.log",
-        "abba2-alloc.log",
-        "abba2-native-1.log",
-        "abba2-native-2.log",
-        "abba3-alloc.log",
-        "abba3-native-1.log",
-        "abba3-native-2.log",
-        "attr",
-        "build-after-alloc-2.log",
-        "build-after-alloc-3.log",
-        "build-after-alloc.log",
-        "build-after-native-2.log",
-        "build-after-native-3.log",
-        "build-after-native.log",
-        "build-before-alloc.log",
-        "build-before-native.log",
-        "build-fp-2.log",
-        "build-fp.log",
-        "gates",
+        "build-after-alloc.out",
+        "build-after-native.out",
+        "build-after.status",
+        "build-before-alloc.out",
+        "build-before-native.out",
+        "build-before.status",
+        "gate-check.out",
+        "gate-clippy-lib.out",
+        "gate-clippy-opc-zip-all-targets.out",
+        "gate-clippy-pptx-all-targets.out",
+        "gate-crate-boundaries.out",
+        "gate-doc.out",
+        "gate-fmt.out",
+        "gate-non-iwork.out",
+        "gate-perf-claims.out",
+        "gate-test-core.out",
+        "gate-test-dependents.out",
+        "gate-test-facade.out",
+        "gates-preliminary.log",
+        "gates.log",
         "gates.sh",
-        "legacy-fixture",
-        "packet",
-        "perf-after-media.data",
-        "perf-record.err",
-        "probe-after-pptx_cross_copy_media_rich.json",
-        "probe-after-pptx_cross_copy_media_rich_lifecycle.err",
-        "probe-after-pptx_cross_copy_media_rich_lifecycle.json",
-        "probe-after-pptx_cross_copy_plain.json",
-        "probe-after-pptx_cross_copy_plain_lifecycle.err",
-        "probe-after-pptx_cross_copy_plain_lifecycle.json",
-        "probe-after-sb.json",
-        "probe-base-pptx_cross_copy_media_rich.json",
-        "probe-base-pptx_cross_copy_plain.json",
-        "probe-base-pptx_cross_copy_plain_lifecycle.json",
-        "probe-base-sb.json",
-        "probe-base.json",
-        "probe-before-alloc-plain.json",
-        "route-compare",
-        "test-core-2.log",
-        "test-dependents.log",
-        "test-facade.log",
-        "test-opc-pptx.log"
+        "gates.stdout",
+        "matrix.out"
       ]
     }
   ],
