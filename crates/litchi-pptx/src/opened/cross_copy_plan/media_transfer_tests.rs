@@ -1,15 +1,17 @@
 //! Proof obligations of the owned cross-copy's source-compressed media
 //! transfer (change 0742).
 //!
-//! A copy planned against an unmodified owned destination publishes each
-//! eligible copied image from the source member's verified compressed bytes
-//! in fresh known-size framing, and records that encoding in the plan and in
+//! A copy publishes each eligible copied image from the source member's
+//! verified compressed bytes in fresh known-size framing, decided from the
+//! bytes the source publishes, and records that encoding in the plan and in
 //! the `LPCP0004` durable patch. These tests pin: the published span and its
-//! framing; byte identity of every route that publishes the same copy; the
-//! members that keep the recompressing route; the modified-destination
-//! refusal and its remedy; source freshness, foreignness and provenance; the
-//! refusal of genuine `LPCP0003` patches by name; and the new typed refusal of
-//! a source member whose strict layout cannot be proven.
+//! framing; byte identity of every route that publishes the same copy,
+//! including redo after undo and byte-identical modified packages; the
+//! members and copies that keep the recompressing route (unprovable layouts,
+//! capture disproofs, padding, captures over the patch-byte bound, and
+//! destinations holding caller-defined parts); the typed refusals; source
+//! freshness and foreignness; and the refusal of genuine `LPCP0003` patches by
+//! name.
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -964,14 +966,56 @@ fn a_tampered_encoding_byte_is_refused() -> Result<()> {
     Ok(())
 }
 
-/// The captures a transferring copy holds are charged, before any capture is
-/// taken, against the destination's `max_patch_bytes`: one byte below the
-/// charge is refused by name although the copy fits without them.
+/// Limits whose `max_patch_bytes` is `max_patch_bytes` and whose other
+/// fields are the defaults.
+fn patch_byte_limits(max_patch_bytes: usize) -> super::Limits {
+    let default = super::Limits::default();
+    super::Limits::new(
+        default.max_parts(),
+        max_patch_bytes,
+        default.max_text_bytes(),
+        default.max_history_entries(),
+        default.max_history_bytes(),
+        default.max_retained_candidate_bytes(),
+    )
+    .expect("finite limits")
+}
+
+/// Rename the local headers of `names` only: their central records, which
+/// the ordinary reader trusts, still name them, but their strict layouts are
+/// disproven, so they are never eligible.
+fn disprove_local_names(archive: &[u8], names: &[&str]) -> Vec<u8> {
+    let mut output = archive.to_vec();
+    let zip = ZipArchive::from_slice(archive).expect("parse ZIP");
+    for entry in zip.entries() {
+        let entry = entry.expect("central record");
+        let Some(name) = names
+            .iter()
+            .find(|name| entry.file_path().as_ref() == &name.as_bytes()[1..])
+        else {
+            continue;
+        };
+        let local = usize::try_from(entry.local_header_offset()).expect("offset");
+        // The last character of the stem, before `.png`.
+        let position = local + 30 + name.len() - 1 - 5;
+        assert_ne!(output[position], b'0');
+        output[position] = b'0';
+    }
+    output
+}
+
+/// A transfer holds its captures besides the candidate every route builds.
+/// When only the captures would cross the destination's `max_patch_bytes`, a
+/// first planning records the recompressing route, whose output is the copy
+/// from a source whose images are not eligible; a bound the candidate itself
+/// crosses refuses both alike; and a recorded transfer read under a bound
+/// its captures no longer fit is refused, leaving the destination untouched.
 #[test]
-fn captures_are_charged_against_the_patch_byte_limit() -> Result<()> {
+fn captures_that_do_not_fit_record_the_recompressing_route() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
-    let source = Package::from_vec(source_bytes)?;
-    let destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_vec(source_bytes.clone())?;
+    let ineligible = Package::from_vec(disprove_local_names(&source_bytes, &[PHOTO, FLAT]))?;
+    let destination = Package::from_vec(destination_bytes.clone())?;
     let plan = plan_copy(&source, &destination)?;
     let mut capture_bytes = 0usize;
     for part in image_parts(&plan) {
@@ -980,26 +1024,19 @@ fn captures_are_charged_against_the_patch_byte_limit() -> Result<()> {
             .compressed_transfer_size(part.source())?
             .expect("the fixture's images are eligible");
         capture_bytes += usize::try_from(size).expect("size");
+        assert_eq!(
+            ineligible.opc.compressed_transfer_size(part.source())?,
+            None
+        );
     }
     let snapshot = destination.opened_presentation()?;
     let without = super::candidate_estimate(&snapshot, plan.parts(), plan.planned_bytes(), 0)?;
     let with =
         super::candidate_estimate(&snapshot, plan.parts(), plan.planned_bytes(), capture_bytes)?;
     assert_eq!(with, without + capture_bytes);
-    let limits = |max_patch_bytes| {
-        let default = super::Limits::default();
-        super::Limits::new(
-            default.max_parts(),
-            max_patch_bytes,
-            default.max_text_bytes(),
-            default.max_history_entries(),
-            default.max_history_bytes(),
-            default.max_retained_candidate_bytes(),
-        )
-        .expect("finite limits")
-    };
-    let plan_under = |max_patch_bytes| {
-        let limits = limits(max_patch_bytes);
+    assert_eq!(with - 1, 219_573, "the bound of the review's example");
+    let plan_under = |source: &Package, max_patch_bytes| {
+        let limits = patch_byte_limits(max_patch_bytes);
         destination
             .opened_presentation_with_limits(limits)?
             .plan_cross_slide_copy(
@@ -1009,14 +1046,57 @@ fn captures_are_charged_against_the_patch_byte_limit() -> Result<()> {
                 POSITION,
             )
     };
-    assert!(matches!(
-        plan_under(with - 1),
-        Err(Error::Limit {
-            resource: "cross-slide candidate patch bytes",
-            limit,
-        }) if limit == with - 1
-    ));
-    assert!(plan_under(with)?.transfers_source_compressed_media());
+    let publish = |source: &Package, plan: &CrossSlideCopyPlan| -> Result<Vec<u8>> {
+        let mut destination = Package::from_vec(destination_bytes.clone())?;
+        destination.apply_cross_slide_copy_plan(source, plan)?;
+        destination.to_bytes()
+    };
+
+    // One byte short of the captures: the recompressing route, byte-identical
+    // to the copy from the ineligible source, by plan and by durable patch.
+    let tight = plan_under(&source, with - 1)?;
+    assert!(!tight.transfers_source_compressed_media());
+    let reference = plan_under(&ineligible, with - 1)?;
+    assert!(!reference.transfers_source_compressed_media());
+    let expected = publish(&ineligible, &reference)?;
+    assert_eq!(publish(&source, &tight)?, expected);
+    let mut patched = Package::from_vec(destination_bytes.clone())?;
+    patched.apply_cross_slide_copy_patch(
+        &source,
+        &CrossSlideCopyPatch::from_bytes_with_limits(
+            &tight.patch().to_bytes()?,
+            patch_byte_limits(with - 1),
+        )?,
+    )?;
+    assert_eq!(patched.to_bytes()?, expected);
+
+    // A bound the candidate itself crosses is refused for both sources.
+    for source in [&source, &ineligible] {
+        assert!(matches!(
+            plan_under(source, without - 1),
+            Err(Error::Limit {
+                resource: "cross-slide candidate patch bytes",
+                limit,
+            }) if limit == without - 1
+        ));
+    }
+
+    // With room for the captures the copy transfers. Its durable patch read
+    // under the tighter bound cannot rebuild the recorded transfer and is
+    // refused; the destination is untouched.
+    let roomy = plan_under(&source, with)?;
+    assert!(roomy.transfers_source_compressed_media());
+    let squeezed = CrossSlideCopyPatch::from_bytes_with_limits(
+        &roomy.patch().to_bytes()?,
+        patch_byte_limits(with - 1),
+    )?;
+    let mut refused = Package::from_vec(destination_bytes.clone())?;
+    assert_unsafe_edit(
+        &refused
+            .apply_cross_slide_copy_patch(&source, &squeezed)
+            .expect_err("the recorded transfer does not fit"),
+    );
+    assert_eq!(refused.to_bytes()?, destination_bytes);
     Ok(())
 }
 
@@ -1072,66 +1152,166 @@ fn a_published_candidate_lends_its_media_to_a_further_copy() -> Result<()> {
     Ok(())
 }
 
-/// A caller-defined part whose relationship-counting behaviour differs from
-/// a built-in part's.
+/// A caller-defined part with behavior of its own: it refuses a content-type
+/// change (the trait's default), counts `set_blob` calls, and answers every
+/// relationship-reference count with a sentinel.
 #[derive(Clone)]
-struct Sentinel(litchi_opc::BlobPart);
+struct Sentinel {
+    inner: litchi_opc::BlobPart,
+    writes: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
 
 impl litchi_opc::Part for Sentinel {
     fn blob(&self) -> &[u8] {
-        self.0.blob()
+        self.inner.blob()
     }
     fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
-        self.0.blob_arc()
+        self.inner.blob_arc()
     }
     fn content_type(&self) -> &str {
-        self.0.content_type()
+        self.inner.content_type()
     }
     fn partname(&self) -> &PackURI {
-        self.0.partname()
+        self.inner.partname()
     }
     fn rel_ref_count(&self, _r_id: &str) -> usize {
         0x51_7e
     }
     fn rels(&self) -> &litchi_opc::Relationships {
-        self.0.rels()
+        self.inner.rels()
     }
     fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
-        self.0.rels_mut()
+        self.inner.rels_mut()
     }
     fn set_blob(&mut self, blob: Vec<u8>) {
-        self.0.set_blob(blob);
+        self.writes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.set_blob(blob);
     }
 }
 
-/// A transferring copy into a destination that holds a caller-defined part
-/// and save preferences publishes the reopened candidate: the part keeps its
-/// bytes but becomes a built-in part, and the save preferences are carried.
-/// The output is the output of the same copy into the destination's bytes.
+fn sentinel_uri() -> PackURI {
+    PackURI::new("/custom/sentinel.bin").expect("sentinel URI")
+}
+
+/// Open `bytes` and add a [`Sentinel`] part; returns its write counter.
+fn with_sentinel(
+    bytes: &[u8],
+) -> Result<(Package, std::sync::Arc<std::sync::atomic::AtomicUsize>)> {
+    let mut package = Package::from_vec(bytes.to_vec())?;
+    let writes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    package.opc.try_add_part(Box::new(Sentinel {
+        inner: litchi_opc::BlobPart::new(
+            sentinel_uri(),
+            "application/octet-stream".to_owned(),
+            b"sentinel".to_vec(),
+        ),
+        writes: std::sync::Arc::clone(&writes),
+    }))?;
+    assert!(!package.opc.holds_only_built_in_parts());
+    Ok((package, writes))
+}
+
+/// The sentinel part still behaves as a [`Sentinel`], not as a built-in part
+/// with its bytes.
+fn assert_sentinel_behaves(
+    package: &mut Package,
+    writes: &std::sync::atomic::AtomicUsize,
+) -> Result<()> {
+    let uri = sentinel_uri();
+    assert_eq!(package.opc.get_part(&uri)?.rel_ref_count("rId1"), 0x51_7e);
+    assert!(
+        package
+            .opc
+            .get_part_mut(&uri)?
+            .set_content_type("application/x-retyped".to_owned())
+            .is_err(),
+        "the sentinel refuses retyping"
+    );
+    let before = writes.load(std::sync::atomic::Ordering::SeqCst);
+    package.opc.get_part_mut(&uri)?.set_blob(b"logged".to_vec());
+    assert_eq!(
+        writes.load(std::sync::atomic::Ordering::SeqCst),
+        before + 1,
+        "the sentinel observes writes"
+    );
+    Ok(())
+}
+
+/// A destination holding a caller-defined part is planned with the
+/// recompressing route, whose clone-and-apply publication keeps the part and
+/// its behavior, for a copy with images exactly as for a plain one, by plan
+/// and by durable patch.
 #[test]
-fn a_transferring_copy_keeps_save_options_but_not_caller_part_types() -> Result<()> {
+fn copies_into_a_destination_with_a_caller_defined_part_keep_its_behavior() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let media_source = Package::from_vec(source_bytes)?;
+    let plain_source = Package::from_vec(authored("plain", 3)?)?;
+    for source in [&media_source, &plain_source] {
+        let (mut destination, writes) = with_sentinel(&destination_bytes)?;
+        let plan = plan_copy(source, &destination)?;
+        assert!(!plan.transfers_source_compressed_media());
+        let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+        destination.apply_cross_slide_copy_plan(source, &plan)?;
+        assert_sentinel_behaves(&mut destination, &writes)?;
+
+        let (mut patched, writes) = with_sentinel(&destination_bytes)?;
+        patched.apply_cross_slide_copy_patch(source, &durable)?;
+        assert_sentinel_behaves(&mut patched, &writes)?;
+    }
+    Ok(())
+}
+
+/// A transferring plan or patch, planned against an ordinary destination
+/// with the same bytes and revisions, meets a destination holding a
+/// caller-defined part: both are refused by type, and the destination and
+/// its part are untouched.
+#[test]
+fn a_transferring_copy_is_refused_by_a_destination_with_a_caller_defined_part() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
     let source = Package::from_vec(source_bytes)?;
-    let sentinel = PackURI::new("/custom/sentinel.bin").map_err(Error::Invalid)?;
-    let custom = || -> Result<Package> {
-        let mut destination = Package::from_vec(destination_bytes.clone())?;
-        destination
-            .opc
-            .try_add_part(Box::new(Sentinel(litchi_opc::BlobPart::new(
-                sentinel.clone(),
-                "application/octet-stream".to_owned(),
-                b"sentinel".to_vec(),
-            ))))?;
-        destination.opc.set_save_options(litchi_opc::SaveOptions {
-            fonts: litchi_opc::FontEmbedding::Full,
-        });
-        Ok(destination)
+    let (mut custom, writes) = with_sentinel(&destination_bytes)?;
+    let before = litchi_opc::PackageWriter::to_bytes(&custom.opc)?;
+    let ordinary = Package::from_vec(before.clone())?;
+    let plan = plan_copy(&source, &ordinary)?;
+    assert!(plan.transfers_source_compressed_media());
+    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let caller_defined = |error: &Error| {
+        matches!(
+            error,
+            Error::SlideCopyPlan {
+                kind: crate::SlideCopyRefusal::CallerDefinedPart,
+                ..
+            }
+        )
     };
-    let mut destination = custom()?;
-    assert_eq!(
-        destination.opc.get_part(&sentinel)?.rel_ref_count("rId1"),
-        0x51_7e
-    );
+    let error = custom
+        .apply_cross_slide_copy_plan(&source, &plan)
+        .expect_err("a transferring plan is refused");
+    assert!(caller_defined(&error), "{error:?}");
+    let error = custom
+        .apply_cross_slide_copy_patch(&source, &durable)
+        .expect_err("a transferring patch is refused");
+    assert!(caller_defined(&error), "{error:?}");
+    assert_eq!(litchi_opc::PackageWriter::to_bytes(&custom.opc)?, before);
+    assert_sentinel_behaves(&mut custom, &writes)?;
+    Ok(())
+}
+
+/// A transferring copy into a destination whose only departure from an
+/// unmodified owned source is its save preferences publishes the reopened
+/// candidate, carries the preferences onto it, and publishes what the same
+/// copy into the destination's bytes publishes.
+#[test]
+fn a_transferring_copy_into_a_modified_destination_keeps_its_save_options() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let source = Package::from_vec(source_bytes)?;
+    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    destination.opc.set_save_options(litchi_opc::SaveOptions {
+        fonts: litchi_opc::FontEmbedding::Full,
+    });
+    assert!(!destination.opc.is_unmodified_owned_source());
+    assert!(destination.opc.holds_only_built_in_parts());
     let plan = plan_copy(&source, &destination)?;
     assert!(plan.transfers_source_compressed_media());
     destination.apply_cross_slide_copy_plan(&source, &plan)?;
@@ -1139,13 +1319,9 @@ fn a_transferring_copy_keeps_save_options_but_not_caller_part_types() -> Result<
         destination.opc.save_options().fonts,
         litchi_opc::FontEmbedding::Full
     );
-    let part = destination.opc.get_part(&sentinel)?;
-    assert_eq!(part.blob(), b"sentinel");
-    assert_eq!(part.rel_ref_count("rId1"), 0, "a built-in part now");
     let published = litchi_opc::PackageWriter::to_bytes(&destination.opc)?;
 
-    let clean_bytes = litchi_opc::PackageWriter::to_bytes(&custom()?.opc)?;
-    let mut clean = Package::from_vec(clean_bytes)?;
+    let mut clean = Package::from_vec(destination_bytes)?;
     let clean_plan = plan_copy(&source, &clean)?;
     assert_eq!(clean_plan, plan);
     clean.apply_cross_slide_copy_plan(&source, &clean_plan)?;
@@ -1208,5 +1384,62 @@ fn a_member_padded_with_empty_stored_blocks_is_recompressed() -> Result<()> {
     assert_ne!(flat.flags & 0x08, 0, "the padded member is recompressed");
     assert!(flat.compressed.len() < 1024);
     assert!(output.len() < padded.len() / 2);
+    Ok(())
+}
+
+/// Open `bytes` under read limits that admit exactly its members, then add
+/// one part, so the package is modified and its own limits refuse the re-read
+/// of its serialization.
+fn outgrown(bytes: &[u8]) -> Result<Package> {
+    let members = ZipArchive::from_slice(bytes)
+        .expect("parse ZIP")
+        .entries()
+        .count();
+    let limits = litchi_opc::ReadLimits::builder()
+        .max_parts(members)
+        .and_then(|builder| builder.max_relationship_parts(members))
+        .and_then(|builder| builder.max_archive_members(members))
+        .and_then(litchi_opc::ReadLimitsBuilder::build)
+        .expect("limits");
+    let mut package = Package::from_vec_with_limits(bytes.to_vec(), limits)?;
+    package
+        .opc
+        .try_add_part(Box::new(litchi_opc::BlobPart::new(
+            PackURI::new("/custom/extra.bin").map_err(Error::Invalid)?,
+            "application/octet-stream".to_owned(),
+            b"extra".to_vec(),
+        )))?;
+    Ok(package)
+}
+
+/// A package whose own read limits refuse the re-read of its serialization
+/// cannot be decided from its bytes. The recompressing route never re-reads
+/// either package, so a first planning records it instead of refusing: for
+/// such a source, and for such a destination of a copy whose images would
+/// otherwise transfer. Each publishes what the same copy from a source whose
+/// images are ineligible publishes.
+#[test]
+fn a_package_whose_limits_refuse_its_re_read_records_the_recompressing_route() -> Result<()> {
+    let (source_bytes, destination_bytes) = media_fixture()?;
+    let ineligible = Package::from_vec(disprove_local_names(&source_bytes, &[PHOTO, FLAT]))?;
+    let copy = |source: &Package, destination: &mut Package| -> Result<Vec<u8>> {
+        let plan = plan_copy(source, destination)?;
+        assert!(!plan.transfers_source_compressed_media());
+        destination.apply_cross_slide_copy_plan(source, &plan)?;
+        litchi_opc::PackageWriter::to_bytes(&destination.opc).map_err(Error::from)
+    };
+
+    let source = outgrown(&source_bytes)?;
+    let published = copy(&source, &mut Package::from_vec(destination_bytes.clone())?)?;
+    let expected = copy(
+        &ineligible,
+        &mut Package::from_vec(destination_bytes.clone())?,
+    )?;
+    assert_eq!(published, expected);
+
+    let source = Package::from_vec(source_bytes)?;
+    let published = copy(&source, &mut outgrown(&destination_bytes)?)?;
+    let expected = copy(&ineligible, &mut outgrown(&destination_bytes)?)?;
+    assert_eq!(published, expected);
     Ok(())
 }

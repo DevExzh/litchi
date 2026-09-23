@@ -88,6 +88,13 @@ impl DeferredPartSource {
         &self.bytes
     }
 
+    /// Record `error` as this source's index refusal, as a failed first
+    /// build would.
+    #[cfg(test)]
+    pub(crate) fn refuse_index_for_test(&self, error: OpcError) {
+        let _first = self.index.set(Err(error));
+    }
+
     /// The ZIP index over the retained archive, built at most once.
     pub(crate) fn index(&self) -> Result<&IndexedArchive<Arc<Vec<u8>>>> {
         let end_offset = self.bytes.len() as u64;

@@ -450,9 +450,14 @@ impl CrossSlideCopyPatch {
     /// source archive's headers prove its Store or Deflate layout, its
     /// compressed size is at most its decoded size plus stored-block overhead,
     /// and its capture decodes to exactly the planned bytes. A member whose own
-    /// bytes fail any of these is deflated again, so the same two packages'
-    /// bytes always give the same encoding, which the plan and the durable
-    /// patch record.
+    /// bytes fail any of these is deflated again.
+    ///
+    /// A first planning records the recompressing route for the whole copy
+    /// instead when the destination holds a caller-defined `Part`
+    /// implementation, when the captures alone would take the candidate past
+    /// the destination's `max_patch_bytes`, or when a package's own read
+    /// limits refuse the re-read of its bytes. The plan and the durable patch
+    /// record the encoding.
     ///
     /// Application rebuilds the candidate with the recorded encoding from the
     /// two packages' bytes, after their recorded revisions are checked, so
@@ -460,10 +465,12 @@ impl CrossSlideCopyPatch {
     /// destination restored by this patch's inverse, or one edited back to
     /// the same bytes — publish the same output. A transferring copy into a
     /// destination that is not an unmodified owned source publishes the
-    /// candidate reopened from its archive: the destination's save
-    /// preferences are carried onto it, but caller-defined `Part`
-    /// implementations become built-in parts with the same bytes, where a
-    /// recompressing copy keeps them.
+    /// candidate reopened from its archive and carries the destination's save
+    /// preferences onto it. A destination holding a caller-defined `Part`
+    /// implementation refuses a transferring copy with
+    /// [`crate::SlideCopyRefusal::CallerDefinedPart`], because the reopen
+    /// would replace that part with a built-in one; a recorded transfer whose
+    /// captures no longer fit is refused with [`crate::Error::Limit`].
     #[must_use]
     pub fn transfers_source_compressed_media(&self) -> bool {
         self.copied_media == CopiedMedia::SourceCompressed
@@ -807,6 +814,11 @@ pub(crate) fn apply_plan(
             reason: "the serialized destination package changed after cross-slide planning",
         });
     }
+    if plan.patch.copied_media == CopiedMedia::SourceCompressed
+        && !holds_only_built_in_parts(destination)
+    {
+        return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
+    }
     let source_snapshot = super::model::capture_with_revision(
         source,
         limits,
@@ -944,6 +956,11 @@ pub(crate) fn apply_patch(
             && fresh.presentation_relationship_id == patch.presentation_relationship_id)
             .then_some((candidate, true, normalized))
     });
+    // The forward route would publish the reopen of the destination's bytes.
+    // The inverse route publishes the restored clone and keeps every part.
+    if matches!(forward_candidate, Some((_, _, true))) && !holds_only_built_in_parts(destination) {
+        return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
+    }
     let candidate = if let Some(candidate) = forward_candidate {
         Some(candidate)
     } else {
@@ -1020,6 +1037,10 @@ pub(crate) fn apply_patch(
     *destination = candidate;
     Ok(snapshot)
 }
+
+/// Why a transferring copy is refused by a destination holding a
+/// caller-defined part.
+const CALLER_DEFINED_PART: &str = "a cross-slide copy that frames source-compressed media publishes the reopen of the destination's bytes, which cannot keep its caller-defined parts; plan the copy against this destination to record the recompressing route";
 
 /// Validate the candidate application publishes, or rebuild it from the live
 /// destination.
@@ -1296,13 +1317,42 @@ fn prepare_cross_slide_copy_for_slides(
     }
     let slide_id = next_slide_id(&destination.slides)?;
     let presentation_relationship_id = next_relationship_id(destination_presentation.rels())?;
-    let media = classify_media(source, &parts, limits, build.media)?;
-    preflight_parts(destination, &parts, planned_bytes, media.capture_bytes)?;
+    // A destination holding a caller-defined part is published by
+    // clone-and-apply, which only a recompressing copy can use, so a first
+    // planning records that route for it.
+    let policy = match build.media {
+        MediaPolicy::Classify if !holds_only_built_in_parts(destination.package.as_ref()) => {
+            MediaPolicy::Recorded(CopiedMedia::Recompressed)
+        },
+        policy => policy,
+    };
+    let mut media = classify_media(source, &parts, limits, policy)?;
+    // Every route builds a candidate of this estimate; a transfer also holds
+    // its captures while it builds. When only the captures would cross the
+    // bound, a first planning records the recompressing route, which fits,
+    // and a recorded transfer is refused.
+    let estimate = candidate_estimate(destination, &parts, planned_bytes, 0)?;
+    preflight_parts(destination, &parts, estimate)?;
+    let bound = destination.limits.max_patch_bytes();
+    if estimate
+        .checked_add(media.capture_bytes)
+        .is_none_or(|charged| charged > bound)
+    {
+        match policy {
+            MediaPolicy::Classify => media = MediaTransfers::none(source),
+            MediaPolicy::Recorded(_) => {
+                return Err(Error::Limit {
+                    resource: "cross-slide candidate patch bytes",
+                    limit: bound,
+                });
+            },
+        }
+    }
     let reuse = match build.archive {
         CandidateArchive::Reuse(held) => Some(held),
         CandidateArchive::Build | CandidateArchive::BuildAndRetain => None,
     };
-    let media = media.capture(&parts, reuse, limits.max_patch_bytes())?;
+    let mut media = media.capture(&parts, reuse, limits.max_patch_bytes())?;
     // A transferring copy is built from the bytes the destination publishes,
     // so its candidate, and the package application publishes, never depend
     // on the destination's edit history. A recompressing copy keeps building
@@ -1311,7 +1361,17 @@ fn prepare_cross_slide_copy_for_slides(
     let destination_view = if media.members.is_empty() {
         Cow::Borrowed(destination.package.as_ref())
     } else {
-        owned_view(destination, limits)?
+        match owned_view(destination, limits) {
+            Ok(view) => view,
+            // The recompressing route never re-reads the destination, so a
+            // first planning whose re-read the destination's own read limits
+            // refuse records that route instead.
+            Err(error) if matches!(policy, MediaPolicy::Classify) && is_read_limit(&error) => {
+                media = MediaTransfers::none(source);
+                Cow::Borrowed(destination.package.as_ref())
+            },
+            Err(error) => return Err(error),
+        }
     };
     let normalized = matches!(destination_view, Cow::Owned(_));
     let source_physical_revision = snapshot_physical_revision(source, limits)?;
@@ -1467,13 +1527,18 @@ fn classify_media<'s>(
         }
     }
     if candidates.is_empty() {
-        return Ok(MediaTransfers {
-            source_view: Cow::Borrowed(source.package.as_ref()),
-            members: Vec::new(),
-            capture_bytes: 0,
-        });
+        return Ok(MediaTransfers::none(source));
     }
-    let source_view = owned_view(source, limits)?;
+    let source_view = match owned_view(source, limits) {
+        Ok(view) => view,
+        // The recompressing route never re-reads the source, so a first
+        // planning whose re-read the source's own read limits refuse records
+        // that route instead.
+        Err(error) if matches!(policy, MediaPolicy::Classify) && is_read_limit(&error) => {
+            return Ok(MediaTransfers::none(source));
+        },
+        Err(error) => return Err(error),
+    };
     let mut members = Vec::new();
     members
         .try_reserve_exact(candidates.len())
@@ -1499,7 +1564,16 @@ fn classify_media<'s>(
     })
 }
 
-impl MediaTransfers<'_> {
+impl<'s> MediaTransfers<'s> {
+    /// No transferred member: the recompressing route.
+    fn none(source: &'s Snapshot) -> Self {
+        Self {
+            source_view: Cow::Borrowed(source.package.as_ref()),
+            members: Vec::new(),
+            capture_bytes: 0,
+        }
+    }
+
     /// Capture every eligible member, keeping those whose capture verifies.
     ///
     /// A member whose own bytes disprove its capture — for example a Deflate
@@ -1563,6 +1637,18 @@ impl MediaTransfers<'_> {
             capture_bytes,
         })
     }
+}
+
+/// Whether `package` holds only `litchi-opc`'s own part types, so that the
+/// reopen of its serialization behaves like it. An unmodified owned source
+/// always does.
+fn holds_only_built_in_parts(package: &OpcPackage) -> bool {
+    package.is_unmodified_owned_source() || package.holds_only_built_in_parts()
+}
+
+/// Whether `error` is a read-limit refusal of a package's re-read.
+const fn is_read_limit(error: &Error) -> bool {
+    matches!(error, Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
 }
 
 /// The package that holds, as its owned source archive, exactly the bytes
@@ -1885,13 +1971,14 @@ fn candidate_estimate(
         .ok_or_else(|| invalid("cross-slide candidate byte count overflow"))
 }
 
+/// Refuse a copy whose candidate `estimate` (see [`candidate_estimate`]) the
+/// destination's `max_patch_bytes` does not admit, or whose new part names the
+/// destination cannot take.
 fn preflight_parts(
     destination: &Snapshot,
     parts: &[super::SlideCopyPart],
-    planned_bytes: usize,
-    capture_bytes: usize,
+    estimate: usize,
 ) -> Result<()> {
-    let estimate = candidate_estimate(destination, parts, planned_bytes, capture_bytes)?;
     if estimate > destination.limits.max_patch_bytes() {
         return Err(Error::Limit {
             resource: "cross-slide candidate patch bytes",
