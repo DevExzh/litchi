@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized] target(s) in 0.06s
+     Running tests/source_replacement.rs (/home/zhuhe/code/litchi-worktrees/targets/0747/release/deps/source_replacement-d7f0d313fac3b6c8)
+
+running 1 test
+test the_pair_verdict_equals_two_complete_audits_on_generated_edits ... cases 3000000: refused on the original 1061109, refused on the replacement 782724, identical 77159, window 564421, complete 514587; two separated edits 468614 (window 26996)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 10.04s
+

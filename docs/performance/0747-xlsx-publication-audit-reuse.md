@@ -8,7 +8,8 @@ OLE2 and OOXML remain the active priority. ODF optimization stays deferred until
 that goal completes; iWork is excluded.
 
 Base `009d515bef`; branch `perf/0747-xlsx-publication-audit-reuse`; candidate
-commits `1ccfe6b354` and `6b49ce999a`. The coordinator's task: eliminate XML
+commits `1ccfe6b354` and `6b49ce999a`, and a review follow-up commit (see
+*Review follow-up*) that changes no release code path. The coordinator's task: eliminate XML
 audit work in source-backed XLSX cell edit/save publication that re-proves a
 property already proven within the same operation over the identical bytes,
 without weakening the audit of any published byte.
@@ -53,8 +54,8 @@ than 0.36%.
   XLSX editor uses, the single-Part overlay, the single- and multi-Part
   overlays with external relationship removals (Part and relationship
   pairs), and the multi-Part overlay.
-* Tests: `crates/xml-minifier/tests/source_replacement.rs` (13),
-  `crates/litchi-opc/tests/source_replacement_audit.rs` (4),
+* Tests: `crates/xml-minifier/tests/source_replacement.rs` (14 after the
+  review follow-up), `crates/litchi-opc/tests/source_replacement_audit.rs` (4),
   `crates/litchi-xlsx/src/cell_values/publication_audit_tests.rs` (6).
 
 **Breaking changes: none.** The `xml-minifier` API is additive; the
@@ -233,6 +234,45 @@ Every one of the seven paired audit sites in `litchi-opc` now calls one helper,
 `validate_source_part_replacement_xml`, which maps either side's error to the
 unchanged `OpcError::XmlPublication { part, source }`.
 
+## Review follow-up
+
+An adversarial review of the first two commits (reported by the coordinator:
+about 595 million differential cases, no mismatch) asked for one fix and three
+record corrections. They are applied in one further commit, without history
+rewrite:
+
+* **The invariant is now stated where it can be broken.** The window proof is
+  sound only because no source-policy check reads a token's offset or ordinal,
+  whether another token was seen, the `xml:space` scope, the root count away
+  from depth zero, or other state of the enclosing elements. `scan`'s doc comment
+  now lists exactly what a check may read, and the obligation on any new check:
+  be replayed by the window, or disable window proofs. `Policy::SOURCE` points
+  to it. `State::within` sets every field explicitly, each with its reason, so
+  a new field forces a decision; it no longer fills fields from `Self::new()`.
+* **Debug builds re-derive every window proof.** `debug_check_window_proof`,
+  compiled only under `debug_assertions`, asserts that `verify_source` accepts
+  the replacement whenever a window proof is returned. Every debug-build test
+  that reaches a window, in `xml-minifier`, `litchi-opc` and `litchi-xlsx`,
+  therefore re-checks the equivalence. Release builds do not contain it, so the
+  measured binaries' code path is unchanged and no timing is repeated.
+* **The reviewer's counterexample is now a test, and it is caught.** A new
+  test compares the pair with the complete audit on position-sensitive tokens
+  placed inside a window: declarations, an `xml-stylesheet` instruction, a
+  comment, a byte-order mark, CDATA, a DOCTYPE and a closing-and-reopening
+  root. As a mutation check, the reviewer's scratch rule (refuse a declaration
+  whose offset is not the start of the input) was applied temporarily. The test
+  then failed in the debug cross-check with `window proof Window { original:
+  3..7, replacement: 3..24 } contradicts the complete source audit of the
+  replacement: Err(Malformed { offset: 3, … })`. The mutation was reverted;
+  the diff hash before and after the check is identical.
+* **The differential evidence is restated** by window proofs rather than cases,
+  with the generator's shape limits. The generator now also makes two
+  separated edits. See *Correctness evidence*.
+* **The worst case of the fallback is measured and stated** under *What is not
+  claimed*. The docx round-4 figure is corrected to +129.24% / +126.95% /
+  +129.19% at p50 / p95 / mean. The auditor's pre-existing gaps are listed
+  under *What remains*, not fixed.
+
 ## Measured
 
 Host AMD EPYC 9R45, `Linux 7.0.0-1012-aws x86_64`, shared with other agents;
@@ -321,7 +361,8 @@ comparisons over 5% (p50, p95 or mean) in the final campaign are in
   after, overlapping, and the 16-process follow-up gives −1.49% [−6.58%,
   −0.06%]. The follow-up's own 35 flags (15 adverse) are this case and pptx, in
   both directions. The other three are `docx_source_backed_one_edit_save`
-  round 4, +129% at p50/p95/mean, where the after process ran in the slow mode
+  round 4, +129.24% at p50, +126.95% at p95 and +129.19% at mean, where the
+  after process ran in the slow mode
   this case shows in both legs: three processes near 4.1–4.3 ms (two before,
   one after) against 1.76–1.84 ms for the rest. That bimodality is also why its
   interval is so wide.
@@ -395,15 +436,34 @@ and its two slice audits 46,051,909 → 45,853,940 (−0.43%).
 ### Correctness evidence beyond the tests
 
 The seeded differential test (`the_pair_verdict_equals_two_complete_audits_on_generated_edits`)
-generates documents with valid and malformed markup and applies a structural
-or arbitrary edit to each. It draws limits either default or narrowed to within
-two of what the payloads need. It then requires the pair verdict, side and
-error value to equal the two `verify_source` calls. The suite runs 40,000 cases.
-Two release-mode campaigns ran it longer: 40,000,000 cases over eight seeds
-against the first candidate and 24,000,000 over eight seeds against the final
-one. In the final campaign 9.76 million pairs passed, 4.97 million of them by
-a window, and 14.24 million were refused. **No verdict, side or error value
-ever differed.**
+requires the pair's verdict, failing side and error value to equal those of
+the two `verify_source` calls. It generates small documents (a few hundred
+bytes to a few KiB) holding a random element tree at most five levels deep over
+eight names, with attributes, text, references, comments, CDATA and
+processing instructions. About 1–3% of tokens are malformed or refused, and 5%
+of documents start with a byte-order mark. Limits are the defaults half the
+time, and otherwise have each budget narrowed to within two of what one side
+needs. The generator has no namespaces beyond one prefix, no multi-KiB tokens,
+no real-producer layouts and no sizes near the default budgets. Two campaign
+generations ran:
+
+| generator | cases | refused on the original | window proofs | two separated edits (their window proofs) |
+| --- | ---: | ---: | ---: | ---: |
+| one edit per case (the campaigns first reported here: 8 seeds × 5,000,000 on `1ccfe6b354`, 8 × 3,000,000 on `6b49ce999a`) | 64,000,000 | about 36% (the review's replay of the default seed: 35.9%; 3.2% identical) | 13,242,171 | none: this generator never makes them |
+| extended in the review follow-up: in a quarter of the cases a second, separated edit, half of them inside the first edit's enclosing element (8 seeds × 3,000,000) | 24,000,000 | 8,489,897 (35.4%) | 4,510,930 | 3,746,101 (214,761) |
+
+The extended campaign also refused 6,266,432 replacements, found 619,092
+identical pairs and scanned 4,113,649 replacements completely. **No verdict,
+side or error value ever differed**, in either generation or in the 40,000-case
+suite run by every `cargo test`. The window path, not the case count, is what
+this evidence covers: 17,753,101 window proofs, of which 214,761 cover two
+separated edits.
+
+The coordinator also reports an independent adversarial review. It ran about
+595 million differential cases: a 25-minute mutation fuzz over 4,144 real OOXML
+parts, plus exhaustive 4-token and single-byte-pair campaigns. It found no
+mismatch and reproduced the packet's numbers. That evidence is the reviewer's
+and is not in this packet.
 
 ## What remains
 
@@ -429,6 +489,19 @@ ever differed.**
   writer-declared list of windows, each proved by byte comparison and scanned
   as above, would extend the proof to them; the value writer already knows its
   spans.
+* **Pre-existing gaps in the source audit itself, not fixed here.** The
+  adversarial review found inputs the base `verify_source` accepts although
+  they are not well-formed XML. The scratch probe confirms each is accepted,
+  and that the pair agrees with the complete audit on each:
+  `<r/>& ;` (character data outside the root, read as a reference), `<r>&;</r>`,
+  `<r>&a b;</r>`, `<r>&#xZZ;&#0;</r>`, a declaration inside the root
+  (`<r><?xml version="1.0"?></r>`), `<r>]]></r>`, and an undeclared namespace
+  prefix (`<p:r/>`). The coordinator is queuing them as a separate correctness
+  item. Fixing some of them is exactly the kind of check the window invariant
+  forbids: "a declaration must come first" reads a token's position, and the
+  reviewer's version of it produced a false window pass. Any such fix must be
+  replayed by the window or must disable window proofs, as the obligation at
+  the auditor's token loop now states.
 
 ## What is not claimed
 
@@ -455,10 +528,23 @@ ever differed.**
   whose complete audit would fail only because the allocator could not grow its
   depth stack is not scanned completely on the window path, so that failure,
   which says nothing about the bytes, is not reproduced there.
-* The equivalence argument is stated above, and 64,040,000 generated
-  differential cases found no counterexample. That is evidence, not a machine
-  proof. The fall-back-on-any-doubt structure bounds the risk to a false
-  *passes*, which is exactly what the differential oracle checks.
+* The equivalence argument is stated above, and the generated differential
+  campaigns (17,753,101 window proofs among 88,000,000 cases) found no
+  counterexample. That is evidence, not a machine proof. The
+  fall-back-on-any-doubt structure bounds the risk to a false *passes*, which
+  is exactly what the differential oracle checks, and which debug builds now
+  re-check on every window proof (see *Review follow-up*).
+* **The fallback has a worst case, and it is slower than before.** When a
+  window is found but a check made only on the window path then fails, the
+  replacement is scanned about one and a half times, plus the byte comparison.
+  A scratch probe measured constructed ~64 KiB documents whose window is
+  just under half the document, four processes on CPU 24. A valid replacement
+  whose window ends with character data containing `>` costs 1.290× the two
+  audits (median; range 1.248–1.311×). An invalid replacement whose defect sits
+  at the end of such a window costs 1.288× (1.247–1.301×). The same document's
+  one-element edit costs 0.540× (0.506–0.553×). Only invalid or unusual
+  replacements pay this, which is 0652 trade-off 3: the malicious minority
+  may pay more. No real input measured here takes that path.
 * The first campaign's 2.7–3.4% control shifts are attributed to the two
   builds' code layout, on the evidence that same-flag builds remove them. The
   mechanism was not isolated further.
@@ -499,7 +585,16 @@ record and packet in place (commands, test totals and exit codes in
 `cargo check --all-targets` reports three dead-code warnings in the facade's
 `unexpected_format` test target under the default features. That file is not
 touched by this record (the facade has no diff), and the warnings are
-pre-existing. The harness is unchanged, so its own test suite and the coverage
+pre-existing.
+
+The review follow-up was gated again with a fresh `CARGO_TARGET_DIR`
+(`targets/0747`, deleted afterwards), with the results in
+[`gates-review.txt`](results/change-0747/gates-review.txt). `cargo fmt --all --check`, `cargo clippy -p xml-minifier
+-p litchi-opc -p litchi-xlsx --lib --no-deps --locked -- -D warnings` and the
+same with `--all-targets`, `cargo test -p xml-minifier -p litchi-opc -p
+litchi-xlsx --locked` (2,192 passed, 0 failed, 2 ignored, with the debug
+cross-check active) and `RUSTDOCFLAGS="-D warnings" cargo doc -p xml-minifier -p
+litchi-opc -p litchi-xlsx --no-deps --locked` all exit 0. The harness is unchanged, so its own test suite and the coverage
 validator were not required. No shared log, registry or coverage index was edited; the
 ready-to-paste sections are in
 [`log-sections.md`](results/change-0747/log-sections.md).
@@ -515,3 +610,8 @@ the scratch directory (224 MB) were deleted. Each is verified absent in
 [`binaries.txt`](results/change-0747/binaries.txt). Raw callgrind profiles, the
 captured payload bytes and binary copies are not kept; their summaries and
 hashes are. The worktree and branch are kept.
+
+For the review follow-up a fresh `targets/0747` and scratch directory were
+created and used for the gates, the extended campaign and the worst-case probe.
+Both were deleted again afterwards (17.4 GB and 252 KB), and that second
+cleanup is recorded in the same file.
