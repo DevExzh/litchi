@@ -541,7 +541,17 @@ fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
     );
     assert_eq!(ordinary_shape.source_bytes, source.bytes().len() as u64);
     assert_eq!(ordinary_shape.planning_fingerprint_scans, 1);
-    assert_eq!(ordinary_shape.composed_source_preflight_scans, 1);
+    // Sealed owned bytes: the planning pass computes both digests once;
+    // no view preflight re-proves them and no emission re-hashes them.
+    assert_eq!(ordinary_shape.composed_source_preflight_scans, 0);
+    assert_eq!(ordinary_shape.composed_source_preflight_bytes, 0);
+    assert_eq!(ordinary_shape.target_materialization_emission_bytes, 0);
+    assert_eq!(ordinary_shape.direct_emission_bytes, 0);
+    assert_eq!(ordinary_shape.atomic_save_emission_bytes, 0);
+    assert_eq!(
+        ordinary_shape.planning_fingerprint_bytes,
+        2 * source.bytes().len() as u64
+    );
     assert_eq!(ordinary_shape.target_materialization_write_pre_scans, 0);
     assert_eq!(ordinary_shape.target_materialization_emission_scans, 1);
     assert_eq!(ordinary_shape.target_materialization_write_post_scans, 0);
@@ -562,7 +572,17 @@ fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
     assert_eq!(plan_shape.source_mode, OverlaySourceMode::OwnedImmutableArc);
     assert_eq!(plan_shape.source_bytes, source.bytes().len() as u64);
     assert_eq!(plan_shape.planning_fingerprint_scans, 1);
-    assert_eq!(plan_shape.composed_source_preflight_scans, 1);
+    // Sealed owned bytes: the planning pass computes both digests once;
+    // no view preflight re-proves them and no emission re-hashes them.
+    assert_eq!(plan_shape.composed_source_preflight_scans, 0);
+    assert_eq!(plan_shape.composed_source_preflight_bytes, 0);
+    assert_eq!(plan_shape.target_materialization_emission_bytes, 0);
+    assert_eq!(plan_shape.direct_emission_bytes, 0);
+    assert_eq!(plan_shape.atomic_save_emission_bytes, 0);
+    assert_eq!(
+        plan_shape.planning_fingerprint_bytes,
+        2 * source.bytes().len() as u64
+    );
     assert_eq!(plan_shape.target_materialization_write_pre_scans, 0);
     assert_eq!(plan_shape.target_materialization_emission_scans, 1);
     assert_eq!(plan_shape.target_materialization_write_post_scans, 0);

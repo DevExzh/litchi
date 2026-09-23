@@ -2603,8 +2603,10 @@ impl Transaction {
     /// physical replacements derived from the numeric source splices. The
     /// composed candidate is reopened
     /// through the public [`Workbook`] reader over a positional source before
-    /// this method returns. The overlay plan performs exact source and target
-    /// fingerprint checks again whenever it is read or published.
+    /// this method returns. The overlay plan computes the exact source and
+    /// target fingerprints once, over the snapshot's sealed immutable bytes;
+    /// reading or publishing it does not re-hash an artifact that cannot
+    /// change.
     ///
     /// The result deliberately does not expose the ordinary reversible
     /// [`Patch`], because that contract retains complete before/after CFB
@@ -3439,12 +3441,11 @@ impl fmt::Debug for SourceBackedCommit {
 /// It keeps the immutable source and the checked CFB overlay plan. The plan
 /// owns the compact exact physical replacement spans derived from the numeric
 /// splices; logical path and expected-range descriptors are consumed during
-/// validation rather than duplicated here. Direct sequential publication
-/// retains source/target hashing during its one emission pass and relies on
-/// the source's sealed immutable `Arc<[u8]>` ownership instead of generic
-/// pre/post scans. Checked composed views retain their complete preflight;
-/// atomic saves use the sealed ownership to omit redundant outer scans while
-/// retaining complete emission hashes and durability steps.
+/// validation rather than duplicated here. The plan's source and target
+/// fingerprints are computed once, at planning, over the source's sealed
+/// immutable `Arc<[u8]>`; direct sequential publication, checked composed
+/// views and atomic saves rely on that ownership instead of re-hashing the
+/// artifact, and atomic saves keep every durability step.
 ///
 /// The plan is intentionally forward-only. An exact artifact inverse would
 /// need a source-bound reverse plan rooted in the composed target; the
@@ -3488,9 +3489,9 @@ impl SourceBackedPlanCommit {
     /// Returns a checked positional view of the composed target without
     /// materializing the complete artifact.
     ///
-    /// The view performs complete source and target fingerprint checks before
-    /// it is returned and repeats source freshness checks on each positional
-    /// read.
+    /// The view shares the plan's once-computed source and target
+    /// fingerprints over the sealed immutable source and repeats source
+    /// freshness checks on each positional read.
     pub fn composed_source(&self) -> std::result::Result<ComposedOverlaySource, OverlayError> {
         self.plan.composed_source()
     }
