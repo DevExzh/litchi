@@ -152,10 +152,12 @@ impl Limits {
     /// The retained bytes are observable through
     /// [`CrossSlideCopyPlan::retained_candidate_bytes`] and released by
     /// [`CrossSlideCopyPlan::release_retained_candidate`] or by dropping the
-    /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*;
-    /// applying the plan copies the retained archive into the package it
-    /// opens, so the transient peak during one application carries the
-    /// retained bytes twice.
+    /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*.
+    /// Applying the plan shares the retained archive with the package it
+    /// opens and publishes rather than copying it (change 0751), so after an
+    /// application the plan and the destination may hold one allocation
+    /// between them, and releasing or dropping the plan frees it only once
+    /// the destination no longer holds it.
     ///
     /// Zero is rejected for this field by [`Self::new`]. Pass `1` to turn
     /// candidate retention off, since no ZIP archive is
@@ -358,6 +360,30 @@ impl PartDigests {
     /// Digest memoized for exactly this allocation, if any.
     fn get(&self, key: (usize, usize)) -> Option<[u8; 32]> {
         self.entries.get(&key).map(|(_blob, digest)| *digest)
+    }
+
+    /// One parent memo answering for every allocation any of `parents`
+    /// names, for a capture of a package assembled from several packages'
+    /// payloads (change 0751).
+    ///
+    /// Each entry is copied with the payload `Arc` it retains, so every
+    /// answer is still the digest of the allocation its own memo hashed. Two
+    /// parents naming one allocation name the same bytes and hold the same
+    /// digest. The union is transient: a capture consults it and keeps a memo
+    /// built over its own package, so the union pins nothing beyond that
+    /// capture. `None` when it cannot be reserved; a memo is optional, so the
+    /// caller then captures without one.
+    pub(crate) fn union(parents: &[&Self]) -> Option<Self> {
+        let capacity = parents.iter().try_fold(0usize, |total, parent| {
+            total.checked_add(parent.entries.len())
+        })?;
+        let mut union = Self::with_capacity(capacity).ok()?;
+        for parent in parents {
+            for (key, (blob, digest)) in &parent.entries {
+                union.entries.insert(*key, (Arc::clone(blob), *digest));
+            }
+        }
+        Some(union)
     }
 
     /// Return the package-owned payload allocation for an exact memo key.
@@ -632,30 +658,6 @@ pub(crate) fn capture_with_parent_digests(
     )
 }
 
-/// Capture `package` with a complete-package revision the caller already
-/// computed from the identical package content.
-///
-/// The revision still binds the complete package: it is the value
-/// [`package_fingerprint`] returns for this exact content, so the snapshot is
-/// the one [`capture_with_provenance`] would produce. Every validation the
-/// ordinary capture performs still runs; only the repeated hash of unchanged
-/// bytes is skipped. Callers must not pass a revision taken from any other
-/// package state.
-pub(crate) fn capture_with_revision(
-    package: &OpcPackage,
-    limits: Limits,
-    physical_source_provenance: bool,
-    revision: [u8; 32],
-) -> Result<Snapshot> {
-    capture_internal(
-        package,
-        limits,
-        physical_source_provenance,
-        Revision::Known(revision, PartDigests::default()),
-        None,
-    )
-}
-
 pub(crate) fn capture_with_revision_and_digests_and_mce(
     package: &OpcPackage,
     limits: Limits,
@@ -892,6 +894,8 @@ pub(crate) fn package_fingerprint_with_memo(
     feed(&mut digest, b"parts");
     digest.update(part_count.to_le_bytes());
     let mut memo = PartDigests::with_capacity(parts.len())?;
+    #[cfg(test)]
+    let (part_total, mut hashed) = (parts.len(), 0usize);
     for metadata in parts {
         let part = package.get_part(metadata.partname())?;
         let payload = match memo_key(part) {
@@ -908,15 +912,29 @@ pub(crate) fn package_fingerprint_with_memo(
                         );
                         memoized
                     },
-                    None => payload_digest(&blob),
+                    None => {
+                        #[cfg(test)]
+                        {
+                            hashed += 1;
+                        }
+                        payload_digest(&blob)
+                    },
                 };
                 memo.insert(key, blob, payload)?;
                 payload
             },
-            None => payload_digest(part.blob()),
+            None => {
+                #[cfg(test)]
+                {
+                    hashed += 1;
+                }
+                payload_digest(part.blob())
+            },
         };
         digest.update(part_digest(part, payload)?);
     }
+    #[cfg(test)]
+    fingerprint_log::record(parent.is_some(), part_total, hashed);
     Ok((digest.finalize().into(), memo))
 }
 
@@ -1088,6 +1106,54 @@ fn feed(digest: &mut Sha256, value: &[u8]) {
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+/// Which complete-package fingerprints a test thread computed, and how many
+/// payloads each hashed rather than answering from a memo (change 0751).
+///
+/// Only fingerprints outside a `debug_assert!` are of interest to the tests
+/// that read this log, and those are the ones taken with a parent memo; the
+/// memo-free fingerprints that debug builds use to re-derive a value are
+/// logged too and are told apart by `with_parent`.
+#[cfg(test)]
+pub(crate) mod fingerprint_log {
+    use std::cell::RefCell;
+
+    /// One fingerprint: whether a parent memo was consulted, the package's
+    /// part count, and the payloads hashed rather than answered.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct Entry {
+        pub(crate) with_parent: bool,
+        pub(crate) parts: usize,
+        pub(crate) hashed: usize,
+    }
+
+    thread_local! {
+        static LOG: RefCell<Vec<Entry>> = const { RefCell::new(Vec::new()) };
+    }
+
+    pub(super) fn record(with_parent: bool, parts: usize, hashed: usize) {
+        LOG.with(|log| {
+            log.borrow_mut().push(Entry {
+                with_parent,
+                parts,
+                hashed,
+            });
+        });
+    }
+
+    /// Take this thread's log, leaving it empty.
+    pub(crate) fn take() -> Vec<Entry> {
+        LOG.with(|log| std::mem::take(&mut *log.borrow_mut()))
+    }
+
+    /// Take this thread's log and keep the fingerprints taken with a parent.
+    pub(crate) fn take_with_parent() -> Vec<Entry> {
+        take()
+            .into_iter()
+            .filter(|entry| entry.with_parent)
+            .collect()
+    }
 }
 
 #[cfg(test)]

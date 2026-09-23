@@ -22,9 +22,25 @@ use super::copy_plan::{
     reject_unknown_non_part_members, resolve_slide, validate_registered_layout,
     validate_slide_surface,
 };
-use super::model::{Limits, Slide, Snapshot, invalid};
+use super::model::{Limits, PartDigests, Slide, Snapshot, invalid};
 use super::patch::Patch;
 use crate::{Error, Result, SlideCopyRefusal};
+
+/// Payload-digest memos the caller already holds for the two live packages an
+/// application checks, offered as parents of their complete-package revisions
+/// (change 0751).
+///
+/// The facade passes the memo it retains for each package (change 0655). Each
+/// entry retains the payload allocation it names, so a hit proves byte
+/// identity and a miss is an ordinary hash: the revisions, and every verdict
+/// taken over them, are the ones computed without a memo.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct LiveDigests<'a> {
+    /// The source package's memo, if the caller holds one.
+    pub(crate) source: Option<&'a PartDigests>,
+    /// The destination package's memo, if the caller holds one.
+    pub(crate) destination: Option<&'a PartDigests>,
+}
 
 /// Current durable cross-slide-copy header magic.
 ///
@@ -287,7 +303,9 @@ impl CrossSlideCopyPlan {
     /// The bytes are released by [`Self::release_retained_candidate`] and by
     /// dropping the plan.  Applying a plan does not release them, because a
     /// plan may be applied to more than one destination that proves the same
-    /// six revisions.
+    /// six revisions.  An application shares the retained allocation with the
+    /// package it publishes instead of copying it (change 0751), so that
+    /// package keeps the bytes alive after the plan lets them go.
     #[must_use]
     pub fn retained_candidate_bytes(&self) -> Option<usize> {
         self.candidate.0.as_ref().map(|held| held.archive.len())
@@ -785,16 +803,22 @@ pub(crate) fn apply_plan(
     plan: &CrossSlideCopyPlan,
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
+    live: LiveDigests<'_>,
 ) -> Result<Snapshot> {
     let limits = plan.patch.patch.limits();
-    let source_revision = super::model::package_fingerprint(source)?;
+    // Both revisions are recomputed from the live packages; the caller's memos
+    // only answer for payload allocations they provably name, and the memos
+    // these passes fill are kept for the captures below (change 0751).
+    let (source_revision, source_digests) =
+        super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != plan.source_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
             reason: "the complete source package graph changed after cross-slide planning",
         });
     }
-    let destination_revision = super::model::package_fingerprint(destination)?;
+    let (destination_revision, destination_digests) =
+        super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != plan.destination_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
@@ -820,21 +844,30 @@ pub(crate) fn apply_plan(
     {
         return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
     }
-    let source_snapshot = super::model::capture_with_revision(
+    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
         source,
         limits,
         source_physical_source_provenance,
         source_revision,
+        source_digests,
+        None,
     )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision(
+    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
         destination,
         limits,
         destination_physical_source_provenance,
         destination_revision,
+        destination_digests,
+        None,
     )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
-    let (fresh, candidate, normalized) = prepare_cross_slide_copy_for_slides(
+    let Prepared {
+        plan: fresh,
+        candidate,
+        normalized,
+        digests: candidate_digests,
+    } = prepare_cross_slide_copy_for_slides(
         &source_snapshot,
         &destination_snapshot,
         plan.source.clone(),
@@ -869,6 +902,7 @@ pub(crate) fn apply_plan(
         plan.target_revision,
         destination_physical_source_provenance,
         !normalized,
+        Some(&candidate_digests),
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
@@ -891,16 +925,21 @@ pub(crate) fn apply_patch(
     patch: &CrossSlideCopyPatch,
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
+    live: LiveDigests<'_>,
 ) -> Result<Snapshot> {
     let limits = patch.patch.limits();
-    let source_revision = super::model::package_fingerprint(source)?;
+    // As in `apply_plan`: recomputed from the live packages, consulting the
+    // caller's memos, and the filled memos are kept for the captures below.
+    let (source_revision, source_digests) =
+        super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != patch.source_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
             reason: "the complete source package graph differs from the cross-slide patch source",
         });
     }
-    let destination_revision = super::model::package_fingerprint(destination)?;
+    let (destination_revision, destination_digests) =
+        super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != patch.destination_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
@@ -921,18 +960,22 @@ pub(crate) fn apply_patch(
             reason: "the serialized destination package differs from the cross-slide patch source",
         });
     }
-    let source_snapshot = super::model::capture_with_revision(
+    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
         source,
         limits,
         source_physical_source_provenance,
         source_revision,
+        source_digests,
+        None,
     )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision(
+    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
         destination,
         limits,
         destination_physical_source_provenance,
         destination_revision,
+        destination_digests,
+        None,
     )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
@@ -949,17 +992,24 @@ pub(crate) fn apply_patch(
         },
     )
     .ok()
-    .and_then(|(fresh, candidate, normalized)| {
+    .and_then(|prepared| {
+        let fresh = &prepared.plan;
         (fresh.patch == *patch
             && fresh.target_revision == patch.target_revision
             && fresh.target_physical_revision == patch.target_physical_revision
             && fresh.slide_id == patch.slide_id
             && fresh.presentation_relationship_id == patch.presentation_relationship_id)
-            .then_some((candidate, true, normalized))
+            .then_some((
+                prepared.candidate,
+                true,
+                prepared.normalized,
+                prepared.digests,
+            ))
     });
     // The forward route would publish the reopen of the destination's bytes.
     // The inverse route publishes the restored clone and keeps every part.
-    if matches!(forward_candidate, Some((_, _, true))) && !holds_only_built_in_parts(destination) {
+    if matches!(forward_candidate, Some((_, _, true, _))) && !holds_only_built_in_parts(destination)
+    {
         return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
     }
     let candidate = if let Some(candidate) = forward_candidate {
@@ -984,9 +1034,16 @@ pub(crate) fn apply_patch(
         {
             None
         } else {
-            let restored_snapshot =
-                super::model::capture(&restored, limits, destination_physical_source_provenance);
-            let inverse_matches = restored_snapshot
+            // The restored clone shares every payload allocation the inverse
+            // did not replace with the live destination, whose memo this
+            // capture consults (change 0751).
+            let restored_snapshot = super::model::capture_with_parent_digests(
+                &restored,
+                limits,
+                destination_physical_source_provenance,
+                &destination_snapshot.part_digests,
+            );
+            let restored_digests = restored_snapshot
                 .ok()
                 .inspect(|base| {
                     remember_physical_revision(base, limits, patch.target_physical_revision);
@@ -1006,16 +1063,16 @@ pub(crate) fn apply_patch(
                         },
                     )
                     .ok()?;
-                    Some(forward.patch.inverse() == *patch)
-                })
-                .unwrap_or(false);
-            inverse_matches.then_some((restored, false, false))
+                    (forward.patch.inverse() == *patch).then(|| Arc::clone(&base.part_digests))
+                });
+            restored_digests.map(|digests| (restored, false, false, digests))
         }
     };
-    let (candidate, reopened, normalized) = candidate.ok_or(Error::UnsafeEdit {
-        operation: "apply_cross_slide_copy_patch",
-        reason: "the durable cross-slide patch does not match a freshly proven candidate",
-    })?;
+    let (candidate, reopened, normalized, candidate_digests) =
+        candidate.ok_or(Error::UnsafeEdit {
+            operation: "apply_cross_slide_copy_patch",
+            reason: "the durable cross-slide patch does not match a freshly proven candidate",
+        })?;
     let (mut candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
@@ -1023,6 +1080,7 @@ pub(crate) fn apply_patch(
         patch.target_revision,
         destination_physical_source_provenance,
         reopened && !normalized,
+        Some(&candidate_digests),
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
@@ -1051,6 +1109,13 @@ const CALLER_DEFINED_PART: &str = "a cross-slide copy that frames source-compres
 /// was built from the destination's reopened serialization, which a
 /// clone-and-apply rebuild could not reproduce because the targeted writer
 /// deflates the patch's decoded resources again.
+///
+/// `candidate_digests` is the payload-digest memo of the capture that proved
+/// `candidate` in this same call (change 0751). The candidate is still
+/// captured here, after `validate_before` and under the patch's limits, with
+/// every validation a capture runs; the memo only spares hashing payload
+/// allocations the candidate provably holds. A candidate rebuilt from the
+/// destination is a different package and is captured as before.
 fn validate_application_candidate(
     destination: &OpcPackage,
     candidate: OpcPackage,
@@ -1058,6 +1123,7 @@ fn validate_application_candidate(
     target_revision: [u8; 32],
     physical_source_provenance: bool,
     may_rebuild: bool,
+    candidate_digests: Option<&PartDigests>,
 ) -> Result<(OpcPackage, Snapshot, bool)> {
     // Reopening preserves the observable state of untouched owned ingress.
     // Dirty packages can carry caller-defined parts or save preferences that
@@ -1080,6 +1146,7 @@ fn validate_application_candidate(
         patch,
         target_revision,
         physical_source_provenance,
+        candidate_digests,
     )?;
     Ok((candidate, snapshot, false))
 }
@@ -1119,7 +1186,7 @@ fn published_archive_revision(
         return physical_package_fingerprint(candidate, limits);
     }
     debug_assert!(
-        physical_package_fingerprint(candidate, limits).is_ok_and(|fresh| fresh == proven),
+        streamed_physical_revision(candidate, limits).is_ok_and(|fresh| fresh == proven),
         "cross-slide published a candidate with an unproven serialized package revision"
     );
     Ok(proven)
@@ -1141,11 +1208,26 @@ fn plan_cross_slide_copy_for_slides(
         position,
         build,
     )
-    .map(|(plan, _candidate, _normalized)| plan)
+    .map(|prepared| prepared.plan)
 }
 
-// Keep the reopened candidate only within an application call. Public plans
-// retain their existing descriptor and durable patch representation.
+/// A freshly proven plan with the candidate package it built.
+///
+/// Kept only within one planning or application call: public plans retain
+/// their descriptor, durable patch and at most the candidate's archive bytes,
+/// never the candidate package or a capture of it.
+struct Prepared {
+    plan: CrossSlideCopyPlan,
+    /// The candidate reopened from its archive.
+    candidate: OpcPackage,
+    /// Whether the candidate was built from the destination's reopened
+    /// serialization rather than from the destination itself.
+    normalized: bool,
+    /// Payload digests of the allocations `candidate` holds, from the capture
+    /// that proved `plan.target_revision` over it in this call.
+    digests: Arc<PartDigests>,
+}
+
 fn prepare_cross_slide_copy_for_slides(
     source: &Snapshot,
     destination: &Snapshot,
@@ -1153,7 +1235,7 @@ fn prepare_cross_slide_copy_for_slides(
     destination_slide: Slide,
     position: usize,
     build: CandidateBuild<'_>,
-) -> Result<(CrossSlideCopyPlan, OpcPackage, bool)> {
+) -> Result<Prepared> {
     if position > destination.slides.len() {
         return Err(Error::SlideIndexOutOfBounds {
             index: position,
@@ -1380,6 +1462,7 @@ fn prepare_cross_slide_copy_for_slides(
     let BuiltCandidate {
         candidate,
         revision: candidate_revision,
+        digests: candidate_digests,
         archive_revision: candidate_archive_revision,
         retained: retained_candidate,
         copied_media,
@@ -1437,8 +1520,8 @@ fn prepare_cross_slide_copy_for_slides(
         cross_patch.slide_id,
         &cross_patch.presentation_relationship_id,
     )?;
-    Ok((
-        CrossSlideCopyPlan {
+    Ok(Prepared {
+        plan: CrossSlideCopyPlan {
             source: source_slide,
             destination: destination_slide,
             position,
@@ -1460,7 +1543,8 @@ fn prepare_cross_slide_copy_for_slides(
         },
         candidate,
         normalized,
-    ))
+        digests: candidate_digests,
+    })
 }
 
 /// One built, reopened and captured candidate.
@@ -1469,6 +1553,9 @@ struct BuiltCandidate {
     candidate: OpcPackage,
     /// Complete-package revision of `candidate`.
     revision: [u8; 32],
+    /// Payload-digest memo of the capture that computed `revision`; every
+    /// entry names an allocation `candidate` holds.
+    digests: Arc<PartDigests>,
     /// Physical revision of the archive when the reopen republishes it
     /// verbatim.
     archive_revision: Option<[u8; 32]>,
@@ -1841,56 +1928,66 @@ fn build_candidate(
     // reuse in debug and test builds; a release build rests on the argument
     // plus the recomputed archive and graph revisions taken below from the
     // bytes it is about to publish.
-    let (serialized, archive_digest) = match archive {
+    let (serialized, written_digest) = match archive {
         CandidateArchive::Reuse(held) if reuses_archive => {
             debug_assert!(
                 bounded_package_bytes(&candidate, archive_limit)
                     .is_ok_and(|(fresh, _)| fresh == *held.archive),
                 "cross-slide reused a retained candidate archive a fresh serialization does not reproduce"
             );
-            // The copy is fallible, exactly as `BoundedVecWriter::into_bytes`
-            // is: an infallible `Vec::clone` would abort the process where the
-            // route it replaces returns `Error::Allocation`.
-            let mut serialized = Vec::new();
-            serialized
-                .try_reserve_exact(held.archive.len())
-                .map_err(|source| Error::Allocation {
-                    resource: "cross-slide candidate archive",
-                    source,
-                })?;
-            serialized.extend_from_slice(&held.archive);
-            // The digest is recomputed over the retained bytes rather than
-            // carried beside them, so the sealed physical revision stays a
-            // hash of the bytes this call publishes. That hash is the one
-            // `bounded_package_bytes` takes anyway, so what reuse removes is
-            // exactly the serialization with its deflate and, in release
-            // builds, the copied media captures.
-            let mut digest = Sha256::new();
-            digest.update(&serialized);
-            (serialized, digest.finalize().into())
+            // The reopen shares the retained allocation instead of copying it
+            // (change 0751): the bytes are immutable behind the `Arc`, so the
+            // package reads and republishes exactly what the plan holds. Its
+            // digest is still recomputed over those bytes, below.
+            (CandidateBytes::Shared(Arc::clone(&held.archive)), None)
         },
-        _ => bounded_package_bytes(&candidate, archive_limit)?,
+        _ => {
+            let (bytes, digest) = bounded_package_bytes(&candidate, archive_limit)?;
+            (CandidateBytes::Owned(bytes), Some(digest))
+        },
     };
     let serialized_bytes = serialized.len();
     // Clean owned ingress proves the destination has built-in parts. Keep
     // the existing path for caller-defined parts and revoked authorization.
-    let reopened = if destination_view.is_unmodified_owned_source() {
-        OpcPackage::from_vec_reusing_payloads(
-            serialized,
-            litchi_opc::ReadLimits::default(),
-            &candidate,
-        )?
-    } else {
-        OpcPackage::from_vec(serialized)?
+    let reopened = match serialized {
+        CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
+            OpcPackage::from_vec_reusing_payloads(
+                bytes,
+                litchi_opc::ReadLimits::default(),
+                &candidate,
+            )?
+        },
+        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes)?,
+        CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
+            OpcPackage::from_shared_vec_reusing_payloads(
+                bytes,
+                litchi_opc::ReadLimits::default(),
+                &candidate,
+            )?
+        },
+        CandidateBytes::Shared(bytes) => {
+            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::ReadLimits::default())?
+        },
     };
     // Owned ingress retains the archive it was opened from and republishes it
     // verbatim, so the bytes just hashed are exactly what a serializing hash
     // sink would read back. A reopen that revoked that authorization is left
     // to the ordinary recomputation.
-    let archive_revision = reopened
-        .is_unmodified_owned_source()
-        .then(|| seal_physical_revision(archive_digest, serialized_bytes))
-        .transpose()?;
+    //
+    // A retained archive's digest is recomputed here, at application, over
+    // the bytes about to be published, never carried beside them (change
+    // 0646's G5): the reopened package hashes the archive it now holds, and
+    // keeps the digest bound to that archive for any later request.
+    let archive_revision = match written_digest {
+        Some(digest) => reopened
+            .is_unmodified_owned_source()
+            .then(|| seal_physical_revision(digest, serialized_bytes))
+            .transpose()?,
+        None => reopened
+            .exact_source_sha256()
+            .map(|digest| seal_physical_revision(digest, serialized_bytes))
+            .transpose()?,
+    };
     let copied_media = if transferred.is_empty() {
         CopiedMedia::Recompressed
     } else {
@@ -1913,11 +2010,27 @@ fn build_candidate(
             transferred: transferred.into_boxed_slice(),
         }),
     );
-    let captured = super::model::capture(
-        &reopened,
-        destination.limits,
-        destination.physical_source_provenance,
-    )?;
+    // The reopen took every payload whose bytes equal the built graph's from
+    // that graph, whose parts share the two snapshots' allocations: the
+    // destination's for its untouched parts and the source's for the copied
+    // ones. The capture therefore consults both snapshots' memos, which name
+    // only allocations their own packages hold; every other payload, such as
+    // the rewritten presentation part, is hashed (change 0751).
+    let parents = PartDigests::union(&[&source.part_digests, &destination.part_digests]);
+    let captured = match parents.as_ref() {
+        Some(parents) => super::model::capture_with_parent_digests(
+            &reopened,
+            destination.limits,
+            destination.physical_source_provenance,
+            parents,
+        )?,
+        None => super::model::capture(
+            &reopened,
+            destination.limits,
+            destination.physical_source_provenance,
+        )?,
+    };
+    drop(parents);
     let published = captured
         .slides
         .get(position)
@@ -1934,14 +2047,31 @@ fn build_candidate(
             "cross-slide candidate did not retarget the copied slide layout",
         ));
     }
-    let revision = captured.revision;
     Ok(BuiltCandidate {
         candidate: reopened,
-        revision,
+        revision: captured.revision,
+        digests: Arc::clone(&captured.part_digests),
         archive_revision,
         retained: retained_candidate,
         copied_media,
     })
+}
+
+/// The bytes one candidate build reopens.
+enum CandidateBytes {
+    /// A fresh serialization, moved into the reopened package.
+    Owned(Vec<u8>),
+    /// A plan's retained archive, shared with the reopened package.
+    Shared(Arc<Vec<u8>>),
+}
+
+impl CandidateBytes {
+    fn len(&self) -> usize {
+        match self {
+            Self::Owned(bytes) => bytes.len(),
+            Self::Shared(bytes) => bytes.len(),
+        }
+    }
 }
 
 /// Bytes a candidate build is charged against the destination's
@@ -2748,8 +2878,43 @@ fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
 /// comments, and extra fields), while an authored or mutated package streams
 /// the complete checked OPC graph. Unknown non-Part members are refused before
 /// this helper, so no unmodeled ZIP item can be silently dropped.
+///
+/// An unmodified owned source streams exactly its retained archive, and
+/// `litchi-opc` keeps that archive's SHA-256 in a memo created with the
+/// archive and filled only from it (change 0751). Its revision is therefore
+/// sealed from that digest — computed on the first request of any clone of the
+/// package's ingress and read by every later one — instead of streaming the
+/// archive into a fresh hash. The archive bound is checked first, so an
+/// archive over it is refused with the error the stream would raise and
+/// without being hashed.
 fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     reject_unknown_non_part_members(package, "cross-slide physical authorization")?;
+    if let Some(archive) = package.exact_source_shared() {
+        let length = archive.len();
+        drop(archive);
+        if length > limits.max_patch_bytes() {
+            return Err(Error::Limit {
+                resource: "cross-slide serialized archive bytes",
+                limit: limits.max_patch_bytes(),
+            });
+        }
+        if let Some(digest) = package.exact_source_sha256() {
+            let revision = seal_physical_revision(digest, length)?;
+            debug_assert!(
+                streamed_physical_revision(package, limits).is_ok_and(|fresh| fresh == revision),
+                "cross-slide sealed an exact source digest its stream does not reproduce"
+            );
+            return Ok(revision);
+        }
+    }
+    streamed_physical_revision(package, limits)
+}
+
+/// [`physical_package_fingerprint`] by streaming the serialized archive into a
+/// bounded hash sink, which is how every package other than an unmodified
+/// owned source is fingerprinted, and how test and debug builds re-derive
+/// every memoized value.
+fn streamed_physical_revision(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     let mut sink = ArchiveHashWriter::new(limits.max_patch_bytes());
     let result = package.to_stream(&mut sink);
     if sink.exceeded {
@@ -2797,7 +2962,7 @@ fn snapshot_physical_revision(snapshot: &Snapshot, limits: Limits) -> Result<[u8
             "cross-slide physical authorization",
         )?;
         debug_assert!(
-            physical_package_fingerprint(snapshot.package.as_ref(), limits)
+            streamed_physical_revision(snapshot.package.as_ref(), limits)
                 .is_ok_and(|fresh| fresh == revision),
             "cross-slide reused a stale serialized package revision"
         );
@@ -2818,7 +2983,7 @@ fn snapshot_physical_revision(snapshot: &Snapshot, limits: Limits) -> Result<[u8
 /// package in test and debug builds.
 fn remember_physical_revision(snapshot: &Snapshot, limits: Limits, revision: [u8; 32]) {
     debug_assert!(
-        physical_package_fingerprint(snapshot.package.as_ref(), limits)
+        streamed_physical_revision(snapshot.package.as_ref(), limits)
             .is_ok_and(|fresh| fresh == revision),
         "cross-slide seeded a snapshot with a foreign serialized package revision"
     );
@@ -2843,7 +3008,7 @@ fn candidate_physical_revision(
     };
     reject_unknown_non_part_members(candidate, "cross-slide physical authorization")?;
     debug_assert!(
-        physical_package_fingerprint(candidate, limits).is_ok_and(|fresh| fresh == known),
+        streamed_physical_revision(candidate, limits).is_ok_and(|fresh| fresh == known),
         "cross-slide reused a stale candidate archive revision"
     );
     Ok(known)
@@ -3142,7 +3307,11 @@ impl<'a> WireInput<'a> {
 #[cfg(test)]
 mod bounded_writer_tests;
 #[cfg(test)]
+mod digest_reuse_tests;
+#[cfg(test)]
 mod media_transfer_tests;
+#[cfg(test)]
+mod memo_path_tests;
 #[cfg(test)]
 mod retention_tests;
 #[cfg(test)]

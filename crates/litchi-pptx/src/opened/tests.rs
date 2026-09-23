@@ -5462,18 +5462,27 @@ fn the_superseded_refusal_does_not_displace_the_durable_byte_limit() -> Result<(
 }
 
 /// The facade's retained memo names only allocations its own graph holds,
-/// after a publication and after a mutation that publishes no snapshot.
+/// after a capture, after a publication and after a mutation that publishes
+/// no snapshot.
 #[test]
 fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     let mut package = opened_plain_slides_package(4)?;
-    assert_eq!(package.part_digests.len(), 0, "a fresh package has no memo");
+    assert_eq!(facade_memo_len(&package), 0, "a fresh package has no memo");
 
+    // A capture of the current graph offers its memo to a package holding
+    // none (change 0751); it names only the package's own allocations.
     let source = package.opened_presentation()?;
+    assert_eq!(
+        facade_memo_len(&package),
+        package.opc.part_count(),
+        "a capture fills an empty memo"
+    );
+    assert_facade_memo_names_only_its_own_package("after a capture", &package);
     let mut edit = source.edit();
     edit.set_shape_text(0, crate::shape::Key::Index(0), "facade memo")?;
     let commit = edit.commit()?;
     package.apply_opened_presentation_commit(commit)?;
-    assert!(package.part_digests.len() > 0, "publication fills the memo");
+    assert!(facade_memo_len(&package) > 0, "publication fills the memo");
     assert_facade_memo_names_only_its_own_package("after publication", &package);
 
     // A typed edit publishes no opened-presentation snapshot, so the memo of
@@ -5484,7 +5493,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
         .map_err(|error| Error::Invalid(error.to_string()))?;
     package.put_custom_props(props)?;
     assert_eq!(
-        package.part_digests.len(),
+        facade_memo_len(&package),
         0,
         "a typed edit must release the memo of the graph it replaced"
     );
@@ -5492,11 +5501,23 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
 
     // A slide-removal patch publishes a snapshot, so its exact memo is adopted.
     let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
+    assert_facade_memo_names_only_its_own_package("after a second capture", &package);
     let patch = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
     package.apply_slide_removal_patch(&patch)?;
-    assert!(package.part_digests.len() > 0);
+    assert!(facade_memo_len(&package) > 0);
     assert_facade_memo_names_only_its_own_package("after a removal patch", &package);
+
+    // A slide-removal plan publishes a snapshot too, and adopts its memo
+    // rather than keeping the capture's memo of the graph it replaced.
+    let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
+    package.apply_slide_removal_plan(&plan)?;
+    assert_eq!(facade_memo_len(&package), package.opc.part_count());
+    assert_facade_memo_names_only_its_own_package("after a removal plan", &package);
     Ok(())
+}
+
+fn facade_memo_len(package: &Package) -> usize {
+    package.part_digest_memo().map_or(0, |memo| memo.len())
 }
 
 fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package) {
@@ -5509,7 +5530,11 @@ fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package)
             std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
         })
         .collect();
-    for key in package.part_digests.keys() {
+    for key in package
+        .part_digest_memo()
+        .into_iter()
+        .flat_map(|memo| memo.keys())
+    {
         assert!(
             live.contains(&key),
             "{stage}: the facade's memo names an allocation its own graph does not hold"

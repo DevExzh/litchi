@@ -845,12 +845,21 @@ fn capture_candidate(
 /// Validate a detached candidate already constructed from a freshly proven
 /// patch. This retains the application checks without rebuilding that same
 /// candidate and discarding its validated physical package representation.
+///
+/// The candidate is captured here, after `validate_before`, under the patch's
+/// limits, with every validation a capture runs. `parent` is a payload-digest
+/// memo whose entries name allocations the candidate may hold — the memo of
+/// the capture that built it moments earlier in the same operation (change
+/// 0751). It is consulted only to skip re-hashing a payload allocation the
+/// candidate provably holds; a miss is an ordinary hash, so the snapshot and
+/// its revision are the ones a capture without it returns.
 pub(crate) fn validate_candidate(
     source: &OpcPackage,
     candidate: &OpcPackage,
     patch: &Patch,
     result_revision: [u8; 32],
     physical_source_provenance: bool,
+    parent: Option<&super::model::PartDigests>,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(source)?
         .part()
@@ -862,7 +871,15 @@ pub(crate) fn validate_candidate(
         ));
     }
     validate_before(source, patch)?;
-    let snapshot = capture(candidate, patch.limits, physical_source_provenance)?;
+    let snapshot = match parent {
+        Some(parent) => super::model::capture_with_parent_digests(
+            candidate,
+            patch.limits,
+            physical_source_provenance,
+            parent,
+        )?,
+        None => capture(candidate, patch.limits, physical_source_provenance)?,
+    };
     validate_after(candidate, patch)?;
     if snapshot.revision() != result_revision {
         return Err(invalid(

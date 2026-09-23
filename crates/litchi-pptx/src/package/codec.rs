@@ -161,7 +161,7 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
-            part_digests: std::sync::Arc::default(),
+            part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: false,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
@@ -272,7 +272,7 @@ impl Package {
         Ok(Self {
             opc,
             mutable_pres: None,
-            part_digests: std::sync::Arc::default(),
+            part_digests: std::sync::OnceLock::new(),
             physical_source_provenance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
