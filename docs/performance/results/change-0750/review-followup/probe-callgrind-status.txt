@@ -1,0 +1,21 @@
+before source/ws-structured 4
+before source/ws-patriarch 2
+before source/docx-drawing 20
+before source/docx-table-alignment 100
+before source/pptx-slide11 40
+before pair/ws-structured 4
+before source/corpus-accepted 1
+before authored/ws-patriarch 2
+before authored/tiny 10000
+before source/tiny 10000
+after source/ws-structured 4
+after source/ws-patriarch 2
+after source/docx-drawing 20
+after source/docx-table-alignment 100
+after source/pptx-slide11 40
+after pair/ws-structured 4
+after source/corpus-accepted 1
+after authored/ws-patriarch 2
+after authored/tiny 10000
+after source/tiny 10000
+done

@@ -39,5 +39,36 @@
     "/home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps (worktree) and branch perf/0750-xml-audit-well-formedness-gaps",
     "the empty directory /home/zhuhe/code/litchi-worktrees/scratch/0750"
   ],
-  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout"
+  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout",
+  "review_follow_up": {
+    "performed": "2026-09-23, after the expanded-name fix and the citation fix were committed (0bbcc9bf94, 900eb6de11), gated and measured, and their evidence was copied into review-followup/",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0750",
+        "bytes": 72839893947,
+        "what": "fresh target directory for the follow-up: debug test, clippy and doc builds of xml-minifier and its OOXML dependents and the facade, a compile-only check of the ODF and OLE2 crates, the release differential-test build, the release harness of the fix, and the subdirectories harness-before (release harness of the base), dos-before, dos-prefix, dos-fixed and audit-before, audit-fixed (release probes)"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/0750-before-src",
+        "bytes": 10155519678,
+        "what": "detached worktree of base 3174242282 for the harness and probe before legs (git worktree remove --force, then git worktree prune)"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/0750-prefix-src",
+        "bytes": 10155611969,
+        "what": "detached worktree of the first candidate de69fb407d for the adversarial-input probe (git worktree remove --force, then git worktree prune)"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0750/*",
+        "bytes": 184707494,
+        "what": "scratch: TMPDIR contents, harness binary copies (hashes in binaries.txt), the probe's input parts (rebuilt by scripts/extract_parts.py), raw callgrind profiles (summaries kept), harness reports (kept gzip-compressed), an extract of the OPC specification used to check rule M1.17's wording, the pre-fix copy of namespaces.rs used by the mutation check, build and test logs (totals in review-followup/gates.txt)"
+      }
+    ],
+    "verified_after_removal": {
+      "targets/0750": "absent",
+      "0750-before-src": "absent and not listed by git worktree list",
+      "0750-prefix-src": "absent and not listed by git worktree list",
+      "scratch/0750": "0 entries"
+    }
+  }
 }

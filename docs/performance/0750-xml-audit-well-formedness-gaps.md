@@ -9,8 +9,10 @@ that goal completes; iWork is excluded.
 
 Base `3174242282` (the branch tip with records 0745 and 0747); branch
 `perf/0750-xml-audit-well-formedness-gaps`; commits `a07d680852` (fixture
-corrections in dependent tests) and `de69fb407d` (the auditor), and the commit
-that adds this record. The coordinator's task: close the well-formedness gaps
+corrections in dependent tests), `de69fb407d` (the auditor) and `9c0c953689`
+(this record), then, after an independent review, `0bbcc9bf94` (a fix for a
+CPU denial of service in the expanded-name check), `900eb6de11` (a corrected
+citation) and the commit that adds *Review follow-up* to this record. The coordinator's task: close the well-formedness gaps
 that 0747's reviewer found in the source policy of the OOXML publication XML
 auditor, look for more of the same kind, keep 0747's window-proof invariant, run
 a compatibility census over the repository's real OOXML parts, and measure only
@@ -30,12 +32,20 @@ under *What remains* rather than decided silently. Across the repository's 7,222
 real OOXML XML members and 5,504 evidence-packet members, three loose sample
 parts are newly refused, and each is genuinely malformed. No package member
 changes verdict. A release differential campaign of 24 million generated pairs
-found no difference between a window proof and two complete audits. The cost: a
-source audit of a real part takes 8–18% more time and executes 14–24% more
-instructions. The source-backed XLSX and PPTX one-edit saves are unchanged
-within noise. The DOCX one-edit save is 3.90% slower (95% CI [+1.73%, +6.46%],
-+68 µs at p50); it audits its whole main document twice per commit, so it pays
-the new checks in full. Every output byte is unchanged.
+found no difference between a window proof and two complete audits. An
+independent review then found a CPU denial of service in the first candidate's
+expanded-name check, which compared namespace names byte by byte on every tag:
+one tag under three 3.9 MB names took 180 s to audit, where the base takes 0.017
+s. The fix gives each namespace name an identity when it is declared, so no tag
+reads a name, and that input now takes 0.038 s (*Review follow-up*). The cost on
+benign input: a source audit of a real part executes 14–24% more instructions
+and, as timed on the first candidate, takes 8–18% more time. Re-measured on the
+fix, the DOCX one-edit save is 2.67% slower (95% CI [+2.15%, +3.90%], +43 µs at
+p50); it audits its whole main document twice per commit, so it pays the new
+checks in full. The XLSX dense-sparse one-edit save is 1.91% slower ([+1.36%,
++2.06%]): about 210 µs of it is the audit, and the rest is in planning code the
+change does not touch. The PPTX and medium XLSX one-edit saves were unchanged
+within noise on the first candidate. Every output byte is unchanged.
 
 ## What was changed
 
@@ -72,7 +82,9 @@ Production code, all in `crates/xml-minifier`:
 * `src/audit/namespaces.rs` (new, private): the bindings in scope, a keyed
   prefix index (`RandomState`, so collisions cannot be chosen), a 32-slot
   direct-mapped lookup cache, declaration checks, scope closing, and the
-  per-tag prefix and expanded-name checks.
+  per-tag prefix and expanded-name checks. Since the review fix it also gives
+  each namespace name an identity when it is declared (see *Review
+  follow-up*).
 
 No public item is added, removed or re-signed. `Limits`, `Resource`, `Error`,
 `Report` and every signature are as they were.
@@ -86,6 +98,8 @@ Tests:
   and default policies keep their verdicts on fragments.
 * `crates/xml-minifier/src/audit/wellformed.rs` unit tests (5), including every
   placement of `]]>` around a 64-byte block boundary.
+* `crates/xml-minifier/src/audit/namespaces.rs` unit tests (3, added by the
+  review fix): bounds on the namespace-name bytes an audit reads.
 * `crates/xml-minifier/tests/source_replacement.rs`: a window-replay test and a
   generator extension (see *The differential generator*).
 * `crates/litchi-opc/tests/source_xml_census.rs` (new): the census as a test.
@@ -199,7 +213,7 @@ identically on both, and the 3 refused more precisely listed above.
 | names | `<1r/>`, `<r><a<b/></r>`, `< a="1"/>`, `<a/ >`, `<×/>` | invalid XML name |
 | qualified names | `<a:b:c …/>`, `<r:/>`, `<:r/>`, `a:="1"`, `xmlns:=""` | name is not namespace-well-formed |
 | PI targets | `<?XML x?>`, `<? x?>`, `<?1x?>`, `<?a:b x?>`, `<?xmlversion="1.0"?>` | target `xml` is reserved / invalid processing-instruction target |
-| declaration grammar | `<?xml?>`, no version or a late one, `version="2.0"`, `standalone="maybe"`, wrong order, an unknown attribute, `encoding="ISO-8859-1"`, `"UTF-16"` or `"UTF8"` | the matching declaration diagnostic. The audit reads UTF-8, so any other declared encoding is refused: XML 1.0 §4.3.3 makes a mismatch fatal, OPC permits only UTF-8 and UTF-16, and UTF-16 input is not UTF-8 |
+| declaration grammar | `<?xml?>`, no version or a late one, `version="2.0"`, `standalone="maybe"`, wrong order, an unknown attribute, `encoding="ISO-8859-1"`, `"UTF-16"` or `"UTF8"` | the matching declaration diagnostic. The audit reads UTF-8, so any other declared encoding is refused. For a non-Unicode name such as `ISO-8859-1` or `US-ASCII` the authority is OPC rule M1.17 (ECMA-376 Part 2, §6.2.5 a) in the fifth edition): a declaration may name only UTF-8 or UTF-16, whatever the bytes, so these are refused even over ASCII-only bytes. `UTF-16` over the UTF-8 the audit reads is the mismatch XML 1.0 §4.3.3 makes fatal. `UTF8` is not UTF-8's name |
 
 Well-formed spellings are still accepted:
 
@@ -230,19 +244,23 @@ Well-formed spellings are still accepted:
   like every other. A text token is checked against the next `]]>` at or after
   its start. Only a document that contains a `]]>` somewhere (a CDATA
   section's end, a comment) ever searches again.
-* **Namespace bindings.**
+* **Namespace bindings.** This is the design after the review fix; *Review
+  follow-up* describes the first candidate's defect.
   * Declarations are checked where they appear: reserved prefixes and names,
     compared after normalization, and no undeclaring.
-  * Prefixed bindings are kept while their element is open.
-  * Every prefix of an element or attribute name must resolve.
-  * Attributes must be unique by namespace name and local name. In the common
-    case, where all prefixed attributes share one binding, this is decided
-    without a comparison; otherwise it is decided by sorting.
-  * Lookups go through a direct-mapped cache of prefixes packed into a `u64`,
-    backed by a keyed hash index. So a document cannot make lookups slower than
-    constant time by piling up declarations.
-  * Memory is bounded by the input and by the attribute budget, since every
-    binding is an attribute. The tables exist only under the source policy.
+  * Prefixed bindings are kept while their element is open. Each binding gets
+    the identity of its namespace name when it is declared.
+  * Every prefix of an element or attribute name must resolve. Prefix lookups
+    go through a direct-mapped cache of prefixes of up to seven bytes, packed
+    into a `u64`, backed by a hash index keyed at random per audit. Resolving
+    a prefix therefore costs time proportional to that prefix's own length.
+  * Attributes must be unique by namespace name and local name. The check
+    compares name identities, never name bytes. Only a tag in which two
+    prefixes share a namespace name hashes its local names to find the
+    duplicate.
+  * The tables exist only under the source policy. Memory is bounded by the
+    input and by the attribute budget, since every binding is an attribute.
+  * *Review follow-up* states the cost of every new check.
 * **The declaration's place.** `document_start` is true only before the first
   token of a complete scan.
 
@@ -261,7 +279,9 @@ window proofs. Two new checks read more, and both are replayed exactly:
   Their start tags precede the window, so they are identical in the
   replacement.
   * `WindowSearch::consider` copies these bindings, and the window scan starts
-    from the copy.
+    from the copy. The copy carries each binding's namespace-name identity,
+    the stack of names with its index, and the audit's hash keys. So the
+    window compares identities exactly as the complete audit does.
   * A balanced window closes every binding it opens, so the bindings after it
     are also the original's.
   * If the copy cannot be allocated, no window is used.
@@ -382,6 +402,10 @@ inputs of eight lengths around the block boundaries. It fails on the defective
 pass (length 129, offset 126) and passes on the fixed one.
 
 ## Measured
+
+This section measures the first candidate (`de69fb407d`). *Review follow-up*
+re-measures the DOCX one-edit and XLSX dense-sparse saves, and the audit's
+instructions, on the fix.
 
 Host AMD EPYC 9R45, `Linux 7.0.0-1012-aws x86_64`, shared with other agents.
 Every measured process was pinned to CPU 24 with `taskset`, and no build or test
@@ -548,6 +572,258 @@ other eleven adverse flags are isolated:
   cases are adverse, which is the cost in the table above;
 * three are favourable, on the authored tiny fragment.
 
+## Review follow-up
+
+The coordinator's independent review differential-tested `verify_source`
+against expat 2.7.4 and libxml2 2.15.2:
+
+* 7,214 fixture parts, about one million mutations of them, 144,000 generated
+  valid documents and 656 edge cases;
+* no false refusal and no missed malformation;
+* the window replay, the 64-byte block boundaries and this record's numbers
+  verified.
+
+It found one blocker and two documentation defects, fixed in `0bbcc9bf94` and
+`900eb6de11`.
+
+### The blocker: per-tag work proportional to ancestors' namespace names
+
+The first candidate's `check_expanded_names` compared namespace names byte by
+byte:
+
+* its two-prefix fast path compared the two names once per tag;
+* otherwise it sorted the tag's attributes by namespace name, which is
+  O(k log k) name comparisons for k attributes.
+
+The names come from declarations on the tag's ancestors, so neither the tag's
+size nor the attribute budget bounds them. Comparing two 3.9 MB names that
+differ only in their last byte reads 3.9 MB. The reviewer's input stays within
+`Limits::default()`: one tag with 249,990 attributes that cycle through three
+prefixes bound to such names. The first candidate took 180 s to audit it; the
+base takes 0.017 s.
+
+### The fix
+
+* **A binding gets the identity of its namespace name when it is declared.**
+  The name is hashed once with the audit's random keys and compared only with
+  names in scope that have the same hash. An equal name gives its identity; a
+  new name gets a new one. Declaring therefore reads the name a constant number
+  of times.
+* **Names are a stack.** A name is removed with the binding that declared it
+  first. Every binding and every name declared after that binding has already
+  been removed by then. So identities are dense indices, and closing a scope
+  costs constant work per binding: prefix hashes are stored, not recomputed.
+* **The per-tag check compares identities.** `check_expanded_names` marks each
+  name with the first binding the tag reaches it through: constant work per
+  attribute, and no name bytes. Two attributes can share an expanded name only
+  if two bindings in the tag share a name. Only such a tag looks for the
+  duplicate. It inserts (identity, local name) pairs, in document order, into a
+  hash set keyed with the audit's keys. It reports the first attribute that
+  repeats an earlier expanded name:
+  * for a single duplicate pair, this is the offset the first candidate
+    reported, the later attribute of the pair;
+  * for a tag with several duplicate pairs, the first candidate reported the
+    pair smallest in its sort order instead.
+* **The window replays identities.** The window proof's copy of the bindings
+  carries their identities, the name stack and its index, and the audit's
+  keys. So a window reads no namespace name and reaches the complete audit's
+  verdict. The release campaign repeated on the fix (8 seeds × 3,000,000
+  cases) passes with totals identical to the first campaign's.
+
+### The cost of every new check
+
+For an input of n bytes, with hash tables keyed at random per audit, so these
+bounds hold in expectation and an input cannot choose collisions:
+
+| check | work |
+| --- | --- |
+| legal characters | one pass over the input, in 64-byte blocks |
+| `]]>` in character data | searches from successive text tokens never cover a byte twice: O(n) in all |
+| names, references, attribute values, comments, PI targets, the declaration's place and grammar | O(length of the token checked) |
+| a namespace declaration | O(its prefix and value): normalize the value, hash the prefix and the name, and compare with at most one same-hash name in scope |
+| resolving a prefix | O(the prefix's length), to hash it and compare it with the stored prefix of the innermost binding with that hash; a prefix of up to seven bytes is usually answered by the direct-mapped cache. Never reads a namespace name |
+| unique expanded names in a tag with k prefixed attributes | O(k) marks; if two prefixes in the tag share a name, O(the k local names' total length) to hash them. Never reads a namespace name |
+| closing a scope | O(1) per binding removed |
+| a window proof | one copy of the bindings in scope, O(their bytes), per pair audit |
+
+No check reads, per tag, anything the tag's ancestors declared, and a source
+audit takes time linear in its input. The module documentation of
+`audit/namespaces.rs` and the documentation of `verify_source` now state these
+bounds. The first candidate's documentation said lookups could not become
+"slower than constant time", which was true of prefix lookups only.
+
+### Regression tests
+
+Three unit tests in `audit/namespaces.rs` count two things:
+
+* the namespace-name bytes an audit reads, through the one accessor that every
+  read of a kept name goes through;
+* the steps of its expanded-name check.
+
+They cover:
+
+* the reviewer's single-tag input, with distinct and with aliased names;
+* 50,000 two-attribute tags under two 3.9 MB names: distinct, aliased, and
+  aliased with a duplicate in the first tag, which is refused at its exact
+  offset;
+* a window proof inside those tags, and an in-window duplicate.
+
+Each test bounds the name bytes by twice the declared bytes per complete audit,
+and the steps by twice the attributes. The same tests were applied to the first
+candidate, with its accessor counted the same way. The 50,000-tag test fails
+there: 390,000,000,000 name bytes read against a bound of 23,400,000
+([`review-followup/mutation-check.txt`](results/change-0750/review-followup/mutation-check.txt)).
+The three tests take 1.6 s in a debug build.
+
+### Before and after on the reviewer's inputs
+
+`verify_source` was run in release builds of the same probe
+(`probe/dos`, `scripts/run_dos.sh`) against the base, the first candidate and
+the fix. Each case and leg ran as one process pinned to core 24. The table shows
+the median of up to five audits, or one audit where it took more than 60 s
+([`review-followup/dos/summary.md`](results/change-0750/review-followup/dos/summary.md)):
+
+| input | bytes | base s | first candidate s | fix s |
+| --- | ---: | ---: | ---: | ---: |
+| reviewer: one tag, 249,990 attributes, three 3.9 MB names | 14,838,818 | 0.0168 | 180.35 (1 run) | 0.0382 |
+| reviewer: one tag, 60,000 attributes | 12,408,948 | 0.0082 | 39.10 | 0.0215 |
+| reviewer: the same, two prefixes bound to one name | 12,408,948 | 0.0083 | 48.60 | 0.0235 |
+| reviewer: 50,000 tags `<x a:k="" b:k=""/>`, two 3.9 MB names | 8,700,036 | 0.0070 | 3.556 | 0.0169 |
+| 50,000 tags with two prefixes aliasing one 3.9 MB name | 8,700,036 | 0.0069 | 10.58 | 0.0188 |
+| a window proof inside those 50,000 tags | 8,700,036 | 0.0074 | 10.26 | 0.0226 |
+| six nested aliases of one 4 MB name, 20,000 six-attribute tags | 25,160,126 | 0.0158 | 13.61 | 0.0458 |
+| a 100 KB name redeclared at each of 200 levels, 10,000 tags | 20,184,580 | 0.0104 | 0.025 | 0.0326 |
+| 100,000 prefixes in scope, each used once | 4,066,677 | 0.0099 | 0.023 | 0.0283 |
+
+Every input is accepted on all three legs, and the window case is a window proof
+on all three. The fix audits these inputs at 2.3–3.2 times the base's time,
+which is the linear cost of the new checks on markup made almost entirely of
+namespace names. On such inputs that cost is the character pass, the value scan
+and hashing each declared name once. The first candidate was about 500 to 10,700
+times the base on the first seven rows.
+
+### What the fix costs on benign input
+
+Instructions per audit of the audit probe on the real parts
+([`review-followup/probe-instructions.txt`](results/change-0750/review-followup/probe-instructions.txt)):
+
+| case | base | first candidate | fix | fix vs first candidate |
+| --- | ---: | ---: | ---: | ---: |
+| source, `ws-structured` | 99,994,825 | 114,551,990 | 114,322,401 | −0.20% |
+| source, `ws-patriarch` | 300,237,054 | 343,249,874 | 342,728,972 | −0.15% |
+| source, `docx-drawing` | 11,751,112 | 13,996,126 | 14,003,230 | +0.05% |
+| source, `docx-table-alignment` | 1,640,063 | 2,023,220 | 2,025,172 | +0.10% |
+| source, `pptx-slide11` | 7,082,460 | 8,162,344 | 8,153,026 | −0.11% |
+| pair, `ws-structured` | 105,387,705 | 120,272,179 | 120,614,016 | +0.28% |
+| source, every accepted `test-data` member | 2,022,249,382 | 2,415,654,489 | 2,423,319,818 | +0.32% |
+| authored, `ws-patriarch` | 303,870,724 | 308,823,796 | 308,240,936 | −0.19% |
+| source, the 55-byte document | 5,107 | 9,356 | 9,917 | +6.00% |
+
+On real parts the fix is within ±0.32% of the first candidate. Against the base,
+the source audit is now +14.2% to +23.5% in instructions, where the first
+candidate was +14.1% to +24.3%. The 55-byte document gains 561 instructions:
+its one declaration's name is now hashed. The base column reproduces the first
+run's within 0.8%. The per-part times in *Unit probe* are the first
+candidate's; they were not re-timed.
+
+### Re-measured end to end
+
+Both harness legs were built again with the identical command, the base from a
+detached worktree at `3174242282` and the fix from the branch (`37c9d54e…` and
+`e78216fd…`, rustc 1.95.0). The run used the ABBA method of *Timing* with six
+rounds, 12+12 processes, pinned to core 24
+([`review-followup/timing/`](results/change-0750/review-followup/timing/analysis.txt)):
+
+| case | processes × samples | before p50 ms | after p50 ms | paired p50 change | 95% CI | p95 ms, before → after | output |
+| --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| `docx_source_backed_one_edit_save` | 12+12 × 40 | 1.757 | 1.800 | **+2.67%** | [+2.15%, +3.90%] | 1.782 → 1.841 | identical |
+| `xlsx_source_backed_cell_values_one_edit_save` dense-sparse | 12+12 × 20 | 26.142 | 26.624 | **+1.91%** | [+1.36%, +2.06%] | 26.467 → 26.855 | identical |
+| `xls_semantic_one_edit_save` (control) | 12+12 × 20 | 0.081 | 0.081 | −0.24% | [−0.67%, −0.16%] | 0.090 → 0.088 | no digest reported |
+
+* **DOCX one-edit save.** It is +2.67% (+43 µs), where the first candidate
+  measured +3.90% [+1.73%, +6.46%] (+68 µs). Eleven of the twelve pairs lie
+  between +1.9% and +7.4%. The twelfth pairs a slow-mode base process (p50
+  4.049 ms) and shows −55.9%. Its two audits of the main document add 583,614
+  instructions per commit (table below). By the probe's rate that predicts
+  about 13–19 µs, so, as in the first campaign, the instructions do not
+  account for the whole change.
+* **XLSX dense-sparse one-edit save.** It is +1.91% (+482 µs), where the first
+  campaign measured +0.32% [−1.78%, +1.17%]. The phases show where the change
+  comes from, as medians of per-process medians:
+  * publication, which runs the audit: 10.952 → 11.162 ms (+2.06% paired);
+  * planning, whose code this change does not touch: 9.895 → 10.199 ms
+    (+3.06% paired, every one of the 12 pairs between +1.8% and +6.2%);
+  * commit: −0.85%.
+
+  Planning executes no more instructions: outside the auditor, the program's
+  per-sample instructions differ by −0.47 M, inside the ±2 M that unchanged code
+  varies by. Planning's move is therefore a property of the two binaries
+  (consistent with code layout), not work this change does. It was −0.7% in
+  the first campaign. Publication's +210 µs matches the audit's +5.3 M
+  instructions at the audit's rate on the real worksheets (about 41 ns per
+  thousand).
+* **Control.** The XLS control is flat.
+
+Flags over 5%: 16 of 108 comparisons (3 cases × 12 pairs × p50, p95 and mean), 10 adverse
+([`review-followup/timing/flags.json`](results/change-0750/review-followup/timing/flags.json)):
+
+* eight are DOCX p50, p95 or mean moves of +5.5% to +9.9%, in rounds 1, 4, 5
+  and 6;
+* two are XLS p95 moves of +7.4% and +14.0% on a 0.09 ms case;
+* the favourable six are the slow base process's three metrics and three XLS
+  p95s.
+
+The auditor's instructions per sample on these two cases
+([`review-followup/callgrind/summary.txt`](results/change-0750/review-followup/callgrind/summary.txt)):
+
+| case | entry point (caller) | base per sample | fix per sample | change | first candidate's change |
+| --- | --- | ---: | ---: | ---: | ---: |
+| XLSX one-edit dense-sparse | `verify_source_replacement` (`write_topology_to_stream`) | 48,067,712 | 53,379,358 | +5,311,645 (+11.1%) | +5,112,647 (+10.6%) |
+| DOCX one-edit | `verify_source` (`Edit::commit`'s gate) | 1,241,075 | 1,524,006 | +282,931 (+22.8%) | +276,138 (+22.3%) |
+| DOCX one-edit | `verify_source_replacement` (`write_single_part_overlay_to_stream`) | 1,315,854 | 1,616,536 | +300,683 (+22.9%) | +288,677 (+21.9%) |
+
+The fix adds 0.4–1.0% of the audit's instructions on these generated parts:
+hashing each declared namespace name and marking names per tag. Every output
+digest is identical between the legs.
+
+### The citation
+
+The gap table and `check_declaration_grammar` cited XML 1.0 §4.3.3 for refusing
+every declared encoding other than UTF-8. §4.3.3 makes it fatal to present an
+entity in an encoding other than the one it declares. That covers `UTF-16` over
+the UTF-8 the audit reads, but not `US-ASCII` or `ISO-8859-1` over bytes that
+are all ASCII, which those encodings decode identically.
+
+The refusal is still correct. OPC rule M1.17 (ECMA-376 Part 2, §6.2.5 a) in the
+fifth edition) says an encoding declaration shall not name any encoding other
+than UTF-8 or UTF-16, whatever the bytes. The table, the function's
+documentation and the test's comment now cite it. Part 2 states the rule for
+the XML of the package's own parts, and the audit applies it to every XML
+member it publishes, as it applies its other rules. No behaviour changed.
+
+### Gates on the fix
+
+These ran with a fresh `CARGO_TARGET_DIR` under `targets/0750` and `TMPDIR` on
+`/home`
+([`review-followup/gates.txt`](results/change-0750/review-followup/gates.txt)),
+and every one exits 0:
+
+* `cargo test -p xml-minifier`: 107 passed, 0 failed, 1 ignored (the lib now has
+  19 tests);
+* `cargo test` for `litchi-opc`, `litchi-ooxml-common`, `litchi-docx`,
+  `litchi-xlsx`, `litchi-pptx` and `litchi-xlsb`: 5,628 passed, 0 failed, 45
+  ignored;
+* the facade with `doc,docx,ppt,pptx,xls,xlsx,xlsb,odt`: 382 passed, 0 failed,
+  7 ignored;
+* a compile-only `cargo check` of the ODF and OLE2 crates and `litchi-imgconv`;
+* `cargo clippy` of `xml-minifier`, `litchi-opc`, `litchi-docx` and
+  `litchi-xlsx`, with `--lib` and with `--all-targets`, under `-D warnings`;
+* `RUSTDOCFLAGS="-D warnings" cargo doc` of the same four crates;
+* `cargo fmt --all --check`;
+* `check_crate_boundaries.py`, `non_iwork_gate.py verify` and
+  `check_perf_claims.py` (10 claims validated);
+* the release differential campaign.
+
 ## What remains
 
 * **The authored, default and streaming audits keep every gap in this
@@ -582,9 +858,18 @@ other eleven adverse flags are isolated:
   need a proof like 0747's.
 * **The fixed cost.** The character pass checks an input's last partial block
   (all of an input shorter than 64 bytes) byte by byte. Checking that tail as
-  one padded block would remove about half of the roughly 200 ns fixed cost.
-  This matters only to callers that audit many tiny documents, and it was not
-  pursued here.
+  one padded block would remove about half of the roughly 200 ns fixed cost
+  that the first candidate measured; the fix adds 561 instructions to it, for
+  hashing the declared name. This matters only to callers that audit many tiny
+  documents, and it was not pursued here.
+* **A pre-existing path in quick-xml that was not examined.** Every policy
+  relies on quick-xml's own check that no two attributes of a tag share a
+  qualified name. Above 32 attributes that check pre-filters with a 64-bit hash
+  that is not keyed (`DefaultHasher::new()`) and, on every hash hit, scans the
+  tag's earlier attributes. Many precomputed collisions in one tag would make it
+  quadratic in that tag's attributes. Each collision costs about 2^32 hash
+  evaluations to find, and the base behaves the same way. This record neither
+  changes nor measures it.
 * **What the source audit still does not check.**
   * Namespace names are checked for emptiness and the two reserved names only,
     not as URI references. Mainstream parsers do not check them either.
@@ -607,15 +892,22 @@ other eleven adverse flags are isolated:
   end-to-end cases use the harness's synthetic corpora.
 * The equivalence of window and complete audits rests on evidence (campaigns,
   the debug cross-check, mutation checks), not on a proof.
+* The linear-time bounds of *Review follow-up* hold in expectation over hash
+  keys drawn at random for each audit. They are not worst-case bounds against
+  an attacker who knows the keys.
 * No claim is made that the audit now checks everything XML 1.0 and Namespaces
   in XML 1.0 require; the exceptions are listed above.
 
 ## Verification
 
-Gates were run in the worktree on the final candidate. That is the content of
-commits `a07d680852` and `de69fb407d`: no source file changed between the gates
-and the commits. Commands, tails and exit codes are in
-[`gates.txt`](results/change-0750/gates.txt). Every gate exits 0:
+The gates below ran on the first candidate, the content of commits
+`a07d680852` and `de69fb407d`; no source file changed between those gates and
+the commits. Commands, tails and exit codes are in
+[`gates.txt`](results/change-0750/gates.txt). The fix was gated again, with the
+results under *Review follow-up* and in
+[`review-followup/gates.txt`](results/change-0750/review-followup/gates.txt):
+`xml-minifier` 107 passed, the OOXML crates 5,628 passed, the facade 382
+passed, and every other gate clean. Every gate exits 0:
 
 | gate | result |
 | --- | --- |
@@ -658,3 +950,15 @@ Each is verified absent in
 callgrind profiles (their summaries are kept), the probe's input parts
 (`scripts/extract_parts.py` rebuilds them), and build and test logs (their
 totals are in `gates.txt`). The worktree and the branch are kept.
+
+The review follow-up used a fresh `targets/0750`, a detached base worktree
+again, and a detached worktree of the first candidate for the adversarial
+probe. After its evidence was copied into `review-followup/` and its code
+commits were made, the following were deleted:
+
+* `targets/0750` (72.8 GB);
+* `0750-before-src` (10.2 GB);
+* `0750-prefix-src` (10.2 GB);
+* the scratch directory's contents (185 MB).
+
+That second cleanup is recorded in the same `cleanup.json`.

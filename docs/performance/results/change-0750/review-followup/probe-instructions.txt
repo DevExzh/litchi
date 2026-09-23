@@ -1,0 +1,15 @@
+Instructions per audit (callgrind; the probe at N iterations minus 0 iterations, divided by N).
+base and fix: this run; first candidate: callgrind/probe-summary.txt (de69fb407d), whose base column
+this run's base reproduces within 0.8%.
+
+case                                      base  first candidate             fix  fix vs base  fix vs first
+source/ws-structured                99,994,825      114,551,990     114,322,401      +14.33%        -0.20%
+source/ws-patriarch                300,237,054      343,249,874     342,728,972      +14.15%        -0.15%
+source/docx-drawing                 11,751,112       13,996,126      14,003,230      +19.17%        +0.05%
+source/docx-table-alignment          1,640,063        2,023,220       2,025,172      +23.48%        +0.10%
+source/pptx-slide11                  7,082,460        8,162,344       8,153,026      +15.12%        -0.11%
+pair/ws-structured                 105,387,705      120,272,179     120,614,016      +14.45%        +0.28%
+source/corpus-accepted           2,022,249,382    2,415,654,489   2,423,319,818      +19.83%        +0.32%
+authored/ws-patriarch              303,870,724      308,823,796     308,240,936       +1.44%        -0.19%
+authored/tiny                            4,319            4,397           4,384       +1.49%        -0.31%
+source/tiny                              5,107            9,356           9,917      +94.18%        +6.00%

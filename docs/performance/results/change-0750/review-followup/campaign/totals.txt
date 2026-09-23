@@ -1,0 +1,9 @@
+seed1.log ok cases 3000000: refused on the original 1182502, refused on the replacement 904407, identical 70855, window 470912, complete 371324; two separated edits 474230 (window 18140)
+seed2.log ok cases 3000000: refused on the original 1181519, refused on the replacement 904540, identical 70769, window 471253, complete 371919; two separated edits 474851 (window 18204)
+seed3.log ok cases 3000000: refused on the original 1181544, refused on the replacement 904992, identical 70746, window 471330, complete 371388; two separated edits 474872 (window 18297)
+seed4.log ok cases 3000000: refused on the original 1181810, refused on the replacement 905682, identical 70402, window 470516, complete 371590; two separated edits 474957 (window 18062)
+seed5.log ok cases 3000000: refused on the original 1181220, refused on the replacement 905376, identical 70682, window 470357, complete 372365; two separated edits 473881 (window 18376)
+seed6.log ok cases 3000000: refused on the original 1181079, refused on the replacement 904418, identical 70738, window 471182, complete 372583; two separated edits 474817 (window 18337)
+seed7.log ok cases 3000000: refused on the original 1182503, refused on the replacement 905308, identical 70581, window 470298, complete 371310; two separated edits 474999 (window 18255)
+seed8.log ok cases 3000000: refused on the original 1181977, refused on the replacement 905004, identical 70505, window 469714, complete 372800; two separated edits 476369 (window 18157)
+seeds passed 8 {'cases': 24000000, 'original': 9454154, 'replacement': 7239727, 'identical': 565278, 'window': 3765562, 'complete': 2975279, 'two_sites': 3798976, 'two_site_windows': 145828}
