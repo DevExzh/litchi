@@ -20,8 +20,11 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-/// The ZIP index over an owned package's retained source archive.
-type TransferIndex = soapberry_zip::office::IndexedArchive<Arc<Vec<u8>>>;
+/// The lazily built ZIP index over an owned package's retained source
+/// archive, boxed so the cell every owned open allocates stays small.
+type TransferIndexCell = OnceLock<
+    std::result::Result<Box<soapberry_zip::office::IndexedArchive<Arc<Vec<u8>>>>, OpcError>,
+>;
 
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
@@ -111,8 +114,9 @@ pub struct OpcPackage {
     /// Index of the owned source archive for compressed transfers out of
     /// parts this package materialized eagerly, built on first use and shared
     /// by clones, which share the archive. Deferred parts use the index their
-    /// own decode builds (change 0742).
-    transfer_index: Arc<OnceLock<std::result::Result<TransferIndex, OpcError>>>,
+    /// own decode builds (change 0742). `None` without an owned source, so a
+    /// package that never transfers pays one small cell at most.
+    transfer_index: Option<Arc<TransferIndexCell>>,
 
     /// Clone-local authorization for exact whole-source publication.
     exact_source_authorized: bool,
@@ -188,7 +192,7 @@ impl OpcPackage {
             source_xml_parts: HashMap::new(),
             source_archive: None,
             source_limits: ReadLimits::default(),
-            transfer_index: Arc::new(OnceLock::new()),
+            transfer_index: None,
             exact_source_authorized: false,
             source_ingress: false,
             signature_graph_tracked: false,
@@ -1364,7 +1368,7 @@ impl OpcPackage {
         self.preservation = preservation.map(Arc::new);
         self.source_archive = Some(source);
         self.source_limits = limits;
-        self.transfer_index = Arc::new(OnceLock::new());
+        self.transfer_index = Some(Arc::new(OnceLock::new()));
         self.exact_source_authorized = true;
     }
 
