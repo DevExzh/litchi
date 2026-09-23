@@ -82,10 +82,18 @@ fn open_with_limit(
     collection.validate()?;
     validate_object_mappings(&collection, &mappings)?;
 
+    // `document` and `current_user` already own those two streams, read and
+    // validated above, and `finish` always emits them from there. Their list
+    // entries therefore keep only the stream's position in the output order;
+    // reading them again would copy the largest stream a second time.
     let streams = paths
         .into_iter()
         .map(|path| {
-            let data = ole.open_stream(&stream_refs(&path))?;
+            let data = if path == document_path || path == current_user_path {
+                Vec::new()
+            } else {
+                ole.open_stream(&stream_refs(&path))?
+            };
             Ok((path, data))
         })
         .collect::<Result<Vec<_>>>()?;

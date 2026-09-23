@@ -29,6 +29,9 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Editor {
     pub(super) original: Arc<[u8]>,
     pub(super) max_output_bytes: usize,
+    /// Every stream in source order. Entries whose path is `document_path` or
+    /// `current_user_path` carry no payload: `document` and `current_user`
+    /// own those bytes, and `finish` emits them from there.
     pub(super) streams: Vec<(Vec<String>, Vec<u8>)>,
     pub(super) document_path: Vec<String>,
     pub(super) current_user_path: Vec<String>,
