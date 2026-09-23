@@ -254,6 +254,41 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
 }
 
 #[test]
+fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
+    // The source-backed writer audits its own pair and never reads a proof,
+    // so a snapshot bound to a source identity must not pay for one.
+    let package = generated_package(16);
+    let plain = package.document_snapshot().unwrap();
+    let mut archive = std::io::Cursor::new(Vec::new());
+    let mut writable = generated_package(16);
+    writable.to_stream(&mut archive).unwrap();
+    let source_backed = crate::source_backed::Package::from_read_at(Arc::new(
+        litchi_core::OwnedSource::new(archive.into_inner()),
+    ))
+    .unwrap();
+    let base = source_backed.edit_document().unwrap().source().clone();
+    assert!(base.xml.identity().is_some());
+    assert_eq!(base.xml_bytes(), plain.xml_bytes());
+    let mut edit = base.edit();
+    edit.replace_paragraph_text(Position::new(3), "edited")
+        .unwrap();
+    let projected = edit.projected().clone();
+    let committed = commit_preserving_unmodified(&base, &projected).unwrap();
+    assert!(committed.publication_proof().is_none());
+    assert_eq!(
+        committed.xml_bytes(),
+        historical_route(&base, &projected).unwrap().xml_bytes()
+    );
+    // The same edit on the identity-free snapshot is proven.
+    let mut edit = plain.edit();
+    edit.replace_paragraph_text(Position::new(3), "edited")
+        .unwrap();
+    let proven = commit_preserving_unmodified(&plain, edit.projected()).unwrap();
+    assert!(proven.publication_proof().is_some());
+    assert_eq!(proven.xml_bytes(), committed.xml_bytes());
+}
+
+#[test]
 fn a_derived_snapshot_never_inherits_a_proof() {
     let package = generated_package(8);
     let mut edit = package.edit_document().unwrap();
