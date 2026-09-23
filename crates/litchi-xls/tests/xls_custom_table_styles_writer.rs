@@ -41,7 +41,7 @@ fn configured_styles(number_format_id: u16) -> CustomTableStyles {
 fn custom_table_styles_round_trip_from_writer_to_reader() {
     let mut writer = Writer::new();
     writer.add_worksheet("Data").unwrap();
-    let number_format_id = writer.register_number_format("0.0000\"kg\"");
+    let number_format_id = writer.register_number_format("0.0000\"kg\"").unwrap();
     writer
         .set_custom_table_styles(configured_styles(number_format_id))
         .unwrap();

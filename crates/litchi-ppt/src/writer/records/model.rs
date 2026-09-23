@@ -194,7 +194,7 @@ impl RecordBuilder {
 /// body succeeds, so a record whose header is never patched cannot be
 /// written. When the body fails, the output holds a partial record and must be
 /// discarded, as every writer that uses this type does on error.
-#[must_use = "an in-place record's length is only patched by `finish`"]
+#[must_use = "an in-place record's length is patched only when it is finished"]
 pub(crate) struct InPlaceRecord {
     start: usize,
     header: RecordHeader,

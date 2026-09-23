@@ -10,7 +10,8 @@
 //! - **FORMAT**: Number format definition
 //! - **PALETTE**: Color palette
 
-use super::super::Result;
+use super::super::{Error, Result};
+use super::string_limits::{NUMBER_FORMAT_UNITS, ensure_utf16_len_within};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -110,6 +111,17 @@ const FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX: u16 = 164;
 /// This mirrors Apache POI's `BuiltinFormats.getBuiltinFormat(String)`
 /// in a simplified form and is used by the formatting manager to avoid
 /// creating duplicate custom FORMAT records for built-in patterns.
+/// Refuses a number format a `Format` record cannot hold: 1 through 255 UTF-16
+/// code units ([MS-XLS] 2.4.126; the reader refuses anything else).
+pub(crate) fn validate_number_format(pattern: &str) -> Result<()> {
+    if pattern.is_empty() {
+        return Err(Error::InvalidData(
+            "number format must not be empty".to_string(),
+        ));
+    }
+    ensure_utf16_len_within(pattern, NUMBER_FORMAT_UNITS, "number format")
+}
+
 fn builtin_number_format_index(pattern: &str) -> Option<u16> {
     BUILTIN_NUMBER_FORMATS
         .iter()
@@ -519,7 +531,15 @@ impl FormattingManager {
     /// - The "TEXT" alias normalizes to "@".
     /// - Custom patterns are assigned indices starting at 164 and
     ///   written as FORMAT (0x041E) records.
-    pub fn register_number_format(&mut self, pattern: &str) -> u16 {
+    ///
+    /// # Errors
+    ///
+    /// A `Format` record holds 1 through 255 UTF-16 code units ([MS-XLS]
+    /// 2.4.126): an empty pattern is refused with [`Error::InvalidData`] and a
+    /// longer one with [`Error::StringTooLong`]. A refused pattern leaves the
+    /// manager unchanged.
+    pub fn register_number_format(&mut self, pattern: &str) -> Result<u16> {
+        validate_number_format(pattern)?;
         // Normalize "TEXT" alias used by POI to "@".
         let normalized = if pattern.eq_ignore_ascii_case("TEXT") {
             "@"
@@ -529,12 +549,12 @@ impl FormattingManager {
 
         // Built-in lookup
         if let Some(idx) = builtin_number_format_index(normalized) {
-            return idx;
+            return Ok(idx);
         }
 
         // Existing custom format
         if let Some(&idx) = self.number_format_map.get(normalized) {
-            return idx;
+            return Ok(idx);
         }
 
         // Allocate new user-defined format index starting at 164, as in BIFF8.
@@ -543,7 +563,7 @@ impl FormattingManager {
             .push((next_index, normalized.to_string()));
         self.number_format_map
             .insert(normalized.to_string(), next_index);
-        next_index
+        Ok(next_index)
     }
 
     /// Register a high-level `CellStyle` and return its internal style index.
@@ -555,7 +575,13 @@ impl FormattingManager {
     ///   `register_number_format` and the resulting index is stored in
     ///   `ExtendedFormat.format_index`.
     /// - Borders, fills, and alignment settings are copied into the XF.
-    pub fn register_cell_style(&mut self, style: CellStyle) -> u16 {
+    ///
+    /// # Errors
+    ///
+    /// Refuses the style's number format as [`Self::register_number_format`]
+    /// does, before registering its font or XF, so a refused style leaves the
+    /// manager unchanged.
+    pub fn register_cell_style(&mut self, style: CellStyle) -> Result<u16> {
         let CellStyle {
             font,
             borders,
@@ -566,10 +592,13 @@ impl FormattingManager {
             number_format,
         } = style;
 
+        // The number format is the only fallible part, so it is registered
+        // first; the font and XF tables are separate and keep their indices.
+        let format_index = match number_format.as_deref() {
+            Some(pattern) => self.register_number_format(pattern)?,
+            None => 0,
+        };
         let font_index = self.add_font(font);
-        let format_index = number_format
-            .as_deref()
-            .map_or(0, |pattern| self.register_number_format(pattern));
 
         let xf = ExtendedFormat {
             font_index,
@@ -581,7 +610,7 @@ impl FormattingManager {
             fill,
         };
 
-        self.add_format(xf)
+        Ok(self.add_format(xf))
     }
 
     pub fn enable_pivot_xfs(&mut self) {
@@ -1004,28 +1033,90 @@ mod tests {
     fn test_formatting_manager_register_number_format_builtin() {
         let mut mgr = FormattingManager::new();
         // Built-in format should return predefined index
-        let idx = mgr.register_number_format("General");
+        let idx = mgr.register_number_format("General").unwrap();
         assert_eq!(idx, 0);
-        let idx2 = mgr.register_number_format("0.00");
+        let idx2 = mgr.register_number_format("0.00").unwrap();
         assert_eq!(idx2, 2);
     }
 
     #[test]
     fn test_formatting_manager_register_number_format_custom() {
         let mut mgr = FormattingManager::new();
-        let idx = mgr.register_number_format("0.00\"mm\"");
+        let idx = mgr.register_number_format("0.00\"mm\"").unwrap();
         // Custom formats start at index 164
         assert_eq!(idx, 164);
         // Second registration should return same index
-        let idx2 = mgr.register_number_format("0.00\"mm\"");
+        let idx2 = mgr.register_number_format("0.00\"mm\"").unwrap();
         assert_eq!(idx2, 164);
     }
 
     #[test]
     fn test_formatting_manager_register_number_format_text_alias() {
         let mut mgr = FormattingManager::new();
-        let idx = mgr.register_number_format("TEXT");
+        let idx = mgr.register_number_format("TEXT").unwrap();
         assert_eq!(idx, 0x31); // "@" is index 49
+    }
+
+    #[test]
+    fn a_refused_number_format_leaves_the_manager_unchanged() {
+        let mut mgr = FormattingManager::new();
+        mgr.register_number_format("0.0\"x\"").unwrap();
+        let formats = mgr.number_formats.clone();
+        let fonts = mgr.fonts.len();
+        let xfs = mgr.formats.len();
+
+        assert!(matches!(
+            mgr.register_number_format(""),
+            Err(Error::InvalidData(message)) if message.contains("empty")
+        ));
+        for too_long in [
+            "0".repeat(256),
+            "é".repeat(256),
+            format!("{}😀", "0".repeat(254)),
+        ] {
+            assert!(matches!(
+                mgr.register_number_format(&too_long),
+                Err(Error::StringTooLong {
+                    field: "number format",
+                    utf16_units: 256,
+                    limit: 255,
+                })
+            ));
+            let style = CellStyle {
+                number_format: Some(too_long.clone()),
+                ..Default::default()
+            };
+            assert!(mgr.register_cell_style(style).is_err());
+        }
+        assert_eq!(mgr.number_formats, formats);
+        assert_eq!(mgr.fonts.len(), fonts);
+        assert_eq!(mgr.formats.len(), xfs);
+        // 255 units fit, and the next custom index follows the kept one.
+        assert_eq!(mgr.register_number_format(&"0".repeat(255)).unwrap(), 165);
+    }
+
+    #[test]
+    fn the_format_encoder_refuses_what_registration_refuses() {
+        // Placed behind registration's own checks.
+        let mut empty = FormattingManager::new();
+        empty.number_formats.push((164, String::new()));
+        assert!(matches!(
+            empty.write_number_formats(&mut Vec::new()),
+            Err(Error::InvalidData(_))
+        ));
+        let mut long = FormattingManager::new();
+        long.number_formats.push((164, "0".repeat(256)));
+        assert!(matches!(
+            long.write_number_formats(&mut Vec::new()),
+            Err(Error::StringTooLong {
+                utf16_units: 256,
+                limit: 255,
+                ..
+            })
+        ));
+        let mut fits = FormattingManager::new();
+        fits.number_formats.push((164, "0".repeat(255)));
+        fits.write_number_formats(&mut Vec::new()).unwrap();
     }
 
     #[test]
@@ -1042,7 +1133,7 @@ mod tests {
             number_format: Some("0.00".to_string()),
             ..Default::default()
         };
-        let idx = mgr.register_cell_style(style);
+        let idx = mgr.register_cell_style(style).unwrap();
         assert_eq!(idx, 1); // Index 0 is default
         let retrieved = mgr.get_format(1).unwrap();
         assert_eq!(retrieved.h_align, HorizontalAlignment::Right);
