@@ -3,6 +3,11 @@
 [Record](../../0749-cfb-reuse-plan-validation.md). `performance_claim: none`.
 The numbers are evidence, not registered claims.
 
+The packet has two rounds. Round one (this directory's top level) measured
+the first version against the base. The review round (`round2/`,
+`summary-r2.md`) measured the base, the first version and the fix of its
+quadratic mini-stream readback; see [the review-round section](#review-round-round2).
+
 ## Arms
 
 | Arm | Source | What it is |
@@ -118,3 +123,54 @@ python3 scripts/package.py . packet && python3 scripts/summarize.py packet > pac
 
 Timings are specific to this host, its load and these fixtures. A replay
 should compare the paired changes, not the absolute microseconds.
+
+## Review round (`round2/`)
+
+| Arm | Source | What it is |
+|---|---|---|
+| A | `ab29ac6291` | The base. |
+| B | `776ad05175` | The first 0749 version: in-place readback, quadratic in mini streams. |
+| C | `f2a57ac936` | The fix: root mini stream loaded once per validation, contiguous mini sectors compared as one range, chain maps cleared by chain or table. Also `LimitExceeded` declines, `examine_at` fails closed, and the reader shares the chain walkers. |
+
+- `round2/binaries.json`: SHA-256 of every measured binary and of every
+  input, including the four files the probe generates, plus the build
+  commands. Probes are built for A, B and C, the harness for A and C, all
+  with identical commands under rustc 1.95.0.
+- `round2/probe/`: the v2 probe. It adds `--edit same|grow` (the two edits
+  of `sector_layout_corpus`) and `generate`; its manifests are `A/`, `B/`,
+  `C/`, with one `Cargo.lock`.
+- `round2/scripts/`:
+  - `run2.py`: the matrix. 12 rounds, each A/B/C order twice, argv[0]
+    +8 bytes per round, core 20.
+  - `analyze2.py`: C vs A, B vs A and C vs B.
+  - `counters2.py`: per-owner counters, resumable.
+  - `alloc2.py`: the allocation lane.
+  - `corpus_counters.py`: the 214-fixture instruction lane.
+  - `callgrind_scaling.py`: the Callgrind scaling lane.
+  - `summarize2.py`, `package2.py`: `summary-r2.md` and this assembly.
+  - `build-probe.sh`, `build-harness.sh`: the arm builds.
+- `round2/matrix/`: every process report (660), zstd-compressed as
+  `*.json.zst` per the repository's convention, with
+  `reduction-manifest.json` (each original's SHA-256 and size),
+  `commands*.json` and `analysis.json`.
+  `analysis-superseded-59d853618f.json` is the same matrix on the
+  intermediate build that the reader-instruction check led to replace.
+- `round2/counters/`: per-owner instructions, cycles and page faults. The
+  summaries cover the probe cases (A, B, C), the harness selectors (A, C),
+  the DOC `large` save under fixed glibc thresholds, and the reader check
+  that motivated `f2a57ac936`; the `perf stat` outputs are bundled in
+  `*-perf-stat.json.zst`.
+- `round2/scaling/`: Callgrind inclusive instructions per write at 1,000 and
+  3,000 mini streams (`callgrind-scaling.json`), with the head of each
+  inclusive listing. The raw Callgrind outputs were deleted.
+- `round2/corpus/`: `corpus-instructions.json` holds the summary, all 418
+  pairs and every row. `corpus-raw.json.zst` bundles every `perf stat`
+  output and probe report of the lane.
+- `round2/allocation/`: the counting-allocator summary and bundled reports.
+- `round2/gates.txt`: the review-round gates.
+
+Replay: rebuild the binaries as `round2/binaries.json` describes into
+`scratch/0749/bin/{A,B,C}`. Regenerate `scratch/0749/gen/` with
+`bin/A/probe --mode generate`, and check the recorded digests. Then run
+`run2.py matrix2 12` and each lane script from the scratch root.
+

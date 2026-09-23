@@ -1,9 +1,10 @@
-# 0749 — Reuse-plan validation compares streams in place: same verdicts, the CFB Reuse write 17–34% faster
+# 0749 — Reuse-plan validation compares streams in place: same verdicts, a linear readback, the CFB Reuse write 4–41% faster
 
-Status: retained, implemented in `litchi-cfb` as one production commit and
-one test commit. `performance_claim: none`. Paired timings, instruction and
-cycle counts and allocation counts are reported as evidence, not registered
-as claims.
+Status: retained, implemented in `litchi-cfb`. The first version (one
+production commit and one test commit) was quadratic in mini streams; the
+review round fixed that in three further commits and re-measured.
+`performance_claim: none`. Paired timings, instruction and cycle counts and
+allocation counts are reported as evidence, not registered as claims.
 
 OLE2 and OOXML remain the active priority. ODF work stays deferred until that
 goal completes; iWork is excluded.
@@ -14,7 +15,29 @@ Base `ab29ac6291` (the branch tip with record 0745); branch
 - `897d24fd0f`: `ReusePlan::validate` reads streams back in place.
 - `776ad05175`: the fault-injection tests also cover version 4 (4096-byte
   sector) plans.
+- `56548fd06e` (review round): the readback loads the root mini stream once
+  per validation, compares contiguous mini sectors as one range and clears
+  its chain map in proportion to the chains, so it is linear in the streams;
+  the reader and the comparison share one chain walker and one run
+  segmentation; `examine_at` fails closed.
+- `59d853618f` (review round): a plan whose view exceeds the plan's own
+  limits declines to the from-scratch writer instead of failing the save.
+- `f2a57ac936` (review round): the shared walkers are always inlined, which
+  keeps the reader's instruction count at the base's, and the chain map is
+  cleared by chain or by table, whichever is cheaper.
 
+**Review round.** The independent review measured the first version
+quadratic in mini streams: a Reuse write of 3,000 2,000-byte mini streams
+went from 8.2 to 114 ms, and all-mini-stream fixtures regressed by a median
++7.4%. The four fixtures timed in round one hold 0, 1, 1 and 9 mini streams,
+so round one never measured that path.
+[The review-round section](#review-round-the-mini-stream-regression-and-its-fix)
+has the fix and a three-arm re-measurement: base, first version, fix. With
+the fix, every measured Reuse write is 3.9–40.9% faster than the base, the
+readback's instructions grow ×3.07 from 1,000 to 3,000 mini streams, and
+over the whole OLE2 corpus no fixture/edit pair runs more than 1.22% more
+instructions than the base. The Result table below is round one's, measured
+on the first version.
 ## Result
 
 `OleWriter::write_to` with the default `SectorLayoutPolicy::Reuse` validates
@@ -62,38 +85,277 @@ untouched, and on every plan tested the verdict is identical.
   `cfb_open/few-large` at +4.7%, a code-placement effect examined under
   [Regression flags](#regression-flags-every-change-above-5).
 
+## Review round: the mini-stream regression and its fix
+
+**The regression.** The independent review measured the first version
+(`776ad05175`) against the base on the Reuse `write_to`:
+
+| Input (review's measurement) | Base | First version |
+|---|---:|---:|
+| v3, 1,000 × 2,000-byte mini streams | 2.2 ms | 13.6 ms |
+| v3, 3,000 × 2,000-byte mini streams | 8.2 ms | 114 ms |
+| v4, 10,000 × 4,000-byte mini streams | 69 ms | 346 ms |
+
+Over 418 real fixture/edit pairs, the 42 pairs on all-mini-stream files
+regressed by a median +7.4%, 24 of them by more than 5%.
+
+- **The mechanism.** For every mini stream, the first version's
+  `minifat_stream_equals` repeated the root mini stream's whole load:
+  - it re-collected the root chain;
+  - it cleared a FAT-sized visited map;
+  - it checked every root run for readability through `examine_at`.
+
+  It then compared the stream one 64-byte mini sector at a time. The cost
+  was mini streams × root sectors. `open_stream`, which it replaced, loads
+  the mini stream once per reader. The verdicts were right; the cost was
+  not.
+- **Why round one missed it.** The fixtures it timed hold 0 (45543.ppt),
+  1 (41246-1.ppt), 1 (NoHeadFoot.doc) and 9 (FloatingPictures.doc) mini
+  streams, and its tests bound verdicts, not work per stream.
+- **What the fix could not remove.** It is also an adversarial cost: a
+  source crafted with many mini streams made validation quadratic. The fix
+  removes that from the readback. The unchanged reparse's own per-stream
+  term (below) predates this record.
+
+**The fix** (`56548fd06e`, `59d853618f`, `f2a57ac936`):
+
+- **`StreamComparer` binds the comparison to one reader and one candidate.**
+  It performs the root load once, on the first mini or empty stream. It
+  keeps the load only after it succeeded; a failed load is repeated and
+  fails the same way, as `open_stream` does.
+- **Mini sectors are compared as one range per run.** Sectors whose bytes
+  follow one another in the file become one candidate call, instead of one
+  call per 64-byte mini sector.
+- **Chain maps are cleared in proportion to the work.** `EndChainScratch`
+  restores its visited map by clearing the chain's bits or the table's
+  words, whichever is fewer. The first version cleared a table-sized map
+  per chain.
+- **The review's nits are fixed.**
+  - `examine_at` fails closed.
+  - The reader and the comparison share `walk_chain_to_end` and
+    `visit_sector_runs`, always inlined, so they cannot drift.
+- **Plans whose view exceeds the plan's own limits decline.** This was a
+  pre-existing gap the review found, identical on the base. The review saw
+  it in 12 of its fault cases: a FAT that runs the version 3 directory chain
+  past the planned directory image makes the reparse report `LimitExceeded`
+  ("directory bytes"). `write_to` failed the save instead of falling back.
+  - The validation reader's only limits are the plan's own output and
+    directory lengths (`OleFileLimits::for_writer`), so this is a plan
+    defect of the same class as the `CorruptedFile` errors that already
+    decline.
+  - `plan_validation_declines` now declines it. Allocation and
+    invalid-limit failures still fail the save.
+  - A named fault test covers both validators.
+
+An intermediate build (`59d853618f`) showed two small costs of the
+de-duplication:
+
+- The reader's open-and-read-all of 45543.ppt ran 1,962 more instructions
+  (159,634 → 161,596), because the shared walkers were no longer inlined.
+- A Reuse write of 45543.ppt ran 5,531 more instructions than the first
+  version, because per-bit clearing costs more than word clearing for long
+  regular chains.
+
+`f2a57ac936` fixes both: the reader runs 159,420, and the write 379,453.
+That intermediate matrix is kept as `analysis-superseded-59d853618f.json`.
+
+**Re-measurement.** Three arms, built with identical commands (rustc
+1.95.0), in `round2/` of the packet:
+
+| Arm | Commit | What it is |
+|---|---|---|
+| A | `ab29ac6291` | Base |
+| B | `776ad05175` | First version |
+| C | `f2a57ac936` | Fix |
+
+- **Inputs:**
+  - the four round-one fixtures with their public edits;
+  - hyperlink.doc, `test-data/ole/ppt/empty.ppt` and WithCheckBoxes.xls,
+    with both edits of the `sector_layout_corpus` test (`same` flips the
+    largest stream's last byte; `grow` appends `3 * sector_size + 7` bytes);
+  - four files generated by the probe (`generate`) with the `grow` edit:
+    v3 1,000 and 3,000 × 2,000 B, v4 3,000 × 2,000 B and 10,000 × 4,000 B.
+- **Controls:** the Rewrite policy, the reader, and the harness edit/save
+  and read selectors (A and C only).
+- **Timing:** 12 rounds, each of the six A/B/C orders twice, with argv[0]
+  8 bytes longer each round, pinned to core 20. 660 processes, none failed,
+  and every output digest is identical across all arms.
+- **Further lanes:** per-owner `instructions` and `cycles` (three layouts),
+  Callgrind scaling, a corpus-wide instruction lane and the allocation lane.
+
+`summary-r2.md` has every row.
+
+| Reuse `write_to` | A p50 | B p50 | C p50 | C vs A [95% CI] | B vs A | C vs B |
+|---|---:|---:|---:|---:|---:|---:|
+| v3 1,000 × 2,000 B | 1,843 µs | 15,579 µs | 1,719 µs | −6.44% [−7.59, −5.21] | +742% | −88.9% |
+| v3 3,000 × 2,000 B | 7,149 µs | 125,726 µs | 6,428 µs | −10.55% [−12.31, −8.61] | +1,659% | −94.9% |
+| v4 3,000 × 2,000 B | 7,077 µs | 22,377 µs | 6,384 µs | −10.47% [−11.36, −8.89] | +215% | −71.6% |
+| v4 10,000 × 4,000 B | 63,218 µs | 377,096 µs | 46,340 µs | −26.12% [−26.67, −25.68] | +490% | −87.7% |
+| hyperlink.doc, same | 6.8 µs | 7.5 µs | 6.5 µs | −4.79% [−5.37, −3.52] | +10.30% | −13.59% |
+| hyperlink.doc, grow | 6.9 µs | 7.1 µs | 6.5 µs | −5.70% [−6.89, −4.54] | +2.68% | −7.95% |
+| empty.ppt, same | 6.4 µs | 7.2 µs | 6.1 µs | −4.83% [−6.04, −4.52] | +11.85% | −15.25% |
+| empty.ppt, grow | 6.6 µs | 6.9 µs | 6.4 µs | −3.85% [−4.35, −2.65] | +4.68% | −7.91% |
+| WithCheckBoxes.xls, same | 13.5 µs | 15.3 µs | 12.5 µs | −7.03% [−7.55, −6.57] | +13.51% | −17.96% |
+| WithCheckBoxes.xls, grow | 13.7 µs | 14.8 µs | 12.6 µs | −8.19% [−8.62, −7.68] | +8.32% | −14.82% |
+| 45543.ppt, public | 38.5 µs | 22.8 µs | 22.7 µs | −40.94% [−41.83, −40.32] | −40.77% | −0.72% |
+| 41246-1.ppt, public | 28.8 µs | 19.6 µs | 19.2 µs | −33.48% [−35.09, −32.03] | −32.03% | −1.92% |
+| FloatingPictures.doc, public | 45.8 µs | 32.5 µs | 31.1 µs | −32.13% [−33.03, −31.28] | −28.90% | −4.59% |
+| NoHeadFoot.doc, public | 6.5 µs | 5.3 µs | 5.4 µs | −16.88% [−17.19, −16.29] | −17.30% | +1.03% |
+
+Controls, C vs A:
+
+- Rewrite: 45543.ppt −3.71%, WithCheckBoxes.xls −0.55%.
+- Reader: open-and-read-all of 45543.ppt +0.88% [−1.81, +3.54].
+- Harness edit/save:
+  - `doc_semantic_one_edit_save`: tiny −2.20%, large +2.83% [−1.91, +10.63];
+  - `ppt_semantic_one_edit_save`: tiny −0.20%, large −1.19%;
+  - `xls_semantic_one_edit_save`: tiny +0.43%, large −0.68%.
+- Harness reads:
+  - `cfb_open`: few-large +0.19%, many-small +0.20%;
+  - `cfb_read_one`: few-large +1.68% [+0.87, +2.98], many-small +0.00%.
+
+**Instructions per owner** (user mode, median of three layouts):
+
+| Case | A | B | C | C vs A | C vs B |
+|---|---:|---:|---:|---:|---:|
+| v3 1,000 × 2,000 B | 28.13 M | 384.52 M | 25.96 M | −7.69% | −93.25% |
+| v3 3,000 × 2,000 B | 87.42 M | 3,268.04 M | 79.63 M | −8.91% | −97.56% |
+| v4 3,000 × 2,000 B | 82.83 M | 491.93 M | 75.96 M | −8.29% | −84.56% |
+| v4 10,000 × 4,000 B | 457.29 M | 9,225.91 M | 417.78 M | −8.64% | −95.47% |
+| hyperlink.doc, same | 127,502 | 151,278 | 123,409 | −3.21% | −18.42% |
+| empty.ppt, same | 126,417 | 150,250 | 121,217 | −4.11% | −19.32% |
+| WithCheckBoxes.xls, same | 261,461 | 324,547 | 250,158 | −4.32% | −22.92% |
+| 45543.ppt, public | 518,694 | 383,706 | 379,453 | −26.84% | −1.11% |
+| NoHeadFoot.doc, public | 112,055 | 96,198 | 95,916 | −14.40% | −0.29% |
+| Reader, 45543.ppt | 159,608 | 159,608 | 159,420 | −0.12% | −0.12% |
+
+Every harness selector runs −0.97% to +0.11% of the base's instructions.
+
+**Scaling.** Callgrind per write on the generated v3 files:
+
+| | Streams | `write_to` | `validate` | Reparse | Of which A5 | Readback |
+|---|---:|---:|---:|---:|---:|---:|
+| A | 1,000 | 38.18 M | 22.99 M | 9.77 M | 6.10 M | 12.39 M (`open_stream`) |
+| A | 3,000 | 164.47 M | 116.99 M | 53.13 M | 42.30 M | 61.39 M |
+| B | 1,000 | 394.08 M | 378.89 M | 9.76 M | 6.10 M | 368.86 M |
+| C | 1,000 | 31.57 M | 16.38 M | 9.76 M | 6.10 M | 6.36 M (`StreamComparer`) |
+| C | 3,000 | 120.92 M | 73.41 M | 53.08 M | 42.30 M | 19.53 M |
+
+Callgrind counts its own byte-loop `memcpy` and `memset`, so its totals
+exceed the native counts above; its ratios are what matter here.
+
+- **C's readback is linear:** ×3.07 for three times the streams. The base's
+  readback grows ×4.96, because it allocates a zeroed map sized to the whole
+  MiniFAT for each stream.
+- **The reparse is the one super-linear term left,** unchanged and identical
+  in every arm. Its `validate_stream_allocations` (A5) clears a
+  table-sized map per stream: ×6.93 from 1,000 to 3,000 streams.
+- **Natively,** C's whole write runs ×3.07 the instructions (25.96 M →
+  79.63 M) and the base's ×3.11.
+
+A5 runs on every `OleFile::open` of the reader, not only here; see the
+follow-ups.
+
+**The corpus.** Every OLE2 fixture (214), with both corpus edits: 418
+fixture/edit pairs, all taking Reuse, and every output identical across the
+three arms. User instructions per owner:
+
+| Pairs | B vs A, median | B > +5% | C vs A, median | C vs A, max | C > +1% | C > +5% |
+|---|---:|---:|---:|---:|---:|---:|
+| All 418 | −11.80% | 57 | −12.55% | +1.22% | 1 | 0 |
+| 42 on all-mini-stream files | +14.06% | 33 | −3.87% | +1.22% | 1 | 0 |
+
+- **This reproduces the review's finding in instructions.** B's all-mini
+  median is +14.06%, where the review timed +7.4%; the fix removes it.
+- **The one pair above +1% is WithExtendedStyles.xls, same-length edit:**
+  +1.22% (88,631 → 89,715), where B was +16.36%. The same file's `grow`
+  edit is −5.27%.
+
+**Allocation.** B and C allocate identically in every case; the fix
+allocates nothing new. Against the base, the v4 10,000-stream write
+allocates 189 MB instead of 1,063 MB (121,771 calls instead of 201,761).
+Peak live bytes are unchanged, except that WithCheckBoxes.xls `grow` falls
+from 43,191 to 42,620.
+
+**Regression flags in the re-measurement** (C vs A, a round's paired p50,
+mean or p95 above +5%): 33, each listed in `summary-r2.md`.
+
+- **`doc_semantic_one_edit_save/large`, 12 flags.** Rounds 3, 4, 5, 8 and 9
+  are +6.2% to +27.5%.
+  - Instructions are equal (−0.02%).
+  - The candidate takes 478–605 page faults per owner where the base takes
+    about 0: the glibc trim policy that round one tested.
+  - With `glibc.malloc.trim_threshold` and `mmap_threshold` at 256 MiB,
+    both arms take 0 page faults, and C runs +0.43% cycles and −0.23%
+    instructions.
+- **`doc_semantic_one_edit_save/tiny`, 5 p95 flags:** rounds 2, 3, 4, 6
+  and 10, +5.7% to +15.7%. Its p50 is −2.20%.
+- **`open-read-45543`, 5 flags:** round 2 p95 +9.4%, and rounds 8 and 10
+  p50/p95 +5.3% to +6.0%. Its instructions are −0.12%.
+- **`cfb_read_one/few-large`, 4 flags:** rounds 5 and 11, +5.4% to +5.8%,
+  and +1.68% over all rounds. Instructions and cycles per owner are the
+  same (−0.00% and −0.12%): code placement.
+- **`cfb_read_one/many-small`, 4 flags:** rounds 8 and 11, 0.3 µs → 0.4 µs,
+  up to +21.9%. Instructions +0.11%.
+- **`rewrite-45543-public`, 2 flags:** round 3, p50 +6.3% and mean +5.5%.
+  Instructions −0.15%.
+- **`cfb_open/many-small`, 1 flag:** round 1 p95 +5.3%.
+
+None of the 14 CFB-only Reuse write cases, where this change's work is, has
+a flag.
+
 ## What was changed
 
+The state after the review round.
+
 `crates/litchi-cfb/src/file.rs` gains an in-place comparison beside the
-reader's existing read path, which is not modified:
+reader:
 
 - `CandidateBytes` (crate-private trait): `equals_at(offset, expected)` and
   `check_readable(offset, len)` over the bytes of a composed candidate.
-- `OleFile::stream_equals` (crate-private) with `fat_stream_equals`,
-  `minifat_stream_equals`, `ministream_bytes_equal` and `read_bytes_equal`:
-  `open_stream`'s traversal, with each range it would read handed to the
-  candidate instead of copied.
-- `StreamCompareScratch` and `SectorChainScratch::collect_to_end`: one set of
-  reusable chain buffers per validation instead of a chain vector and a
-  visited map per stream. `collect_to_end` mirrors `collect_sector_chain`.
+- `StreamComparer` (crate-private), created by
+  `OleFile::stream_comparer(&candidate)`. It borrows one reader and one
+  candidate, so its cached state cannot outlive them or be applied to
+  others.
+  - `stream_equals(path, expected)` performs `open_stream`'s traversal, with
+    each range it would read handed to the candidate instead of copied.
+  - `load_root` performs the root mini stream's load once per comparer and
+    keeps it only after it succeeded, as `open_stream` caches its loaded
+    mini stream.
+  - `minifat_stream_equals` compares mini sectors whose bytes follow one
+    another in the file as one range.
+- `EndChainScratch`: reusable chain buffers whose visited map is restored
+  by clearing the chain's bits or the table's words, whichever is fewer. So
+  collecting chains costs time proportional to the chains.
+- `walk_chain_to_end`: the one implementation of `collect_sector_chain`'s
+  loop, which `collect_sector_chain` and `EndChainScratch` both call.
 - `visit_sector_runs`: `read_sectors_batched`'s run segmentation and checks,
-  without the read.
+  which `read_sectors_batched` itself now runs on. Both shared walkers are
+  `#[inline(always)]`, so the reader keeps the base's instruction count.
+- Helpers: `present_bytes` (the body of `present_sector_bytes`),
+  `read_bytes_equal`, `ministream_physical_offset`, `file_bytes_equal`,
+  `CheckedBitSet::remove`.
 
 `crates/litchi-cfb/src/writer/layout.rs`:
 
-- `ReusePlan::validate` keeps its structural reparse and now calls
-  `stream_equals` with a `PlanView`, whose `examine_at` walks the planned
-  bytes exactly as `ReusePlan::read_at` copies them.
+- `ReusePlan::validate` keeps its structural reparse and now runs a
+  `StreamComparer` over a `PlanView`, whose `examine_at` walks the planned
+  bytes exactly as `ReusePlan::read_at` copies them. Every comparison goes
+  through `fold_comparison`, which fails closed: an expectation that does
+  not cover a range is a mismatch.
 - The previous validation is kept as `#[cfg(test)] validate_by_readback`, the
   oracle the tests hold the new one to. `ReusePlan` derives `Clone` under
   `cfg(test)` for fault injection.
 
 `crates/litchi-cfb/src/writer/core.rs`: `plan_validation_declines` becomes
-`pub(super)` so the tests use the writer's own decline classification.
+`pub(super)` so the tests use the writer's own decline classification. It
+now also declines `OleError::LimitExceeded`: the validation reader's only
+limits are the plan's own output and directory lengths, so exceeding one is
+a plan defect (see the review-round section).
 
 New tests: `src/writer/layout/validation_tests.rs`,
-`src/stream_compare_tests.rs`, and
-`file::tests::scratch_to_end_matches_the_owned_chain_helper_and_resets`.
+`src/stream_compare_tests.rs`, and three `file::tests` for the chain
+scratch.
 
 There is no public API change, no new dependency, no `unsafe`, no new budget
 or limit, and no change to emitted bytes, planning or emission.
@@ -212,18 +474,19 @@ write. Per stream, the old readback did the following:
 That is four passes over every byte and three allocations per stream. For a
 correct plan, the bytes it copied are the model's own payload chunks.
 
-**What the new readback does.** `OleFile::stream_equals` performs
+**What the new readback does.** `StreamComparer::stream_equals` performs
 `open_stream`'s traversal in the same order and with the same errors:
 
 1. the entry lookup and stream-type check;
-2. the chain collection (`collect_to_end`, the same checks as
-   `collect_sector_chain`: index in the table, no revisit, only
+2. the chain collection (`EndChainScratch::collect`, which runs
+   `collect_sector_chain`'s own walker: index in the table, no revisit, only
    `ENDOFCHAIN` or regular links);
 3. the declared-length and chain-capacity checks;
-4. for a mini or empty stream, the root mini-stream load checks;
+4. for a mini or empty stream, the root mini-stream load checks, once per
+   comparer as `open_stream` loads the mini stream once per reader;
 5. the mini-sector bounds;
 6. `read_sectors_batched`'s run segmentation and physical bounds checks
-   (`visit_sector_runs`).
+   (`visit_sector_runs`, which the batched read itself runs on).
 
 Where `open_stream` would copy a physical range into its result,
 `stream_equals` asks the candidate instead. It compares the range while the
@@ -258,6 +521,14 @@ compared byte for byte:
   - the bytes it examines are the bytes `read_at` would copy, from the same
     sources;
   - a skipped `memcmp` compares a slice with itself.
+- The root load's result is kept exactly as `open_stream` keeps its loaded
+  mini stream: once, after a successful load, for the one reader. A failed
+  load is repeated for the next mini stream and fails the same way.
+- Comparing contiguous mini sectors as one range examines the same bytes:
+  the zero fill of a short final sector depends only on the physical
+  position, which a contiguous range preserves. Those comparisons cannot
+  raise an error the load did not, because the load already checked every
+  range of the root chain for readability.
 - Two differences remain, and neither changes the verdict:
   - An allocation failure of a removed buffer can no longer occur.
   - A read error is the view's `InvalidData` rather than the same failure
@@ -297,7 +568,7 @@ compared byte for byte:
   cost of that default without changing its layouts or its Rewrite fallback.
 - **Change 0652's standing trade-offs:**
   - Correctness comes first: the verdict is proven the same, and tested on
-    5,000 random faults.
+    5,600 random faults.
   - Optimize the benign common path: a correctly placed payload run
     compares by identity, while a corrupted plan pays for byte comparison.
 - **GOAL, "LEGACY CFB-SPECIFIC WORK":** all CFB validation, ownership, cycle,
@@ -357,8 +628,33 @@ compared byte for byte:
     comparisons;
   - 2,884 of 3,000 corrupted files that still open;
   - files with short final sectors, in both geometries.
-- **Chain collection:** `collect_to_end` matches `collect_sector_chain`'s
-  result or error on 14 adversarial tables and resets after errors.
+- **Chain collection:** `EndChainScratch::collect` matches
+  `collect_sector_chain`'s result or error on 14 adversarial tables. Its
+  visited map is clear after every call, success or error, and a long chain
+  followed by short ones through a 10,000-entry table reuses both buffers.
+- **Review round, linearity and caching**
+  (`stream_compare_tests.rs`):
+  - over 300 mini streams in both geometries, the root load's readability
+    checks happen for the first mini stream only, and each contiguous stream
+    takes exactly one candidate comparison (not one per 64-byte mini sector);
+  - a root load that fails once is not kept: the next mini stream loads
+    again and succeeds, and a load that always fails fails every mini stream
+    the same way;
+  - files of 120 mini streams in both geometries reach the readback verdict,
+    call for call.
+
+  Sequence equivalence is now checked with a fresh reader and a fresh
+  comparer seeing the same calls in the same order, so each side's one-time
+  mini-stream load is exercised alike.
+- **Review round, plans** (`validation_tests.rs`):
+  - 240-mini-stream plans in both geometries, with mini growth, a shrink
+    and a mini-to-regular migration, are accepted by both validators;
+  - 600 random faults on them give identical verdicts (512-byte: 60
+    accepted, 240 refused; 4096-byte: 128 accepted, 172 refused);
+  - the directory-chain-past-its-image fault raises `LimitExceeded` in both
+    validators and now declines;
+  - the classifier keeps allocation and invalid-limit failures on the error
+    path.
 - **Admission is unchanged.** The existing corpus test
   `every_ole2_fixture_agrees_stream_by_stream_under_both_policies` admits
   Reuse for 209 of 211 examined fixtures on no-op, same-length and
@@ -625,18 +921,34 @@ and harness edit/save selectors ran with the same `GLIBC_TUNABLES` (packet
 - **No claim that validation is now cheap in general.** The structural reparse
   (16% of the candidate's CFB-only write) and the readback's chain walks
   remain, by design.
+- **No claim that validation as a whole is linear in the number of
+  streams.** The readback is; the unchanged reparse's A5 is not (see the
+  follow-ups).
+- **No claim for every file.** One of 418 corpus fixture/edit pairs
+  (WithExtendedStyles.xls, same-length edit) runs 1.22% more instructions
+  than the base.
 - **No claim about planning or emission.** Planning is now the largest phase
   of the CFB-only write, and emission is unchanged.
 - **No claim about the same-length overlay path** (`render_copy_through`,
   record 0748's area) or about Rewrite.
 - **Scope of the measurements:**
   - warm, in-memory, serial, on one host;
-  - four fixtures and the generated harness decks;
+  - round one: four fixtures and the generated harness decks;
+  - review round: seven fixtures, four generated many-mini-stream files, the
+    harness selectors, and a corpus-wide instruction lane;
   - no cold-I/O, concurrency, RSS or cross-platform result;
   - peak live bytes are allocator ownership, not RSS.
 
 ## Follow-up candidates found, not changed
 
+- **The reparse's per-stream map clearing (A5).** `validate_stream_allocations`
+  clears a map sized to the whole FAT or MiniFAT for every stream
+  (`SectorChainScratch::prepare_visited`). That is the one super-linear
+  term left in the Reuse validation (×6.93 in Callgrind from 1,000 to 3,000
+  mini streams), and it runs on every `OleFile::open` of the reader.
+  `EndChainScratch`'s clearing, by chain or by table whichever is cheaper,
+  would make it linear. It is left for its own record because it changes
+  every reader's open path and needs the reader controls measured.
 - **Planning.** `plan_reuse` is now about 45% of the CFB-only Reuse write
   (native samples). Most of it is:
   - the `place` closure's per-sector checks (12.8%);
@@ -659,9 +971,35 @@ and harness edit/save selectors ran with the same `GLIBC_TUNABLES` (packet
 
 ## Verification
 
-`gates.txt` in the packet lists commands and exit codes.
+`gates.txt` in the packet lists commands and exit codes for round one, and
+`round2/gates.txt` for the review round.
 
-All gates passed on `776ad05175`, run serially after measurement with
+**Review round, on `f2a57ac936`.** Every gate passed, run in the foreground
+after measurement with `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=6` and
+`TMPDIR` under the scratch directory:
+
+- `cargo fmt --all --check`.
+- `cargo check --all-targets` for `litchi-cfb` and its eight dependents.
+- Clippy `-D warnings` on the `litchi-cfb` library and all targets.
+- `RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-cfb --no-deps`.
+- Tests:
+
+  | Crate | Passed | Ignored |
+  |---|---:|---:|
+  | `litchi-cfb` | 447 | 1 |
+  | `litchi-ole-common` | 165 | 0 |
+  | `litchi-doc` | 1,198 | 13 |
+  | `litchi-ppt` | 1,229 | 11 |
+  | `litchi-xls` | 1,474 | 1 |
+
+  None failed; the ignored tests are pre-existing.
+- Crate boundaries (64 packages, 241 declarations, 11 debt items),
+  `non_iwork_gate verify`, and the structural perf-claims check (10 claims).
+
+The facade and the remaining dependents' test suites were not rerun in the
+review round; their check gate passed.
+
+**Round one, on `776ad05175`.** All gates passed, run serially after measurement with
 `CARGO_BUILD_JOBS=6` and `RUST_TEST_THREADS=6` under rustc 1.95.0:
 
 - `cargo fmt --all --check`.
@@ -697,6 +1035,24 @@ rerun. No shared log, claim registry or coverage index is edited;
 
 ## Cleanup
 
-[CLEANUP]
+`cleanup.json` records both rounds.
+
+- **Round one.** The coordinator committed the record and packet as
+  `fc308af0d7` and then removed:
+  - `targets/0749` (55G) and `targets/0749-before` (2.7G);
+  - the `0749-before-src` checkout;
+  - `scratch/0749`.
+- **Review round.** After committing this record and packet, the
+  implementer removes:
+  - `targets/0749` (47G: the debug gate build, three probe builds and two
+    harness builds);
+  - the `0749-before-src` and `0749-v1-src` checkouts (9.5G each), with
+    `git worktree remove --force`;
+  - `scratch/0749` (640M).
+
+The packet keeps sources, scripts, compressed raw reports and summaries
+(15M). It holds no binaries, `perf.data`, Callgrind outputs or corpora; the
+generated inputs regenerate byte-identically from the probe, and their
+digests are recorded. The worktree and branch remain.
 
 [Evidence packet and replay instructions](results/change-0749/README.md).

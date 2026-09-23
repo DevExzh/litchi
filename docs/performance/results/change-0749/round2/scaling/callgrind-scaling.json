@@ -1,0 +1,75 @@
+{
+ "schema": "0749-callgrind-scaling-v1",
+ "rows": [
+  {
+   "arm": "A",
+   "input": "v3-1000x2000",
+   "writes": 2,
+   "inclusive_ir_per_write": {
+    "write_to": 38177145,
+    "validate": 22985838,
+    "reparse": 9773221,
+    "reparse_stream_allocations": 6103166,
+    "readback_open_stream": 12387254,
+    "readback_stream_equals_b": null,
+    "readback_stream_equals_c": null
+   }
+  },
+  {
+   "arm": "A",
+   "input": "v3-3000x2000",
+   "writes": 2,
+   "inclusive_ir_per_write": {
+    "write_to": 164469979,
+    "validate": 116994887,
+    "reparse": 53129099,
+    "reparse_stream_allocations": 42301694,
+    "readback_open_stream": 61389273,
+    "readback_stream_equals_b": null,
+    "readback_stream_equals_c": null
+   }
+  },
+  {
+   "arm": "B",
+   "input": "v3-1000x2000",
+   "writes": 2,
+   "inclusive_ir_per_write": {
+    "write_to": 394080319,
+    "validate": 378889300,
+    "reparse": 9757541,
+    "reparse_stream_allocations": 6103195,
+    "readback_open_stream": null,
+    "readback_stream_equals_b": 368859431,
+    "readback_stream_equals_c": null
+   }
+  },
+  {
+   "arm": "C",
+   "input": "v3-1000x2000",
+   "writes": 2,
+   "inclusive_ir_per_write": {
+    "write_to": 31571061,
+    "validate": 16380042,
+    "reparse": 9757543,
+    "reparse_stream_allocations": 6103195,
+    "readback_open_stream": null,
+    "readback_stream_equals_b": null,
+    "readback_stream_equals_c": 6355167
+   }
+  },
+  {
+   "arm": "C",
+   "input": "v3-3000x2000",
+   "writes": 2,
+   "inclusive_ir_per_write": {
+    "write_to": 120916060,
+    "validate": 73406141,
+    "reparse": 53082216,
+    "reparse_stream_allocations": 42301736,
+    "readback_open_stream": null,
+    "readback_stream_equals_b": null,
+    "readback_stream_equals_c": 19525339
+   }
+  }
+ ]
+}
