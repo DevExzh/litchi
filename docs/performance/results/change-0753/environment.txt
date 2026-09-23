@@ -1,0 +1,24 @@
+host: Model name: AMD EPYC 9R45, 32 logical CPUs, 123 GiB
+kernel: Linux 7.0.0-1012-aws x86_64; CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y (pages zeroed at allocation)
+transparent_hugepage: always [madvise] never
+perf_event_paranoid: 1
+perf: perf version 7.0.14
+valgrind: valgrind-3.26.0
+rustc (workspace pin; harness binaries and gates): rustc 1.95.0 (59807616e 2026-04-14)
+rustc (host default; allocation/callgrind probes, built outside the repository with the same command for both legs): rustc 1.98.1 (48a229cea 2026-09-01)
+python: Python 3.14.4
+pinning: taskset -c 8 for every measured process; ASLR left enabled
+base: 6d989cad6320f41bc6d5a5c7d39bf5247234d5de (detached worktree 0753-before-src)
+measured production code: 4c079ef4bf1d54a1ac6acb616b999aa04060e639 (branch head)
+latency window 1:
+  2026-09-23T09:50:01Z
+   05:50:01 up 12 days,  3:17,  2 users,  load average: 7.31, 5.98, 5.72
+  2026-09-23T09:50:31Z
+   05:50:31 up 12 days,  3:18,  2 users,  load average: 11.42, 7.11, 6.10
+  2026-09-23T09:51:32Z
+   05:51:32 up 12 days,  3:19,  2 users,  load average: 9.76, 7.31, 6.22
+latency window 2:
+  2026-09-23T09:51:58Z
+   05:51:58 up 12 days,  3:19,  2 users,  load average: 7.05, 6.88, 6.12
+  2026-09-23T09:52:28Z
+   05:52:28 up 12 days,  3:20,  2 users,  load average: 11.09, 7.89, 6.48

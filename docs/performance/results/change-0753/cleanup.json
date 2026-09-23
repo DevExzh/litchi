@@ -1,0 +1,62 @@
+{
+ "change": "0753",
+ "date": "2026-09-23",
+ "binary_identities_recorded_before_removal": "binaries.sha256",
+ "removed": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753",
+   "bytes": 72083144609,
+   "contents": "after-leg release harness builds and the debug/test/doc builds of every gate run (three crates, facade, rustdoc, clippy)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753-before",
+   "bytes": 4786354055,
+   "contents": "before-leg release harness builds, and the base-side golden-test and clippy builds"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753-prof",
+   "bytes": 2288223760,
+   "contents": "frame-pointer, line-table harness build of the after leg (attribution only)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753-before-prof",
+   "bytes": 2286908677,
+   "contents": "frame-pointer, line-table harness build of the before leg (attribution only)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753-probe-A",
+   "bytes": 471760200,
+   "contents": "allocation/callgrind probe built against the base sources"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0753-probe-B",
+   "bytes": 472193452,
+   "contents": "allocation/callgrind probe built against the branch sources"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0753-before-src",
+   "bytes": 10194950721,
+   "contents": "detached checkout of 6d989cad63 used to build the before leg and to run the golden tests on the base; removed with git worktree remove --force"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0753/*",
+   "bytes": 1061597049,
+   "contents": "measurement binaries (bin/A, bin/B), probe projects, folded profile stacks, micro-benchmarks (UTF-16 widening, counting, encoding and field-scan variants), build and test logs, raw results before copying; everything cited is copied into this packet"
+  },
+  {
+   "path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/scratch/0753 and its eight ~/.debug/.build-id links",
+   "bytes": 833893840,
+   "contents": "perf build-id cache copies of the profiled binaries (bin/A/lpb, bin/A/lpbf, bin/A/probe, bin/B/lpbf); other agents' cache entries untouched"
+  },
+  {
+   "path": "perf.data files",
+   "contents": "frame-pointer perf record outputs, each folded into stacks and summarized into profiles/payload-heavy-attribution.json, then deleted as recorded"
+  }
+ ],
+ "kept": [
+  "the branch worktree /home/zhuhe/code/litchi-worktrees/0753-legacy-fresh-writer-text-paths and branch perf/0753-legacy-fresh-writer-text-paths"
+ ],
+ "not_touched": [
+  "the main checkout, other agents' worktrees, targets and scratch directories, and the untracked docs/performance/results/change-0741/ packet in the main checkout"
+ ]
+}

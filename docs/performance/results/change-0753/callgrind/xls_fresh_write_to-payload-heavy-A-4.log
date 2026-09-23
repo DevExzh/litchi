@@ -1,0 +1,14 @@
+==2568235== Callgrind, a call-graph generating cache profiler
+==2568235== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==2568235== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2568235== Command: /home/zhuhe/code/litchi-worktrees/scratch/0753/bin/A/probe 4 xls_fresh_write_to/payload-heavy
+==2568235== 
+==2568235== For interactive control, run 'callgrind_control -h'.
+==2568235== brk segment overflow in thread #1: can't grow to 0x4b8e000
+==2568235== (see section Limitations in user manual)
+==2568235== NOTE: further instances of this message will not be shown
+==2568235== 
+==2568235== Events    : Ir
+==2568235== Collected : 423246995
+==2568235== 
+==2568235== I   refs:      423,246,995

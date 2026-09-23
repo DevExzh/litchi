@@ -1,0 +1,15 @@
+[package]
+name = "probe0753"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-doc = { path = "<leg source tree: 0753-before-src or the 0753 worktree>/crates/litchi-doc" }
+litchi-ppt = { path = "<leg source tree: 0753-before-src or the 0753 worktree>/crates/litchi-ppt" }
+litchi-xls = { path = "<leg source tree: 0753-before-src or the 0753 worktree>/crates/litchi-xls" }
+
+[profile.release]
+debug = false
+
+[workspace]

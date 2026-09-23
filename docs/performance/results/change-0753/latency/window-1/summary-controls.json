@@ -1,0 +1,758 @@
+[
+ {
+  "case": "doc_semantic_one_edit_save",
+  "shape": "tiny",
+  "warmup": 50,
+  "samples": 500,
+  "corpus": "doc-tiny",
+  "archive_sha256_before": [
+   "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+  ],
+  "archive_sha256_after": [
+   "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+  ],
+  "before_median_p50": 36000.25,
+  "after_median_p50": 35667.5,
+  "before_median_p95": 38130.72499999999,
+  "after_median_p95": 38186.5,
+  "before_median_mean": 36314.33,
+  "after_median_mean": 36101.734,
+  "paired_p50_ratios": [
+   0.9907280552441843,
+   0.9841291747170853,
+   1.0001402131239483,
+   0.9944243100083635
+  ],
+  "paired_mean_ratios": [
+   0.9928191238952562,
+   0.9846265448278656,
+   1.002344904714459,
+   0.9944736085314048
+  ],
+  "median_paired_p50_ratio": 0.9925761826262739,
+  "bootstrap_95ci_p50_ratio": [
+   0.9841291747170853,
+   1.0001402131239483
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-0-A.json",
+    "p50": 36130.5,
+    "p95": 38376.95,
+    "mean": 36450.984,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-1-B.json",
+    "p50": 35795.5,
+    "p95": 37930.0,
+    "mean": 36189.234,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-2-B.json",
+    "p50": 35655.0,
+    "p95": 38443.0,
+    "mean": 36069.71,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-3-A.json",
+    "p50": 36230.0,
+    "p95": 40914.999999999985,
+    "mean": 36632.884,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-4-A.json",
+    "p50": 35660.0,
+    "p95": 37884.49999999998,
+    "mean": 36049.226,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-5-B.json",
+    "p50": 35665.0,
+    "p95": 38588.44999999994,
+    "mean": 36133.758,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-6-B.json",
+    "p50": 35670.0,
+    "p95": 37886.499999999985,
+    "mean": 35977.744,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-tiny-7-A.json",
+    "p50": 35870.0,
+    "p95": 37830.5,
+    "mean": 36177.676,
+    "n": 500,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   }
+  ]
+ },
+ {
+  "case": "doc_semantic_one_edit_save",
+  "shape": "large",
+  "warmup": 10,
+  "samples": 100,
+  "corpus": "doc-large",
+  "archive_sha256_before": [
+   "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+  ],
+  "archive_sha256_after": [
+   "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+  ],
+  "before_median_p50": 779531.0,
+  "after_median_p50": 642415.0,
+  "before_median_p95": 813894.725,
+  "after_median_p95": 660016.725,
+  "before_median_mean": 751306.505,
+  "after_median_mean": 643432.895,
+  "paired_p50_ratios": [
+   0.8269782564674688,
+   0.8306070674223096,
+   0.827497248990877,
+   0.8147023439549378
+  ],
+  "paired_mean_ratios": [
+   0.8604031362306739,
+   0.859902720270361,
+   0.861262666026064,
+   0.8470806890888593
+  ],
+  "median_paired_p50_ratio": 0.8272377527291729,
+  "bootstrap_95ci_p50_ratio": [
+   0.8147023439549378,
+   0.8306070674223096
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-large-0-A.json",
+    "p50": 785199.0,
+    "p95": 817521.95,
+    "mean": 755055.43,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-large-1-B.json",
+    "p50": 649342.5,
+    "p95": 657813.0,
+    "mean": 649652.06,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-large-2-B.json",
+    "p50": 635487.5,
+    "p95": 661510.0,
+    "mean": 637213.73,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-large-3-A.json",
+    "p50": 765088.0,
+    "p95": 802361.5,
+    "mean": 741030.02,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-large-4-A.json",
+    "p50": 794254.0,
+    "p95": 823537.0,
+    "mean": 762552.71,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-large-5-B.json",
+    "p50": 657243.0,
+    "p95": 665271.5,
+    "mean": 656758.18,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/doc_semantic_one_edit_save-large-6-B.json",
+    "p50": 630468.0,
+    "p95": 658523.45,
+    "mean": 633241.59,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/doc_semantic_one_edit_save-large-7-A.json",
+    "p50": 773863.0,
+    "p95": 810267.5,
+    "mean": 747557.58,
+    "n": 100,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   }
+  ]
+ },
+ {
+  "case": "ppt_semantic_one_edit_save",
+  "shape": "tiny",
+  "warmup": 40,
+  "samples": 400,
+  "corpus": "ppt-tiny",
+  "archive_sha256_before": [
+   "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+  ],
+  "archive_sha256_after": [
+   "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+  ],
+  "before_median_p50": 77500.25,
+  "after_median_p50": 78022.5,
+  "before_median_p95": 85387.525,
+  "after_median_p95": 86053.25,
+  "before_median_mean": 78226.78625,
+  "after_median_mean": 78838.29000000001,
+  "paired_p50_ratios": [
+   1.0080634756805573,
+   0.9960984969619443,
+   1.0054135668243205,
+   1.0096205962059621
+  ],
+  "paired_mean_ratios": [
+   1.0098843023384025,
+   0.9973662680386968,
+   1.0060154443360003,
+   1.009622361401942
+  ],
+  "median_paired_p50_ratio": 1.006738521252439,
+  "bootstrap_95ci_p50_ratio": [
+   0.9960984969619443,
+   1.0096205962059621
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-0-A.json",
+    "p50": 77510.0,
+    "p95": 85045.54999999999,
+    "mean": 78223.275,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-1-B.json",
+    "p50": 78135.0,
+    "p95": 86735.0,
+    "mean": 78996.4575,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-2-B.json",
+    "p50": 77870.0,
+    "p95": 85921.0,
+    "mean": 78684.075,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-3-A.json",
+    "p50": 78175.0,
+    "p95": 86071.95,
+    "mean": 78891.855,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-4-A.json",
+    "p50": 77490.5,
+    "p95": 85432.05,
+    "mean": 78230.2975,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-5-B.json",
+    "p50": 77910.0,
+    "p95": 85476.95,
+    "mean": 78700.8875,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-6-B.json",
+    "p50": 78235.5,
+    "p95": 86185.5,
+    "mean": 78975.6925,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-tiny-7-A.json",
+    "p50": 77490.0,
+    "p95": 85343.0,
+    "mean": 78223.0025,
+    "n": 400,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   }
+  ]
+ },
+ {
+  "case": "ppt_semantic_one_edit_save",
+  "shape": "large",
+  "warmup": 20,
+  "samples": 200,
+  "corpus": "ppt-large",
+  "archive_sha256_before": [
+   "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+  ],
+  "archive_sha256_after": [
+   "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+  ],
+  "before_median_p50": 186695.75,
+  "after_median_p50": 187596.0,
+  "before_median_p95": 198339.475,
+  "after_median_p95": 200265.75,
+  "before_median_mean": 186571.025,
+  "after_median_mean": 188016.6675,
+  "paired_p50_ratios": [
+   1.0029732249043746,
+   1.0006453323193671,
+   1.0081009114530959,
+   1.0076906227294098
+  ],
+  "paired_mean_ratios": [
+   1.0051673106017966,
+   1.0047332664868835,
+   1.0128085691594775,
+   1.0078534728543742
+  ],
+  "median_paired_p50_ratio": 1.0053319238168923,
+  "bootstrap_95ci_p50_ratio": [
+   1.0006453323193671,
+   1.0081009114530959
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-large-0-A.json",
+    "p50": 186666.0,
+    "p95": 197825.0,
+    "mean": 186465.47,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-large-1-B.json",
+    "p50": 187221.0,
+    "p95": 199573.5,
+    "mean": 187428.995,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-large-2-B.json",
+    "p50": 186846.0,
+    "p95": 203001.5,
+    "mean": 187560.17,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-large-3-A.json",
+    "p50": 186725.5,
+    "p95": 198950.5,
+    "mean": 186676.58,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-large-4-A.json",
+    "p50": 186460.5,
+    "p95": 197697.0,
+    "mean": 186141.01,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-large-5-B.json",
+    "p50": 187971.0,
+    "p95": 199825.0,
+    "mean": 188525.21,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ppt_semantic_one_edit_save-large-6-B.json",
+    "p50": 188615.5,
+    "p95": 200706.5,
+    "mean": 188473.165,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ppt_semantic_one_edit_save-large-7-A.json",
+    "p50": 187176.0,
+    "p95": 198853.95,
+    "mean": 187004.53,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   }
+  ]
+ },
+ {
+  "case": "xls_semantic_one_edit_save",
+  "shape": "tiny",
+  "warmup": 40,
+  "samples": 400,
+  "corpus": "xls-tiny",
+  "archive_sha256_before": [
+   "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+  ],
+  "archive_sha256_after": [
+   "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+  ],
+  "before_median_p50": 49190.0,
+  "after_median_p50": 49702.5,
+  "before_median_p95": 53007.72499999998,
+  "after_median_p95": 56197.24999999999,
+  "before_median_mean": 49695.8575,
+  "after_median_mean": 50253.335,
+  "paired_p50_ratios": [
+   1.0181966877939073,
+   1.0080137959018056,
+   1.0128335709920555,
+   1.0041557128412537
+  ],
+  "paired_mean_ratios": [
+   1.0243966261025286,
+   1.010694623235453,
+   1.0117408142004005,
+   1.0065886892197453
+  ],
+  "median_paired_p50_ratio": 1.0104236834469305,
+  "bootstrap_95ci_p50_ratio": [
+   1.0041557128412537,
+   1.0181966877939073
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-0-A.json",
+    "p50": 48910.0,
+    "p95": 50668.44999999999,
+    "mean": 49145.8325,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-1-B.json",
+    "p50": 49800.0,
+    "p95": 56120.0,
+    "mean": 50344.825,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-2-B.json",
+    "p50": 49685.0,
+    "p95": 56274.499999999985,
+    "mean": 50220.865,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-3-A.json",
+    "p50": 49290.0,
+    "p95": 51888.49999999999,
+    "mean": 49689.455,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-4-A.json",
+    "p50": 49090.0,
+    "p95": 56323.5,
+    "mean": 49702.26,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-5-B.json",
+    "p50": 49720.0,
+    "p95": 54351.94999999996,
+    "mean": 50285.805,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-6-B.json",
+    "p50": 49655.5,
+    "p95": 56454.999999999985,
+    "mean": 50220.2825,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-tiny-7-A.json",
+    "p50": 49450.0,
+    "p95": 54126.94999999997,
+    "mean": 49891.5625,
+    "n": 400,
+    "corpus": "xls-tiny",
+    "archive_sha256": "cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b"
+   }
+  ]
+ },
+ {
+  "case": "xls_semantic_one_edit_save",
+  "shape": "large",
+  "warmup": 10,
+  "samples": 100,
+  "corpus": "xls-large",
+  "archive_sha256_before": [
+   "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+  ],
+  "archive_sha256_after": [
+   "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+  ],
+  "before_median_p50": 1544909.5,
+  "after_median_p50": 1540676.75,
+  "before_median_p95": 1616737.25,
+  "after_median_p95": 1607547.75,
+  "before_median_mean": 1552014.435,
+  "after_median_mean": 1549868.295,
+  "paired_p50_ratios": [
+   0.9973524886927199,
+   0.9934273897459345,
+   0.977520160381163,
+   1.039305635265904
+  ],
+  "paired_mean_ratios": [
+   0.9977500559929771,
+   0.9973522082104743,
+   0.9839050119833431,
+   1.03693190003882
+  ],
+  "median_paired_p50_ratio": 0.9953899392193272,
+  "bootstrap_95ci_p50_ratio": [
+   0.977520160381163,
+   1.039305635265904
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-large-0-A.json",
+    "p50": 1558067.0,
+    "p95": 1633717.5,
+    "mean": 1566758.99,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-large-1-B.json",
+    "p50": 1553942.0,
+    "p95": 1609473.0,
+    "mean": 1563233.87,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-large-2-B.json",
+    "p50": 1527411.5,
+    "p95": 1602390.5,
+    "mean": 1536502.72,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-large-3-A.json",
+    "p50": 1537517.0,
+    "p95": 1588985.0,
+    "mean": 1540581.86,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-large-4-A.json",
+    "p50": 1552302.0,
+    "p95": 1614992.0,
+    "mean": 1557887.46,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-large-5-B.json",
+    "p50": 1517406.5,
+    "p95": 1605622.5,
+    "mean": 1532813.28,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls_semantic_one_edit_save-large-6-B.json",
+    "p50": 1591787.0,
+    "p95": 1693986.5,
+    "mean": 1603243.35,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls_semantic_one_edit_save-large-7-A.json",
+    "p50": 1531587.0,
+    "p95": 1618482.5,
+    "mean": 1546141.41,
+    "n": 100,
+    "corpus": "xls-large",
+    "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb"
+   }
+  ]
+ }
+]
