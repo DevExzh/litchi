@@ -6,7 +6,9 @@ Writes `cleanup.json` in the packet: for every staged binary its SHA-256 and
 size, taken before removal; for every removed tree its path, size and file
 count; and what was kept. The before leg's detached worktree is removed with
 `git worktree remove --force`. The worktree and branch of this change are
-kept.
+kept. The first round's record (before the review) is
+`superseded-f84522f8af/cleanup.json`; running this script again after the
+review's re-measurement writes the second round's `cleanup.json`.
 
 Usage: cleanup.py [--dry-run]
 """
