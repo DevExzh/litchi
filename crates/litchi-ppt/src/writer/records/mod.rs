@@ -26,4 +26,5 @@ pub(crate) use codec::{
     create_docinfo_list_container_with_extensions, create_document_atom_with_font_embedding,
     create_environment_with_font_collection,
 };
+pub(crate) use model::InPlaceRecord;
 pub use model::{Error, RecordBuilder, RecordHeader, record_type};

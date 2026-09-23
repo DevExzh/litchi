@@ -14,10 +14,11 @@ use super::client_data::{
 };
 use super::properties::build_shape_properties;
 use super::text::{
-    build_client_textbox_formatted_with_interactions, build_client_textbox_with_interactions,
+    append_client_textbox_with_interactions, build_client_textbox_formatted_with_interactions,
 };
 use super::validation::validate_user_shape;
 use super::wire::EscherBuilder;
+use crate::writer::records::InPlaceRecord;
 
 #[derive(Clone, Copy)]
 enum ShapeAnchor {
@@ -30,11 +31,22 @@ enum ShapeAnchor {
 }
 
 /// Creates a standalone PPT shape container with a host `ClientAnchor`.
+#[cfg(test)]
 pub(crate) fn create_user_shape_container(
     shape_id: u32,
     shape: &UserShapeData,
 ) -> Result<Vec<u8>, Error> {
     create_shape_container(shape_id, shape, ShapeAnchor::Ppt)
+}
+
+/// Appends a standalone PPT shape container with a host `ClientAnchor` to
+/// `output` in place; on error `output` must be discarded.
+pub(super) fn append_user_shape_container(
+    output: &mut Vec<u8>,
+    shape_id: u32,
+    shape: &UserShapeData,
+) -> Result<(), Error> {
+    append_shape_container(output, shape_id, shape, ShapeAnchor::Ppt)
 }
 
 /// Creates a group-member shape container with a typed `ChildAnchor`.
@@ -61,8 +73,27 @@ fn create_shape_container(
     shape: &UserShapeData,
     anchor_kind: ShapeAnchor,
 ) -> Result<Vec<u8>, Error> {
+    let mut container = Vec::new();
+    append_shape_container(&mut container, shape_id, shape, anchor_kind)?;
+    Ok(container)
+}
+
+/// Appends one `SpContainer` to `output`, writing its children, including a
+/// plain-text `ClientTextbox`, directly after its header rather than into a
+/// separate buffer that is then copied. On error `output` must be discarded.
+fn append_shape_container(
+    output: &mut Vec<u8>,
+    shape_id: u32,
+    shape: &UserShapeData,
+    anchor_kind: ShapeAnchor,
+) -> Result<(), Error> {
     validate_user_shape(shape)?;
-    let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+    let container = InPlaceRecord::begin(
+        output,
+        header_version::CONTAINER,
+        0,
+        record_type::SP_CONTAINER,
+    );
 
     let mut flags = Flags::HAVE_ANCHOR | Flags::HAVE_SPT;
     if matches!(anchor_kind, ShapeAnchor::Child(_)) {
@@ -77,7 +108,7 @@ fn create_shape_container(
 
     let mut sp = EscherBuilder::new(header_version::SP, shape.shape_type, record_type::SP);
     sp.add_data(Sp::with_flags(shape_id, flags).as_bytes());
-    container.add_data(&sp.build()?);
+    output.extend_from_slice(&sp.build()?);
 
     let mut properties: Vec<(Property, Option<Vec<u8>>)> = build_shape_properties(shape)
         .into_iter()
@@ -139,20 +170,20 @@ fn create_shape_container(
             opt.add_data(data);
         }
     }
-    container.add_data(&opt.build()?);
+    output.extend_from_slice(&opt.build()?);
 
     match anchor_kind {
         ShapeAnchor::Child(anchor_data) => {
             let mut anchor =
                 EscherBuilder::new(header_version::SIMPLE, 0, record_type::CHILD_ANCHOR);
             anchor.add_data(anchor_data.as_bytes());
-            container.add_data(&anchor.build()?);
+            output.extend_from_slice(&anchor.build()?);
         },
         ShapeAnchor::Host(anchor_data) => {
             let mut anchor =
                 EscherBuilder::new(header_version::SIMPLE, 0, record_type::CLIENT_ANCHOR);
             anchor.add_data(anchor_data.as_bytes());
-            container.add_data(&anchor.build()?);
+            output.extend_from_slice(&anchor.build()?);
         },
         ShapeAnchor::Ppt => {
             // PPT top-level shapes use the compact eight-byte host anchor.
@@ -166,7 +197,7 @@ fn create_shape_container(
             anchor.add_data(&x1.to_le_bytes());
             anchor.add_data(&x2.to_le_bytes());
             anchor.add_data(&y2.to_le_bytes());
-            container.add_data(&anchor.build()?);
+            output.extend_from_slice(&anchor.build()?);
         },
     }
 
@@ -226,7 +257,7 @@ fn create_shape_container(
     if let Some(client_data_bytes) = client_data {
         crate::ClientData::parse(&client_data_bytes)
             .map_err(|error| std::io::Error::other(error.to_string()))?;
-        container.add_data(&client_data_bytes);
+        output.extend_from_slice(&client_data_bytes);
     }
 
     if let Some(paragraphs) = &shape.paragraphs {
@@ -236,24 +267,24 @@ fn create_shape_container(
                 shape.text_type,
                 &shape.text_interactions,
             )?;
-            container.add_data(&textbox);
+            output.extend_from_slice(&textbox);
         } else if !shape.text_interactions.is_empty() {
             return Err(std::io::Error::other(
                 "shape has text interactions but no corresponding text",
             ));
         }
     } else if let Some(text) = &shape.text {
-        let textbox = build_client_textbox_with_interactions(
+        append_client_textbox_with_interactions(
+            output,
             text,
             shape.text_type,
             &shape.text_interactions,
         )?;
-        container.add_data(&textbox);
     } else if !shape.text_interactions.is_empty() {
         return Err(std::io::Error::other(
             "shape has text interactions but no corresponding text",
         ));
     }
 
-    container.build()
+    container.finish(output)
 }

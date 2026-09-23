@@ -27,7 +27,7 @@ pub(crate) use client_data::build_client_data_with_placeholder;
 #[cfg(test)]
 pub(crate) use drawing::create_dg_container_with_tables;
 pub(crate) use drawing::{
-    create_dg_container_with_charts, create_dg_container_with_shapes, create_dgg_container,
+    append_dg_container_with_charts, create_dg_container_with_shapes, create_dgg_container,
     create_dgg_container_with_blips,
 };
 #[cfg(test)]

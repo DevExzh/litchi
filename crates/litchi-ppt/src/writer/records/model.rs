@@ -180,3 +180,55 @@ impl RecordBuilder {
         self.data.is_empty()
     }
 }
+
+/// A record appended to an output buffer in place: its eight-byte header is
+/// written first and its length patched once the body has been appended.
+///
+/// A nested record can therefore be written straight into its parent's buffer
+/// instead of being built separately and copied in. The header bytes are those
+/// [`RecordBuilder::build`] writes for the same version, instance, type and
+/// body, which are also the `OfficeArt` header bytes of the PPT drawing
+/// builders. When a step between [`Self::begin`] and [`Self::finish`] fails,
+/// the output holds a partial record and must be discarded, as every writer
+/// that uses this type does on error.
+pub(crate) struct InPlaceRecord {
+    start: usize,
+    header: RecordHeader,
+}
+
+impl InPlaceRecord {
+    /// Appends a placeholder header for a record whose body follows.
+    pub(crate) fn begin(
+        output: &mut Vec<u8>,
+        version: u8,
+        instance: u16,
+        record_type: u16,
+    ) -> Self {
+        let start = output.len();
+        output.extend_from_slice(&[0; 8]);
+        Self {
+            start,
+            header: RecordHeader::new(version, instance, record_type, 0),
+        }
+    }
+
+    /// Patches the header with the length of the body appended since
+    /// [`Self::begin`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the header cannot be serialized.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the length keeps RecordBuilder's truncating 32-bit conversion; a stream that large is still refused by the writers' later stream-offset checks"
+    )]
+    pub(crate) fn finish(mut self, output: &mut [u8]) -> Result<(), Error> {
+        let body_start = self.start + 8;
+        self.header.length = output.len().saturating_sub(body_start) as u32;
+        let slot = output
+            .get_mut(self.start..body_start)
+            .ok_or_else(|| std::io::Error::other("in-place record header is outside its output"))?;
+        let mut header = slot;
+        self.header.write(&mut header)
+    }
+}
