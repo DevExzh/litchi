@@ -1,0 +1,64 @@
+[
+ {
+  "selector": "xls_comments_source_backed_edit_save",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 3261003821,
+    "cycles": 2277323912
+   },
+   "raw_large": {
+    "instructions": 10207428291,
+    "cycles": 7957176523
+   },
+   "instructions_per_sample": 347321223.5,
+   "cycles_per_sample": 283992630.55
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 3258028100,
+    "cycles": 2333744559
+   },
+   "raw_large": {
+    "instructions": 10195983678,
+    "cycles": 8162701664
+   },
+   "instructions_per_sample": 346897778.9,
+   "cycles_per_sample": 291447855.25
+  },
+  "instructions_per_sample_change": -0.001219172832955362,
+  "cycles_per_sample_change": 0.026251472390539377
+ },
+ {
+  "selector": "xls_semantic_full_cell_scan",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 1579211289,
+    "cycles": 753943345
+   },
+   "raw_large": {
+    "instructions": 4436422099,
+    "cycles": 1647606894
+   },
+   "instructions_per_sample": 142860540.5,
+   "cycles_per_sample": 44683177.45
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 1541215668,
+    "cycles": 722505187
+   },
+   "raw_large": {
+    "instructions": 4194882983,
+    "cycles": 1632272236
+   },
+   "instructions_per_sample": 132683365.75,
+   "cycles_per_sample": 45488352.45
+  },
+  "instructions_per_sample_change": -0.07123852894844673,
+  "cycles_per_sample_change": 0.018019645109190963
+ }
+]

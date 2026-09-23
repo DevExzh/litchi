@@ -1,0 +1,12 @@
+round 1 probe-before    open p50 1.638 ms  process cycles:u 776103476 instructions:u 2700572458 page-faults 1496
+round 1 probe-after-v1  open p50 1.360 ms  process cycles:u 633879248 instructions:u 1428758751 page-faults 5755
+round 1 probe-c4        open p50 0.774 ms  process cycles:u 370538903 instructions:u 1428527411 page-faults 1286
+round 1 probe-after     open p50 1.250 ms  process cycles:u 594462834 instructions:u 1428581394 page-faults 1298
+round 2 probe-before    open p50 1.591 ms  process cycles:u 756155520 instructions:u 2699816505 page-faults 1682
+round 2 probe-after-v1  open p50 1.365 ms  process cycles:u 629143702 instructions:u 1428738035 page-faults 5753
+round 2 probe-c4        open p50 0.798 ms  process cycles:u 373606741 instructions:u 1428736445 page-faults 5744
+round 2 probe-after     open p50 1.317 ms  process cycles:u 620014351 instructions:u 1428761707 page-faults 5754
+round 3 probe-before    open p50 1.525 ms  process cycles:u 728531801 instructions:u 2699429242 page-faults 1440
+round 3 probe-after-v1  open p50 1.335 ms  process cycles:u 632926835 instructions:u 1428754456 page-faults 1296
+round 3 probe-c4        open p50 0.799 ms  process cycles:u 374628293 instructions:u 1427981348 page-faults 5647
+round 3 probe-after     open p50 1.361 ms  process cycles:u 639728772 instructions:u 1428026054 page-faults 5660

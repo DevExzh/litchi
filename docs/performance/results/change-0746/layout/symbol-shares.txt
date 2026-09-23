@@ -1,0 +1,14 @@
+== probe-c4
+    32.03%  [.] <litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::parse_worksheet_records_with_compatibility::<litchi_xls::wor
+    13.77%  [.] litchi_xls::cell_values::push_entry                                                                                                   
+     7.29%  [.] <litchi_xls::row_block_index::codec::RowBlockIndexCollector>::feed_record                                                             
+     5.59%  [.] <litchi_xls::page_setup::PageSetupCollector>::feed_record                                                                             
+     3.07%  [.] <litchi_xls::layout::Collector>::feed_record                                                                                          
+     2.58%  [.] <litchi_xls::view::codec::ViewCollector>::feed_record                                                                                 
+== probe-after
+    51.43%  [.] <litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::parse_worksheet_records_with_compatibility::<litchi_xls::wor
+     8.83%  [.] litchi_xls::cell_values::push_entry                                                                                                   
+     5.26%  [.] <litchi_xls::conditional_format::codec::Collector>::feed_record                                                                       
+     5.03%  [.] <litchi_xls::row_block_index::codec::RowBlockIndexCollector>::feed_record                                                             
+     3.55%  [.] <litchi_xls::query_table::validation::QueryTableCollector>::feed_record                                                               
+     1.90%  [.] <litchi_xls::pivot_table::package::PivotTableCollector>::feed_record                                                                  

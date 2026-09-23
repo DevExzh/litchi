@@ -1,0 +1,85 @@
+HEAD b85d3e534cee7111805a6bbc0617e9ae77aa510e
+rustc rustc 1.95.0 (59807616e 2026-04-14)
+
+$ cargo fmt --all --check
+exit 0
+
+$ cargo check -p litchi-xls --all-targets --locked --offline
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.34s
+exit 0
+
+$ cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.57s
+exit 0
+
+$ cargo clippy -p litchi-xls --lib --no-deps --locked --offline -- -D warnings
+        Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-ograph)
+        Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-crypto)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.78s
+exit 0
+
+$ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
+        = help: to override `-D clippy::all` add `#[allow(clippy::unusual_byte_groupings)]`
+    
+    error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+exit 101
+
+$ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
+        Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-vba)
+        Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-crypto)
+        Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.90s
+exit 0
+
+$ cargo test -p litchi-xls --locked --offline
+    
+    test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+    
+    all doctests ran in 2.46s; merged doctests compilation took 2.46s
+exit 0
+
+$ cargo test --release -p litchi-xls --lib --locked --offline -- generic_commit_publishes validation_only_tests deterministically
+    test workbook::validation_only_tests::worksheet_parse_agrees_with_the_complete_reader_under_mutation ... ok
+    
+    test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 4.57s
+    
+exit 0
+
+$ cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+    
+    test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+    
+    all doctests ran in 0.93s; merged doctests compilation took 0.93s
+exit 0
+
+$ RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-xls --no-deps --locked --offline
+     Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls)
+        Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.80s
+       Generated /home/zhuhe/code/litchi-worktrees/targets/0746/doc/litchi_xls/index.html
+exit 0
+
+$ python3 tools/check_crate_boundaries.py
+      [014] litchi-iwa -> litchi-keynote
+      [015] litchi-iwa -> litchi-numbers
+      [016] litchi-iwa -> litchi-numbers-wire
+      [017] litchi-iwa -> litchi-pages
+exit 0
+
+$ python3 tools/non_iwork_gate.py verify
+    facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+    verified_bulk_tree_roots=45
+    verified_facade_safe_trees=35
+    verified_facade_combined_tree=1
+exit 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+    OK: 10 performance claims validated (structural)
+exit 0
+
+note: the --all-targets clippy exit 101 is the pre-existing unusual_byte_groupings error in crates/litchi-xls/tests/xls_query_index_cache.rs:546 (file untouched by this change); the identical command on the base checkout 009d515bef also exits 101 with the same single error.
+gates done

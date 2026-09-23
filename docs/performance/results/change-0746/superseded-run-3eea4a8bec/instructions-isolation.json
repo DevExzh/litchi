@@ -1,0 +1,482 @@
+[
+ {
+  "fixture": "54016.xls",
+  "operation": "open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 767393361,
+    "cycles": 235520131
+   },
+   "raw_large": {
+    "instructions": 3850258488,
+    "cycles": 1175768132
+   },
+   "instructions_per_op": 154143256.35,
+   "cycles_per_op": 47012400.05
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 427263433,
+    "cycles": 141534135
+   },
+   "raw_large": {
+    "instructions": 2134432610,
+    "cycles": 686478687
+   },
+   "instructions_per_op": 85358458.85,
+   "cycles_per_op": 27247227.6
+  },
+  "instructions_per_op_change": -0.4462394212291467,
+  "cycles_per_op_change": -0.42042466304589354
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "number-plan",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 767206661,
+    "cycles": 261445741
+   },
+   "raw_large": {
+    "instructions": 3843972036,
+    "cycles": 1303571069
+   },
+   "instructions_per_op": 153838268.75,
+   "cycles_per_op": 52106266.4
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 428475365,
+    "cycles": 166058320
+   },
+   "raw_large": {
+    "instructions": 2142065114,
+    "cycles": 813857397
+   },
+   "instructions_per_op": 85679487.45,
+   "cycles_per_op": 32389953.85
+  },
+  "instructions_per_op_change": -0.44305478639234874,
+  "cycles_per_op_change": -0.37838659171327615
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "number-source-backed",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 890248749,
+    "cycles": 327962788
+   },
+   "raw_large": {
+    "instructions": 4591135736,
+    "cycles": 1729904533
+   },
+   "instructions_per_op": 185044349.35,
+   "cycles_per_op": 70097087.25
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 551993032,
+    "cycles": 222446555
+   },
+   "raw_large": {
+    "instructions": 2882623057,
+    "cycles": 1182233037
+   },
+   "instructions_per_op": 116531501.25,
+   "cycles_per_op": 47989324.1
+  },
+  "instructions_per_op_change": -0.37025096059762497,
+  "cycles_per_op_change": -0.31538775742782377
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "number-generic",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 1028440833,
+    "cycles": 455851941
+   },
+   "raw_large": {
+    "instructions": 5418820633,
+    "cycles": 2476467735
+   },
+   "instructions_per_op": 219518990.0,
+   "cycles_per_op": 101030789.7
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 560862304,
+    "cycles": 246722291
+   },
+   "raw_large": {
+    "instructions": 2936314690,
+    "cycles": 1302967614
+   },
+   "instructions_per_op": 118772619.3,
+   "cycles_per_op": 52812266.15
+  },
+  "instructions_per_op_change": -0.4589414824658222,
+  "cycles_per_op_change": -0.47726563053876636
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "string-generic",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 1071714051,
+    "cycles": 468135776
+   },
+   "raw_large": {
+    "instructions": 5680254422,
+    "cycles": 2545457843
+   },
+   "instructions_per_op": 230427018.55,
+   "cycles_per_op": 103866103.35
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 602234884,
+    "cycles": 258814962
+   },
+   "raw_large": {
+    "instructions": 3184487374,
+    "cycles": 1381172659
+   },
+   "instructions_per_op": 129112624.5,
+   "cycles_per_op": 56117884.85
+  },
+  "instructions_per_op_change": -0.43968105254122336,
+  "cycles_per_op_change": -0.45970934655266427
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "comments-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 582817285,
+    "cycles": 177055057
+   },
+   "raw_large": {
+    "instructions": 3508311565,
+    "cycles": 1054073456
+   },
+   "instructions_per_op": 146274714.0,
+   "cycles_per_op": 43850919.95
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 311601196,
+    "cycles": 101970494
+   },
+   "raw_large": {
+    "instructions": 1867213301,
+    "cycles": 596075732
+   },
+   "instructions_per_op": 77780605.25,
+   "cycles_per_op": 24705261.9
+  },
+  "instructions_per_op_change": -0.4682566581535069,
+  "cycles_per_op_change": -0.4366078994883208
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "visibility-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 560186199,
+    "cycles": 178772186
+   },
+   "raw_large": {
+    "instructions": 3372659811,
+    "cycles": 1072800317
+   },
+   "instructions_per_op": 140623680.6,
+   "cycles_per_op": 44701406.55
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 288983197,
+    "cycles": 100098763
+   },
+   "raw_large": {
+    "instructions": 1731557577,
+    "cycles": 565929438
+   },
+   "instructions_per_op": 72128719.0,
+   "cycles_per_op": 23291533.75
+  },
+  "instructions_per_op_change": -0.48707985246689667,
+  "cycles_per_op_change": -0.47895300064109503
+ },
+ {
+  "fixture": "54016.xls",
+  "operation": "reader-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 557524360,
+    "cycles": 180319874
+   },
+   "raw_large": {
+    "instructions": 3356767165,
+    "cycles": 1004204811
+   },
+   "instructions_per_op": 139962140.25,
+   "cycles_per_op": 41194246.85
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 556351975,
+    "cycles": 164323477
+   },
+   "raw_large": {
+    "instructions": 3349844018,
+    "cycles": 957335832
+   },
+   "instructions_per_op": 139674602.15,
+   "cycles_per_op": 39650617.75
+  },
+  "instructions_per_op_change": -0.0020543991359834868,
+  "cycles_per_op_change": -0.03747195829604055
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 127594770,
+    "cycles": 37622764
+   },
+   "raw_large": {
+    "instructions": 637049278,
+    "cycles": 181047352
+   },
+   "instructions_per_op": 25472725.4,
+   "cycles_per_op": 7171229.4
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 67948578,
+    "cycles": 20131581
+   },
+   "raw_large": {
+    "instructions": 337431589,
+    "cycles": 89428204
+   },
+   "instructions_per_op": 13474150.55,
+   "cycles_per_op": 3464831.15
+  },
+  "instructions_per_op_change": -0.47103616364505696,
+  "cycles_per_op_change": -0.5168427954626581
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "number-plan",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 126485136,
+    "cycles": 40887807
+   },
+   "raw_large": {
+    "instructions": 630560764,
+    "cycles": 192050197
+   },
+   "instructions_per_op": 25203781.4,
+   "cycles_per_op": 7558119.5
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 67030999,
+    "cycles": 22396619
+   },
+   "raw_large": {
+    "instructions": 331766095,
+    "cycles": 106539995
+   },
+   "instructions_per_op": 13236754.8,
+   "cycles_per_op": 4207168.8
+  },
+  "instructions_per_op_change": -0.4748107599441407,
+  "cycles_per_op_change": -0.44335772939287343
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "number-source-backed",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 142474382,
+    "cycles": 49906077
+   },
+   "raw_large": {
+    "instructions": 727462512,
+    "cycles": 243252841
+   },
+   "instructions_per_op": 29249406.5,
+   "cycles_per_op": 9667338.2
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 83070929,
+    "cycles": 31083291
+   },
+   "raw_large": {
+    "instructions": 428291546,
+    "cycles": 159341611
+   },
+   "instructions_per_op": 17261030.85,
+   "cycles_per_op": 6412916.0
+  },
+  "instructions_per_op_change": -0.40986731303419777,
+  "cycles_per_op_change": -0.3366409794166505
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "number-generic",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 164709722,
+    "cycles": 69289791
+   },
+   "raw_large": {
+    "instructions": 860051097,
+    "cycles": 365518092
+   },
+   "instructions_per_op": 34767068.75,
+   "cycles_per_op": 14811415.05
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 83518316,
+    "cycles": 34283518
+   },
+   "raw_large": {
+    "instructions": 430712874,
+    "cycles": 177479245
+   },
+   "instructions_per_op": 17359727.9,
+   "cycles_per_op": 7159786.35
+  },
+  "instructions_per_op_change": -0.5006847420808234,
+  "cycles_per_op_change": -0.5166034895497713
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "comments-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 99356589,
+    "cycles": 29918845
+   },
+   "raw_large": {
+    "instructions": 594592651,
+    "cycles": 161285072
+   },
+   "instructions_per_op": 24761803.1,
+   "cycles_per_op": 6568311.35
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 51931819,
+    "cycles": 13779704
+   },
+   "raw_large": {
+    "instructions": 308655183,
+    "cycles": 75503314
+   },
+   "instructions_per_op": 12836168.2,
+   "cycles_per_op": 3086180.5
+  },
+  "instructions_per_op_change": -0.48161415595781076,
+  "cycles_per_op_change": -0.5301409547219469
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "visibility-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 94212612,
+    "cycles": 28348386
+   },
+   "raw_large": {
+    "instructions": 564422255,
+    "cycles": 154238159
+   },
+   "instructions_per_op": 23510482.15,
+   "cycles_per_op": 6294488.65
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 46694399,
+    "cycles": 12668693
+   },
+   "raw_large": {
+    "instructions": 277234911,
+    "cycles": 71714528
+   },
+   "instructions_per_op": 11527025.6,
+   "cycles_per_op": 2952291.75
+  },
+  "instructions_per_op_change": -0.5097069670261951,
+  "cycles_per_op_change": -0.5309719479754722
+ },
+ {
+  "fixture": "xls-large.xls",
+  "operation": "reader-open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 93854203,
+    "cycles": 28585821
+   },
+   "raw_large": {
+    "instructions": 561958021,
+    "cycles": 164774286
+   },
+   "instructions_per_op": 23405190.9,
+   "cycles_per_op": 6809423.25
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 93770066,
+    "cycles": 25880156
+   },
+   "raw_large": {
+    "instructions": 561708902,
+    "cycles": 146779979
+   },
+   "instructions_per_op": 23396941.8,
+   "cycles_per_op": 6044991.15
+  },
+  "instructions_per_op_change": -0.0003524474564314817,
+  "cycles_per_op_change": -0.1122609172516923
+ }
+]
