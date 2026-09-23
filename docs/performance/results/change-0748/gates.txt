@@ -301,3 +301,52 @@ exit 101
 $ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
         Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.52s
 exit 0
+
+# Review round (2026-09-23), HEAD f45930efb5, fresh CARGO_TARGET_DIR=targets/0748,
+# TMPDIR=targets/0748/tmp, every command in the foreground
+
+$ cargo fmt --all --check
+exit 0
+
+$ cargo test -p litchi-cfb --locked --offline
+    test result: ok. 376 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+    test result: ok. 7 passed; 0 failed; 0 ignored
+    test result: ok. 11 passed; 0 failed; 0 ignored
+    test result: ok. 13 passed; 0 failed; 0 ignored
+    test result: ok. 6 passed; 0 failed; 0 ignored
+    test result: ok. 6 passed; 0 failed; 0 ignored
+    test result: ok. 12 passed; 0 failed; 1 ignored
+exit 0
+
+$ cargo test -p litchi-ole-common --locked --offline
+    166 passed, 0 failed, 0 ignored (all suites)
+exit 0
+
+$ cargo test -p litchi-xls --locked --offline
+    73 suites: 1474 passed, 0 failed, 1 ignored
+exit 0
+
+$ cargo clippy -p litchi-cfb -p litchi-ole-common -p litchi-xls --lib --no-deps --locked --offline -- -D warnings
+exit 0
+
+$ cargo clippy -p litchi-cfb -p litchi-ole-common --all-targets --no-deps --locked --offline -- -D warnings
+exit 0
+
+$ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings
+    error: digits of hex, binary or octal literal not in groups of equal size
+       --> crates/litchi-xls/tests/xls_query_index_cache.rs:546:32
+exit 101 (pre-existing; identical on the base, see the first round)
+
+$ cargo clippy -p litchi-xls --all-targets --no-deps --locked --offline -- -D warnings -A clippy::unusual_byte_groupings
+exit 0
+
+$ RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-cfb -p litchi-ole-common -p litchi-xls --no-deps --locked --offline
+exit 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+    OK: 10 performance claims validated (structural)
+exit 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+    OK: 10 performance claims validated (strict)
+exit 0
