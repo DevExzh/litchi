@@ -267,6 +267,19 @@ fn releasing_and_dropping_return_the_retained_bytes() -> Result<()> {
     let mut reused = Package::from_vec(destination.to_bytes()?)?;
     reused.apply_cross_slide_copy_plan(&source, &plan)?;
     assert_eq!(rebuilt.to_bytes()?, reused.to_bytes()?);
+    // The application shares the retained allocation with the package it
+    // publishes instead of copying it (change 0751).
+    let published = reused
+        .opc()?
+        .exact_source_shared()
+        .expect("the published candidate is an unmodified owned source");
+    assert!(Arc::ptr_eq(&published, &archive));
+    drop(published);
+    assert_eq!(
+        Arc::strong_count(&archive),
+        3,
+        "the plan and the published package share one allocation"
+    );
 
     // Applying does not release: a plan may be applied again.
     assert_eq!(plan.retained_candidate_bytes(), Some(archive.len()));
@@ -275,8 +288,14 @@ fn releasing_and_dropping_return_the_retained_bytes() -> Result<()> {
     drop(plan);
     assert_eq!(
         Arc::strong_count(&archive),
+        2,
+        "dropping the plan returns its handle; the published package keeps its own"
+    );
+    drop(reused);
+    assert_eq!(
+        Arc::strong_count(&archive),
         1,
-        "dropping the plan returns the retained bytes"
+        "dropping the published package returns the last other handle"
     );
     Ok(())
 }

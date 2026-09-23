@@ -26,7 +26,13 @@ pub struct Package {
     /// names, so a memo left over from an earlier package state can only miss,
     /// never answer for bytes that no longer exist. Nothing observable depends
     /// on it: a miss is an ordinary hash.
-    pub(crate) part_digests: std::sync::Arc<crate::opened::PartDigests>,
+    ///
+    /// The slot is also filled, when empty, by a capture of the current graph
+    /// (change 0751), which is why it is a cell: a capture takes `&self`. It
+    /// is only ever set from a memo whose every entry names an allocation
+    /// `opc` holds, and every mutation that publishes no opened-presentation
+    /// snapshot still empties it.
+    pub(crate) part_digests: std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "automatic-fonts")]
@@ -197,7 +203,21 @@ impl Package {
                 reason: "save and reopen the authored presentation before starting an opened-package transaction",
             });
         }
-        crate::opened::capture_with_provenance(&self.opc, limits, self.physical_source_provenance)
+        let snapshot = match self.part_digest_memo() {
+            Some(parent) => crate::opened::capture_with_parent_digests(
+                &self.opc,
+                limits,
+                self.physical_source_provenance,
+                parent,
+            )?,
+            None => crate::opened::capture_with_provenance(
+                &self.opc,
+                limits,
+                self.physical_source_provenance,
+            )?,
+        };
+        self.offer_part_digests(&snapshot);
+        Ok(snapshot)
     }
 
     /// Start one detached transaction over an immutable opened root.
@@ -310,6 +330,11 @@ impl Package {
             plan,
             source.physical_source_provenance,
             self.physical_source_provenance,
+            crate::opened::cross_copy_plan::LiveDigests {
+                source: source.part_digest_memo(),
+                // A field borrow, disjoint from `self.opc`.
+                destination: self.part_digests.get().map(std::sync::Arc::as_ref),
+            },
         )?;
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
@@ -370,6 +395,11 @@ impl Package {
             patch,
             source.physical_source_provenance,
             self.physical_source_provenance,
+            crate::opened::cross_copy_plan::LiveDigests {
+                source: source.part_digest_memo(),
+                // A field borrow, disjoint from `self.opc`.
+                destination: self.part_digests.get().map(std::sync::Arc::as_ref),
+            },
         )?;
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
@@ -406,6 +436,10 @@ impl Package {
             "apply_slide_removal_plan",
             self.physical_source_provenance,
         )?;
+        // Like every other publication, adopt the published snapshot's memo,
+        // so the memo of the graph this removal replaced (which a capture may
+        // have offered, change 0751) is not kept.
+        self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -492,18 +526,23 @@ impl Package {
         // The opened owner validates and captures a detached complete candidate
         // before one assignment, so the facade's clone-and-rollback wrapper
         // would only duplicate the entire OPC graph without adding atomicity.
+        let no_memo = crate::opened::PartDigests::default();
+        let parent = self
+            .part_digests
+            .get()
+            .map_or(&no_memo, std::sync::Arc::as_ref);
         let snapshot = crate::opened::apply_committed(
             &mut self.opc,
             patch,
             committed,
             self.physical_source_provenance,
-            &self.part_digests,
+            parent,
         )?;
         // The published snapshot describes the package now held in `self.opc`,
         // and every entry of its memo names one of that package's own payload
         // allocations, so adopting it retains nothing this facade does not
         // already own.
-        self.part_digests = std::sync::Arc::clone(&snapshot.part_digests);
+        self.adopt_part_digests(&snapshot);
         if changed {
             self.mutable_pres = None;
         }
@@ -1511,7 +1550,32 @@ impl Package {
     /// package holds, and the snapshot was captured from the graph now in
     /// `self.opc`, so adopting it retains nothing this package does not hold.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
-        self.part_digests = std::sync::Arc::clone(&snapshot.part_digests);
+        self.part_digests =
+            std::sync::OnceLock::from(std::sync::Arc::clone(&snapshot.part_digests));
+    }
+
+    /// Keep the memo of a capture of the current graph when this package holds
+    /// none (change 0751).
+    ///
+    /// The snapshot's package is a clone of `self.opc`, and a clone of a
+    /// built-in part shares its payload allocation, so when every part is
+    /// built in, every entry of the capture's memo names an allocation
+    /// `self.opc` itself holds and keeping it retains nothing the package does
+    /// not hold. A package holding a caller-defined part keeps nothing, since
+    /// such a part may copy its payload when cloned. A filled slot is kept: it
+    /// describes this same graph, because every mutation that publishes no
+    /// snapshot empties it and every publication replaces it.
+    fn offer_part_digests(&self, snapshot: &crate::opened::Snapshot) {
+        if self.part_digests.get().is_none() && self.opc.holds_only_built_in_parts() {
+            let _kept = self
+                .part_digests
+                .set(std::sync::Arc::clone(&snapshot.part_digests));
+        }
+    }
+
+    /// The payload-digest memo this package retains for its current graph.
+    pub(crate) fn part_digest_memo(&self) -> Option<&crate::opened::PartDigests> {
+        self.part_digests.get().map(std::sync::Arc::as_ref)
     }
 
     /// Drop the retained payload-digest memo.
@@ -1521,7 +1585,7 @@ impl Package {
     /// own graph has replaced. The next capture hashes from cold, which costs
     /// time and can never change a value.
     pub(crate) fn release_part_digests(&mut self) {
-        self.part_digests = std::sync::Arc::default();
+        self.part_digests = std::sync::OnceLock::new();
     }
 
     pub(crate) fn ensure_plain_mutation(&self, operation: &'static str) -> Result<()> {
