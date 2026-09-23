@@ -2889,9 +2889,7 @@ fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
 /// without being hashed.
 fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     reject_unknown_non_part_members(package, "cross-slide physical authorization")?;
-    if let Some(archive) = package.exact_source_shared() {
-        let length = archive.len();
-        drop(archive);
+    if let Some(length) = package.exact_source_len() {
         if length > limits.max_patch_bytes() {
             return Err(Error::Limit {
                 resource: "cross-slide serialized archive bytes",

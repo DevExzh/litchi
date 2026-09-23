@@ -99,7 +99,7 @@ pub struct OpcPackage {
 
     /// Owned source archive retained for exact and targeted publication,
     /// with the digest memo bound to exactly those bytes (change 0751).
-    source_archive: Option<owned_source::OwnedSource>,
+    source_archive: Option<retained_archive::RetainedArchive>,
 
     /// Read limits the owned source archive was admitted under. Meaningful
     /// only while `source_archive` is `Some`; a compressed transfer out of the
@@ -291,7 +291,19 @@ impl OpcPackage {
         }
         self.source_archive
             .as_ref()
-            .map(owned_source::OwnedSource::sha256)
+            .map(retained_archive::RetainedArchive::sha256)
+    }
+
+    /// Length of the exact owned source archive, while the exact-source
+    /// authorization is intact: the number of bytes [`Self::to_stream`]
+    /// writes for such a package.
+    ///
+    /// Returns `None` exactly when [`Self::exact_source_sha256`] does. It reads
+    /// the length without taking a handle to the archive or hashing it, so a
+    /// caller can check a bound before asking for the digest.
+    #[must_use]
+    pub fn exact_source_len(&self) -> Option<usize> {
+        self.exact_source().map(<[u8]>::len)
     }
 
     /// The read limits this package's owned source archive was admitted
@@ -1470,7 +1482,7 @@ impl OpcPackage {
             self.bind_relationship_captures(preservation);
         }
         self.preservation = preservation.map(Arc::new);
-        self.source_archive = Some(owned_source::OwnedSource::new(source));
+        self.source_archive = Some(retained_archive::RetainedArchive::new(source));
         self.source_limits = limits;
         self.transfer_index = Some(Arc::new(OnceLock::new()));
         self.exact_source_authorized = true;
@@ -1501,20 +1513,20 @@ impl OpcPackage {
 
 /// The retained owned source archive and the digest memo bound to it.
 ///
-/// The fields are private to this module and [`OwnedSource::new`] is the only
+/// The fields are private to this module and [`RetainedArchive::new`] is the only
 /// constructor, so an archive always enters a package with a fresh, empty
 /// memo, and a digest can never be attached to other bytes: struct-update
 /// syntax or field assignment elsewhere in the crate cannot pair one archive's
 /// digest with another archive. The memo is filled at most once, from exactly
 /// the bytes it describes; clones share both the archive and the memo, so an
 /// ingress and every clone of it hash the archive at most once between them.
-mod owned_source {
+mod retained_archive {
     use std::sync::{Arc, OnceLock};
 
     use sha2::{Digest as _, Sha256};
 
     #[derive(Clone)]
-    pub(super) struct OwnedSource {
+    pub(super) struct RetainedArchive {
         /// The retained archive. It is never mutated: no path reaches it
         /// through `Arc::get_mut` or `Arc::make_mut`, and a further owner of
         /// the allocation cannot mutate it in place while this one exists.
@@ -1523,7 +1535,7 @@ mod owned_source {
         sha256: Arc<OnceLock<[u8; 32]>>,
     }
 
-    impl OwnedSource {
+    impl RetainedArchive {
         pub(super) fn new(bytes: Arc<Vec<u8>>) -> Self {
             Self {
                 bytes,
@@ -2065,6 +2077,7 @@ mod tests {
         ];
         for package in &packages {
             assert_eq!(package.exact_source_sha256(), Some(expected));
+            assert_eq!(package.exact_source_len(), Some(bytes.len()));
             let mut streamed = Vec::new();
             package.to_stream(&mut streamed).unwrap();
             assert_eq!(sha256_of(&streamed), expected);
@@ -2072,6 +2085,7 @@ mod tests {
         }
 
         assert_eq!(OpcPackage::new().exact_source_sha256(), None);
+        assert_eq!(OpcPackage::new().exact_source_len(), None);
         assert_eq!(
             OpcPackage::from_bytes(&bytes)
                 .unwrap()
@@ -2102,6 +2116,7 @@ mod tests {
 
         clone.set_save_options(SaveOptions::default());
         assert_eq!(clone.exact_source_sha256(), None, "an edit revokes it");
+        assert_eq!(clone.exact_source_len(), None, "and the length with it");
         assert_eq!(package.exact_source_sha256(), Some(sha256_of(&bytes)));
 
         let again = OpcPackage::from_vec(bytes.clone()).unwrap();
