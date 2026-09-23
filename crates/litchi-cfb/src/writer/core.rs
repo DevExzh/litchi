@@ -1812,7 +1812,7 @@ fn validate_stream_size(
     Ok(())
 }
 
-fn plan_validation_declines(error: &OleError) -> bool {
+pub(super) fn plan_validation_declines(error: &OleError) -> bool {
     matches!(
         error,
         OleError::InvalidFormat(_)

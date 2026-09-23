@@ -26,9 +26,12 @@ use super::super::consts::{
     DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET,
     MAXREGSECT, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
-use super::super::file::{OleError, OleFile, OleFileLimits};
+use super::super::file::{CandidateBytes, OleError, OleFile, OleFileLimits, StreamCompareScratch};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+
+#[cfg(test)]
+mod validation_tests;
 
 /// Header offset of the Number of Directory Sectors field (MS-CFB 2.2).
 const NUM_DIR_SECTORS_OFFSET: usize = 0x28;
@@ -741,6 +744,7 @@ enum PlannedSector {
 
 /// A complete source-anchored serialization, ready to emit.
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone))]
 pub(super) struct ReusePlan {
     sector_size: usize,
     header_sector: Vec<u8>,
@@ -811,6 +815,62 @@ impl Seek for PlanCursor<'_> {
     }
 }
 
+/// The planned artifact's bytes, examined where they lie.
+///
+/// [`OleFile::stream_equals`] asks this view about exactly the byte ranges
+/// [`OleFile::open_stream`] would read through a [`PlanCursor`]. The view
+/// answers from the same sources [`ReusePlan::read_at`] copies from, without
+/// copying, and fails exactly where that read fails. Its failures are the
+/// plan's own [`OleError::InvalidData`] rather than the same message wrapped
+/// in the [`OleError::Io`] a cursor read reports; the writer declines both
+/// to the from-scratch serialization.
+#[derive(Clone, Copy)]
+struct PlanView<'a> {
+    plan: &'a ReusePlan,
+    streams: &'a [StreamInput<'a>],
+}
+
+impl CandidateBytes for PlanView<'_> {
+    fn equals_at(&self, offset: u64, expected: &[u8]) -> Result<bool, OleError> {
+        self.plan
+            .examine_at(self.streams, offset, expected.len(), Some(expected))
+    }
+
+    fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError> {
+        self.plan
+            .examine_at(self.streams, offset, len, None)
+            .map(drop)
+    }
+}
+
+/// Whether `next` is the physical successor of `previous` within one source:
+/// the next sector of the same table image or of the same stream's payload,
+/// or another unallocated sector. [`ReusePlan::examine_at`] examines such a
+/// run as one contiguous slice of that source.
+fn continues(previous: PlannedSector, next: PlannedSector) -> bool {
+    let successor = |before: u32, after: u32| before.checked_add(1) == Some(after);
+    match (previous, next) {
+        (PlannedSector::Free, PlannedSector::Free) => true,
+        (PlannedSector::Fat(before), PlannedSector::Fat(after))
+        | (PlannedSector::MiniFat(before), PlannedSector::MiniFat(after))
+        | (PlannedSector::Directory(before), PlannedSector::Directory(after))
+        | (PlannedSector::MiniStream(before), PlannedSector::MiniStream(after)) => {
+            successor(before, after)
+        },
+        (
+            PlannedSector::Stream {
+                index: before_index,
+                chunk: before_chunk,
+            },
+            PlannedSector::Stream {
+                index: after_index,
+                chunk: after_chunk,
+            },
+        ) => before_index == after_index && successor(before_chunk, after_chunk),
+        _ => false,
+    }
+}
+
 impl ReusePlan {
     pub(super) const fn report(&self) -> SectorLayoutReport {
         self.report
@@ -822,7 +882,44 @@ impl ReusePlan {
     /// readback proves that the planner emitted the model payloads at their
     /// assigned chains. The validation view is positional and does not
     /// allocate a second full output artifact.
+    ///
+    /// The readback does not materialize the streams either.
+    /// [`OleFile::stream_equals`] performs [`OleFile::open_stream`]'s lookup
+    /// and allocation traversal with its checks and asks the plan whether
+    /// each physical range it would read holds the model's bytes. The verdict
+    /// is the one `open_stream` followed by a byte comparison would reach; a
+    /// range whose planned source is the very payload slice the model
+    /// supplies for that position compares equal without being read, and
+    /// every other range is compared byte for byte.
     pub(super) fn validate(&self, streams: &[StreamInput<'_>]) -> Result<(), OleError> {
+        let output_length = self.output_len()?;
+        let directory_length = u64::try_from(self.directory_image.len())
+            .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
+        let limits = OleFileLimits::for_writer(output_length, directory_length)?;
+        let check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        let view = PlanView {
+            plan: self,
+            streams,
+        };
+        let mut scratch = StreamCompareScratch::default();
+        let mut refs: Vec<&str> = Vec::new();
+        for stream in streams {
+            refs.clear();
+            refs.try_reserve(stream.path.len())
+                .map_err(|source| OleError::allocation("CFB planned stream path", source))?;
+            refs.extend(stream.path.iter().map(String::as_str));
+            if !check.stream_equals(&refs, stream.bytes, &mut scratch, &view)? {
+                return Err(invalid("CFB reused layout stream readback differs"));
+            }
+        }
+        Ok(())
+    }
+
+    /// The validation this plan used before streams were compared in place:
+    /// every stream is materialized by [`OleFile::open_stream`] and compared
+    /// with the model. Tests hold [`Self::validate`] to this oracle.
+    #[cfg(test)]
+    fn validate_by_readback(&self, streams: &[StreamInput<'_>]) -> Result<(), OleError> {
         let output_length = self.output_len()?;
         let directory_length = u64::try_from(self.directory_image.len())
             .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
@@ -839,6 +936,165 @@ impl ReusePlan {
             }
         }
         Ok(())
+    }
+
+    /// Walks the `len` planned bytes at `offset` that [`Self::read_at`]
+    /// would copy, failing exactly where that read fails, and reports
+    /// whether they equal `expected` when it is given (`true` otherwise).
+    ///
+    /// Like a `read_exact` through [`PlanCursor`], a range that does not lie
+    /// wholly inside the output is an error. Consecutive sectors that
+    /// [`continues`] joins are examined as one slice of their common source;
+    /// `read_at` copies the same bytes sector by sector, and the run's
+    /// bounds and overflow checks fail exactly when one of its sectors' would.
+    /// A stream payload slice that is the very slice of `expected` it is
+    /// compared with is equal without being read. Once a mismatch is known,
+    /// the rest of the range is still walked for its errors but not compared.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one walk mirrors `read_at` case for case; splitting it would separate each case from the bounds it shares"
+    )]
+    fn examine_at(
+        &self,
+        streams: &[StreamInput<'_>],
+        offset: u64,
+        len: usize,
+        expected: Option<&[u8]>,
+    ) -> Result<bool, OleError> {
+        let length = self.output_len()?;
+        if expected.is_some_and(|expected| expected.len() != len) {
+            return Err(invalid(
+                "CFB planned comparison length differs from its range",
+            ));
+        }
+        let end = offset
+            .checked_add(
+                u64::try_from(len)
+                    .map_err(|_error| invalid("CFB planned read length exceeds u64"))?,
+            )
+            .ok_or_else(|| invalid("CFB planned read range overflows u64"))?;
+        if end > length {
+            return Err(invalid("CFB planned read leaves the output"));
+        }
+        let header_len = u64::try_from(self.header_sector.len())
+            .map_err(|_error| invalid("CFB planned header length exceeds u64"))?;
+        let sector_size_u64 = u64::try_from(self.sector_size)
+            .map_err(|_error| invalid("CFB sector size exceeds u64"))?;
+        let mut equal = true;
+        let mut done = 0usize;
+        while done < len {
+            let absolute = offset
+                .checked_add(
+                    u64::try_from(done)
+                        .map_err(|_error| invalid("CFB planned read offset exceeds u64"))?,
+                )
+                .ok_or_else(|| invalid("CFB planned read offset overflows u64"))?;
+            let expected_part =
+                |count: usize| expected.and_then(|expected| expected.get(done..done + count));
+            if absolute < header_len {
+                let source_offset = usize::try_from(absolute)
+                    .map_err(|_error| invalid("CFB planned header offset exceeds usize"))?;
+                let count = (self.header_sector.len() - source_offset).min(len - done);
+                if equal && let Some(wanted) = expected_part(count) {
+                    equal = self.header_sector[source_offset..source_offset + count] == *wanted;
+                }
+                done += count;
+                continue;
+            }
+
+            let body_offset = absolute - header_len;
+            let sector_index = usize::try_from(body_offset / sector_size_u64)
+                .map_err(|_error| invalid("CFB planned sector index exceeds usize"))?;
+            let within = usize::try_from(body_offset % sector_size_u64)
+                .map_err(|_error| invalid("CFB planned sector offset exceeds usize"))?;
+            let planned = *self
+                .sectors
+                .get(sector_index)
+                .ok_or_else(|| invalid("CFB planned read sector is outside the output"))?;
+            // Join the following sectors this range also reads while they
+            // continue the same source.
+            let remaining = len - done;
+            let mut run = 1usize;
+            let mut span = self.sector_size - within;
+            let mut last = planned;
+            while span < remaining {
+                let Some(next) = sector_index
+                    .checked_add(run)
+                    .and_then(|index| self.sectors.get(index))
+                    .copied()
+                else {
+                    break;
+                };
+                if !continues(last, next) {
+                    break;
+                }
+                last = next;
+                run += 1;
+                span += self.sector_size;
+            }
+            let count = span.min(remaining);
+
+            match planned {
+                PlannedSector::Free => {
+                    if equal && let Some(wanted) = expected_part(count) {
+                        equal = wanted.iter().all(|&byte| byte == 0);
+                    }
+                },
+                PlannedSector::Fat(position)
+                | PlannedSector::MiniFat(position)
+                | PlannedSector::Directory(position)
+                | PlannedSector::MiniStream(position) => {
+                    let (image, resource) = match planned {
+                        PlannedSector::Fat(_) => (&self.fat_image, "FAT"),
+                        PlannedSector::MiniFat(_) => (&self.minifat_image, "MiniFAT"),
+                        PlannedSector::Directory(_) => (&self.directory_image, "directory"),
+                        _ => (&self.ministream_image, "mini stream"),
+                    };
+                    let image = Self::image_run(image, position, run, self.sector_size, resource)?;
+                    if equal && let Some(wanted) = expected_part(count) {
+                        equal = image[within..within + count] == *wanted;
+                    }
+                },
+                PlannedSector::Stream { index, chunk } => {
+                    let stream_index =
+                        usize_from_u32(index, "CFB reused layout stream index does not fit usize")?;
+                    let bytes = streams
+                        .get(stream_index)
+                        .ok_or_else(|| invalid("CFB reused layout names a missing stream"))?
+                        .bytes;
+                    let chunk = usize_from_u32(chunk, "CFB stream chunk does not fit usize")?;
+                    let source_start = chunk
+                        .checked_mul(self.sector_size)
+                        .and_then(|start| start.checked_add(within))
+                        .ok_or_else(|| invalid("CFB reused layout chunk offset overflows usize"))?;
+                    // `read_at` computes every later sector's chunk offset too.
+                    chunk
+                        .checked_add(run - 1)
+                        .and_then(|last_chunk| last_chunk.checked_mul(self.sector_size))
+                        .ok_or_else(|| invalid("CFB reused layout chunk offset overflows usize"))?;
+                    if equal && let Some(wanted) = expected_part(count) {
+                        let data_len = if source_start < bytes.len() {
+                            count.min(bytes.len() - source_start)
+                        } else {
+                            0
+                        };
+                        // `read_at` copies nothing when the chunk starts at or
+                        // beyond the payload's end; the whole run reads as zero.
+                        let data = bytes
+                            .get(source_start..source_start + data_len)
+                            .unwrap_or(&[]);
+                        let (payload, padding) = wanted.split_at(data_len);
+                        // The same slice is equal to itself: a correct plan
+                        // places each model chunk exactly where the reader
+                        // looks for it, so this is the common case.
+                        equal = (std::ptr::eq(data.as_ptr(), payload.as_ptr()) || data == payload)
+                            && padding.iter().all(|&byte| byte == 0);
+                    }
+                },
+            }
+            done += count;
+        }
+        Ok(equal)
     }
 
     fn output_len(&self) -> Result<u64, OleError> {

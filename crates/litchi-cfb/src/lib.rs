@@ -55,6 +55,8 @@ mod overlay_tests;
 #[cfg(test)]
 mod splice_tests;
 #[cfg(test)]
+mod stream_compare_tests;
+#[cfg(test)]
 mod stream_move_tests;
 #[cfg(test)]
 mod validation_tests;
