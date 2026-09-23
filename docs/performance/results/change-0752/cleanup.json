@@ -1,0 +1,63 @@
+{
+  "record": "0752",
+  "performed": "2026-09-23, after every cited artifact was copied into this packet, the gates passed and the record and packet were committed",
+  "removed_during_the_work": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-exp",
+      "bytes": 1055052561,
+      "what": "release harness build of the throwaway scoped-reservation experiment (its evidence is in experiments/scoped-reservation-upper-bound/); removed as soon as it was measured"
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752",
+      "bytes": 133319590851,
+      "what": "candidate Cargo target directory: debug gate and test builds of the touched crates, their in-scope dependents, the facade and the harness tests; the release native and allocation harness binaries (digests in binaries.txt)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-before",
+      "bytes": 1216174379,
+      "what": "release native and allocation harness builds of base 6d989cad63 for the before leg"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-layout",
+      "bytes": 1054527295,
+      "what": "release native harness build of base 6d989cad63 at a second path, for the A/A layout control"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-probe",
+      "bytes": 4860951,
+      "what": "release build of the CRC-32 and Deflate chunking probe"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-probe-base",
+      "bytes": 467169634,
+      "what": "release build of the differential probe against the base tree"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0752-probe-after",
+      "bytes": 467656744,
+      "what": "release build of the differential probe against the candidate tree"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0752-before-src",
+      "bytes": 10194916235,
+      "what": "detached worktree of base 6d989cad63 for the before leg (git worktree remove --force, then git worktree prune)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0752-layout-src",
+      "bytes": 10194916235,
+      "what": "second detached worktree of base 6d989cad63 for the A/A layout control (git worktree remove --force, then git worktree prune)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0752/*",
+      "bytes": 321836458,
+      "what": "scratch: raw harness reports (kept here gzip-compressed), perf.data files (summaries kept), the two 39 MB differential transcripts (digests and outcome counts kept), the dumped large DOCX files and model stream (hashes kept), probe sources (kept), draft text, build, gate and test logs (results in gates.txt)"
+    }
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0752-streaming-writer-small-write-batching (worktree) and branch perf/0752-streaming-writer-small-write-batching",
+    "the coordinator's shared read-only base checkout, prebuilt base binary and profile-r2 scratch, untouched"
+  ],
+  "not_created": "TMPDIR pointed into scratch/0752; no build, measurement or evidence artifact was written to /tmp or to the main checkout, apart from the session tool's own command-output capture and the git metadata of the two detached worktrees, which their removal prunes"
+}

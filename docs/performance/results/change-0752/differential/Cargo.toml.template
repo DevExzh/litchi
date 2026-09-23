@@ -1,0 +1,14 @@
+[package]
+name = "diffprobe0752"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "ROOT/crates/litchi-core" }
+litchi-docx = { path = "ROOT/crates/litchi-docx" }
+litchi-xlsx = { path = "ROOT/crates/litchi-xlsx" }
+litchi-pptx = { path = "ROOT/crates/litchi-pptx" }
+sha2 = "0.10"
+
+[workspace]

@@ -1,0 +1,51 @@
+Gates for change 0752 at 1167398a3e (source identical to the measured after binaries).
+Environment: CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0752 CARGO_BUILD_JOBS=6, rustc 1.95.0, --locked --offline.
+
+cargo fmt --all --check                                                   exit 0
+cargo check <in-scope set> --all-targets --locked                          exit 0 (3 pre-existing dead-code warnings in the untouched crates/litchi/tests/unexpected_format.rs)
+  in-scope set: -p litchi -p litchi-cfb -p litchi-core -p litchi-crypto -p litchi-doc -p litchi-docx -p litchi-drawingml -p litchi-eval -p litchi-fonts -p litchi-imgconv -p litchi-markdown -p litchi-ograph -p litchi-ole-common -p litchi-ooxml-common -p litchi-opc -p litchi-oth -p litchi-ppt -p litchi-pptx -p litchi-rtf -p litchi-sheet -p litchi-sign -p litchi-slide -p litchi-spreadsheet-drawing -p litchi-vba -p litchi-word -p litchi-xls -p litchi-xlsb -p litchi-xlsx -p soapberry-zip
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --lib --no-deps --locked -- -D warnings          exit 0
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --all-targets --no-deps --locked -- -D warnings  exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --no-deps --locked       exit 0
+
+cargo test -p <crate> --locked (touched crates first, then in-scope dependents):
+  litchi-core                  exit 0  222 passed, 0 failed, 0 ignored
+  soapberry-zip                exit 0  643 passed, 0 failed, 2 ignored
+  litchi-docx                  exit 0  1530 passed, 0 failed, 31 ignored
+  litchi-xlsx                  exit 0  1420 passed, 0 failed, 0 ignored
+  litchi-opc                   exit 0  764 passed, 0 failed, 1 ignored
+  litchi-pptx                  exit 0  966 passed, 0 failed, 2 ignored
+  litchi-cfb                   exit 0  426 passed, 0 failed, 1 ignored
+  litchi-ooxml-common          exit 0  307 passed, 0 failed, 0 ignored
+  litchi-ole-common            exit 0  165 passed, 0 failed, 0 ignored
+  litchi-doc                   exit 0  1198 passed, 0 failed, 13 ignored
+  litchi-xls                   exit 0  1492 passed, 0 failed, 1 ignored
+  litchi-ppt                   exit 0  1229 passed, 0 failed, 11 ignored
+  litchi-xlsb                  exit 0  734 passed, 0 failed, 11 ignored
+  litchi-drawingml             exit 0  131 passed, 0 failed, 0 ignored
+  litchi-word                  exit 0  1 passed, 0 failed, 0 ignored
+  litchi-sheet                 exit 0  13 passed, 0 failed, 0 ignored
+  litchi-slide                 exit 0  1 passed, 0 failed, 0 ignored
+  litchi-sign                  exit 0  25 passed, 0 failed, 0 ignored
+  litchi-vba                   exit 0  29 passed, 0 failed, 0 ignored
+  litchi-crypto                exit 0  33 passed, 0 failed, 0 ignored
+  litchi-eval                  exit 0  1147 passed, 0 failed, 0 ignored
+  litchi-fonts                 exit 0  19 passed, 0 failed, 0 ignored
+  litchi-imgconv               exit 0  209 passed, 0 failed, 1 ignored
+  litchi-markdown              exit 0  67 passed, 0 failed, 3 ignored
+  litchi-ograph                exit 0  67 passed, 0 failed, 0 ignored
+  litchi-oth                   exit 0  37 passed, 0 failed, 0 ignored
+  litchi-rtf                   exit 0  1335 passed, 0 failed, 0 ignored
+  litchi-spreadsheet-drawing   exit 0  24 passed, 0 failed, 2 ignored
+  litchi (facade)              exit 0  382 passed, 0 failed, 7 ignored
+    cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked
+  tools/perf-baseline          exit 0  553 passed, 0 failed, 1 ignored
+    cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked --no-fail-fast (unchanged harness; run because litchi-core is shared)
+
+python3 tools/check_crate_boundaries.py                                    exit 0  (crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items))
+python3 tools/non_iwork_gate.py verify                                     exit 0  (verified_facade_safe_trees=35 verified_facade_combined_tree=1 )
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural   exit 0  (OK: 10 performance claims validated (structural))
+
+Not run: the CRUD coverage validator (no harness selector changed).
+Excluded from the dependent test set by the program's scope: ODF crates, iWork crates, and the Python binding (litchi-py).
+Note: a first foreground run of the harness tests was stopped by the 10-minute tool limit (exit 124, no failure reported); the background run above completed.

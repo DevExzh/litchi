@@ -1,0 +1,162 @@
+[
+ {
+  "case": "docx_streaming_create",
+  "corpus": "docx-streaming-paragraphs-large",
+  "before": {
+   "allocation_calls": 131112,
+   "reallocation_calls": 4,
+   "allocated_bytes": 10901013,
+   "region_peak_live_bytes": 520610
+  },
+  "after": {
+   "allocation_calls": 131113,
+   "reallocation_calls": 4,
+   "allocated_bytes": 10905109,
+   "region_peak_live_bytes": 524697
+  }
+ },
+ {
+  "case": "docx_streaming_create",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "before": {
+   "allocation_calls": 8232,
+   "reallocation_calls": 4,
+   "allocated_bytes": 1070613,
+   "region_peak_live_bytes": 471947
+  },
+  "after": {
+   "allocation_calls": 8233,
+   "reallocation_calls": 4,
+   "allocated_bytes": 1074709,
+   "region_peak_live_bytes": 476034
+  }
+ },
+ {
+  "case": "docx_streaming_create",
+  "corpus": "docx-streaming-paragraphs-tiny",
+  "before": {
+   "allocation_calls": 104,
+   "reallocation_calls": 4,
+   "allocated_bytes": 420373,
+   "region_peak_live_bytes": 441590
+  },
+  "after": {
+   "allocation_calls": 105,
+   "reallocation_calls": 4,
+   "allocated_bytes": 424469,
+   "region_peak_live_bytes": 445677
+  }
+ },
+ {
+  "case": "pptx_streaming_create",
+  "corpus": "pptx-streaming-slides-large",
+  "before": {
+   "allocation_calls": 278154,
+   "reallocation_calls": 48271,
+   "allocated_bytes": 31428197,
+   "region_peak_live_bytes": 9071989
+  },
+  "after": {
+   "allocation_calls": 278155,
+   "reallocation_calls": 48271,
+   "allocated_bytes": 31432293,
+   "region_peak_live_bytes": 9076076
+  }
+ },
+ {
+  "case": "pptx_streaming_create",
+  "corpus": "pptx-streaming-slides-medium",
+  "before": {
+   "allocation_calls": 9050,
+   "reallocation_calls": 1385,
+   "allocated_bytes": 1415266,
+   "region_peak_live_bytes": 848198
+  },
+  "after": {
+   "allocation_calls": 9051,
+   "reallocation_calls": 1385,
+   "allocated_bytes": 1419362,
+   "region_peak_live_bytes": 852285
+  }
+ },
+ {
+  "case": "pptx_streaming_create",
+  "corpus": "pptx-streaming-slides-tiny",
+  "before": {
+   "allocation_calls": 851,
+   "reallocation_calls": 138,
+   "allocated_bytes": 499486,
+   "region_peak_live_bytes": 571724
+  },
+  "after": {
+   "allocation_calls": 852,
+   "reallocation_calls": 138,
+   "allocated_bytes": 503582,
+   "region_peak_live_bytes": 575811
+  }
+ },
+ {
+  "case": "xlsx_ordinary_save_lifecycle",
+  "corpus": "xlsx-cell-values-medium",
+  "before": {
+   "allocation_calls": 29848,
+   "reallocation_calls": 5601,
+   "allocated_bytes": 1100172358,
+   "region_peak_live_bytes": 14971825
+  },
+  "after": {
+   "allocation_calls": 29848,
+   "reallocation_calls": 5601,
+   "allocated_bytes": 1100172358,
+   "region_peak_live_bytes": 14971816
+  }
+ },
+ {
+  "case": "xlsx_streaming_create",
+  "corpus": "xlsx-streaming-create-large",
+  "before": {
+   "allocation_calls": 131143,
+   "reallocation_calls": 6,
+   "allocated_bytes": 11170316,
+   "region_peak_live_bytes": 436206
+  },
+  "after": {
+   "allocation_calls": 131144,
+   "reallocation_calls": 6,
+   "allocated_bytes": 11174412,
+   "region_peak_live_bytes": 440293
+  }
+ },
+ {
+  "case": "xlsx_streaming_create",
+  "corpus": "xlsx-streaming-create-medium",
+  "before": {
+   "allocation_calls": 8263,
+   "reallocation_calls": 6,
+   "allocated_bytes": 1094156,
+   "region_peak_live_bytes": 430080
+  },
+  "after": {
+   "allocation_calls": 8264,
+   "reallocation_calls": 6,
+   "allocated_bytes": 1098252,
+   "region_peak_live_bytes": 434167
+  }
+ },
+ {
+  "case": "xlsx_streaming_create",
+  "corpus": "xlsx-streaming-create-tiny",
+  "before": {
+   "allocation_calls": 135,
+   "reallocation_calls": 6,
+   "allocated_bytes": 427660,
+   "region_peak_live_bytes": 423956
+  },
+  "after": {
+   "allocation_calls": 136,
+   "reallocation_calls": 6,
+   "allocated_bytes": 431756,
+   "region_peak_live_bytes": 428043
+  }
+ }
+]

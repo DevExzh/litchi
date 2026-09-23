@@ -1,0 +1,21 @@
+Binaries measured by change 0752 (deleted after measurement; digests only).
+
+Build command, identical for both legs, run in each leg's source tree with its own CARGO_TARGET_DIR
+(before: detached worktree 0752-before-src at 6d989cad63, targets/0752-before;
+ after: branch worktree at 1167398a3e, targets/0752; A/A layout control: detached worktree
+ 0752-layout-src at 6d989cad63, targets/0752-layout), with the root Cargo.lock copied in and
+ the harness's own tools/perf-baseline/Cargo.lock unchanged:
+  CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline
+  CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --features allocator-metrics --bin litchi-perf-baseline-alloc
+rustc 1.95.0 (59807616e 2026-04-14); default release profile of the harness workspace; no RUSTFLAGS.
+
+before  native  ffd2e348a4d423918dad3b0bfd558f554e994720e7feb9c3a10ed9f48c2ed175  63,821,760 bytes
+after   native  8d984f37673df70587a77f096afac39da9fa49bc59dab07228ddabb0739a1119  63,795,024 bytes
+before  alloc   99a8567f579db812e23b2a6509a4e4b8db6fd99434aa5547896c0c6056497b0e  63,535,648 bytes
+after   alloc   5c68c75d08b18bcf814e569eaf908eb283f2dbd36b7d48da9c987e9afc91ef80  63,508,384 bytes
+layout  native  633a426d9617d5f0558bde0937bebe35115983118c1a9b66ccad4a7475671418  (base source at a second path; A/A control only)
+
+Probes (sources in probe/ and differential/):
+  crc_deflate_probe  (crc32fast 1.5.0, flate2 1.1.9, zlib-rs 0.6.7 = the harness lock's versions)  d8b55ec09dd82b350baa1a694f3bd6f4a7e20a8464b608b4cc2ade796f50e9e1
+  diffprobe base     (path deps into 0752-before-src; lock in differential/Cargo.lock)             8a2dc3696f05d99cb471d406924641b9470e24e5eab5032456837eee920e23dc
+  diffprobe after    (path deps into the branch worktree; same lock)                                83c7c3694a3f79b64a49984d8277e60b1100a0fa68b546d5356c42ec62e76b26

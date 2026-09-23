@@ -1,0 +1,41 @@
+perf report --no-children --sort symbol of xlsx-final.data (whole process: timed loop plus untimed corpus construction and reopen gates); top 40
+    43.35%  [.] zlib_rs::deflate::longest_match::longest_match
+    14.67%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     7.46%  [.] litchi_core::execution::ExecutionContext::consume
+     2.05%  [.] zlib_rs::deflate::flush_block_only
+     2.04%  [.] litchi_xlsx::streaming::push_escaped
+     1.72%  [.] __memmove_avx512_unaligned_erms
+     1.52%  [.] sha2::sha256::x86_sha::compress
+     1.16%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     1.09%  [.] <core::fmt::Formatter>::pad_integral
+     0.98%  [.] crc32fast::specialized::pclmulqdq::calculate
+     0.87%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive
+     0.87%  [.] ryu::pretty::format64
+     0.83%  [.] litchi_core::execution::ExecutionContext::reserve_scoped
+     0.75%  [k] 0xffffffff9e800ef0
+     0.74%  [.] zlib_rs::deflate::compare256::avx2::compare256
+     0.74%  [.] litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+     0.62%  [.] quick_xml::name::NamespaceResolver::resolve_event
+     0.58%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+     0.53%  [.] cfree@GLIBC_2.2.5
+     0.52%  [.] litchi_ooxml_common::xml::unqualified_attribute_value
+     0.51%  [k] 0xffffffff9f4acb5c
+     0.50%  [k] 0xffffffff9f124131
+     0.49%  [.] <usize as core::fmt::Display>::fmt
+     0.45%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+     0.44%  [.] litchi_xlsx::raw::worksheet::codec::scan_cell_attributes
+     0.40%  [k] 0xffffffff9f1119eb
+     0.33%  [k] 0xffffffff9effed03
+     0.32%  [.] litchi_xlsx::raw::worksheet::validation::optional_bool
+     0.29%  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     0.29%  [.] zlib_rs::deflate::compare256::compare256_slice
+     0.29%  [.] __GI___readdir64
+     0.26%  [k] 0xffffffff9f1119a7
+     0.26%  [.] zlib_rs::inflate::inflate_fast_help_avx2
+     0.25%  [.] litchi_xlsx::streaming::push_bytes
+     0.25%  [k] 0xffffffff9f3abcc8
+     0.24%  [.] alloc::fmt::format::format_inner
+     0.23%  [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.22%  [k] 0xffffffff9f218f02
+     0.22%  [.] litchi_xlsx::raw::worksheet::semantic::materialize
+     0.19%  [.] zlib_rs::deflate::BitWriter::send_bits_overflow

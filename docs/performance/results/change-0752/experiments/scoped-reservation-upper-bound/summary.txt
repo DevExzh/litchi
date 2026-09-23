@@ -1,0 +1,5 @@
+Throwaway experiment (not committed): docx_streaming_create large, CPU 28, 15 samples / 3 warmups per process,
+three rounds of A E E A. A = candidate at that time (owned single-handle reservation in write_text);
+E = the same with the reservation replaced by a plain consume of the same amount (experiment.diff).
+A process p50 ms: [49.395, 49.167, 48.767, 48.944, 49.581, 49.148] median 49.157
+E process p50 ms: [46.579, 46.521, 46.973, 46.445, 46.77, 46.804] median 46.675

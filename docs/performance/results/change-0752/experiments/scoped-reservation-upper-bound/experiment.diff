@@ -1,0 +1,19 @@
+--- /home/zhuhe/code/litchi-worktrees/scratch/0752/streaming.rs.keep	2026-09-23 02:50:44.921011511 -0400
++++ /home/zhuhe/code/litchi-worktrees/scratch/0752/streaming.rs.exp	2026-09-23 02:53:26.545090879 -0400
+@@ -703,14 +703,11 @@
+             checked_add(paragraph_xml_bytes, encoded_bytes, "paragraph XML bytes")
+                 .map_err(|resource| self.fail_overflow(resource))?;
+         self.preflight_document_and_paragraph(encoded_bytes, next_paragraph_bytes)?;
+-        let input_reservation = self
++        self
+             .context
+-            .reserve(Resource::InputBytes, input_bytes)
++            .consume(Resource::InputBytes, input_bytes)
+             .map_err(|error| self.fail_execution(error))?;
+         self.emit_escaped_text(text)?;
+-        if !input_reservation.commit(input_bytes) {
+-            return Err(self.fail_invalid("input reservation committed more bytes than reserved"));
+-        }
+         self.input_bytes = next_input;
+         self.phase = match self.phase {
+             Phase::Paragraph {
