@@ -2687,6 +2687,280 @@ impl<R: Read + Seek> OleFile<R> {
     }
 }
 
+/// The bytes of a composed candidate artifact, examined where they lie.
+///
+/// A writer that validates a composed candidate before publication used to
+/// read every stream back through [`OleFile::open_stream`] — copying each
+/// physical range into a fresh buffer — and compare the result with the bytes
+/// it meant to publish. [`OleFile::stream_equals`] asks this trait instead,
+/// once per range `open_stream` would read.
+pub(crate) trait CandidateBytes {
+    /// Whether the candidate holds `expected` at absolute `offset`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error a read of those bytes would raise.
+    fn equals_at(&self, offset: u64, expected: &[u8]) -> Result<bool, OleError>;
+
+    /// Checks that `len` bytes at absolute `offset` can be read, without
+    /// examining them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error a read of those bytes would raise.
+    fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError>;
+}
+
+/// In-place stream comparison for composed candidates.
+///
+/// `stream_equals` reaches `open_stream`'s verdict on a stream without
+/// materializing it. It performs `open_stream`'s traversal — the entry
+/// lookup, the stream-type check, the chain collection with its index, cycle
+/// and marker checks, the declared-length and chain-capacity checks, the root
+/// mini-stream load with its checks, the mini-sector bounds, the run
+/// segmentation and the physical bounds checks — in the same order and with
+/// the same errors. Every physical range `open_stream` reads is handed to the
+/// candidate: compared with the corresponding bytes of `expected` while the
+/// stream still matches, and checked for readability once it no longer does,
+/// so a read error `open_stream` would raise is still raised. The bytes a
+/// short final sector zero-fills are compared with zero.
+impl<R: Read + Seek> OleFile<R> {
+    /// Whether the stream at `path` holds exactly `expected`.
+    ///
+    /// `candidate` must describe the source this reader parsed; it is only
+    /// asked about ranges inside the file. Then this returns `Ok(true)`
+    /// exactly when `open_stream(path)` would return `Ok(data)` with
+    /// `data == expected`, `Ok(false)` exactly when it would return
+    /// `Ok(data)` with `data != expected`, and an error exactly when
+    /// `open_stream` would fail — with two exceptions: an allocation failure
+    /// of a buffer this method does not allocate cannot occur, and a read
+    /// error is the one `candidate` reports rather than the reader's.
+    ///
+    /// # Errors
+    ///
+    /// Returns the lookup, allocation-structure and bounds errors of
+    /// [`Self::open_stream`], and any error `candidate` returns.
+    pub(crate) fn stream_equals<C: CandidateBytes>(
+        &self,
+        path: &[&str],
+        expected: &[u8],
+        scratch: &mut StreamCompareScratch,
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        let (is_minifat, start_sector, size) = {
+            let entry = self.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        if is_minifat {
+            self.minifat_stream_equals(start_sector, size, expected, scratch, candidate)
+        } else {
+            self.fat_stream_equals(start_sector, size, expected, &mut scratch.chain, candidate)
+        }
+    }
+
+    /// [`Self::read_stream_from_fat`] with its copy replaced by `candidate`.
+    fn fat_stream_equals<C: CandidateBytes>(
+        &self,
+        start_sector: u32,
+        declared_size: u64,
+        expected: &[u8],
+        chain: &mut SectorChainScratch,
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        chain.collect_to_end(&self.fat, start_sector, "FAT")?;
+        let size = usize::try_from(declared_size)
+            .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+        let required_sectors = size.div_ceil(self.sector_size);
+        let sectors = chain.sectors();
+        if sectors.len() < required_sectors {
+            return Err(OleError::CorruptedFile(
+                "FAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+        // `open_stream` returns exactly `size` bytes, so a different expected
+        // length can never compare equal; every run is still read.
+        let mut equal = size == expected.len();
+        visit_sector_runs(
+            &sectors[..required_sectors],
+            self.sector_size,
+            self.file_size,
+            size,
+            |position, buffer_offset, requested| {
+                let present = self.present_sector_bytes(position, requested);
+                if equal {
+                    // `equal` implies `expected.len() == size`, and the batched
+                    // read never requests bytes beyond `size`.
+                    let wanted = expected
+                        .get(buffer_offset..buffer_offset + requested)
+                        .ok_or_else(|| {
+                            OleError::CorruptedFile(
+                                "stream comparison range exceeds its stream".to_string(),
+                            )
+                        })?;
+                    equal = Self::read_bytes_equal(position, present, wanted, candidate)?;
+                } else if present > 0 {
+                    candidate.check_readable(position, present)?;
+                }
+                Ok(())
+            },
+        )?;
+        Ok(equal)
+    }
+
+    /// [`Self::read_stream_from_minifat`] with its copies replaced by
+    /// `candidate`. The root mini stream is not materialized: every range its
+    /// load reads is checked for readability, and each mini sector is then
+    /// compared where the root chain places it.
+    fn minifat_stream_equals<C: CandidateBytes>(
+        &self,
+        start_sector: u32,
+        size: u64,
+        expected: &[u8],
+        scratch: &mut StreamCompareScratch,
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        // The mini stream load: `read_stream_from_fat(root.start, root.size)`.
+        // `open_stream` performs it once per reader and caches the bytes; the
+        // load is deterministic over this immutable reader and candidate, so
+        // repeating it for every mini stream reaches the same verdict.
+        let (ministream_start, ministream_size) = self
+            .root
+            .as_ref()
+            .map(|root| (root.start_sector, root.size))
+            .ok_or_else(|| OleError::CorruptedFile("No root entry".to_string()))?;
+        scratch
+            .root
+            .collect_to_end(&self.fat, ministream_start, "FAT")?;
+        let root_len = usize::try_from(ministream_size)
+            .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+        let root_required = root_len.div_ceil(self.sector_size);
+        let root_sectors = scratch.root.sectors();
+        if root_sectors.len() < root_required {
+            return Err(OleError::CorruptedFile(
+                "FAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+        let root_sectors = &root_sectors[..root_required];
+        visit_sector_runs(
+            root_sectors,
+            self.sector_size,
+            self.file_size,
+            root_len,
+            |position, _buffer_offset, requested| {
+                let present = self.present_sector_bytes(position, requested);
+                if present > 0 {
+                    candidate.check_readable(position, present)?;
+                }
+                Ok(())
+            },
+        )?;
+        let ministream_len = usize::try_from(ministream_size)
+            .map_err(|_err| OleError::CorruptedFile("Mini stream is too large".to_string()))?;
+        // The loaded mini stream has exactly `root_len` bytes, which equals
+        // `ministream_len`: its "shorter than declared" check cannot fire and
+        // its truncation keeps every byte.
+
+        let chain = &mut scratch.chain;
+        chain.collect_to_end(&self.minifat, start_sector, "MiniFAT")?;
+        let stream_len = usize::try_from(size)
+            .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+        let chain_capacity = chain
+            .sectors()
+            .len()
+            .checked_mul(self.mini_sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("MiniFAT stream size overflow".to_string()))?;
+        if chain_capacity < stream_len {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+
+        // Copying from the loaded mini stream cannot fail a read: every byte
+        // it holds was read above. Only the bounds checks remain, and they run
+        // for every sector `open_stream` visits, matched or not.
+        let mut equal = stream_len == expected.len();
+        let mut copied = 0usize;
+        for &sector in chain.sectors() {
+            let position = usize::try_from(sector)
+                .ok()
+                .and_then(|sector_id| sector_id.checked_mul(self.mini_sector_size))
+                .ok_or_else(|| {
+                    OleError::CorruptedFile("Mini sector offset overflow".to_string())
+                })?;
+            let end = position
+                .checked_add(self.mini_sector_size)
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
+            if end > ministream_len {
+                return Err(OleError::CorruptedFile(
+                    "Mini sector out of bounds".to_string(),
+                ));
+            }
+            let copy_len = self.mini_sector_size.min(stream_len.saturating_sub(copied));
+            if copy_len == 0 {
+                break;
+            }
+            if equal {
+                let wanted = expected.get(copied..copied + copy_len).ok_or_else(|| {
+                    OleError::CorruptedFile(
+                        "mini stream comparison range exceeds its stream".to_string(),
+                    )
+                })?;
+                equal = self.ministream_bytes_equal(root_sectors, position, wanted, candidate)?;
+            }
+            copied += copy_len;
+        }
+        Ok(equal)
+    }
+
+    /// Compares the loaded mini stream's bytes at `offset` with `wanted`.
+    ///
+    /// The mini stream holds the root chain's sectors in chain order, as the
+    /// batched read of that chain placed them. A mini sector never crosses a
+    /// regular sector boundary, because the sector size is a multiple of the
+    /// mini sector size, so the bytes lie in one root sector.
+    fn ministream_bytes_equal<C: CandidateBytes>(
+        &self,
+        root_sectors: &[u32],
+        offset: usize,
+        wanted: &[u8],
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        let root_sector = *root_sectors.get(offset / self.sector_size).ok_or_else(|| {
+            OleError::CorruptedFile("mini-sector is outside the root FAT chain".to_string())
+        })?;
+        let within = u64::try_from(offset % self.sector_size).map_err(|_err| {
+            OleError::CorruptedFile("root mini-stream offset does not fit u64".to_string())
+        })?;
+        let physical = (u64::from(root_sector) + 1)
+            .checked_mul(self.sector_size as u64)
+            .and_then(|value| value.checked_add(within))
+            .ok_or_else(|| {
+                OleError::CorruptedFile("mini-stream physical offset overflow".to_string())
+            })?;
+        let present = self.present_sector_bytes(physical, wanted.len());
+        Self::read_bytes_equal(physical, present, wanted, candidate)
+    }
+
+    /// Compares what a read of `wanted.len()` bytes at `position` produces
+    /// with `wanted`: the `present` bytes the file holds, through
+    /// `candidate`, followed by the zero fill a short final sector reads as.
+    fn read_bytes_equal<C: CandidateBytes>(
+        position: u64,
+        present: usize,
+        wanted: &[u8],
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        let (in_file, beyond) = wanted.split_at(present.min(wanted.len()));
+        if !in_file.is_empty() && !candidate.equals_at(position, in_file)? {
+            return Ok(false);
+        }
+        Ok(beyond.iter().all(|&byte| byte == 0))
+    }
+}
+
 fn try_vec_with_capacity<T>(capacity: usize, resource: &'static str) -> Result<Vec<T>, OleError> {
     let mut values = Vec::new();
     values
@@ -3065,6 +3339,136 @@ impl SectorChainScratch {
         }
         result
     }
+
+    /// Collects a chain up to its `ENDOFCHAIN` terminator into the reusable
+    /// buffers, with exactly the checks, their order and the errors of
+    /// [`collect_sector_chain`]: an `ENDOFCHAIN` start is the empty chain,
+    /// and every visited index must lie inside `allocation_table`, be visited
+    /// once, and lead to `ENDOFCHAIN` or a regular sector. The visited map is
+    /// reserved before the first entry is recorded, and both carry the same
+    /// allocation resource labels.
+    fn collect_to_end(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        table_name: &str,
+    ) -> Result<(), OleError> {
+        self.reset();
+        let result = (|| {
+            if start_sector == ENDOFCHAIN {
+                return Ok(());
+            }
+            self.prepare_visited(allocation_table.len())?;
+            let mut sector = start_sector;
+            while sector != ENDOFCHAIN {
+                let index = usize::try_from(sector).map_err(|_err| {
+                    OleError::CorruptedFile(format!("Invalid sector index in {table_name}"))
+                })?;
+                if index >= allocation_table.len() {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    )));
+                }
+                if self.visited.contains(index) {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Cycle detected in {table_name} chain at sector {sector}"
+                    )));
+                }
+                self.visited.insert(index)?;
+                try_push(&mut self.sectors, sector, "sector-chain entries")?;
+                let next = *allocation_table.get(index).ok_or_else(|| {
+                    OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    ))
+                })?;
+                if next != ENDOFCHAIN && next >= MAXREGSECT {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Invalid sector marker 0x{next:08X} in {table_name} chain"
+                    )));
+                }
+                sector = next;
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            self.reset();
+        }
+        result
+    }
+}
+
+/// Reusable buffers for [`OleFile::stream_equals`].
+///
+/// A reuse-plan validation compares every stream of one artifact against the
+/// same FAT and MiniFAT. [`OleFile::open_stream`] allocates a chain vector
+/// and a visited map for every stream, plus the stream's own bytes; the
+/// comparison allocates none of these per stream once the buffers have grown
+/// to the longest chain and the larger table.
+#[derive(Debug, Default)]
+pub(crate) struct StreamCompareScratch {
+    /// The chain of the stream being compared (FAT or MiniFAT).
+    chain: SectorChainScratch,
+    /// The root mini-stream chain a MiniFAT stream is addressed through.
+    root: SectorChainScratch,
+}
+
+/// Visits `sectors` in the physically contiguous runs
+/// [`OleFile::read_sectors_batched`] reads them in, with that method's run
+/// segmentation, its checks in their order and its errors.
+///
+/// `visit` receives each run's absolute file offset, its offset into the
+/// `buffer_len`-byte destination the batched read fills, and the number of
+/// destination bytes the read requests; like the batched read, a run that
+/// requests no bytes is skipped.
+fn visit_sector_runs<V>(
+    sectors: &[u32],
+    sector_size: usize,
+    file_size: u64,
+    buffer_len: usize,
+    mut visit: V,
+) -> Result<(), OleError>
+where
+    V: FnMut(u64, usize, usize) -> Result<(), OleError>,
+{
+    let mut i = 0;
+    while i < sectors.len() {
+        let start_sector = sectors[i];
+        let mut count = 1;
+        while let Some(next_index) = i.checked_add(count) {
+            if next_index >= sectors.len()
+                || sectors[next_index]
+                    != sectors[next_index - 1].checked_add(1).ok_or_else(|| {
+                        OleError::CorruptedFile("contiguous sector index overflow".to_string())
+                    })?
+            {
+                break;
+            }
+            count += 1;
+        }
+        let position = (u64::from(start_sector) + 1)
+            .checked_mul(sector_size as u64)
+            .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
+        if position >= file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector {start_sector} is outside the file"
+            )));
+        }
+        let read_size = count
+            .checked_mul(sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched read size overflow".to_string()))?;
+        let buffer_offset = i
+            .checked_mul(sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched buffer offset overflow".to_string()))?;
+        let buffer_remaining = buffer_len.checked_sub(buffer_offset).ok_or_else(|| {
+            OleError::CorruptedFile("batched read buffer offset overflow".to_string())
+        })?;
+        let requested = read_size.min(buffer_remaining);
+        if requested > 0 {
+            visit(position, buffer_offset, requested)?;
+        }
+        i += count;
+    }
+    Ok(())
 }
 
 /// Drop the high stream-size word that version 3 compound files do not use.
@@ -3501,6 +3905,47 @@ mod tests {
                         assert!(scratch.sectors.is_empty());
                         assert_eq!(scratch.visited.bit_len, 0);
                     },
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scratch_to_end_matches_the_owned_chain_helper_and_resets() {
+        let cases = [
+            ("valid", vec![2, 3, 1, ENDOFCHAIN], 0),
+            (
+                "valid-with-free-tail",
+                vec![1, ENDOFCHAIN, FREESECT, FREESECT],
+                0,
+            ),
+            ("empty", vec![], ENDOFCHAIN),
+            ("end-start-in-table", vec![ENDOFCHAIN], ENDOFCHAIN),
+            ("cycle", vec![1, 0, ENDOFCHAIN], 0),
+            ("self-cycle", vec![0], 0),
+            ("free-start", vec![ENDOFCHAIN], FREESECT),
+            ("marker-start", vec![ENDOFCHAIN], MAXREGSECT),
+            ("start-outside-table", vec![ENDOFCHAIN], 1),
+            ("index-outside-table", vec![2, ENDOFCHAIN], 0),
+            ("free-marker", vec![FREESECT, ENDOFCHAIN], 0),
+            ("fat-marker", vec![FATSECT, ENDOFCHAIN], 0),
+            ("difat-marker", vec![DIFSECT, ENDOFCHAIN], 0),
+            ("empty-table", vec![], 0),
+        ];
+        let mut scratch = SectorChainScratch::default();
+        for pass in 0..2 {
+            for (name, allocation_table, start_sector) in &cases {
+                let expected =
+                    collect_sector_chain(allocation_table.as_slice(), *start_sector, name)
+                        .map_err(|error| error.to_string());
+                let actual = scratch
+                    .collect_to_end(allocation_table.as_slice(), *start_sector, name)
+                    .map(|()| scratch.sectors().to_vec())
+                    .map_err(|error| error.to_string());
+                assert_eq!(actual, expected, "pass {pass}, case {name}");
+                if expected.is_err() {
+                    assert!(scratch.sectors.is_empty(), "case {name} keeps no chain");
+                    assert_eq!(scratch.visited.bit_len, 0, "case {name} keeps no map");
                 }
             }
         }
