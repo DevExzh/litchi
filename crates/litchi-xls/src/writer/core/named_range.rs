@@ -232,10 +232,10 @@ impl DefinedName {
             // via SupBook/ExternSheet).
             if let Some(sheet_index) = self.target_sheet {
                 let tokens = [Ptg::Area3d(sheet_index, area)];
-                Ok(encode_ptg_tokens(&tokens))
+                encode_ptg_tokens(&tokens)
             } else {
                 let tokens = [Ptg::Area(area)];
-                Ok(encode_ptg_tokens(&tokens))
+                encode_ptg_tokens(&tokens)
             }
         } else {
             // Single-cell reference like "A1".
@@ -244,9 +244,9 @@ impl DefinedName {
 
             if let Some(sheet_index) = self.target_sheet {
                 let tokens = [Ptg::Area3d(sheet_index, area)];
-                Ok(encode_ptg_tokens(&tokens))
+                encode_ptg_tokens(&tokens)
             } else {
-                Ok(encode_ptg_tokens(&[Ptg::Area(area)]))
+                encode_ptg_tokens(&[Ptg::Area(area)])
             }
         }
     }

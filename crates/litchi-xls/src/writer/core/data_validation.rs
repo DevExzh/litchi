@@ -265,11 +265,11 @@ impl DataValidationType {
 
                 // Encode numeric bounds as simple PtgNum tokens.
                 let f1_tokens = vec![Ptg::Num(crate::utils::approximate_i64_as_f64(*value1))];
-                let formula1 = Some(encode_ptg_tokens(&f1_tokens));
+                let formula1 = Some(encode_ptg_tokens(&f1_tokens)?);
 
                 let formula2 = if let Some(v2) = value2 {
                     let f2_tokens = vec![Ptg::Num(crate::utils::approximate_i64_as_f64(*v2))];
-                    Some(encode_ptg_tokens(&f2_tokens))
+                    Some(encode_ptg_tokens(&f2_tokens)?)
                 } else {
                     // Between / NotBetween require a second bound.
                     match operator {
@@ -313,7 +313,7 @@ impl DataValidationType {
                 }
 
                 let tokens = vec![Ptg::Str(joined)];
-                let formula1 = Some(encode_ptg_tokens(&tokens));
+                let formula1 = Some(encode_ptg_tokens(&tokens)?);
 
                 // LIST uses operator IGNORED (0) and marks explicit list formula.
                 Ok(DataValidationBiffPayload {
@@ -397,8 +397,10 @@ fn numeric_payload(
     value1: f64,
     value2: Option<f64>,
 ) -> Result<DataValidationBiffPayload> {
-    let formula1 = Some(encode_ptg_tokens(&[Ptg::Num(value1)]));
-    let formula2 = value2.map(|value| encode_ptg_tokens(&[Ptg::Num(value)]));
+    let formula1 = Some(encode_ptg_tokens(&[Ptg::Num(value1)])?);
+    let formula2 = value2
+        .map(|value| encode_ptg_tokens(&[Ptg::Num(value)]))
+        .transpose()?;
     let needs_two = matches!(
         operator,
         DataValidationOperator::Between | DataValidationOperator::NotBetween

@@ -10,7 +10,7 @@ use crate::formula_metadata::{Cell as FormulaCell, Range as FormulaRange};
 fn test_create_writer() {
     let writer = Writer::new();
     assert_eq!(writer.worksheets.len(), 0);
-    assert!(writer.shared_string_table().strings().is_empty());
+    assert!(writer.shared_string_table().unwrap().strings().is_empty());
 }
 
 #[test]
@@ -805,7 +805,7 @@ fn test_shared_strings_build() {
     writer.write_string(sheet, 1, 0, "World").unwrap();
 
     // Stage the shared string table (normally done during write)
-    let table = writer.shared_string_table();
+    let table = writer.shared_string_table().unwrap();
 
     // Should only have 2 unique strings, from 3 string cells
     assert_eq!(table.strings().len(), 2);
@@ -853,7 +853,7 @@ fn test_save_to_file() {
 fn test_xls_writer_default() {
     let writer: Writer = Default::default();
     assert_eq!(writer.worksheets.len(), 0);
-    assert!(writer.shared_string_table().strings().is_empty());
+    assert!(writer.shared_string_table().unwrap().strings().is_empty());
 }
 
 #[test]
@@ -1090,4 +1090,78 @@ fn test_xls_defined_name_to_biff_formula_single() {
     };
     let formula = name.to_biff_formula().unwrap();
     assert!(!formula.is_empty());
+}
+
+/// A string cell that did not come through `write_string` (a pivot label or
+/// table header could be one) is still refused when it cannot be an SST entry,
+/// before anything reaches the destination.
+#[test]
+fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_string(sheet, 0, 0, "fits").unwrap();
+    for value in ["x".repeat(0x1_0000), format!("{}😀", "a".repeat(0xFFFE))] {
+        writer.worksheets[sheet].cells.insert(
+            (5, 2),
+            WritableCell::new(
+                CellPos::try_new(5, 2).unwrap(),
+                CellValue::String(value),
+                0,
+                None,
+            ),
+        );
+        let mut output = Cursor::new(Vec::new());
+        let result = writer.write_to(&mut output);
+        assert!(
+            matches!(
+                result,
+                Err(Error::StringTooLong {
+                    field: "shared string",
+                    utf16_units: 0x1_0000,
+                    limit: 0xFFFF,
+                })
+            ),
+            "{result:?}"
+        );
+        assert!(output.get_ref().is_empty());
+    }
+}
+
+/// A string written over a data-table anchor is emitted as the anchor's
+/// `PtgTbl` formula, not as a `LabelSst`; the string cells after it in row
+/// and column order must still take their own indices.
+#[test]
+fn string_cells_after_a_data_table_anchor_keep_their_shared_strings() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let table = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, table).unwrap();
+    writer.write_string(sheet, 0, 0, "shadowed").unwrap();
+    let expected = [
+        (0u32, 1u16, "first"),
+        (0, 4, "shadowed"),
+        (3, 0, "second"),
+        (3, 1, "first"),
+        (7, 3, "third"),
+    ];
+    for (row, col, value) in expected.iter().rev() {
+        writer.write_string(sheet, *row, *col, value).unwrap();
+    }
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let workbook = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert!(worksheet.get_cell(0, 0).unwrap().formula_bytes().is_some());
+    for (row, col, value) in expected {
+        assert_eq!(
+            worksheet.get_cell(row, u32::from(col)).unwrap().value(),
+            &litchi_core::sheet::CellValue::String(value.to_string()),
+            "{row} {col}"
+        );
+    }
 }

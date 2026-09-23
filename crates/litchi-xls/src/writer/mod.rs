@@ -30,6 +30,9 @@ pub use core::shape;
 /// Checked BIFF8 INDEX/DBCELL worksheet layout generation
 pub mod row_blocks;
 
+/// Checked lengths of the BIFF8 string fields the writer emits.
+pub(crate) mod string_limits;
+
 // Re-export public types
 pub use crate::{
     AutoFilter12Criterion, AutoFilter12Icon, AutoFilter12IconSet, AutoFilter12Operator,

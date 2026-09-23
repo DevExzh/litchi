@@ -1,6 +1,7 @@
 //! Shared String Table (SST) BIFF8 writer.
 
 use crate::Result;
+use crate::writer::string_limits::{SHARED_STRING_UNITS, ensure_utf16_len_within, u16_len};
 use std::io::Write;
 
 use super::write_record_header;
@@ -36,12 +37,22 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
 ///
 /// This implementation properly handles string splitting across CONTINUE boundaries,
 /// based on Apache POI's `SSTSerializer`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::StringTooLong`] for a string longer than the
+/// 0xFFFF UTF-16 code units an SST entry can hold, before writing anything.
 pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
     writer: &mut W,
     strings: &[S],
     cst_total: u32,
 ) -> Result<()> {
     const MAX_RECORD_DATA: usize = 8224; // max data payload per record
+
+    // Every string fits, or nothing is written.
+    for s in strings {
+        ensure_utf16_len_within(s.as_ref(), SHARED_STRING_UNITS, "shared string")?;
+    }
 
     // We'll build each record's payload into a local buffer, then flush with the header
     let mut first_record = true;
@@ -86,21 +97,21 @@ pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
         let high_byte_flag: u8;
 
         if is_ascii {
-            let bytes = s.as_bytes();
-            cch = bytes.len().min(0xFFFF);
-            data8 = &bytes[..cch];
+            data8 = s.as_bytes();
+            cch = data8.len();
             high_byte_flag = 0x00;
         } else {
-            // One pass: encode at most the first 0xFFFF code units. A UTF-8
-            // byte never yields more than one unit, so `s.len()` bounds them.
+            // One pass. A UTF-8 byte never yields more than one unit, and the
+            // string was checked to have at most 0xFFFF of them.
             data16.clear();
-            data16.reserve(s.len().min(0xFFFF) * 2);
-            for unit in s.encode_utf16().take(0xFFFF) {
+            data16.reserve(s.len().min(SHARED_STRING_UNITS) * 2);
+            for unit in s.encode_utf16() {
                 data16.extend_from_slice(&unit.to_le_bytes());
             }
             cch = data16.len() / 2;
             high_byte_flag = 0x01;
         }
+        let cch_field = u16_len(cch, "shared string")?;
 
         // String header is 3 bytes (cch u16 + flags u8). Ensure it fits fully in current record.
         if available < 3 {
@@ -112,7 +123,7 @@ pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
         }
 
         // Write header
-        buffer.extend_from_slice(&crate::utils::truncate_usize_to_u16(cch).to_le_bytes());
+        buffer.extend_from_slice(&cch_field.to_le_bytes());
         buffer.push(high_byte_flag);
         available -= 3;
 
@@ -311,12 +322,10 @@ mod tests {
         assert_same_bytes(&[odd.clone(), "😀".repeat(5_000)]);
         assert_same_bytes(&[odd.clone() + "a", "é".repeat(9_000), "tail".to_string()]);
         assert_same_bytes(&["a".repeat(9_000), "漢".repeat(5_000)]);
-        // More than 0xFFFF code units: both encoders keep exactly the first
-        // 0xFFFF units, splitting a surrogate pair at the limit if one falls
-        // there.
-        assert_same_bytes(&["😀".repeat(40_000)]);
-        assert_same_bytes(&[format!("a{}", "😀".repeat(40_000))]);
-        assert_same_bytes(&["é".repeat(70_000), "b".repeat(70_000)]);
+        // Exactly 0xFFFF code units, the most an entry holds, in each width;
+        // the last one ends with a surrogate pair.
+        assert_same_bytes(&["b".repeat(0xFFFF), "é".repeat(0xFFFF)]);
+        assert_same_bytes(&[format!("{}😀", "a".repeat(0xFFFD))]);
         let many: Vec<String> = (0..3_000)
             .map(|index| match index % 4 {
                 0 => format!("ascii {index}"),
@@ -326,5 +335,45 @@ mod tests {
             })
             .collect();
         assert_same_bytes(&many);
+    }
+
+    #[test]
+    fn a_string_one_unit_past_an_entry_is_refused_before_anything_is_written() {
+        let fits = "fits".to_string();
+        for too_long in [
+            "b".repeat(0x1_0000),
+            "é".repeat(0x1_0000),
+            // 0xFFFE units and a surrogate pair: the old encoder kept the
+            // pair's high half alone at the limit.
+            format!("{}😀", "a".repeat(0xFFFE)),
+        ] {
+            let mut output = Vec::new();
+            let result = write_sst(&mut output, &[fits.clone(), too_long], 2);
+            assert!(
+                matches!(
+                    result,
+                    Err(crate::Error::StringTooLong {
+                        field: "shared string",
+                        utf16_units: 0x1_0000,
+                        limit: 0xFFFF,
+                    })
+                ),
+                "{result:?}"
+            );
+            assert!(output.is_empty());
+        }
+    }
+
+    #[test]
+    fn strings_up_to_an_entry_are_written_whole() {
+        for units in [0xFFFE, 0xFFFF] {
+            for value in ["b".repeat(units), "漢".repeat(units)] {
+                let mut output = Vec::new();
+                write_sst(&mut output, std::slice::from_ref(&value), 1).unwrap();
+                // cch follows the record header, cstTotal and cstUnique.
+                let cch = u16::from_le_bytes([output[12], output[13]]);
+                assert_eq!(usize::from(cch), units);
+            }
+        }
     }
 }

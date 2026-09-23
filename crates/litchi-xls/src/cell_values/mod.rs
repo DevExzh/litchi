@@ -1841,7 +1841,7 @@ impl Transaction {
             ));
         }
         let parsed = crate::writer::FormulaTokenizer::new().tokenize(expression)?;
-        let tokens = crate::writer::formula::encode_ptg_tokens(&parsed);
+        let tokens = crate::writer::formula::encode_ptg_tokens(&parsed)?;
         if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
             return Err(Error::UnsafeEdit(
                 "authored Formula token bytes are empty or exceed the BIFF8 record limit".into(),

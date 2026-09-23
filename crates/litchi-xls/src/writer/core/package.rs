@@ -107,7 +107,11 @@ impl Writer {
     }
 
     /// Stage the shared string table from all string cells, borrowing them.
-    pub(super) fn shared_string_table(&self) -> stream::SharedStringTable<'_> {
+    ///
+    /// # Errors
+    ///
+    /// Refuses a string that an SST entry cannot hold.
+    pub(super) fn shared_string_table(&self) -> Result<stream::SharedStringTable<'_>> {
         stream::SharedStringTable::build(&self.worksheets)
     }
 
@@ -138,7 +142,7 @@ impl Writer {
             self.custom_table_styles.as_ref(),
             &self.defined_names,
             &self.defined_name_records,
-            &self.shared_string_table(),
+            &self.shared_string_table()?,
             self.workbook_protection,
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),

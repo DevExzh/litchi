@@ -594,7 +594,7 @@ impl Writer {
 
         let expression = formula.strip_prefix('=').unwrap_or(formula);
         let tokens = FormulaTokenizer::new().tokenize(expression)?;
-        let encoded = encode_ptg_tokens(&tokens);
+        let encoded = encode_ptg_tokens(&tokens)?;
         let mut owner = Owner::new(range, anchor, &encoded)?;
         if !participants.is_empty() {
             owner = owner.with_participants(&participant_cells)?;

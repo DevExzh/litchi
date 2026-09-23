@@ -1,6 +1,7 @@
 use super::super::named_range;
 use super::super::{DefinedName, DefinedNameRecordOptions, Writer};
 use crate::error::{Error, Result};
+use crate::writer::string_limits::{DEFINED_NAME_UNITS, ensure_utf16_len_within};
 
 impl Writer {
     /// Validate a defined name according to basic Excel constraints.
@@ -8,7 +9,8 @@ impl Writer {
     /// This helper enforces only well-defined structural rules from the
     /// specification:
     /// - Name MUST NOT be empty.
-    /// - Name length MUST be at most 255 characters (Lbl.cch is a byte).
+    /// - Name length MUST be at most 255 UTF-16 code units (`Lbl.cch` is a
+    ///   byte counting them), refused with [`Error::StringTooLong`].
     fn validate_defined_name(name: &str) -> Result<()> {
         if name.is_empty() {
             return Err(Error::InvalidData(
@@ -16,14 +18,7 @@ impl Writer {
             ));
         }
 
-        let char_count = name.chars().count();
-        if char_count > u8::MAX as usize {
-            return Err(Error::InvalidData(
-                "Defined name must be at most 255 characters".to_string(),
-            ));
-        }
-
-        Ok(())
+        ensure_utf16_len_within(name, DEFINED_NAME_UNITS, "defined name")
     }
 
     /// Define a workbook-scoped named range.

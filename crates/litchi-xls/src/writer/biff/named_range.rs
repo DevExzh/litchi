@@ -8,6 +8,7 @@ use std::io::Write;
 
 use crate::writer::DefinedName;
 use crate::writer::DefinedNameRecordOptions;
+use crate::writer::string_limits::{DEFINED_NAME_UNITS, checked_utf16_len, u8_len, u16_len};
 use crate::{DefinedNameKind, NameScope};
 use crate::{Error, Result};
 
@@ -35,18 +36,14 @@ pub(crate) fn write_name<W: Write>(writer: &mut W, name: &DefinedName, rgce: &[u
             })?;
             (1, false, Some(code), None)
         } else {
-            let char_count = name.name.chars().count();
-            if char_count == 0 {
+            // `Lbl.cch` counts the UTF-16 code units of `Name`.
+            let units = checked_utf16_len(&name.name, DEFINED_NAME_UNITS, "defined name")?;
+            if units == 0 {
                 return Err(Error::InvalidData(
                     "Defined name must not be empty".to_string(),
                 ));
             }
-            if char_count > u8::MAX as usize {
-                return Err(Error::InvalidData(
-                    "Defined name must be at most 255 characters".to_string(),
-                ));
-            }
-            let cch = crate::utils::truncate_usize_to_u8(char_count);
+            let cch = u8_len(units, "defined name")?;
             let is_16bit = has_multibyte_char(&name.name);
             (cch, is_16bit, None, Some(name.name.as_str()))
         };
@@ -113,8 +110,14 @@ pub(crate) fn write_name<W: Write>(writer: &mut W, name: &DefinedName, rgce: &[u
                 writer.write_all(&code_unit.to_le_bytes())?;
             }
         } else {
-            writer.write_all(&[0x00])?; // compressed 8-bit
-            writer.write_all(s.as_bytes())?;
+            // Compressed 8-bit: the low byte of each code unit, which is
+            // Latin-1; a UTF-8 byte sequence would overrun `cch`.
+            writer.write_all(&[0x00])?;
+            let latin1: Vec<u8> = s
+                .encode_utf16()
+                .map(crate::utils::truncate_u16_to_u8)
+                .collect();
+            writer.write_all(&latin1)?;
         }
     }
 
@@ -179,9 +182,12 @@ pub(crate) fn write_defined_name_record<W: Write>(
     data.push(name.shortcut_key.unwrap_or(0));
     let (name_len, built_in) = match name.built_in() {
         Some(value) => (1usize, Some(value.code())),
-        None => (name.name.encode_utf16().count(), None),
+        None => (
+            checked_utf16_len(&name.name, DEFINED_NAME_UNITS, "defined name")?,
+            None,
+        ),
     };
-    data.push(crate::utils::truncate_usize_to_u8(name_len));
+    data.push(u8_len(name_len, "defined name")?);
     data.extend_from_slice(
         &crate::utils::truncate_usize_to_u16(name.formula_tokens.len()).to_le_bytes(),
     );
@@ -199,7 +205,8 @@ pub(crate) fn write_defined_name_record<W: Write>(
         &name.help_topic,
         &name.status_bar,
     ] {
-        data.push(crate::utils::truncate_usize_to_u8(value.chars().count()));
+        // Validated as at most 255 Latin-1 characters, one code unit each.
+        data.push(u8_len(value.chars().count(), "defined-name UI string")?);
     }
     if let Some(code) = built_in {
         data.extend_from_slice(&[0, code]);
@@ -257,9 +264,9 @@ fn push_frt_header(data: &mut Vec<u8>, record_type: u16) {
     data.extend_from_slice(&0u16.to_le_bytes());
     data.extend_from_slice(&0u64.to_le_bytes());
 }
-fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str) {
+fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str, field: &'static str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
-    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
+    data.extend_from_slice(&u16_len(units.len(), field)?.to_le_bytes());
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     data.push(u8::from(!compressed));
     for unit in units {
@@ -269,6 +276,7 @@ fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str) {
             data.extend_from_slice(&unit.to_le_bytes());
         }
     }
+    Ok(())
 }
 
 pub(crate) fn write_name_function_group<W: Write>(
@@ -278,9 +286,9 @@ pub(crate) fn write_name_function_group<W: Write>(
     let mut data = Vec::new();
     push_frt_header(&mut data, 0x0899);
     let count = value.function_name.encode_utf16().count();
-    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(count).to_le_bytes());
+    data.extend_from_slice(&u16_len(count, "NameFnGrp12 function name")?.to_le_bytes());
     data.extend_from_slice(&u16::from(value.category).to_le_bytes());
-    push_xl_name_unicode(&mut data, &value.function_name);
+    push_xl_name_unicode(&mut data, &value.function_name, "NameFnGrp12 function name")?;
     write_record_header(
         writer,
         0x0899,
@@ -298,7 +306,7 @@ pub(crate) fn write_name_publish<W: Write>(
     push_frt_header(&mut data, 0x0893);
     let flags = u16::from(value.published) | (u16::from(value.workbook_parameter) << 1);
     data.extend_from_slice(&flags.to_le_bytes());
-    push_xl_name_unicode(&mut data, &value.name);
+    push_xl_name_unicode(&mut data, &value.name, "NamePublish name")?;
     write_record_header(
         writer,
         0x0893,

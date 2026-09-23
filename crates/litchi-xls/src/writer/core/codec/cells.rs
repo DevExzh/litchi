@@ -1,6 +1,7 @@
 use super::super::super::formatting::{CellStyle, ExtendedFormat};
 use super::super::{CellPos, CellValue, Hyperlink, WritableCell, Writer};
 use crate::error::{Error, Result};
+use crate::writer::string_limits::{SHARED_STRING_UNITS, ensure_utf16_len_within};
 
 impl Writer {
     /// Write a string value to a cell
@@ -13,14 +14,20 @@ impl Writer {
     /// * `value` - String value
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] when `value` is longer than the 65,535
+    /// UTF-16 code units a BIFF8 shared string can hold, leaving the cell
+    /// unchanged, and an error if any other validation, decoding, encoding,
+    /// or the requested operation fails.
     pub fn write_string(&mut self, sheet: usize, row: u32, col: u16, value: &str) -> Result<()> {
         self.write_string_with_format(sheet, row, col, value, 0)
     }
 
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] when `value` is longer than the 65,535
+    /// UTF-16 code units a BIFF8 shared string can hold, leaving the cell
+    /// unchanged, and an error if any other validation, decoding, encoding,
+    /// or the requested operation fails.
     pub fn write_string_with_format(
         &mut self,
         sheet: usize,
@@ -30,6 +37,7 @@ impl Writer {
         format_id: u16,
     ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
+        ensure_utf16_len_within(value, SHARED_STRING_UNITS, "shared string")?;
         self.write_cell(sheet, pos, CellValue::String(value.to_string()), format_id)
     }
 

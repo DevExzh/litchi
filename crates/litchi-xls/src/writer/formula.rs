@@ -21,7 +21,11 @@
 //! ```
 
 use super::super::Error;
+use super::string_limits::{FORMULA_STRING_UNITS, checked_utf16_len, u8_len};
 use std::collections::HashMap;
+
+/// The field [`Error::StringTooLong`] names for an over-long string constant.
+const FORMULA_STRING_FIELD: &str = "formula string literal";
 
 const MAX_BIFF8_COLUMN: u16 = 255;
 
@@ -425,6 +429,7 @@ impl FormulaTokenizer {
                         "Unterminated string literal".to_string(),
                     ));
                 }
+                checked_utf16_len(&value, FORMULA_STRING_UNITS, FORMULA_STRING_FIELD)?;
                 output.push(Ptg::Str(value));
                 expect_operand = false;
                 continue;
@@ -1018,7 +1023,7 @@ fn try_encode_array_tokens(
                 9
             },
             Ptg::Str(value) => {
-                let units = value.encode_utf16().count();
+                let units = checked_utf16_len(value, FORMULA_STRING_UNITS, FORMULA_STRING_FIELD)?;
                 let width = if value.encode_utf16().all(|unit| unit <= 0xff) {
                     1
                 } else {
@@ -1084,7 +1089,7 @@ fn try_encode_array_tokens(
                 let units = value.encode_utf16().count();
                 let compressed = value.encode_utf16().all(|unit| unit <= 0xff);
                 bytes.push(0x17);
-                bytes.push(crate::utils::truncate_usize_to_u8(units));
+                bytes.push(u8_len(units, FORMULA_STRING_FIELD)?);
                 if compressed {
                     bytes.push(0);
                     bytes.extend(value.encode_utf16().map(crate::utils::truncate_u16_to_u8));
@@ -1150,8 +1155,12 @@ fn try_encode_array_tokens(
 }
 
 /// Encode Ptg tokens to binary format for BIFF8
-#[must_use]
-pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
+///
+/// # Errors
+///
+/// Returns [`Error::StringTooLong`] for a [`Ptg::Str`] longer than the 255
+/// UTF-16 code units a `PtgStr` can hold; a string is never truncated.
+pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Result<Vec<u8>, Error> {
     let mut bytes = Vec::new();
 
     for token in tokens {
@@ -1165,15 +1174,11 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
                 bytes.extend_from_slice(&val.to_le_bytes());
             },
             Ptg::Str(s) => {
+                let units = checked_utf16_len(s, FORMULA_STRING_UNITS, FORMULA_STRING_FIELD)?;
+                let cch = u8_len(units, FORMULA_STRING_FIELD)?;
+                let utf16: Vec<u16> = s.encode_utf16().collect();
                 bytes.push(0x17); // PtgStr
-                let mut utf16: Vec<u16> = s.encode_utf16().take(255).collect();
-                if utf16
-                    .last()
-                    .is_some_and(|unit| (0xd800..=0xdbff).contains(unit))
-                {
-                    utf16.pop();
-                }
-                bytes.push(crate::utils::truncate_usize_to_u8(utf16.len()));
+                bytes.push(cch);
                 if utf16.iter().all(|unit| *unit <= 0xff) {
                     bytes.push(0); // Compressed Unicode
                     bytes.extend(
@@ -1246,7 +1251,7 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
         }
     }
 
-    bytes
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -1586,7 +1591,7 @@ mod tests {
     #[test]
     fn test_encode_ptg_tokens() {
         let tokens = vec![Ptg::Int(42), Ptg::Add, Ptg::Num(std::f64::consts::PI)];
-        let bytes = encode_ptg_tokens(&tokens);
+        let bytes = encode_ptg_tokens(&tokens).unwrap();
         assert!(!bytes.is_empty());
         assert_eq!(bytes[0], 0x1E); // PtgInt opcode
     }
@@ -1599,23 +1604,23 @@ mod tests {
         let relative = row_relative.rel_col(true);
 
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Ref(absolute)]),
+            encode_ptg_tokens(&[Ptg::Ref(absolute)]).unwrap(),
             [0x24, 0x05, 0x00, 0x03, 0x00]
         );
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Ref(row_relative)]),
+            encode_ptg_tokens(&[Ptg::Ref(row_relative)]).unwrap(),
             [0x24, 0x05, 0x00, 0x03, 0x80]
         );
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Ref(column_relative)]),
+            encode_ptg_tokens(&[Ptg::Ref(column_relative)]).unwrap(),
             [0x24, 0x05, 0x00, 0x03, 0x40]
         );
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Ref(relative)]),
+            encode_ptg_tokens(&[Ptg::Ref(relative)]).unwrap(),
             [0x24, 0x05, 0x00, 0x03, 0xc0]
         );
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Ref(Ref::new(u16::MAX, u8::MAX))]),
+            encode_ptg_tokens(&[Ptg::Ref(Ref::new(u16::MAX, u8::MAX))]).unwrap(),
             [0x24, 0xff, 0xff, 0xff, 0x00]
         );
     }
@@ -1623,36 +1628,94 @@ mod tests {
     #[test]
     fn test_encode_ptg_str() {
         let tokens = vec![Ptg::Str("Test".to_string())];
-        let bytes = encode_ptg_tokens(&tokens);
+        let bytes = encode_ptg_tokens(&tokens).unwrap();
         assert_eq!(bytes[0], 0x17); // PtgStr opcode
         assert_eq!(bytes[1], 4); // String length
     }
 
     #[test]
     fn test_encode_ptg_str_as_utf16_when_required() {
-        let bytes = encode_ptg_tokens(&[Ptg::Str("你好".to_string())]);
+        let bytes = encode_ptg_tokens(&[Ptg::Str("你好".to_string())]).unwrap();
         assert_eq!(bytes, [0x17, 2, 1, 0x60, 0x4f, 0x7d, 0x59]);
     }
 
     #[test]
     fn test_encode_ptg_bool() {
-        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(true)]), [0x1d, 1]);
-        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(false)]), [0x1d, 0]);
+        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(true)]).unwrap(), [0x1d, 1]);
+        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(false)]).unwrap(), [0x1d, 0]);
+    }
+
+    fn string_too_long(result: Result<impl std::fmt::Debug, Error>) -> (usize, usize) {
+        match result {
+            Err(Error::StringTooLong {
+                field: "formula string literal",
+                utf16_units,
+                limit,
+            }) => (utf16_units, limit),
+            other => panic!("expected a formula-string refusal, got {other:?}"),
+        }
     }
 
     #[test]
-    fn test_encode_ptg_str_does_not_split_surrogate_pair_at_limit() {
-        let value = format!("{}😀", "a".repeat(254));
-        let bytes = encode_ptg_tokens(&[Ptg::Str(value)]);
-        assert_eq!(bytes[1], 254);
-        assert_eq!(bytes.len(), 257);
+    fn test_encode_ptg_str_refuses_a_string_past_the_limit_instead_of_truncating_it() {
+        // 254 units and a surrogate pair: the old encoder cut the string to
+        // the 254 units in front of the pair.
+        let straddling = format!("{}😀", "a".repeat(254));
+        assert_eq!(
+            string_too_long(encode_ptg_tokens(&[Ptg::Str(straddling)])),
+            (256, 255)
+        );
+        for value in ["a".repeat(256), "é".repeat(256), "漢".repeat(256)] {
+            assert_eq!(
+                string_too_long(encode_ptg_tokens(&[Ptg::Int(1), Ptg::Str(value)])),
+                (256, 255)
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_ptg_str_writes_strings_up_to_the_limit_whole() {
+        for units in [254usize, 255] {
+            let ascii = "a".repeat(units);
+            let bytes = encode_ptg_tokens(&[Ptg::Str(ascii.clone())]).unwrap();
+            assert_eq!(usize::from(bytes[1]), units);
+            assert_eq!(bytes[2], 0);
+            assert_eq!(&bytes[3..], ascii.as_bytes());
+
+            let wide = format!("{}😀", "漢".repeat(units - 2));
+            let bytes = encode_ptg_tokens(&[Ptg::Str(wide.clone())]).unwrap();
+            assert_eq!(usize::from(bytes[1]), units);
+            assert_eq!(bytes[2], 1);
+            let expected: Vec<u8> = wide.encode_utf16().flat_map(u16::to_le_bytes).collect();
+            assert_eq!(&bytes[3..], expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_tokenizer_refuses_a_string_literal_past_the_limit() {
+        let tokenizer = FormulaTokenizer::new();
+        for units in [254usize, 255] {
+            let literal = "é".repeat(units);
+            let tokens = tokenizer.tokenize(&format!("\"{literal}\"&A1")).unwrap();
+            assert!(matches!(&tokens[0], Ptg::Str(value) if *value == literal));
+        }
+        // A doubled quote is one character of the literal.
+        let quoted = format!("\"{}\"\"\"", "a".repeat(254));
+        assert!(matches!(
+            &tokenizer.tokenize(&quoted).unwrap()[0],
+            Ptg::Str(value) if value.len() == 255
+        ));
+        let too_long = format!("\"{}\"\"\"", "a".repeat(255));
+        assert_eq!(string_too_long(tokenizer.tokenize(&too_long)), (256, 255));
+        let straddling = format!("\"{}😀\"", "a".repeat(254));
+        assert_eq!(string_too_long(tokenizer.tokenize(&straddling)), (256, 255));
     }
 
     #[test]
     fn test_encode_ptg_area() {
         let area = Area::new(Ref::new(0, 0), Ref::new(5, 3)).unwrap();
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Area(area)]),
+            encode_ptg_tokens(&[Ptg::Area(area)]).unwrap(),
             [0x25, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00]
         );
     }
@@ -1661,7 +1724,7 @@ mod tests {
     fn test_encode_ptg_area3d() {
         let area = Area::new(Ref::new(0, 0), Ref::new(5, 3)).unwrap();
         assert_eq!(
-            encode_ptg_tokens(&[Ptg::Area3d(2, area)]),
+            encode_ptg_tokens(&[Ptg::Area3d(2, area)]).unwrap(),
             [
                 0x3b, 0x02, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00,
             ]
@@ -1671,7 +1734,7 @@ mod tests {
     #[test]
     fn test_encode_ptg_func() {
         let tokens = vec![Ptg::Func(4, 1)]; // SUM with 1 arg
-        let bytes = encode_ptg_tokens(&tokens);
+        let bytes = encode_ptg_tokens(&tokens).unwrap();
         assert_eq!(bytes[0], 0x42); // PtgFuncVar opcode, value operand class
         assert_eq!(bytes[1], 1); // Arg count
     }
@@ -1700,7 +1763,7 @@ mod tests {
         ];
 
         for (ptg, expected_opcode) in operators {
-            let bytes = encode_ptg_tokens(std::slice::from_ref(&ptg));
+            let bytes = encode_ptg_tokens(std::slice::from_ref(&ptg)).unwrap();
             assert_eq!(bytes[0], expected_opcode, "Opcode mismatch for {:?}", ptg);
         }
     }
