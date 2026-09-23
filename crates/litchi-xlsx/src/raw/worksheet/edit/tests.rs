@@ -17,6 +17,7 @@ use crate::error::{
 use crate::layout::{self, Descent};
 use crate::outline::Outline;
 use crate::raw::worksheet;
+use crate::raw::worksheet::lane::corpus::Lcg;
 use crate::row::Height;
 const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
@@ -1321,4 +1322,108 @@ fn blocks_dependencies_instead_of_guessing() {
             Err(Error::EditBlocked { reason, .. }) if reason == expected
         ));
     }
+}
+
+/// A random cells-only plan, generated deterministically from `seed`: mostly
+/// existing cells, then new cells in existing rows, then anywhere nearby.
+fn random_cells_plan(
+    seed: u64,
+    actions: usize,
+    cells: &[Address],
+    rows: &[u32],
+) -> BTreeMap<Address, Action> {
+    let mut random = Lcg(seed);
+    let mut plan = BTreeMap::new();
+    for _ in 0..actions {
+        let pick = |random: &mut Lcg, length: usize| {
+            usize::try_from(random.next()).expect("usize") % length
+        };
+        let address = match random.next() % 10 {
+            0..=6 if !cells.is_empty() => cells[pick(&mut random, cells.len())],
+            7 | 8 if !rows.is_empty() => {
+                let row = rows[pick(&mut random, rows.len())];
+                let column = u32::try_from(random.next() % 14).expect("column");
+                Address::at(row, column).expect("address")
+            },
+            _ => {
+                let row = u32::try_from(random.next() % 20).expect("row");
+                let column = u32::try_from(random.next() % 14).expect("column");
+                Address::at(row, column).expect("address")
+            },
+        };
+        let action = match random.next() % 10 {
+            0 => Action::set(crate::Content::from("text <&> value")),
+            1 => Action::set(crate::Content::from(random.next() % 2 == 0)),
+            2 => Action::clear(true),
+            3 => Action::clear(false),
+            4 => Action::style(u32::try_from(random.next() % 4).expect("style")),
+            5 => Action::reset_style(),
+            6 => Action::Remove,
+            _ => Action::set(crate::Content::from(
+                i32::try_from(random.next() % 100_000).expect("number"),
+            )),
+        };
+        plan.insert(address, action);
+    }
+    plan
+}
+
+#[test]
+fn provenance_writer_matches_the_ordinary_writer_on_random_cells_only_plans() {
+    use crate::raw::worksheet::lane::corpus::{generated_body, worksheet};
+    let mut random = Lcg(0x0744_0004);
+    let mut recorded = 0usize;
+    let mut refused = 0usize;
+    for index in 0..3_000 {
+        let document = worksheet(&generated_body(&mut random, index % 4 == 0));
+        let content = document.as_bytes();
+        let (cells, rows) = super::codec::scan(content).map_or_else(
+            |_| (Vec::new(), Vec::new()),
+            |layout| {
+                let rows = &layout.sheet_data.rows;
+                (
+                    rows.iter()
+                        .flat_map(|row| row.cells.iter().map(|cell| cell.address))
+                        .collect(),
+                    rows.iter().map(|row| row.number - 1).collect(),
+                )
+            },
+        );
+        let seed = random.next();
+        let actions = 1 + index % 5;
+        let ordinary = rewrite(
+            content,
+            "Sheet1",
+            random_cells_plan(seed, actions, &cells, &rows),
+        );
+        let provenance = rewrite_value_only_with_provenance(
+            content,
+            "Sheet1",
+            random_cells_plan(seed, actions, &cells, &rows),
+            None,
+        );
+        match (ordinary, provenance) {
+            (Ok(ordinary), Ok(provenance)) => {
+                assert_eq!(ordinary, provenance.bytes, "{document}");
+                recorded += usize::from(!provenance.omitted.is_empty());
+            },
+            (Err(ordinary), Err(provenance)) => {
+                assert_eq!(
+                    format!("{ordinary:?}"),
+                    format!("{provenance:?}"),
+                    "{document}"
+                );
+                refused += 1;
+            },
+            (ordinary, provenance) => panic!(
+                "writers disagree for {document}: {:?} vs {:?}",
+                ordinary.map(|bytes| bytes.len()),
+                provenance.map(|rewrite| rewrite.bytes.len())
+            ),
+        }
+    }
+    println!("writer differential: 3000 plans, {recorded} with provenance, {refused} refused");
+    // The comparison must exercise the provenance writer and some refusals.
+    assert!(recorded > 1_000, "provenance recorded {recorded} times");
+    assert!(refused > 100, "only {refused} plans were refused");
 }
