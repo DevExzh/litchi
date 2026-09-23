@@ -37,7 +37,7 @@ pub(crate) use model::{
 };
 
 pub(crate) use codec::{
-    EscherBuilder, build_client_textbox, create_dg_container_with_charts,
+    EscherBuilder, append_dg_container_with_charts, build_client_textbox,
     create_dg_container_with_shapes, create_dgg_container, create_dgg_container_with_blips,
 };
 
