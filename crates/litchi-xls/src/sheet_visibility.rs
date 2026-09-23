@@ -19,6 +19,7 @@
 )]
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
+use crate::workbook::{KeptCells, ValidationWorkbook};
 use crate::{Error, Result, SheetKind, SheetVisibility, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::{
@@ -89,7 +90,10 @@ impl Snapshot {
         let sheets = parse_directory(&workbook_stream)?;
         require_visible_worksheet(&sheets)?;
         let bytes = package.finish()?;
-        let workbook = Workbook::new(Cursor::new(bytes.as_slice()))?;
+        // The complete reader's validation-only mode: every record is
+        // validated as `Workbook::new` validates it; no cell is decoded, and
+        // no cell is read here.
+        let workbook = Workbook::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
         require_unprotected(&workbook)?;
         require_public_readback(&workbook, &sheets)?;
         Ok(Self {
@@ -1008,7 +1012,7 @@ fn require_bof(payload: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn require_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+fn require_unprotected<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Result<()> {
     let protection = workbook.protection();
     if protection.structure_protected()
         || protection.windows_protected()
@@ -1026,7 +1030,7 @@ fn require_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
         let Some(index) = metadata.parsed_worksheet_index() else {
             continue;
         };
-        let protection = workbook.xls_worksheet(index)?.protection();
+        let protection = workbook.worksheet_protection(index)?;
         if protection.is_protected()
             || protection.objects_protected()
             || protection.scenarios_protected()
@@ -1041,7 +1045,7 @@ fn require_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
 }
 
 fn require_public_readback<R: Read + Seek>(
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
     sheets: &[SheetEntry],
 ) -> Result<()> {
     if workbook.sheets().len() != sheets.len() {
@@ -1337,7 +1341,7 @@ fn verify_source_backed_candidate(
     source: &Snapshot,
     changes: &[&Change],
 ) -> Result<()> {
-    let workbook = Workbook::new(PositionalReader::new(candidate))?;
+    let workbook = Workbook::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
     require_unprotected(&workbook)?;
 
     let mut sheets = Vec::new();

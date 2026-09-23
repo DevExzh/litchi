@@ -10,6 +10,7 @@
 use super::{CONTINUE_TYPE, Comment, MSODRAWING_TYPE, OBJ_TYPE, RECORD_TYPE, TXO_TYPE, Visibility};
 use crate::cell_values::{Reference, Selector};
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
+use crate::workbook::{KeptCells, ValidationWorkbook};
 use crate::{Error, Result, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::{
@@ -166,7 +167,10 @@ impl Snapshot {
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let bytes = package.finish()?;
-        let workbook = Workbook::new(Cursor::new(bytes.as_slice()))?;
+        // The complete reader's validation-only mode: every record is
+        // validated as `Workbook::new` validates it; no cell is decoded, and
+        // no cell is read here.
+        let workbook = Workbook::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
         let sheets = parse_inventory(&workbook_stream, &workbook)?;
         Ok(Self {
             inner: Arc::new(Inner {
@@ -1263,7 +1267,7 @@ fn verify_source_backed_candidate(
     source: &Snapshot,
     changes: &[&Change],
 ) -> Result<()> {
-    let workbook = Workbook::new(PositionalReader::new(candidate))?;
+    let workbook = Workbook::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
     let worksheet_count = workbook
         .sheets()
         .iter()
@@ -1286,7 +1290,7 @@ fn verify_source_backed_candidate(
                 "source-backed comment worksheet is not parsed during readback".into(),
             )
         })?;
-        let comments = workbook.xls_worksheet(worksheet_index)?.comments();
+        let comments = workbook.worksheet_comments(worksheet_index)?;
         let comment = comments.iter().find(|comment| {
             comment.row()
                 == source.inner.sheets[change.sheet].entries[change.entry]
@@ -1361,7 +1365,7 @@ fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<
 
 fn parse_inventory<R: Read + Seek>(
     stream: &Arc<[u8]>,
-    workbook: &Workbook<R>,
+    workbook: &ValidationWorkbook<R>,
 ) -> Result<Vec<Sheet>> {
     let mut records = Records::new(stream);
     let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
@@ -1409,7 +1413,8 @@ fn parse_inventory<R: Read + Seek>(
         let parsed_index = metadata.parsed_worksheet_index().ok_or_else(|| {
             Error::UnsafeEdit("a worksheet substream was not completely parsed".into())
         })?;
-        let semantic = workbook.xls_worksheet(parsed_index)?;
+        let comments = workbook.worksheet_comments(parsed_index)?;
+        let protection = workbook.worksheet_protection(parsed_index)?;
         let start = usize::try_from(bound.position)
             .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
         let end = bounds
@@ -1420,12 +1425,11 @@ fn parse_inventory<R: Read + Seek>(
             })
             .min()
             .unwrap_or(stream.len());
-        let entries = parse_sheet_sites(stream, start, end, semantic.comments())?;
+        let entries = parse_sheet_sites(stream, start, end, comments)?;
         sheets.push(Sheet {
             name: bound.name.clone(),
             workbook_position: position,
-            protected: semantic.protection().is_protected()
-                || semantic.protection().objects_protected(),
+            protected: protection.is_protected() || protection.objects_protected(),
             entries,
         });
     }
