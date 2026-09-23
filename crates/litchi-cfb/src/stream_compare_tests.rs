@@ -1,10 +1,16 @@
-//! `OleFile::stream_equals` held to `OleFile::open_stream` (change 0749).
+//! `StreamComparer::stream_equals` held to `OleFile::open_stream` (change
+//! 0749).
 //!
 //! The in-place comparison must reach the verdict `open_stream` followed by a
 //! byte comparison reaches — equal, different, or the same error — for every
 //! stream of every OLE2 fixture, for expectations that differ in one byte or
 //! in length, for files whose final sector is short, and for files whose
-//! allocation tables were corrupted after they were written.
+//! allocation tables were corrupted after they were written. The verdicts are
+//! compared as sequences: a fresh reader and a fresh comparer see the same
+//! calls in the same order, so the one-time root mini-stream load of each is
+//! exercised the same way. Further tests pin that load to once per comparer,
+//! a contiguous mini stream to one comparison, and a failed load to no
+//! cached result.
 
 #![allow(
     clippy::unwrap_used,
@@ -13,10 +19,11 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::file::{CandidateBytes, StreamCompareScratch};
+use crate::file::CandidateBytes;
 use crate::{OleError, OleFile, writer::OleWriter};
 
 const MAGIC: &[u8; 8] = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
@@ -46,24 +53,6 @@ impl CandidateBytes for FileBytes<'_> {
 
 type Verdict = Result<bool, String>;
 
-/// The readback verdict and the in-place verdict for one expectation.
-fn verdicts(
-    file: &[u8],
-    ole: &mut OleFile<Cursor<&[u8]>>,
-    scratch: &mut StreamCompareScratch,
-    path: &[&str],
-    expected: &[u8],
-) -> (Verdict, Verdict) {
-    let readback = ole
-        .open_stream(path)
-        .map(|data| data == expected)
-        .map_err(|error| error.to_string());
-    let in_place = ole
-        .stream_equals(path, expected, scratch, &FileBytes(file))
-        .map_err(|error| error.to_string());
-    (in_place, readback)
-}
-
 /// Expectations around `actual`: itself, one byte flipped at the start, the
 /// middle and the end, one byte longer and shorter, and empty.
 fn expectations(actual: &[u8]) -> Vec<Vec<u8>> {
@@ -87,26 +76,45 @@ fn expectations(actual: &[u8]) -> Vec<Vec<u8>> {
 /// Holds every stream of `file` to the readback verdict; returns how many
 /// expectations were compared.
 fn agree_on_every_stream(label: &str, file: &[u8]) -> usize {
-    let Ok(mut ole) = OleFile::open(Cursor::new(file)) else {
+    let Ok(mut first) = OleFile::open(Cursor::new(file)) else {
         return 0;
     };
-    let mut scratch = StreamCompareScratch::default();
-    let mut compared = 0;
-    for path in ole.list_streams() {
+    let mut cases = Vec::new();
+    for path in first.list_streams() {
         let refs: Vec<&str> = path.iter().map(String::as_str).collect();
-        let actual = ole.open_stream(&refs).unwrap_or_default();
+        let actual = first.open_stream(&refs).unwrap_or_default();
         for expected in expectations(&actual) {
-            let (in_place, readback) = verdicts(file, &mut ole, &mut scratch, &refs, &expected);
-            assert_eq!(
-                in_place,
-                readback,
-                "{label}: stream {path:?}, expectation of {} bytes",
-                expected.len()
-            );
-            compared += 1;
+            cases.push((path.clone(), expected));
         }
     }
-    compared
+    // A fresh reader, whose mini-stream cache starts empty as a comparer's
+    // root load does, answers the readback in order.
+    let mut reader = OleFile::open(Cursor::new(file)).unwrap();
+    let readback: Vec<Verdict> = cases
+        .iter()
+        .map(|(path, expected)| {
+            let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+            reader
+                .open_stream(&refs)
+                .map(|data| data == *expected)
+                .map_err(|error| error.to_string())
+        })
+        .collect();
+    let candidate = FileBytes(file);
+    let mut comparer = reader.stream_comparer(&candidate);
+    for ((path, expected), readback) in cases.iter().zip(&readback) {
+        let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+        let in_place = comparer
+            .stream_equals(&refs, expected)
+            .map_err(|error| error.to_string());
+        assert_eq!(
+            &in_place,
+            readback,
+            "{label}: stream {path:?}, expectation of {} bytes",
+            expected.len()
+        );
+    }
+    cases.len()
 }
 
 fn repository_root() -> PathBuf {
@@ -228,4 +236,133 @@ fn corrupted_files_reach_the_readback_verdict() {
     }
     assert!(opened > 100, "enough corrupted files still open ({opened})");
     eprintln!("0749 corruption: {opened} corrupted files opened and agree");
+}
+
+/// A candidate that counts what it is asked, optionally failing its first
+/// few readability checks.
+struct Counting<'a> {
+    bytes: FileBytes<'a>,
+    equals: Cell<usize>,
+    readable: Cell<usize>,
+    failing_checks: Cell<usize>,
+}
+
+impl<'a> Counting<'a> {
+    fn new(bytes: &'a [u8], failing_checks: usize) -> Self {
+        Self {
+            bytes: FileBytes(bytes),
+            equals: Cell::new(0),
+            readable: Cell::new(0),
+            failing_checks: Cell::new(failing_checks),
+        }
+    }
+}
+
+impl CandidateBytes for Counting<'_> {
+    fn equals_at(&self, offset: u64, expected: &[u8]) -> Result<bool, OleError> {
+        self.equals.set(self.equals.get() + 1);
+        self.bytes.equals_at(offset, expected)
+    }
+
+    fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError> {
+        self.readable.set(self.readable.get() + 1);
+        if self.failing_checks.get() > 0 {
+            self.failing_checks.set(self.failing_checks.get() - 1);
+            return Err(OleError::InvalidData("injected read failure".to_string()));
+        }
+        self.bytes.check_readable(offset, len)
+    }
+}
+
+/// `count` mini streams of `size` bytes each, written from scratch.
+fn many_mini_streams(sector_size: usize, count: usize, size: usize) -> (Vec<u8>, Vec<Vec<u8>>) {
+    let mut writer = OleWriter::with_sector_size(sector_size).unwrap();
+    let mut payloads = Vec::new();
+    for index in 0..count {
+        let payload: Vec<u8> = (0..size)
+            .map(|byte| u8::try_from((byte * 7 + index * 13) % 251).unwrap())
+            .collect();
+        let name = format!("S{index:05}");
+        writer.create_stream(&[name.as_str()], &payload).unwrap();
+        payloads.push(payload);
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), payloads)
+}
+
+#[test]
+fn the_root_mini_stream_is_loaded_once_and_each_contiguous_stream_compared_once() {
+    for sector_size in [512, 4096] {
+        let (file, payloads) = many_mini_streams(sector_size, 300, 2_000);
+        let reader = OleFile::open(Cursor::new(file.as_slice())).unwrap();
+        let candidate = Counting::new(&file, 0);
+        let mut comparer = reader.stream_comparer(&candidate);
+        let mut root_checks = None;
+        for (index, payload) in payloads.iter().enumerate() {
+            let name = format!("S{index:05}");
+            assert!(comparer.stream_equals(&[name.as_str()], payload).unwrap());
+            // The root load's readability checks happen for the first mini
+            // stream only; the quadratic form repeated them for every one.
+            let checks = *root_checks.get_or_insert(candidate.readable.get());
+            assert_eq!(
+                candidate.readable.get(),
+                checks,
+                "{sector_size}: stream {index}"
+            );
+        }
+        assert!(root_checks.is_some_and(|checks| checks >= 1));
+        // Each stream's 32 mini sectors follow one another in the file, so
+        // they are compared as one range, not 64 bytes at a time.
+        assert_eq!(candidate.equals.get(), payloads.len(), "{sector_size}");
+    }
+}
+
+#[test]
+fn a_failed_root_load_is_not_kept_and_is_repeated_like_open_stream() {
+    let (file, payloads) = many_mini_streams(512, 3, 700);
+    let reader = OleFile::open(Cursor::new(file.as_slice())).unwrap();
+    // The first readability check fails once: the first mini stream reports
+    // the error, and the next mini stream loads the root again, successfully.
+    let candidate = Counting::new(&file, 1);
+    let mut comparer = reader.stream_comparer(&candidate);
+    let error = comparer
+        .stream_equals(&["S00000"], &payloads[0])
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("injected read failure"),
+        "{error}"
+    );
+    assert!(comparer.stream_equals(&["S00001"], &payloads[1]).unwrap());
+    assert!(comparer.stream_equals(&["S00000"], &payloads[0]).unwrap());
+    let loaded = candidate.readable.get();
+    assert!(comparer.stream_equals(&["S00002"], &payloads[2]).unwrap());
+    assert_eq!(
+        candidate.readable.get(),
+        loaded,
+        "a successful load is kept"
+    );
+
+    // A candidate whose reads always fail fails every mini stream the same
+    // way, as `open_stream` fails every read of an unreadable mini stream.
+    let failing = Counting::new(&file, usize::MAX);
+    let mut comparer = reader.stream_comparer(&failing);
+    for (index, payload) in payloads.iter().enumerate() {
+        let name = format!("S{index:05}");
+        let error = comparer
+            .stream_equals(&[name.as_str()], payload)
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("injected read failure"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn many_mini_stream_files_reach_the_readback_verdict() {
+    for sector_size in [512, 4096] {
+        let (file, _) = many_mini_streams(sector_size, 120, 1_000);
+        assert!(agree_on_every_stream(&format!("{sector_size}-byte sectors"), &file) > 0);
+    }
 }
