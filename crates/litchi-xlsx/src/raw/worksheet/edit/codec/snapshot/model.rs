@@ -32,9 +32,61 @@ pub(crate) struct CellSlot {
     /// one unqualified `r` attribute. The address is parsed separately, so
     /// the writer can regenerate `r` without retaining an owned tag.
     pub(crate) tag: Option<Tag>,
-    pub(crate) primary: Box<[Span]>,
+    pub(crate) primary: PrimarySpans,
     pub(crate) mce_payload: bool,
     pub(crate) empty: bool,
+}
+
+/// The payload (`<f>`, `<v>` and `<is>`) spans of one scanned cell, in
+/// source order.
+///
+/// Almost every cell has at most one payload, so that span is stored inline
+/// and only a second one moves the spans to the heap.
+#[derive(Debug, Clone)]
+pub(crate) enum PrimarySpans {
+    /// No payload, or the one payload span.
+    Inline(Option<Span>),
+    /// Two or more payload spans.
+    Heap(Box<[Span]>),
+}
+
+impl Default for PrimarySpans {
+    fn default() -> Self {
+        Self::Inline(None)
+    }
+}
+
+impl PrimarySpans {
+    /// Append one payload span.
+    pub(crate) fn push(&mut self, span: Span) {
+        *self = match std::mem::take(self) {
+            Self::Inline(None) => Self::Inline(Some(span)),
+            Self::Inline(Some(first)) => Self::Heap(Box::new([first, span])),
+            Self::Heap(spans) => {
+                let mut spans = spans.into_vec();
+                spans.push(span);
+                Self::Heap(spans.into_boxed_slice())
+            },
+        };
+    }
+
+    /// Keep collected spans, moving them inline when there is at most one.
+    pub(crate) fn from_spans(spans: Vec<Span>) -> Self {
+        match spans.as_slice() {
+            [] => Self::Inline(None),
+            [span] => Self::Inline(Some(*span)),
+            _ => Self::Heap(spans.into_boxed_slice()),
+        }
+    }
+
+    /// The spans in source order.
+    pub(crate) fn as_slice(&self) -> &[Span] {
+        match self {
+            Self::Inline(None) => &[],
+            Self::Inline(Some(span)) => std::slice::from_ref(span),
+            Self::Heap(spans) => spans,
+        }
+    }
 }
 
 #[derive(Debug)]

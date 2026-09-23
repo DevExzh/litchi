@@ -27,7 +27,9 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::Reader;
 
 use super::super::wire::{cell_tag, tag};
-use super::model::{CellFact, CellSlot, DimensionFact, RowFact, SourceFacts, Span, Tag};
+use super::model::{
+    CellFact, CellSlot, DimensionFact, PrimarySpans, RowFact, SourceFacts, Span, Tag,
+};
 use crate::error::{Result, allocation, invalid};
 use crate::raw::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
 use crate::raw::worksheet::model::{MAX_XML_DEPTH, MAX_XML_EVENTS};
@@ -683,7 +685,7 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
             tag_end: end,
             close_start: end,
             tag: slot_tag,
-            primary: Box::new([]),
+            primary: PrimarySpans::default(),
             mce_payload: false,
             empty: true,
         }));
@@ -760,7 +762,7 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
         tag_end,
         close_start,
         tag: slot_tag,
-        primary: primary.into_boxed_slice(),
+        primary: PrimarySpans::from_spans(primary),
         mce_payload: false,
         empty: false,
     }))
