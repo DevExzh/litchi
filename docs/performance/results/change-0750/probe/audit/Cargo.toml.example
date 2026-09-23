@@ -1,0 +1,13 @@
+[package]
+name = "litchi-audit-probe-0750"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+xml-minifier = { path = "<CHECKOUT>/crates/xml-minifier" }
+
+[profile.release]
+debug = 1
+
+[workspace]

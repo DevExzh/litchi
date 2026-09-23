@@ -1,0 +1,29 @@
+Change 0750: SHA-256 of every binary that produced a cited number. The binaries
+themselves are not kept.
+
+Harness (tools/perf-baseline, unchanged by this change), built for both legs by
+  cargo build --release --manifest-path tools/perf-baseline/Cargo.toml --locked --offline --bin litchi-perf-baseline
+(before: detached worktree at 3174242282, CARGO_TARGET_DIR targets/0750-before;
+ after: the branch worktree on the final candidate, CARGO_TARGET_DIR targets/0750),
+then copied to scratch/0750/bin/ and run from there:
+15d6f91b49c6e734ac85ccaac73860d85dbdcae9a324237f6349b6e9278be467  litchi-perf-baseline.before
+6ac6e6c97e72016ee8b8ff836bc27dcf145d53e86fd4abfc0b424e1374347e68  litchi-perf-baseline.after
+
+Audit probe (probe/audit), the same source built with `cargo build --release --offline`
+against each leg's crates/xml-minifier (probe/audit/Cargo.toml.example):
+9783a86af1d3ba0d567fac2eea92efb287edd4a0a6a3c3acd753b2ec4b43fefc  litchi-audit-probe-0750 (before, targets/0750-before/release/)
+de1a213942c8ad875400e14c2f406b63d36c77419e813c1b900b07031c5ac758  litchi-audit-probe-0750 (after, targets/0750-census-after/release/)
+
+Census probe (probe/census), built the same way:
+cdfcd24f0c842ad377f2ffba80c35ff8cbf7c96f7e73434ea325a073b96795a0  litchi-census-0750 (before, targets/0750-before/release/)
+a8e10e20d6b3cc72e5c7c6941816c33a38c75dfd3892a95749139526fa7f312d  litchi-census-0750 (after, targets/0750-census-after/release/)
+
+Compilers, read from each binary's .comment section: both harness binaries by
+rustc 1.95.0, which the repository's rust-toolchain.toml pins for builds in a
+checkout; all four probe binaries by rustc 1.98.1, the host default, because
+the probes were built from scratch directories outside the checkout. Each pair
+of legs therefore used one compiler. The harness reports carry the same binary
+SHA-256 in binary_identity.binary_sha256; their environment.rustc_version is the
+rustc of the directory the harness ran from (1.95.0 for the timing runs, which
+ran in the worktree; 1.98.1 for the callgrind runs, which ran in scratch), not
+the compiler that built it.

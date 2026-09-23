@@ -1,0 +1,62 @@
+per audit: before 5,107, after 9,356, added 4,249 instructions
+   before     after     added  function (or inlined source line)
+        0       841      +841  xml_minifier::audit::wellformed::find_cdata_close
+        0       806      +806  xml_minifier::audit::wellformed::precise_illegal_character
+       50       456      +406  if self < rhs {
+       84       482      +398  xml_minifier::audit::check_start
+        0       318      +318  || (byte == 0xEF
+        0       294      +294  <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&[u8]>
+        0       277      +277  xml_minifier::audit::wellformed::scan_qname
+        0       267      +267  <std::hash::random::DefaultHasher as core::hash::Hasher>::write
+       64       322      +258  compare_bytes(lhs as _, rhs as _, size) == 0
+        0       239      +239  <xml_minifier::audit::namespaces::Namespaces>::declare
+        0       212      +212  let byte = bytes[index];
+        0       196      +196  <counts for unidentified lines in /home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/xml-minifier/src/audit/wellfo
+        0       138      +138  xml_minifier::audit::wellformed::push_normalized_value
+        0       128      +128  <counts for unidentified lines in /home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/xml-minifier/src/audit.rs>
+        0       124      +124  <xml_minifier::audit::namespaces::Namespaces>::close_scope
+      846       963      +117  xml_minifier::audit::verify_with_policy
+      413       528      +115  }
+        1       109      +108   &Self) -> bool { *self <  *other }
+        1       109      +108  if self.start < self.end {
+       54       159      +105  __memcpy_avx_unaligned_erms
+      132       231       +99  free
+        0        94       +94  <xml_minifier::audit::namespaces::Namespaces>::new
+        0        90       +90  :size_of::<T>() as u32 * 8)) }
+        0        88       +88  <hashbrown::raw::RawTable<(u64, usize)>>::reserve_rehash::<hashbrown::map::make_hasher<u64, usize, core::hash::BuildHasherDefault<xml_minifi
+      112       198       +86  malloc
+       15        97       +82  self.len = len + 1;
+        0        81       +81  <xml_minifier::audit::namespaces::Namespaces>::resolve_indexed
+      200       280       +80  <alloc::raw_vec::RawVecInner>::finish_grow
+        0        79       +79  <xml_minifier::audit::namespaces::Namespaces>::check_prefixed_tag
+       41       119       +78  Self {
+        8        76       +68  <counts for unidentified lines in /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/
+        0        66       +66  <hashbrown::map::HashMap<u64, usize, core::hash::BuildHasherDefault<xml_minifier::audit::namespaces::PassThrough>>>::insert
+        0        63       +63  <hashbrown::raw::RawTable<(u64, usize)>>::remove_entry::<hashbrown::map::equivalent_key<u64, u64, usize>::{closure#0}>
+        0        61       +61  :wrapping_add(self, rhs)
+        0        57       +57  <counts for unidentified lines in /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/hash/
+       12        66       +54  if self < slice.len() {
+        0        53       +53  (byte < 0x20 && !matches!(byte, b'\t' | b'\n' | b'\r'))
+       12        63       +51  accum = f(accum, x)?;
+        0        45       +45  xml_minifier::audit::wellformed::scan_characters
+        0        45       +45  match value[cursor] {
+      105       150       +45  match self {
+        0        41       +41  core::ptr::drop_glue::<xml_minifier::audit::State>
+        0        32       +32  :from(inner[cursor])] {
+        0        30       +30  while class(cursor) & NAME_CHAR != 0 {
+        0        27       +27  fn check_start(
+        0        27       +27  $v0 = $v0.wrapping_add($v1);
+        0        27       +27  $v2 = $v2.wrapping_add($v3);
+       36        63       +27  __rustc::__rdl_alloc
+        0        24       +24  check_start(raw, false, start, policy, state)?;
+        0        24       +24  <counts for unidentified lines in /home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps/crates/xml-minifier/src/audit/namesp
+        0        24       +24  if i + 1 < len {
+       79       101       +22  :saturating_add(self, rhs)
+       40        61       +21  :mul_with_overflow(self as $ActualT, rhs as $ActualT);
+        0        21       +21  :scan_qname(inner, 0, false);
+        0        20       +20  pub(super) fn scan_qname(
+       44        24       -20  if predicate(x) {
+       32         0       -32  while cursor < inner.len() && !is_space(inner[cursor]) && inner[cursor] != b'=' {
+       37         0       -37  while cursor < inner.len() && inner[cursor] != quote {
+       45         0       -45  <counts for unidentified lines in /home/zhuhe/code/litchi-worktrees/0750-before-src/crates/xml-minifier/src/audit.rs>
+      256         0      -256  xml_minifier::audit::check_attribute_layout

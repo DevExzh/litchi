@@ -1,0 +1,12 @@
+Change 0750: what the audit probe's two pair cases return on each leg
+(a throwaway program, same edit as probe/audit/src/main.rs's edited(), built against each leg's xml-minifier)
+
+before:
+  docx-drawing-288KB.xml: edit at 146043: Err(Replacement(Encoding { valid_up_to: 146044 }))
+  ws-structured-1.5MB.xml: edit at 779231: Ok(Window { original: 779228..779237, replacement: 779228..779237 })
+after:
+  docx-drawing-288KB.xml: edit at 146043: Err(Replacement(Encoding { valid_up_to: 146044 }))
+  ws-structured-1.5MB.xml: edit at 779231: Ok(Window { original: 779228..779237, replacement: 779228..779237 })
+
+The docx edit replaces the first byte of a two-byte UTF-8 character (U+041C) with '7', so pair/docx-drawing
+times the original's complete audit followed by the replacement's refusal, identically on both legs.

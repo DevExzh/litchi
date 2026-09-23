@@ -1,0 +1,17 @@
+round=1 slot=1 arm=A exit=0
+round=1 slot=2 arm=B exit=0
+round=1 slot=3 arm=B exit=0
+round=1 slot=4 arm=A exit=0
+round=2 slot=1 arm=A exit=0
+round=2 slot=2 arm=B exit=0
+round=2 slot=3 arm=B exit=0
+round=2 slot=4 arm=A exit=0
+round=3 slot=1 arm=A exit=0
+round=3 slot=2 arm=B exit=0
+round=3 slot=3 arm=B exit=0
+round=3 slot=4 arm=A exit=0
+round=4 slot=1 arm=A exit=0
+round=4 slot=2 arm=B exit=0
+round=4 slot=3 arm=B exit=0
+round=4 slot=4 arm=A exit=0
+done

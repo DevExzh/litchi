@@ -1,0 +1,49 @@
+Change 0750: harness callgrind isolation pairs (scripts/callgrind_pairs.sh).
+Each leg's harness binary ran each case under valgrind --tool=callgrind, pinned
+to core 24, with --samples 1 and --samples 3 and --warmup 0. Half the
+difference of the two program totals is one sample: the timed operation plus
+the harness's per-sample preparation and output checks, which the timer
+excludes. Corpus construction and the harness's own gates cancel. Program
+totals only: the harness is built with LTO, which inlines the audit.
+
+case                   before s1       before s3        after s1        after s3   before/sample    after/sample  delta/sample    change
+sb_one_medium     11,073,811,940  13,403,153,845  11,110,740,809  13,440,199,303 1,164,670,952.5 1,164,729,247.0     +58,294.5   +0.005%
+sb_one_dense      16,334,773,865  19,769,747,459  16,406,928,483  19,855,844,533 1,717,486,797.0 1,724,458,025.0  +6,971,228.0   +0.406%
+docx_sb_one       15,875,426,787  18,906,278,290  15,910,538,025  18,947,150,545 1,515,425,751.5 1,518,306,260.0  +2,880,508.5   +0.190%
+pptx_sb_one       15,538,803,060  19,885,625,610  15,577,103,883  19,922,505,343 2,173,411,275.0 2,172,700,730.0    -710,545.0   -0.033%
+
+cases: sb_one_medium = xlsx_source_backed_cell_values_one_edit_save --xlsx-cell-crud-shape medium;
+       sb_one_dense  = the same case with --xlsx-cell-crud-shape dense-sparse;
+       docx_sb_one   = docx_source_backed_one_edit_save;
+       pptx_sb_one   = pptx_source_backed_one_edit_save.
+Every run exited 0 (status.txt). Output digests of the s3 runs are identical across legs:
+  sb_one_medium   identical 9b7b66a02007eeb6
+  sb_one_dense    identical 6bcafbdb87472762
+  docx_sb_one     identical 9af99bf7f63aac1f
+  pptx_sb_one     identical bcfd05dc75900511
+
+Attribution to the auditor (scripts/cg_attribute.py): inclusive instructions of each
+xml_minifier::audit::verify* entry point per sample, at --samples 3 minus --samples 1, halved.
+Entry points under 50,000 instructions per sample on both legs are omitted (they run once per
+process, in corpus construction or the harness's gates).
+
+case           entry point                                        before/sample    after/sample        delta   change
+sb_one_medium  verify_source_replacement                              6,837,808       7,585,362     +747,554   +10.9%
+sb_one_dense   verify_source_replacement                             48,068,156      53,180,802   +5,112,647   +10.6%
+docx_sb_one    verify_source                                          1,240,511       1,516,649     +276,138   +22.3%
+docx_sb_one    verify_source_replacement                              1,315,528       1,604,206     +288,677   +21.9%
+docx_sb_one    verify_with_policy                                     1,240,503       1,516,642     +276,139   +22.3%
+pptx_sb_one    verify_source_replacement                                200,740         243,952      +43,213   +21.5%
+
+Callers per sample (callgrind_annotate --tree=caller): docx_sb_one's verify_source is called once per
+sample by litchi_docx::document::transaction::Edit::commit (the publication_accepts_preserved_xml
+gate) and its verify_source_replacement once by litchi_opc::source_backed::
+SourceBackedPackage::write_single_part_overlay_to_stream; the eager writer's audit_published_xml
+(16 calls) runs only outside the samples; verify_with_policy is verify_source's callee, so its
+row repeats the verify_source row. The xlsx cases' verify_source_replacement is called by
+SourceBackedPackage::write_topology_to_stream and pptx's by write_single_part_overlay_to_stream.
+
+The audit's per-sample change is smaller than the program-total change for sb_one_dense and
+docx_sb_one and larger for sb_one_medium and pptx_sb_one: the program totals of unchanged code
+differ between processes by up to about 2 million instructions per sample (hash seeds, heap
+layout), so only the entry-point figures above measure the audit.

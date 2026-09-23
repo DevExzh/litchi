@@ -1,0 +1,1973 @@
+[
+  {
+    "case": "authored/tiny-fragment",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 0.2,
+    "after_us": 0.19,
+    "change_pct": -6.13
+  },
+  {
+    "case": "authored/tiny-fragment",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 0.2,
+    "after_us": 0.19,
+    "change_pct": -7.25
+  },
+  {
+    "case": "authored/tiny-fragment",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 0.2,
+    "after_us": 0.19,
+    "change_pct": -6.22
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 610.92,
+    "after_us": 726.14,
+    "change_pct": 18.86
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 615.29,
+    "after_us": 727.75,
+    "change_pct": 18.28
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 611.62,
+    "after_us": 726.09,
+    "change_pct": 18.72
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 600.79,
+    "after_us": 723.21,
+    "change_pct": 20.38
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 609.9,
+    "after_us": 735.35,
+    "change_pct": 20.57
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 600.84,
+    "after_us": 726.06,
+    "change_pct": 20.84
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 622.62,
+    "after_us": 722.0,
+    "change_pct": 15.96
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 624.63,
+    "after_us": 724.0,
+    "change_pct": 15.91
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 623.09,
+    "after_us": 722.42,
+    "change_pct": 15.94
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 614.76,
+    "after_us": 721.44,
+    "change_pct": 17.35
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 616.15,
+    "after_us": 722.64,
+    "change_pct": 17.28
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 614.73,
+    "after_us": 721.32,
+    "change_pct": 17.34
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 613.35,
+    "after_us": 722.29,
+    "change_pct": 17.76
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 616.19,
+    "after_us": 726.8,
+    "change_pct": 17.95
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 609.0,
+    "after_us": 721.84,
+    "change_pct": 18.53
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 613.47,
+    "after_us": 727.45,
+    "change_pct": 18.58
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 619.59,
+    "after_us": 732.82,
+    "change_pct": 18.27
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 613.99,
+    "after_us": 728.2,
+    "change_pct": 18.6
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 616.89,
+    "after_us": 726.54,
+    "change_pct": 17.77
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 627.31,
+    "after_us": 739.95,
+    "change_pct": 17.96
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 615.4,
+    "after_us": 727.87,
+    "change_pct": 18.28
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 621.13,
+    "after_us": 717.81,
+    "change_pct": 15.57
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 624.91,
+    "after_us": 723.44,
+    "change_pct": 15.77
+  },
+  {
+    "case": "pair/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 620.68,
+    "after_us": 719.04,
+    "change_pct": 15.85
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4629.6,
+    "after_us": 5118.27,
+    "change_pct": 10.56
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4641.87,
+    "after_us": 5124.95,
+    "change_pct": 10.41
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4629.65,
+    "after_us": 5114.28,
+    "change_pct": 10.47
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4584.54,
+    "after_us": 5049.82,
+    "change_pct": 10.15
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4628.87,
+    "after_us": 5154.3,
+    "change_pct": 11.35
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4576.81,
+    "after_us": 5063.25,
+    "change_pct": 10.63
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4594.57,
+    "after_us": 5074.0,
+    "change_pct": 10.43
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4606.58,
+    "after_us": 5175.33,
+    "change_pct": 12.35
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4599.64,
+    "after_us": 5085.76,
+    "change_pct": 10.57
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4557.52,
+    "after_us": 5002.67,
+    "change_pct": 9.77
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4577.58,
+    "after_us": 5039.8,
+    "change_pct": 10.1
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4558.87,
+    "after_us": 5012.95,
+    "change_pct": 9.96
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4551.91,
+    "after_us": 5076.79,
+    "change_pct": 11.53
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4561.31,
+    "after_us": 5104.8,
+    "change_pct": 11.92
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4550.71,
+    "after_us": 5078.0,
+    "change_pct": 11.59
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4576.99,
+    "after_us": 5173.75,
+    "change_pct": 13.04
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4805.94,
+    "after_us": 5223.53,
+    "change_pct": 8.69
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4658.9,
+    "after_us": 5215.13,
+    "change_pct": 11.94
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4606.69,
+    "after_us": 5083.66,
+    "change_pct": 10.35
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4647.73,
+    "after_us": 5087.97,
+    "change_pct": 9.47
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4608.74,
+    "after_us": 5088.0,
+    "change_pct": 10.4
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4585.35,
+    "after_us": 5029.37,
+    "change_pct": 9.68
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4666.86,
+    "after_us": 5038.12,
+    "change_pct": 7.96
+  },
+  {
+    "case": "pair/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4596.31,
+    "after_us": 5037.03,
+    "change_pct": 9.59
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 96350.01,
+    "after_us": 108393.49,
+    "change_pct": 12.5
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 96564.46,
+    "after_us": 109762.42,
+    "change_pct": 13.67
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 96235.42,
+    "after_us": 108703.86,
+    "change_pct": 12.96
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 96295.45,
+    "after_us": 108695.85,
+    "change_pct": 12.88
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 96906.14,
+    "after_us": 109559.75,
+    "change_pct": 13.06
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 96191.24,
+    "after_us": 108749.21,
+    "change_pct": 13.06
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 95197.91,
+    "after_us": 108108.12,
+    "change_pct": 13.56
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 95882.31,
+    "after_us": 108784.19,
+    "change_pct": 13.46
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 95192.62,
+    "after_us": 108103.37,
+    "change_pct": 13.56
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 95639.25,
+    "after_us": 108294.65,
+    "change_pct": 13.23
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 96220.61,
+    "after_us": 108969.72,
+    "change_pct": 13.25
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 95655.75,
+    "after_us": 108431.16,
+    "change_pct": 13.36
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 95295.38,
+    "after_us": 109410.81,
+    "change_pct": 14.81
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 95668.61,
+    "after_us": 109885.01,
+    "change_pct": 14.86
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 95267.41,
+    "after_us": 109343.88,
+    "change_pct": 14.78
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 95954.01,
+    "after_us": 108217.93,
+    "change_pct": 12.78
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 96326.06,
+    "after_us": 108904.96,
+    "change_pct": 13.06
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 95574.31,
+    "after_us": 108155.97,
+    "change_pct": 13.16
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 95604.8,
+    "after_us": 108535.84,
+    "change_pct": 13.53
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 95991.4,
+    "after_us": 109084.06,
+    "change_pct": 13.64
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 95601.5,
+    "after_us": 108535.15,
+    "change_pct": 13.53
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 95220.16,
+    "after_us": 108209.55,
+    "change_pct": 13.64
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 95542.06,
+    "after_us": 108798.31,
+    "change_pct": 13.87
+  },
+  {
+    "case": "source/corpus-accepted",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 94954.63,
+    "after_us": 108053.71,
+    "change_pct": 13.8
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 566.92,
+    "after_us": 635.86,
+    "change_pct": 12.16
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 577.15,
+    "after_us": 638.12,
+    "change_pct": 10.56
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 568.5,
+    "after_us": 636.57,
+    "change_pct": 11.97
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 570.15,
+    "after_us": 633.72,
+    "change_pct": 11.15
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 571.67,
+    "after_us": 635.22,
+    "change_pct": 11.12
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 570.21,
+    "after_us": 633.87,
+    "change_pct": 11.17
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 563.05,
+    "after_us": 635.17,
+    "change_pct": 12.81
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 575.91,
+    "after_us": 636.42,
+    "change_pct": 10.51
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 564.76,
+    "after_us": 635.77,
+    "change_pct": 12.57
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 571.02,
+    "after_us": 639.15,
+    "change_pct": 11.93
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 574.48,
+    "after_us": 663.59,
+    "change_pct": 15.51
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 571.68,
+    "after_us": 643.22,
+    "change_pct": 12.51
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 559.8,
+    "after_us": 636.82,
+    "change_pct": 13.76
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 564.28,
+    "after_us": 638.38,
+    "change_pct": 13.13
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 560.1,
+    "after_us": 636.93,
+    "change_pct": 13.72
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 569.46,
+    "after_us": 655.43,
+    "change_pct": 15.1
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 574.86,
+    "after_us": 659.66,
+    "change_pct": 14.75
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 571.29,
+    "after_us": 656.41,
+    "change_pct": 14.9
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 562.72,
+    "after_us": 637.18,
+    "change_pct": 13.23
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 572.84,
+    "after_us": 649.52,
+    "change_pct": 13.39
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 564.03,
+    "after_us": 638.54,
+    "change_pct": 13.21
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 561.33,
+    "after_us": 636.78,
+    "change_pct": 13.44
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 569.94,
+    "after_us": 639.14,
+    "change_pct": 12.14
+  },
+  {
+    "case": "source/docx-drawing-288KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 563.32,
+    "after_us": 637.66,
+    "change_pct": 13.2
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 71.86,
+    "after_us": 82.49,
+    "change_pct": 14.8
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 72.04,
+    "after_us": 82.78,
+    "change_pct": 14.91
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 71.87,
+    "after_us": 82.28,
+    "change_pct": 14.48
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 71.82,
+    "after_us": 82.03,
+    "change_pct": 14.22
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 72.07,
+    "after_us": 82.46,
+    "change_pct": 14.4
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 71.89,
+    "after_us": 82.13,
+    "change_pct": 14.25
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 71.63,
+    "after_us": 82.77,
+    "change_pct": 15.55
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 71.99,
+    "after_us": 83.26,
+    "change_pct": 15.67
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 71.72,
+    "after_us": 82.3,
+    "change_pct": 14.76
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 71.39,
+    "after_us": 82.64,
+    "change_pct": 15.76
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 71.65,
+    "after_us": 83.98,
+    "change_pct": 17.21
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 71.45,
+    "after_us": 82.79,
+    "change_pct": 15.87
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 70.35,
+    "after_us": 81.97,
+    "change_pct": 16.51
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 70.54,
+    "after_us": 82.84,
+    "change_pct": 17.43
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 70.34,
+    "after_us": 82.21,
+    "change_pct": 16.87
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 72.22,
+    "after_us": 83.96,
+    "change_pct": 16.25
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 72.47,
+    "after_us": 84.6,
+    "change_pct": 16.74
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 72.34,
+    "after_us": 84.05,
+    "change_pct": 16.2
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 71.3,
+    "after_us": 81.99,
+    "change_pct": 14.99
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 71.48,
+    "after_us": 83.47,
+    "change_pct": 16.76
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 71.38,
+    "after_us": 82.15,
+    "change_pct": 15.09
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 72.1,
+    "after_us": 82.47,
+    "change_pct": 14.39
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 73.41,
+    "after_us": 83.61,
+    "change_pct": 13.89
+  },
+  {
+    "case": "source/docx-table-alignment-40KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 72.23,
+    "after_us": 82.8,
+    "change_pct": 14.64
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 302.09,
+    "after_us": 333.39,
+    "change_pct": 10.36
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 302.57,
+    "after_us": 334.24,
+    "change_pct": 10.47
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 302.06,
+    "after_us": 333.32,
+    "change_pct": 10.35
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 308.78,
+    "after_us": 330.46,
+    "change_pct": 7.02
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 309.45,
+    "after_us": 331.62,
+    "change_pct": 7.16
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 308.47,
+    "after_us": 330.95,
+    "change_pct": 7.29
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 308.97,
+    "after_us": 331.5,
+    "change_pct": 7.29
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 309.78,
+    "after_us": 332.11,
+    "change_pct": 7.21
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 308.26,
+    "after_us": 331.68,
+    "change_pct": 7.6
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 306.99,
+    "after_us": 332.79,
+    "change_pct": 8.41
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 307.63,
+    "after_us": 336.58,
+    "change_pct": 9.41
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 305.09,
+    "after_us": 332.11,
+    "change_pct": 8.86
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 306.85,
+    "after_us": 333.05,
+    "change_pct": 8.54
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 307.47,
+    "after_us": 335.03,
+    "change_pct": 8.96
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 306.34,
+    "after_us": 333.41,
+    "change_pct": 8.84
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 308.67,
+    "after_us": 333.73,
+    "change_pct": 8.12
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 316.02,
+    "after_us": 335.55,
+    "change_pct": 6.18
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 307.81,
+    "after_us": 333.85,
+    "change_pct": 8.46
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 310.21,
+    "after_us": 336.22,
+    "change_pct": 8.39
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 316.48,
+    "after_us": 336.93,
+    "change_pct": 6.46
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 310.52,
+    "after_us": 336.43,
+    "change_pct": 8.34
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 302.75,
+    "after_us": 327.05,
+    "change_pct": 8.03
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 303.42,
+    "after_us": 334.11,
+    "change_pct": 10.12
+  },
+  {
+    "case": "source/pptx-slide11-121KB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 302.99,
+    "after_us": 327.83,
+    "change_pct": 8.2
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 85.79
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 84.97
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 89.66
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 86.77
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 86.68
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 86.71
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 99.31
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 0.23,
+    "after_us": 0.44,
+    "change_pct": 91.3
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 95.58
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 0.24,
+    "after_us": 0.43,
+    "change_pct": 82.83
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 0.24,
+    "after_us": 0.43,
+    "change_pct": 82.21
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 0.24,
+    "after_us": 0.43,
+    "change_pct": 83.76
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 96.87
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 0.23,
+    "after_us": 0.44,
+    "change_pct": 88.17
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 93.57
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 0.24,
+    "after_us": 0.43,
+    "change_pct": 77.89
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 0.25,
+    "after_us": 0.44,
+    "change_pct": 77.79
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 0.24,
+    "after_us": 0.43,
+    "change_pct": 77.92
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 93.7
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 93.34
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 0.22,
+    "after_us": 0.43,
+    "change_pct": 93.51
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 88.86
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 88.89
+  },
+  {
+    "case": "source/tiny-document",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 0.23,
+    "after_us": 0.43,
+    "change_pct": 89.0
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 12770.61,
+    "after_us": 13609.67,
+    "change_pct": 6.57
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 12827.33,
+    "after_us": 13649.11,
+    "change_pct": 6.41
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 12742.55,
+    "after_us": 13610.92,
+    "change_pct": 6.81
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 12417.02,
+    "after_us": 13584.03,
+    "change_pct": 9.4
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 12432.17,
+    "after_us": 13604.86,
+    "change_pct": 9.43
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 12423.25,
+    "after_us": 13597.69,
+    "change_pct": 9.45
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 12286.15,
+    "after_us": 13724.78,
+    "change_pct": 11.71
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 12513.13,
+    "after_us": 13951.91,
+    "change_pct": 11.5
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 12323.9,
+    "after_us": 13764.1,
+    "change_pct": 11.69
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 12442.31,
+    "after_us": 13668.56,
+    "change_pct": 9.86
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 12457.15,
+    "after_us": 13895.76,
+    "change_pct": 11.55
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 12447.63,
+    "after_us": 13700.09,
+    "change_pct": 10.06
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 12414.27,
+    "after_us": 13638.16,
+    "change_pct": 9.86
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 12453.51,
+    "after_us": 13665.2,
+    "change_pct": 9.73
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 12375.32,
+    "after_us": 13653.22,
+    "change_pct": 10.33
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 12443.17,
+    "after_us": 14456.95,
+    "change_pct": 16.18
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 12667.07,
+    "after_us": 14590.9,
+    "change_pct": 15.19
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 12482.81,
+    "after_us": 14469.85,
+    "change_pct": 15.92
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 12361.58,
+    "after_us": 13716.71,
+    "change_pct": 10.96
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 12404.88,
+    "after_us": 13745.55,
+    "change_pct": 10.81
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 12315.83,
+    "after_us": 13731.89,
+    "change_pct": 11.5
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 12461.07,
+    "after_us": 13598.79,
+    "change_pct": 9.13
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 12636.52,
+    "after_us": 13808.07,
+    "change_pct": 9.27
+  },
+  {
+    "case": "source/ws-patriarch-3.4MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 12488.16,
+    "after_us": 13626.02,
+    "change_pct": 9.11
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4384.49,
+    "after_us": 4736.05,
+    "change_pct": 8.02
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4412.85,
+    "after_us": 4749.46,
+    "change_pct": 7.63
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4388.49,
+    "after_us": 4736.7,
+    "change_pct": 7.93
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4309.96,
+    "after_us": 4719.89,
+    "change_pct": 9.51
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4321.99,
+    "after_us": 4725.46,
+    "change_pct": 9.34
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 1,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4307.49,
+    "after_us": 4719.37,
+    "change_pct": 9.56
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4322.91,
+    "after_us": 4745.54,
+    "change_pct": 9.78
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4410.5,
+    "after_us": 4832.94,
+    "change_pct": 9.58
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4330.88,
+    "after_us": 4757.83,
+    "change_pct": 9.86
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4314.34,
+    "after_us": 4764.71,
+    "change_pct": 10.44
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4327.54,
+    "after_us": 4843.06,
+    "change_pct": 11.91
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 2,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4314.52,
+    "after_us": 4773.48,
+    "change_pct": 10.64
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4336.88,
+    "after_us": 4729.97,
+    "change_pct": 9.06
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4345.33,
+    "after_us": 4820.29,
+    "change_pct": 10.93
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4337.31,
+    "after_us": 4741.32,
+    "change_pct": 9.31
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4323.75,
+    "after_us": 5082.65,
+    "change_pct": 17.55
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4338.51,
+    "after_us": 5107.76,
+    "change_pct": 17.73
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4328.88,
+    "after_us": 5023.07,
+    "change_pct": 16.04
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "median",
+    "before_us": 4317.45,
+    "after_us": 4755.52,
+    "change_pct": 10.15
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "p95",
+    "before_us": 4332.69,
+    "after_us": 4832.66,
+    "change_pct": 11.54
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "1-2",
+    "metric": "mean",
+    "before_us": 4318.93,
+    "after_us": 4764.08,
+    "change_pct": 10.31
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "median",
+    "before_us": 4320.13,
+    "after_us": 4725.29,
+    "change_pct": 9.38
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_us": 4331.81,
+    "after_us": 4732.93,
+    "change_pct": 9.26
+  },
+  {
+    "case": "source/ws-structured-1.5MB.xml",
+    "round": 4,
+    "pair": "4-3",
+    "metric": "mean",
+    "before_us": 4322.84,
+    "after_us": 4723.47,
+    "change_pct": 9.27
+  }
+]

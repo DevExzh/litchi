@@ -1,0 +1,8 @@
+seed1.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 29.05s
+seed2.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 28.94s
+seed3.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 28.81s
+seed4.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 16.21s
+seed5.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 14.29s
+seed6.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 14.30s
+seed7.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 14.28s
+seed8.log: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 14.30s
